@@ -68,7 +68,8 @@ const saving = computed(() => busy.value === "create" || busy.value === "connect
 
 watch(headers, (rows) => {
   for (let index = rows.length - 2; index >= 0; index--) {
-    if (rows[index].key.trim() === "") rows.splice(index, 1);
+    const row = rows[index];
+    if (row && row.key.trim() === "") rows.splice(index, 1);
   }
   const last = rows[rows.length - 1];
   if (!last || last.key.trim() !== "") rows.push({ key: "", value: "" });
@@ -76,7 +77,8 @@ watch(headers, (rows) => {
 
 watch(models, (rows) => {
   for (let index = rows.length - 2; index >= 0; index--) {
-    if (rows[index].model.trim() === "") rows.splice(index, 1);
+    const row = rows[index];
+    if (row && row.model.trim() === "") rows.splice(index, 1);
   }
   const last = rows[rows.length - 1];
   if (!last || last.model.trim() !== "") rows.push({ model: "", alias: "", aliased: false });

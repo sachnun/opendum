@@ -23,7 +23,7 @@ import {
   quotaPercentRemaining,
   stripStatusFromErrorMessage,
   type StatMetric,
-} from "./provider-account-card";
+} from "./account-display";
 
 describe("provider account card helpers", () => {
   it("formats durations and numbers", () => {

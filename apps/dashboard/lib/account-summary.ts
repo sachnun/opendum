@@ -1,12 +1,12 @@
 import type {
   ModelFamilyCounts,
-  NavSubItem,
   ProviderAccountCounts,
   ProviderAccountIndicator,
   ProviderAccountIndicators,
 } from "./navigation";
 import type { AccountOverviewData, AccountOverviewDeltaData, AccountOverviewResponse, AccountPingData } from "./api-types";
 import { MODEL_FAMILY_NAV_ITEMS, categorizeModelFamily } from "./model-families";
+import { PROVIDER_ACCOUNT_DEFINITIONS } from "./provider-accounts";
 
 export interface ShellAccountSummary {
   accountCounts: ProviderAccountCounts;
@@ -77,16 +77,4 @@ export function normalizeModelFamilyCounts(counts: Record<string, number>) {
   }
 
   return nextCounts;
-}
-
-export function subItemHref(subItem: NavSubItem) {
-  if (subItem.anchorId) {
-    return `${subItem.href}#${subItem.anchorId}`;
-  }
-
-  return subItem.href;
-}
-
-export function isSwitchSubItem(subItem: NavSubItem) {
-  return subItem.control === "switch";
 }

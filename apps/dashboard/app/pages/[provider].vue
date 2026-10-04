@@ -905,7 +905,8 @@ function openSettings() {
 watch(() => settingsForm.value?.headers, (rows) => {
   if (!rows) return;
   for (let index = rows.length - 2; index >= 0; index--) {
-    if (rows[index].key.trim() === "") rows.splice(index, 1);
+    const row = rows[index];
+    if (row && row.key.trim() === "") rows.splice(index, 1);
   }
   const last = rows[rows.length - 1];
   if (!last || last.key.trim() !== "") rows.push({ key: "", value: "" });
@@ -914,7 +915,8 @@ watch(() => settingsForm.value?.headers, (rows) => {
 watch(() => settingsForm.value?.models, (rows) => {
   if (!rows) return;
   for (let index = rows.length - 2; index >= 0; index--) {
-    if (rows[index].model.trim() === "") rows.splice(index, 1);
+    const row = rows[index];
+    if (row && row.model.trim() === "") rows.splice(index, 1);
   }
   const last = rows[rows.length - 1];
   if (!last || last.model.trim() !== "") rows.push({ model: "", alias: "", aliased: false });
@@ -1069,7 +1071,7 @@ function decodeAccountHash(hash: string): string | null {
             v-for="model in orderedSupportedModels"
             :key="model"
             variant="secondary"
-            :class="['text-xs font-normal', freeSupportedModelIds === null || freeSupportedModelIds.has(model) ? '' : 'opacity-40']"
+            :class="freeSupportedModelIds === null || freeSupportedModelIds.has(model) ? 'text-xs font-normal' : 'text-xs font-normal opacity-40'"
           >
             {{ model }}
           </UiBadge>

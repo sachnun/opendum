@@ -5,14 +5,12 @@ import {
   toShellAccountSummary,
   isAccountOverviewDelta,
   normalizeModelFamilyCounts,
-  subItemHref,
-  isSwitchSubItem,
   type ShellAccountSummary,
-} from "~~/lib/dashboard-shell";
+} from "~~/lib/account-summary";
 
 import type { NavItem, NavSubItem, ProviderAccountIndicator } from "../../lib/navigation";
 import type { AccountOverviewData, AccountOverviewResponse, MeData, PointStatusData } from "../../lib/api-types";
-import { primaryNavigation } from "../../lib/navigation";
+import { isSwitchSubItem, primaryNavigation, subItemHref } from "../../lib/navigation";
 import { signOut, useSession } from "../../lib/auth-client";
 import { buildProviderHrefMap, getProviderAccountPath, PROVIDER_ACCOUNT_DEFINITIONS } from "../../lib/provider-accounts";
 import { avatarUrl } from "../../lib/utils";
@@ -608,7 +606,7 @@ function schedulePrefetch() {
     return;
   }
 
-  window.setTimeout(run, 1500);
+  setTimeout(run, 1500);
 }
 
 function handleVisibilityChange() {

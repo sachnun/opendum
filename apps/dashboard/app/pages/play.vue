@@ -1158,7 +1158,9 @@ async function fetchFromModel(panelId: string, modelId: string, scenario: Scenar
     }
 
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    const errorProvider = provider ?? (accountId ? providerAccountsById.value.get(accountId)?.provider ?? null : null) ?? (usedAccountId ? providerAccountsById.value.get(usedAccountId)?.provider ?? null : null);
+    const providerByAccount = accountId ? providerAccountsById.value.get(accountId)?.provider ?? null : null;
+    const providerByUsedAccount = usedAccountId ? providerAccountsById.value.get(usedAccountId)?.provider ?? null : null;
+    const errorProvider = provider ?? providerByAccount ?? providerByUsedAccount ?? null;
     const errorDetails = buildPlaygroundErrorMessage(errorMessage, { model: modelId, provider: errorProvider, endpoint: currentSettings.endpoint, parameters: errorContextParameters, messages });
     setResponseIfCurrent(panelId, requestId, { content: "", reasoning: "", toolCalls: [], isLoading: false, error: errorMessage, errorDetails, metrics: buildResponseMetrics(waitMs, null, null), usedAccountId });
     return "error";
@@ -1635,7 +1637,7 @@ async function copyPanelError(panelId: string) {
           </UiCardHeader>
 
           <UiCardContent class="flex min-h-0 flex-1 flex-col overflow-hidden p-0">
-            <div :ref="(element) => setPanelScrollElement(panel.id, element)" class="min-h-0 flex-1 overflow-y-auto bg-background/20 p-3" @scroll="handlePanelScroll(panel.id, $event)">
+            <div :ref="(element: unknown) => setPanelScrollElement(panel.id, element)" class="min-h-0 flex-1 overflow-y-auto bg-background/20 p-3" @scroll="handlePanelScroll(panel.id, $event)">
               <template v-if="getScenarioConversationMessages(panel.id).length > 0">
                 <pre v-if="getPanelSystemPromptText(panel.id)" class="mb-2 whitespace-pre-wrap font-sans text-[11px] leading-relaxed text-muted-foreground">{{ getPanelSystemPromptText(panel.id) }}</pre>
 

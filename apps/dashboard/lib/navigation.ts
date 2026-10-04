@@ -58,3 +58,15 @@ export const primaryNavigation: NavItem[] = [
     })),
   },
 ];
+
+export function subItemHref(subItem: NavSubItem): string {
+  if (subItem.anchorId) {
+    return `${subItem.href}#${subItem.anchorId}`;
+  }
+
+  return subItem.href;
+}
+
+export function isSwitchSubItem(subItem: NavSubItem): boolean {
+  return subItem.control === "switch";
+}

@@ -30,14 +30,14 @@ import {
   getErrorEntryRelativeTime,
   getErrorEntryPreview,
   getErrorEntryStatusTag,
-} from "~~/lib/provider-account-card";
+} from "~~/lib/account-display";
 import type {
   StatDeltaTone,
   StatMetric,
   DurationPoint,
   ErrorPreviewEntry,
   Account,
-} from "~~/lib/provider-account-card";
+} from "~~/lib/account-display";
 
 import type { AccountQuotaInfo, ErrorHistoryResult, ProviderAccountUpdateData, ProviderDetailData, QuotaGroupDisplay } from "~~/lib/api-types";
 import { QUOTA_PROVIDER_KEYS } from "~~/lib/provider-accounts";

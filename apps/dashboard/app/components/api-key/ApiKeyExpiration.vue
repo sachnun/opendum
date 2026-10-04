@@ -126,16 +126,17 @@ async function saveExpiration(value: Date | null) {
       <div class="space-y-3 p-3">
         <div class="space-y-1.5">
           <p class="text-xs font-medium text-muted-foreground">Expiration date</p>
-          <UiCalendar v-model="draftDate" :is-date-disabled="isPastDate" class="border-0 p-0" />
+          <UiCalendar :is-date-disabled="isPastDate" class="border-0 p-0" :model-value="draftDate as never" @update:model-value="draftDate = $event as never" />
         </div>
         <div class="space-y-1.5">
           <p class="text-xs font-medium text-muted-foreground">Expiration time</p>
           <TimeFieldRoot
             v-slot="{ segments }"
-            v-model="draftTime"
+            :model-value="draftTime as never"
             granularity="minute"
             :hour-cycle="24"
             class="inline-flex h-9 items-center rounded-md border border-input bg-background px-3 text-sm outline-none focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50"
+            @update:model-value="draftTime = $event as never"
           >
             <template v-for="segment in segments" :key="segment.part">
               <TimeFieldInput

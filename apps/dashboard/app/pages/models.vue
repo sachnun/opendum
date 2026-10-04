@@ -368,7 +368,7 @@ watch(
                     v-for="provider in model.providers"
                     :key="provider"
                     variant="outline"
-                    :class="['text-[10px] font-normal', isLinked(model) ? '' : 'border-border/60 text-muted-foreground opacity-70']"
+                    :class="isLinked(model) ? 'text-[10px] font-normal' : 'text-[10px] font-normal border-border/60 text-muted-foreground opacity-70'"
                   >
                     {{ getProviderLabel(provider) }}
                   </UiBadge>

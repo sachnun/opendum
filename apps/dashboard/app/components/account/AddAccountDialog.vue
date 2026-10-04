@@ -6,13 +6,13 @@ import {
   isOAuthProvider,
   isDeviceProvider,
   callbackPlaceholder,
-} from "~~/lib/add-account-dialog";
+} from "~~/lib/provider-auth";
 import type {
   Provider,
   FlowType,
   MethodKey,
   ProviderConfig,
-} from "~~/lib/add-account-dialog";
+} from "~~/lib/provider-auth";
 
 import type { DeviceProviderKey } from "~~/lib/provider-accounts";
 import { cn } from "~~/lib/utils";
