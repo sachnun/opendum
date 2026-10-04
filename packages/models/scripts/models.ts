@@ -4,7 +4,7 @@ import { readdirSync, writeFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildModelIndex } from "#models/registry.ts";
+import { buildModelIndex, pruneDeadModelEntries } from "#models/registry.ts";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const modelsDir = resolve(scriptDir, "../data");
@@ -125,6 +125,11 @@ async function main(): Promise<void> {
 
   if (failures.length > 0) {
     process.exitCode = 1;
+  }
+
+  const pruned = pruneDeadModelEntries(modelsDir);
+  if (pruned.length > 0) {
+    console.log(`[models] pruned ${pruned.length} dead entries: ${pruned.join(", ")}`);
   }
 
   const after = snapshotProviderModels(providers);

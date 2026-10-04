@@ -293,6 +293,26 @@ export function persistModel(entry: Pick<ModelIndexEntry, "modelsDir" | "relativ
   writeSplitModel(entry.modelsDir, entry.relativeId, data);
 }
 
+function hasCuratedData(data: ModelData): boolean {
+  const authored = splitModelData(data).authored as Record<string, unknown>;
+  delete authored.ignored;
+  return Object.keys(authored).length > 0;
+}
+
+export function pruneDeadModelEntries(modelsDir: string): string[] {
+  const index = buildModelIndex(modelsDir);
+  const removed: string[] = [];
+
+  for (const entry of Object.values(index)) {
+    if ((entry.data.providers ?? []).length > 0) continue;
+    if (hasCuratedData(entry.data)) continue;
+    writeSplitModel(entry.modelsDir, entry.relativeId, {});
+    removed.push(entry.id);
+  }
+
+  return removed.sort();
+}
+
 /**
  * Sync a provider's model map into the JSON registry.
  *

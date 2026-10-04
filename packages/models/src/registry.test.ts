@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { buildModelIdMap, buildModelIndex, getProviderUpstream, syncProviderModels, writeModelJson } from "./registry.ts";
+import { buildModelIdMap, buildModelIndex, getProviderUpstream, pruneDeadModelEntries, syncProviderModels, writeGeneratedModelJson, writeModelJson } from "./registry.ts";
 import type { ModelData } from "./types.ts";
 
 function withTempDir<T>(run: (dataDir: string, generatedDir: string) => T): T {
@@ -105,6 +105,35 @@ test("syncProviderModels writes derived fields to generated only", () => {
     const generated = JSON.parse(readFileSync(join(generatedDir, "mock-model.json"), "utf-8")) as ModelData;
     assert.deepEqual(generated.providers, ["openrouter"]);
     assert.equal(generated.providerConfig?.openrouter?.upstream, "vendor/mock-model");
+  });
+});
+
+test("pruneDeadModelEntries drops uncurated dead entries and keeps the rest", () => {
+  withTempDir((dataDir, generatedDir) => {
+    writeGeneratedModelJson(join(generatedDir, "dead.json"), { providers: [] });
+    writeGeneratedModelJson(join(generatedDir, "live.json"), { providers: ["openrouter"] });
+    writeModelJson(join(dataDir, "ignored-dead.json"), { ignored: true });
+    writeModelJson(join(dataDir, "curated-dead.json"), {
+      ignored: true,
+      providerConfig: { freebuff: { agent: "base2-free" } },
+    });
+
+    assert.deepEqual(pruneDeadModelEntries(dataDir), ["dead", "ignored-dead"]);
+
+    const index = buildModelIndex(dataDir);
+    assert.equal(index["dead"], undefined);
+    assert.equal(index["ignored-dead"], undefined);
+    assert.ok(index["live"]);
+    assert.ok(index["curated-dead"]);
+  });
+});
+
+test("syncProviderModels removes the file once the last provider leaves", () => {
+  withTempDir((dataDir, generatedDir) => {
+    syncProviderModels(dataDir, "openrouter", new Map([["mock-model", "vendor/mock-model"]]));
+    syncProviderModels(dataDir, "openrouter", new Map());
+    assert.equal(buildModelIndex(dataDir)["mock-model"], undefined);
+    assert.throws(() => readFileSync(join(generatedDir, "mock-model.json")));
   });
 });
 
