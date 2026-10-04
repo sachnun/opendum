@@ -3,7 +3,8 @@
   "providers": [
     "hyper",
     "nvidia_nim",
-    "workers_ai"
+    "workers_ai",
+    "antigravity"
   ],
   "aliases": [
     "@cf-openai-gpt-oss-120b",
@@ -11,6 +12,7 @@
     "@cf/openai/gpt-oss-120b",
     "@cf/openai/gpt-oss-20b",
     "gpt-oss",
+    "gpt-oss-120b",
     "gpt-oss-120b-medium",
     "gpt-oss-20b",
     "gpt-oss-medium",
@@ -22,6 +24,11 @@
     "openai/gpt-oss-20b:free"
   ],
   "reasoning": true,
+  "reasoning_effort": [
+    "low",
+    "medium",
+    "high"
+  ],
   "modalities": {
     "input": [
       "text"
@@ -29,6 +36,15 @@
     "output": [
       "text"
     ]
+  },
+  "limit": {
+    "context": 131072,
+    "output": 16384
+  },
+  "cost": {
+    "input": 0.185,
+    "output": 0.85,
+    "cacheRead": 0.445
   },
   "scores": {
     "artificialAnalysis": {
@@ -38,14 +54,25 @@
     }
   },
   "providerConfig": {
+    "antigravity": {
+      "upstream": "gpt-oss-120b-medium",
+      "contextWindow": 131072,
+      "maxOutputTokens": 16384
+    },
     "hyper": {
-      "upstream": "gpt-oss-120b"
+      "upstream": "gpt-oss-120b",
+      "contextWindow": 131072,
+      "maxOutputTokens": 13107
     },
     "nvidia_nim": {
-      "upstream": "openai/gpt-oss-20b"
+      "upstream": "openai/gpt-oss-20b",
+      "contextWindow": 131072,
+      "maxOutputTokens": 16384
     },
     "workers_ai": {
-      "upstream": "@cf/openai/gpt-oss-120b"
+      "upstream": "@cf/openai/gpt-oss-120b",
+      "contextWindow": 128000,
+      "maxOutputTokens": 16384
     }
   }
 }

@@ -1,7 +1,12 @@
 {
+  "id": "gpt-6-sol",
   "providers": [
     "codex",
     "perch"
+  ],
+  "aliases": [
+    "gpt-6-sol-pro",
+    "gpt-6-sol-pro-batch"
   ],
   "reasoning": true,
   "reasoning_effort": [

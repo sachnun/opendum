@@ -1,7 +1,11 @@
 {
+  "id": "gpt-6.1-sol",
   "providers": [
     "codex",
     "perch"
+  ],
+  "aliases": [
+    "gpt-6.1-sol-pro"
   ],
   "reasoning": true,
   "reasoning_effort": [

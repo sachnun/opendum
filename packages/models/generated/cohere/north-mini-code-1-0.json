@@ -5,6 +5,8 @@
     "openrouter"
   ],
   "aliases": [
+    "cohere-north-mini-code:free",
+    "cohere/north-mini-code:free",
     "north-mini-code"
   ],
   "reasoning": true,

@@ -1,5 +1,16 @@
 {
   "providerConfig": {
+    "codex": {
+      "allowedTiers": [
+        "plus",
+        "pro",
+        "pro+",
+        "business",
+        "enterprise",
+        "team",
+        "student"
+      ]
+    },
     "kiro": {
       "allowedTiers": [
         "pro",

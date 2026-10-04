@@ -22,7 +22,7 @@
     ]
   },
   "limit": {
-    "context": 262144,
+    "context": 200000,
     "output": 32000
   },
   "cost": {

@@ -7,7 +7,9 @@
   ],
   "aliases": [
     "minimax-m3",
-    "minimax-m3-free"
+    "minimax-m3-free",
+    "minimax-minimax-m3",
+    "minimax/minimax-m3"
   ],
   "reasoning": true,
   "reasoning_effort": [

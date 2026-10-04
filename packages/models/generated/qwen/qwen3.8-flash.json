@@ -1,8 +1,7 @@
 {
   "providers": [
     "zenmux",
-    "hyper",
-    "harbor"
+    "hyper"
   ],
   "reasoning": true,
   "reasoning_effort": [
@@ -30,11 +29,6 @@
     "cacheWrite": 1
   },
   "providerConfig": {
-    "harbor": {
-      "upstream": "qwen3.8-flash:free",
-      "contextWindow": 1000000,
-      "maxOutputTokens": 131072
-    },
     "hyper": {
       "contextWindow": 1000000,
       "maxOutputTokens": 128000

@@ -5,7 +5,9 @@
     "zenmux"
   ],
   "aliases": [
-    "minimax-m2.1"
+    "minimax-m2.1",
+    "minimax-minimax-m2.1",
+    "minimax/minimax-m2.1"
   ],
   "reasoning": true,
   "providerConfig": {

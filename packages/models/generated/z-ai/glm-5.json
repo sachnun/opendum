@@ -4,6 +4,9 @@
     "perch"
   ],
   "reasoning": true,
+  "reasoning_effort": [
+    "high"
+  ],
   "modalities": {
     "input": [
       "text"
