@@ -207,7 +207,7 @@ function canonicalizeIds(
 
   if (dryRun) return;
   const generatedDir = resolveGeneratedDir(modelsDir);
-  for (const [relativeId, target] of targets) {
+  for (const target of targets.values()) {
     persistModel({ modelsDir, relativeId: target.relativeId }, target.data);
   }
   for (const [nextFileId, target] of targets) {

@@ -15,7 +15,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "test": "tsx --test ./src/*.test.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@paralleldrive/cuid2": "^3.3.0",
@@ -24,11 +25,11 @@
     "pg": "^8.22.0"
   },
   "devDependencies": {
-    "@types/node": "^26.1.1",
+    "@types/node": "catalog:",
     "@types/pg": "^8.20.0",
     "drizzle-kit": "^0.31.10",
-    "tsx": "^4.23.13",
-    "typescript": "^6.0.3"
+    "tsx": "catalog:",
+    "typescript": "catalog:"
   },
   "imports": {
     "#database/*": "./src/*"

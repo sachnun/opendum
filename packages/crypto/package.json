@@ -9,12 +9,13 @@
   },
   "scripts": {
     "test": "tsx --test ./src/*.test.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
   },
   "devDependencies": {
-    "@types/node": "^26.1.1",
-    "tsx": "^4.23.13",
-    "typescript": "^6.0.3"
+    "@types/node": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:"
   },
   "imports": {
     "#crypto/*": "./src/*"

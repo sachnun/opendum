@@ -3,7 +3,6 @@ import { db, type Database } from "#database/client.ts";
 import {
   providerAccount,
   providerAccountDisabledModel,
-  providerAccountModelHealth,
 } from "#database/schema/accounts.ts";
 import { userSharingSetting } from "#database/schema/usage.ts";
 

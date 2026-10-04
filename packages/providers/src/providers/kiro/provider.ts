@@ -205,10 +205,10 @@ async function* transformKiroSse(
     }
     if (typeof event.content === "string" && event.followupPrompt === undefined) {
       totalContent += event.content;
-      let [contentDelta, reasoningDelta] = splitter.process(event.content, false);
+      const [contentDelta, reasoningDeltaValue] = splitter.process(event.content, false);
+      let reasoningDelta = reasoningDeltaValue;
       if (hasNativeReasoning && reasoningDelta) reasoningDelta = "";
       emitContent(contentDelta, reasoningDelta);
-      void contentDelta;
     }
     const name = stringValue(event.name);
     if (name && stringValue(event.toolUseId)) {
@@ -261,7 +261,8 @@ async function* transformKiroSse(
     reader.releaseLock();
   }
 
-  let [flushContent, flushReasoning] = splitter.flush();
+  const [flushContent, flushReasoningValue] = splitter.flush();
+  let flushReasoning = flushReasoningValue;
   if (hasNativeReasoning) flushReasoning = "";
   emitContent(flushContent, flushReasoning);
   for (const call of parseKiroBracketToolCalls(totalContent)) {

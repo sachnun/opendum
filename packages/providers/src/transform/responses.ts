@@ -1067,7 +1067,7 @@ export async function buildResponsesApiPayload(
       const effort = stringValue(body.reasoning_effort);
       if (effort) payload.reasoning = { effort };
     }
-    let reasoning = payload.reasoning;
+    const reasoning = payload.reasoning;
     if (
       reasoning !== null &&
       typeof reasoning === "object" &&
@@ -1077,8 +1077,7 @@ export async function buildResponsesApiPayload(
     ) {
       (reasoning as Json).summary = "auto";
     }
-    reasoning = undefined;
-    let include = stringSlice(body.include);
+    const include = stringSlice(body.include);
     if (body._includeReasoning === true) include.push("reasoning.encrypted_content");
     if (include.length > 0) payload.include = uniqueStrings(include);
     for (const key of [

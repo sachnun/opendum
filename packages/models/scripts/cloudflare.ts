@@ -21,7 +21,7 @@ import {
   syncProviderModels,
   persistModel,
 } from "#models/registry/registry.ts";
-import { fetchJson, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "#models/lib/http.ts";
+import { fetchJson } from "#models/lib/http.ts";
 import { stripParamInfoKey } from "#models/model/clean-key.ts";
 
 const PROVIDER_NAME = "workers_ai";

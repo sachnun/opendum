@@ -116,7 +116,7 @@ function resolveRelayTarget(url: string, method: string): { method: string; targ
   try {
     assertPublicHost(target.hostname);
   } catch (error) {
-    if (error instanceof PrivateHostError) throw new Error("url must not target a private network address");
+    if (error instanceof PrivateHostError) throw new Error("url must not target a private network address", { cause: error });
     throw error;
   }
   return { method: normalizedMethod, target: target.toString() };

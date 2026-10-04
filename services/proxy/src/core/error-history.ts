@@ -54,7 +54,7 @@ export async function upsertErrorHistory(
 ): Promise<void> {
   if (!redis) return;
   const dedupeKey = errorHistoryDedupeKey(accountId, model, statusCode, message);
-  let entryId: string | null = null;
+  let entryId: string | null;
   try {
     entryId = await redis.get(dedupeKey);
   } catch {

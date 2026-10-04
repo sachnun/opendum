@@ -14,7 +14,8 @@
   },
   "scripts": {
     "test": "tsx --test \"./src/**/*.test.ts\"",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@opendum/config": "workspace:*",
@@ -23,12 +24,12 @@
     "@opendum/extension": "workspace:*",
     "@opendum/models": "workspace:*",
     "@opendum/redis": "workspace:*",
-    "eventsource-parser": "^3.1.0"
+    "eventsource-parser": "catalog:"
   },
   "devDependencies": {
-    "@types/node": "^26.1.1",
-    "tsx": "^4.23.13",
-    "typescript": "^6.0.3"
+    "@types/node": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:"
   },
   "imports": {
     "#providers/*": "./src/*"

@@ -789,7 +789,7 @@ export function findOriginalKiroToolCall(messages: unknown[], toolUseId: string)
 }
 
 export function setKiroCurrentToolResults(userInput: Json, results: unknown[]): void {
-  let ctx = (userInput.userInputMessageContext ?? {}) as Json;
+  const ctx = (userInput.userInputMessageContext ?? {}) as Json;
   if (results.length > 0) ctx.toolResults = dedupeKiroToolResults(results);
   else delete ctx.toolResults;
   if (Object.keys(ctx).length > 0) userInput.userInputMessageContext = ctx;

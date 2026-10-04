@@ -24,7 +24,6 @@ import {
   createCustomStore,
 } from "#auth/custom-store.ts";
 import {
-  type AccountAccess,
   type AccountModelAvailability,
   type AuthResult,
   type ModelAccess,

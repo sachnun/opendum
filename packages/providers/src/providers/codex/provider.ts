@@ -385,7 +385,7 @@ export class CodexProvider implements Provider, CredentialRefresher, RefreshBuff
     ) {
       (reasoning as Json).summary = "auto";
     }
-    let include = stringSlice(body.include);
+    const include = stringSlice(body.include);
     if (body._includeReasoning === true || tools.length > 0) {
       include.push("reasoning.encrypted_content");
     }
@@ -404,32 +404,6 @@ export class CodexProvider implements Provider, CredentialRefresher, RefreshBuff
   private resolveModel(model: string): string {
     return this.registry.upstreamModelName(lastModelSegment(model), "codex");
   }
-}
-
-function joinReasoningParts(parts: unknown[]): string {
-  const chunks: string[] = [];
-  for (const raw of parts) {
-    if (typeof raw === "string") {
-      if (raw) chunks.push(raw);
-      continue;
-    }
-    const part = (raw ?? {}) as Json;
-    const text = stringValue(part.text);
-    if (text) chunks.push(text);
-  }
-  return chunks.join("\n\n");
-}
-
-function extractReasoningFromItem(item: Json): string {
-  if (Array.isArray(item.summary)) {
-    const text = joinReasoningParts(item.summary);
-    if (text) return text;
-  }
-  if (Array.isArray(item.content)) {
-    const text = joinReasoningParts(item.content);
-    if (text) return text;
-  }
-  return stringValue(item.text);
 }
 
 export function responsesStreamToCompletion(text: string, model: string): Json {

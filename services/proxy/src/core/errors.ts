@@ -169,7 +169,7 @@ export function buildAccountErrorMessage(errorMessage: string, context: AccountE
     truncatedError = `${truncatedError.slice(0, ACCOUNT_ERROR_RAW_LIMIT)}...[truncated, ${errorMessage.length} chars total]`;
   }
 
-  let serializedParameters = "{}";
+  let serializedParameters: string;
   try {
     serializedParameters = JSON.stringify(sanitizeParametersForError(context.parameters), null, 2);
   } catch {

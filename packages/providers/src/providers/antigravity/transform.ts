@@ -462,7 +462,7 @@ export function geminiDeltas(response: Json, schemas: ToolSchemaMap, toolIndex: 
     const candidate = (rawCandidate ?? {}) as Json;
     const content = (candidate.content ?? {}) as Json;
     const parts = anySlice(content.parts);
-    let localToolIndex = 0;
+    const localToolIndex = 0;
     for (const rawPart of parts) {
       const part = rawPart as Json;
       if (part.functionCall !== undefined && part.functionCall !== null) {

@@ -13,7 +13,6 @@ export const PROVIDER_TO_MODELSDEV: Readonly<Record<string, string>> = {
 };
 
 const VARIANT_SUFFIX = /:(?:free|batch|thinking|online|extended|optimized|nitro|floor|latest)$/i;
-const SEPARATOR = /[^a-z0-9-]+/g;
 const OFFERING_SEPARATOR = "\u0000";
 
 export interface CanonicalModel {

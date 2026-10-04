@@ -36,7 +36,7 @@ async function fetchCodexQuota(
     if (headerGroups.length > 0) return baseQuotaInfo("success", headerGroups);
     return errorQuotaInfo(`Codex quota endpoint failed: HTTP ${result.statusCode} ${result.raw}`);
   }
-  let payload: Json = {};
+  let payload: Json;
   try {
     payload = JSON.parse(result.raw) as Json;
   } catch {

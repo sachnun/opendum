@@ -588,7 +588,7 @@ function appendOpenAiToolCalls(
   for (const raw of calls) {
     const call = (raw ?? {}) as Json;
     const fn = (call.function ?? {}) as Json;
-    let input: Json = {};
+    let input: Json;
     try {
       input = JSON.parse(stringValue(fn.arguments) || "{}") as Json;
     } catch {

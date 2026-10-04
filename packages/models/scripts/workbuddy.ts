@@ -7,7 +7,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 import { buildModelIndex, persistModel, syncProviderModels } from "#models/registry/registry.ts";
 import { fetchJson } from "#models/lib/http.ts";
@@ -53,14 +53,14 @@ async function fetchWorkbuddyCatalog() {
         maxBuffer: 32 * 1024 * 1024,
       });
     } catch (error) {
-      throw new Error(`Failed to extract ${WORKBUDDY_PRODUCT_MEMBER} from ${WORKBUDDY_NPM_PACKAGE}@${version}`);
+      throw new Error(`Failed to extract ${WORKBUDDY_PRODUCT_MEMBER} from ${WORKBUDDY_NPM_PACKAGE}@${version}`, { cause: error });
     }
 
     let product;
     try {
       product = JSON.parse(source);
     } catch (error) {
-      throw new Error(`Invalid ${WORKBUDDY_PRODUCT_MEMBER} JSON in ${WORKBUDDY_NPM_PACKAGE}@${version}`);
+      throw new Error(`Invalid ${WORKBUDDY_PRODUCT_MEMBER} JSON in ${WORKBUDDY_NPM_PACKAGE}@${version}`, { cause: error });
     }
     const models = product?.models;
     if (!Array.isArray(models) || models.length === 0) {

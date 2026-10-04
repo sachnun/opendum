@@ -190,7 +190,7 @@ async function postEgressWithRotation(
 ): Promise<Response> {
   const egressFetch = transport.egress as EgressFetch;
   let lastError: unknown = null;
-  let lastResponse: Response | null = null;
+  let lastResponse: Response | null;
 
   for (let attempt = 0; ; attempt += 1) {
     try {

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 import type { Provider, ProviderAccount } from "@opendum/providers";
-import { cloneMap, numberAsInt, stringValue } from "./helpers.js";
+import { stringValue } from "./helpers.js";
 import type { ProviderRoutingOptions, ProviderScore } from "./provider-performance.js";
 
 export const AUTHLESS_ACCOUNT_PREFIX = "authless:";

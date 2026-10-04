@@ -1,8 +1,7 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 
 import {
   bumpAccountRequestCount,
-  deactivateAPIKey,
   disableFailedAccount,
   getAccountCredentialsByID,
   getAccountHealthState,
@@ -52,12 +51,8 @@ import {
   type ProviderRegistry,
   type RefreshedCredentials,
 } from "@opendum/providers";
-import { cloneMap, numberAsInt, sleep, stringValue } from "./helpers.js";
+import { cloneMap, numberAsInt, sleep } from "./helpers.js";
 import {
-  AUTHLESS_ACCOUNT_PREFIX,
-  COOLDOWN_RECOVERY_RATIO,
-  MODEL_DEGRADED_THRESHOLD,
-  UNHEALTHY_IDLE_DECAY_MS,
   accountAccessDenial,
   accountNeedsCredentialRefresh,
   cooldownRecoveryCount,
@@ -637,7 +632,7 @@ export class ProxyService implements StreamRecorder {
   > {
     const tried: string[] = [];
     const sharedTried: string[] = [];
-    let excludedProviders: string[] = [];
+    const excludedProviders: string[] = [];
     let useShared = false;
     const recoverableFailures: AccountRotationFailure[] = [];
     let lastFailure: RouteError | null = null;
@@ -1306,7 +1301,7 @@ export class ProxyService implements StreamRecorder {
     if (Date.now() - requestTime > window || requestTime - Date.now() > window) {
       return { handled: true, result: emptyResult };
     }
-    let path = "/";
+    let path: string;
     try {
       path = new URL(request.url).pathname;
     } catch {
@@ -1649,7 +1644,7 @@ export class ProxyService implements StreamRecorder {
     const now = new Date();
     const message = error.message.length > MAX_STORED_ERROR_LEN ? error.message.slice(0, MAX_STORED_ERROR_LEN) : error.message;
     const statusCode = parseRefreshErrorStatusCode(error);
-    let failCount = 1;
+    let failCount: number;
     try {
       failCount = await this.redis.incr(`${REFRESH_FAIL_COUNT_PREFIX}${account.id}`);
       await this.redis.expire(`${REFRESH_FAIL_COUNT_PREFIX}${account.id}`, REFRESH_FAIL_COUNT_TTL_SECONDS);

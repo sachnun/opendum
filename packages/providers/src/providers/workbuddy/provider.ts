@@ -1,6 +1,6 @@
 import type { Registry } from "@opendum/models/runtime";
 import { jsonResponse, numberFromAny, parseSseDataLines, stringValue } from "#providers/lib/helpers.ts";
-import { postJSON, type UpstreamTransport } from "#providers/api/http.ts";
+import type { UpstreamTransport } from "#providers/api/http.ts";
 import type {
   CredentialRefresher,
   Provider,

@@ -124,7 +124,7 @@ function parseModelSelectorWidget(html) {
       row.match(/<span class="model-name">([^<]*)<\/span>/)?.[1] ?? ""
     ).trim();
     const tiersRaw = decodeHtmlEntities(row.match(/data-tiers="([^"]*)"/)?.[1] ?? "");
-    let tiers = {};
+    let tiers;
     try {
       tiers = JSON.parse(tiersRaw);
     } catch {

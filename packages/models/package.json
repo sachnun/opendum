@@ -17,16 +17,17 @@
   "scripts": {
     "refresh": "tsx ./scripts/models.ts",
     "test": "tsx --test \"./src/**/*.test.ts\" \"./scripts/**/*.test.ts\"",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@opendum/extension": "workspace:*",
     "fuzzball": "^2.2.6",
-    "p-retry": "^6.2.0"
+    "p-retry": "catalog:"
   },
   "devDependencies": {
-    "@types/node": "^26.1.1",
-    "tsx": "^4.23.13",
-    "typescript": "^6.0.3"
+    "@types/node": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:"
   }
 }

@@ -11,7 +11,6 @@ import { buildAaIndex, parseLeaderboard, resolveAaScore } from "#models/registry
 import { modelProbes } from "#models/model/probes.ts";
 import { fetchText } from "#models/lib/http.ts";
 import { buildModelIndex, generatedModelPath, readModelJson, writeGeneratedModelJson } from "#models/registry/registry.ts";
-import type { ModelData } from "#models/model/types.ts";
 
 const LEADERBOARD_URL = "https://artificialanalysis.ai/leaderboards/models";
 const USER_AGENT = "Mozilla/5.0 (compatible; opendum-model-sync)";

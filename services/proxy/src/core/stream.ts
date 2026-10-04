@@ -88,7 +88,7 @@ export async function passthroughStream(ctx: ResponseContext, recorder: StreamRe
 
 export async function passthroughNonStream(ctx: ResponseContext, recorder: StreamRecorder): Promise<Response> {
   const bodyText = await ctx.response.text();
-  let parsed: Json = {};
+  let parsed: Json;
   try {
     parsed = JSON.parse(bodyText) as Json;
   } catch {
@@ -142,7 +142,7 @@ export async function passthroughNonStream(ctx: ResponseContext, recorder: Strea
 
 export async function anthropicNonStream(ctx: ResponseContext, recorder: StreamRecorder): Promise<Response> {
   const bodyText = await ctx.response.text();
-  let openAi: Json = {};
+  let openAi: Json;
   try {
     openAi = JSON.parse(bodyText) as Json;
   } catch {
