@@ -31,18 +31,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Test database
-        run: pnpm --filter @opendum/database test
-
-      - name: Typecheck database
-        run: pnpm --filter @opendum/database typecheck
-
-      - name: Test models
-        run: pnpm --filter @opendum/models test
-
-      - name: Typecheck models
-        run: pnpm --filter @opendum/models typecheck
-
       - name: Lint web
         run: pnpm --filter @opendum/web lint
 
@@ -55,8 +43,8 @@ jobs:
       - name: Build web
         run: pnpm --filter @opendum/web build
 
-  packages:
-    name: Packages
+  checks:
+    name: Checks
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -81,28 +69,8 @@ jobs:
       - name: Test packages
         run: pnpm --filter "./packages/*" -r --if-present test
 
-  proxy:
-    name: Proxy
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Typecheck
+      - name: Typecheck proxy
         run: pnpm --filter @opendum/proxy typecheck
 
-      - name: Test
+      - name: Test proxy
         run: pnpm --filter @opendum/proxy test
