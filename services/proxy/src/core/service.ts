@@ -1686,10 +1686,18 @@ export class ProxyService implements StreamRecorder {
 
   async startTokenRefresher(signal: AbortSignal, intervalMs: number): Promise<void> {
     if (intervalMs <= 0) return;
-    await this.refreshExpiringTokens();
-    const timer = setInterval(() => void this.refreshExpiringTokens(), intervalMs);
+    await this.runTokenRefresh();
+    const timer = setInterval(() => void this.runTokenRefresh(), intervalMs);
     timer.unref?.();
     signal.addEventListener("abort", () => clearInterval(timer));
+  }
+
+  private async runTokenRefresh(): Promise<void> {
+    try {
+      await this.refreshExpiringTokens();
+    } catch (error) {
+      console.error("token refresh cycle failed", error);
+    }
   }
 
   private async refreshExpiringTokens(): Promise<void> {
@@ -1700,10 +1708,16 @@ export class ProxyService implements StreamRecorder {
       const providerImpl = this.providers.get(name);
       if (!providerImpl) continue;
       const buffer = refreshBufferFor(providerImpl);
-      const accounts = await listExpiringRefreshableAccounts(
-        { provider: name, now, expiresBefore: new Date(now.getTime() + buffer), batchLimit: 500 },
-        this.database
-      );
+      let accounts: Awaited<ReturnType<typeof listExpiringRefreshableAccounts>>;
+      try {
+        accounts = await listExpiringRefreshableAccounts(
+          { provider: name, now, expiresBefore: new Date(now.getTime() + buffer), batchLimit: 500 },
+          this.database
+        );
+      } catch (error) {
+        console.error(`token refresh query failed for provider ${name}`, error);
+        continue;
+      }
       for (const row of accounts) {
         const account: ProviderAccount = {
           id: row.id,
