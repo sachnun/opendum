@@ -19,8 +19,9 @@
   ],
   "modalities": {
     "input": [
-      "text",
-      "image"
+      "image",
+      "pdf",
+      "text"
     ],
     "output": [
       "text"
