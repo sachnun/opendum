@@ -54,7 +54,7 @@ export type ModelInfo = {
 
 const SUGGESTION_THRESHOLD = 0.7;
 
-type ModelEntry = {
+export type ModelEntry = {
   fileId: string;
   owner: string;
   info: ModelInfo;
@@ -202,6 +202,10 @@ function collectModelEntries(authoredDir: string, generatedDir: string): ModelEn
   return order.map((fileId) => byFileId.get(fileId) as ModelEntry);
 }
 
+export function loadModelEntries(dir: string): ModelEntry[] {
+  return collectModelEntries(dir, resolveGeneratedDir(dir));
+}
+
 function isReasoning(model: string, info: ModelInfo): boolean {
   if (info.reasoning == null) return true;
   return info.reasoning;
@@ -241,7 +245,11 @@ export class Registry {
   }
 
   static load(dir: string, options: { familyFromFolder?: boolean } = {}): Registry {
-    return new Registry(collectModelEntries(dir, resolveGeneratedDir(dir)), options);
+    return new Registry(loadModelEntries(dir), options);
+  }
+
+  static fromEntries(entries: ModelEntry[], options: { familyFromFolder?: boolean } = {}): Registry {
+    return new Registry(entries, options);
   }
 
   private mergeModelInfo(modelId: string, fileId: string, info: ModelInfo): void {

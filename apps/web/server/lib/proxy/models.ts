@@ -1,22 +1,9 @@
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
 import { Registry } from "@opendum/models/runtime";
 import type { ModelInfo, ProviderAccessRule } from "@opendum/models/runtime";
+import { MODEL_ENTRIES } from "virtual:opendum-model-registry";
 import { compareModelEntries } from "~~/lib/model-sort";
 
-function resolveModelsDir(): string {
-  const candidates = [
-    resolve(process.cwd(), "../../packages/models/data"),
-    resolve(process.cwd(), "../packages/models/data"),
-    resolve(process.cwd(), "packages/models/data"),
-  ];
-  for (const candidate of candidates) {
-    if (existsSync(candidate)) return candidate;
-  }
-  return resolve(process.cwd(), "packages/models/data");
-}
-
-export const registry = Registry.load(resolveModelsDir(), { familyFromFolder: true });
+export const registry = Registry.fromEntries(MODEL_ENTRIES, { familyFromFolder: true });
 
 export const MODEL_REGISTRY: Record<string, ModelInfo> = registry.entries();
 export const IGNORED_MODELS = new Set(registry.ignoredModels());

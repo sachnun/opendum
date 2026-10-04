@@ -1,6 +1,17 @@
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
+import { loadModelEntries } from "@opendum/models/runtime";
 
 const redisXxhashStub = "\0redis-xxhash-stub";
+const modelRegistryVirtualModule = "virtual:opendum-model-registry";
+const modelRegistryVirtualModuleId = `\0${modelRegistryVirtualModule}`;
+
+function buildModelRegistryModule(): string {
+  const dataDir = resolve(dirname(fileURLToPath(import.meta.url)), "../../packages/models/data");
+  const entries = loadModelEntries(dataDir);
+  return `export const MODEL_ENTRIES = ${JSON.stringify(entries)};`;
+}
 
 export default defineNuxtConfig({
   compatibilityDate: "2025-07-15",
@@ -45,6 +56,15 @@ export default defineNuxtConfig({
           load(id) {
             if (id !== redisXxhashStub) return null;
             return "export const xxh3 = { xxh64() { throw new Error('Redis digest commands are not supported in this build.'); } };";
+          },
+        },
+        {
+          name: "opendum-model-registry",
+          resolveId(id) {
+            return id === modelRegistryVirtualModule ? modelRegistryVirtualModuleId : null;
+          },
+          load(id) {
+            return id === modelRegistryVirtualModuleId ? buildModelRegistryModule() : null;
           },
         },
       ],
