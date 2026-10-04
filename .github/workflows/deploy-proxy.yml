@@ -6,8 +6,8 @@ on:
       - main
     paths:
       - .github/workflows/deploy-proxy.yml
-      - apps/proxy/**
-      - packages/models/**
+      - services/proxy/**
+      - packages/**
   workflow_run:
     workflows:
       - Refresh Provider Models
@@ -44,14 +44,20 @@ jobs:
         with:
           ref: main
 
-      - name: Setup Go
-        uses: actions/setup-go@v7
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
         with:
-          go-version-file: apps/proxy/go.mod
-          cache-dependency-path: apps/proxy/go.sum
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Test proxy
-        run: go -C apps/proxy test ./...
+        run: pnpm --filter @opendum/proxy test
 
       - name: Validate Koyeb configuration
         run: |
@@ -61,16 +67,13 @@ jobs:
           test -n "$KOYEB_REGION"
           test -n "$KOYEB_INSTANCE_TYPE"
           test -n "$KOYEB_ORG_ID"
-          test -f apps/proxy/Dockerfile
+          test -f services/proxy/Dockerfile
 
       - name: Install Koyeb CLI
         run: |
           curl -fsSL https://raw.githubusercontent.com/koyeb/koyeb-cli/master/install.sh | sh
           echo "$HOME/.koyeb/bin" >> "$GITHUB_PATH"
 
-      # Secrets (DATABASE_URL, REDIS_URL, BETTER_AUTH_SECRET) are managed
-      # once in the Koyeb dashboard and referenced by the service as
-      # {{secret.NAME}}. This workflow only ships code and non-secret env.
       - name: Deploy proxy to Koyeb
         run: |
           set -euo pipefail
@@ -81,7 +84,7 @@ jobs:
             --git "$GIT_REPO"
             --git-branch main
             --git-builder docker
-            --git-docker-dockerfile apps/proxy/Dockerfile
+            --git-docker-dockerfile services/proxy/Dockerfile
             --type web
             --instance-type "$KOYEB_INSTANCE_TYPE"
             --regions "$KOYEB_REGION"
@@ -89,11 +92,7 @@ jobs:
             --routes "/:8000"
             --checks "8000:http:/health"
             --checks-grace-period "8000=30"
-            --env PORT=8000
-            --env HOST=0.0.0.0
-            --env TOKEN_REFRESH_INTERVAL_SECONDS=600
           )
-          # Free instances only support scale-to-zero (min 0). Paid types keep min 1.
           if [ "$KOYEB_INSTANCE_TYPE" = "free" ]; then
             SCALE_ARGS=(--min-scale 0 --max-scale 1)
           else

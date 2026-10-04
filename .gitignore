@@ -50,11 +50,11 @@ Thumbs.db
 # vercel
 .vercel/
 
-# agent instructions
-AGENTS.md
-
 # local plan notes
 PLAN.md
 
 # typescript
 *.tsbuildinfo
+
+# nuxt test-utils generated
+apps/web/.nuxtrc

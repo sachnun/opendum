@@ -8,7 +8,7 @@
  * from display names instead of a fixed model table so new Gemini/Claude/GPT-OSS
  * versions can flow through without updating a hardcoded list.
  *
- * It also refreshes the User-Agent version used by the Go proxy and dashboard
+ * It also refreshes the User-Agent version used by the Go proxy and web
  * Antigravity providers from the Antigravity changelog, so the hardcoded
  * version does not go stale between releases.
  *
@@ -42,16 +42,16 @@ const VERSION_FETCH_TIMEOUT_MS = 15_000;
 
 const PROXY_PROVIDER_PATH = resolve(
   repoRoot,
-  "apps/proxy/internal/providers/google_code_assist.go"
+  "packages/providers/src/antigravity.ts"
 );
-const DASHBOARD_CONSTANTS_PATH = resolve(
+const WEB_CONSTANTS_PATH = resolve(
   repoRoot,
-  "apps/dashboard/server/lib/providers/antigravity/constants.ts"
+  "apps/web/server/lib/providers/antigravity/constants.ts"
 );
 
 const PROXY_USER_AGENT_REGEX =
-  /((?:const\s+antigravityUserAgent\s*=\s*"antigravity\/))(\d+\.\d+\.\d+)(\s+")/;
-const DASHBOARD_USER_AGENT_REGEX =
+  /(antigravity\/)(\d+\.\d+\.\d+)(\s)/;
+const WEB_USER_AGENT_REGEX =
   /((?:export\s+)?const USER_AGENT\s*=\s*`antigravity\/)(\d+\.\d+\.\d+)(\s+linux\/amd64`;)/;
 
 const GEMINI_35_FLASH_LEVELS = ["minimal", "low", "medium", "high"];
@@ -522,7 +522,7 @@ function getCurrentVersion() {
 function updateVersion(newVersion) {
   for (const [filePath, regex] of [
     [PROXY_PROVIDER_PATH, PROXY_USER_AGENT_REGEX],
-    [DASHBOARD_CONSTANTS_PATH, DASHBOARD_USER_AGENT_REGEX],
+    [WEB_CONSTANTS_PATH, WEB_USER_AGENT_REGEX],
   ]) {
     const source = readFileSync(filePath, "utf-8");
     const updated = source.replace(regex, `$1${newVersion}$3`);
@@ -533,7 +533,7 @@ function updateVersion(newVersion) {
 async function syncUserAgent(dryRun) {
   const currentVersion = getCurrentVersion();
   if (!currentVersion) {
-    console.warn("[antigravity] Could not find User-Agent version in Go proxy provider, skipping.");
+    console.warn("[antigravity] Could not find User-Agent version in the proxy provider, skipping.");
     return;
   }
 

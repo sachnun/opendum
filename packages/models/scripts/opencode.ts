@@ -11,7 +11,7 @@ const OPENCODE_MODELS_URL = "https://opencode.ai/zen/v1/models";
 const OPENCODE_ZEN_DOCS_URL = "https://raw.githubusercontent.com/anomalyco/opencode/dev/packages/web/src/content/docs/zen.mdx";
 const OPENCODE_NPM_URL = "https://registry.npmjs.org/opencode-ai/latest";
 
-const OPENCODE_UA_REGEX = /(const opencodeUserAgent = "opencode\/)(\d+\.\d+\.\d+)(")/;
+const OPENCODE_UA_REGEX = /(const USER_AGENT = "opencode\/)(\d+\.\d+\.\d+)(")/;
 
 function compareSemver(a, b) {
   const [aMajor, aMinor, aPatch] = a.split(".").map(Number);
@@ -20,11 +20,11 @@ function compareSemver(a, b) {
 }
 
 async function syncUserAgent() {
-  const providerPath = resolve(dirname(fileURLToPath(import.meta.url)), "../../../apps/proxy/internal/providers/providers.go");
+  const providerPath = resolve(dirname(fileURLToPath(import.meta.url)), "../../../packages/providers/src/opencode.ts");
   const source = readFileSync(providerPath, "utf-8");
   const match = source.match(OPENCODE_UA_REGEX);
   if (!match) {
-    console.warn("Opencode: could not find User-Agent version in Go proxy provider, skipping.");
+    console.warn("Opencode: could not find User-Agent version in the proxy provider, skipping.");
     return;
   }
 

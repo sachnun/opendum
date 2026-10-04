@@ -3,14 +3,11 @@
   "private": true,
   "packageManager": "pnpm@12.3.4",
   "scripts": {
-    "dev": "(pnpm --filter @opendum/dashboard dev & TOKEN_REFRESH_INTERVAL_SECONDS=0 go -C apps/proxy run ./cmd/proxy)",
-    "dev:emulate": "(pnpm --filter @opendum/dashboard emulate & pnpm --filter @opendum/dashboard dev:emulate & TOKEN_REFRESH_INTERVAL_SECONDS=0 go -C apps/proxy run ./cmd/proxy)",
-    "build": "pnpm --filter @opendum/dashboard build && go -C apps/proxy build ./...",
+    "dev": "(pnpm --filter @opendum/web dev & pnpm --filter @opendum/proxy dev)",
+    "build": "pnpm --filter @opendum/web build && pnpm --filter @opendum/proxy typecheck",
     "db:push": "pnpm --filter @opendum/database db:push",
     "db:generate": "pnpm --filter @opendum/database db:generate",
     "db:migrate": "pnpm --filter @opendum/database db:migrate",
-    "db:sqlc": "sqlc -f apps/proxy/sqlc.yaml generate",
-    "db:sqlc:diff": "sqlc -f apps/proxy/sqlc.yaml diff",
     "models:refresh": "pnpm --filter @opendum/models refresh"
   },
   "devDependencies": {

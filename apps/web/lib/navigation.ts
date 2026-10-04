@@ -1,0 +1,72 @@
+import { MODEL_FAMILY_NAV_ITEMS } from "./model-families";
+import { getProviderAccountPath, PROVIDER_ACCOUNT_DEFINITIONS } from "./provider-accounts";
+
+export interface NavItem {
+  name: string;
+  href: string;
+  icon: string;
+  disabled?: boolean;
+  children?: NavSubItem[];
+}
+
+export interface NavSubItem {
+  name: string;
+  href: string;
+  anchorId?: string;
+  disabled?: boolean;
+  control?: "switch";
+  tag?: string;
+}
+
+export type ProviderAccountCounts = Record<string, number>;
+
+export type ProviderAccountIndicator = "normal" | "warning" | "error";
+
+export type ProviderAccountIndicators = Record<string, ProviderAccountIndicator>;
+
+export interface ModelFamilyCounts {
+  [anchorId: string]: number;
+}
+
+const ACCOUNT_NAV_CHILDREN: NavSubItem[] = [...PROVIDER_ACCOUNT_DEFINITIONS]
+  .sort((a, b) => (a.navOrder ?? Number.MAX_SAFE_INTEGER) - (b.navOrder ?? Number.MAX_SAFE_INTEGER))
+  .map((definition) => ({ name: definition.label, href: getProviderAccountPath(definition.key) }));
+
+export const primaryNavigation: NavItem[] = [
+  {
+    name: "Accounts",
+    href: "/",
+    icon: "i-lucide-user",
+    children: ACCOUNT_NAV_CHILDREN,
+  },
+  {
+    name: "API Keys",
+    href: "/keys",
+    icon: "i-lucide-key",
+    children: [
+      { name: "Sharing", href: "/keys", control: "switch" },
+    ],
+  },
+  {
+    name: "Models",
+    href: "/models",
+    icon: "i-lucide-cpu",
+    children: MODEL_FAMILY_NAV_ITEMS.map((family) => ({
+      name: family.name,
+      href: "/models",
+      anchorId: family.anchorId,
+    })),
+  },
+];
+
+export function subItemHref(subItem: NavSubItem): string {
+  if (subItem.anchorId) {
+    return `${subItem.href}#${subItem.anchorId}`;
+  }
+
+  return subItem.href;
+}
+
+export function isSwitchSubItem(subItem: NavSubItem): boolean {
+  return subItem.control === "switch";
+}

@@ -1,8 +1,7 @@
 {
   "providers": [
     "kilo_code",
-    "cline",
-    "freebuff"
+    "cline"
   ],
   "reasoning": true,
   "reasoning_effort": [
@@ -32,11 +31,6 @@
   },
   "providerConfig": {
     "cline": {
-      "upstream": "stealth/space-bunny-alpha",
-      "contextWindow": 1000000,
-      "maxOutputTokens": 524288
-    },
-    "freebuff": {
       "upstream": "stealth/space-bunny-alpha",
       "contextWindow": 1000000,
       "maxOutputTokens": 524288

@@ -125,6 +125,7 @@ export function stripParamInfoKey(
   let end = tokens.length;
   while (end > 0) {
     const t = tokens[end - 1];
+    if (t === undefined) break;
     if (
       isPairableMoESuffix(t) ||
       SIZE_BM.test(t) ||

@@ -153,7 +153,7 @@ test("pruneDeadModelEntries drops uncurated dead entries and keeps the rest", ()
     writeModelJson(join(dataDir, "ignored-dead.json"), { ignored: true });
     writeModelJson(join(dataDir, "curated-dead.json"), {
       ignored: true,
-      providerConfig: { freebuff: { agent: "base2-free" } },
+      providerConfig: { example: { agent: "base2-free" } },
     });
 
     assert.deepEqual(pruneDeadModelEntries(dataDir), ["dead", "ignored-dead"]);

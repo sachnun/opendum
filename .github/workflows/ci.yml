@@ -11,8 +11,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  dashboard:
-    name: Dashboard
+  web:
+    name: Web
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -31,46 +31,46 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Test database
-        run: pnpm --filter @opendum/database test
+      - name: Lint web
+        run: pnpm --filter @opendum/web lint
 
-      - name: Typecheck database
-        run: pnpm --filter @opendum/database typecheck
+      - name: Test web
+        run: pnpm --filter @opendum/web test
 
-      - name: Test models
-        run: pnpm --filter @opendum/models test
+      - name: Typecheck web
+        run: pnpm --filter @opendum/web typecheck
 
-      - name: Typecheck models
-        run: pnpm --filter @opendum/models typecheck
+      - name: Build web
+        run: pnpm --filter @opendum/web build
 
-      - name: Lint dashboard
-        run: pnpm --filter @opendum/dashboard lint
-
-      - name: Typecheck dashboard
-        run: pnpm --filter @opendum/dashboard typecheck
-
-      - name: Build dashboard
-        run: pnpm --filter @opendum/dashboard build
-
-  proxy:
-    name: Proxy
+  checks:
+    name: Checks
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Setup Go
-        uses: actions/setup-go@v7
-        with:
-          go-version-file: apps/proxy/go.mod
-          cache-dependency-path: apps/proxy/go.sum
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
 
-      - name: Vet proxy
-        run: go -C apps/proxy vet ./...
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck packages
+        run: pnpm --filter "./packages/*" -r --if-present typecheck
+
+      - name: Test packages
+        run: pnpm --filter "./packages/*" -r --if-present test
+
+      - name: Typecheck proxy
+        run: pnpm --filter @opendum/proxy typecheck
 
       - name: Test proxy
-        run: go -C apps/proxy test ./...
-
-      - name: Build proxy
-        run: go -C apps/proxy build ./...
+        run: pnpm --filter @opendum/proxy test

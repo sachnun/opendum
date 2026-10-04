@@ -58,8 +58,8 @@ test("planCanonicalization merges a provider variant into the canonical model", 
     [
       model("deepseek-v4-flash", { providers: ["openrouter"] }),
       model("deepseek-v4-flash-fast", {
-        providers: ["freebuff"],
-        providerConfig: { freebuff: { upstream: "deepseek/deepseek-v4-flash-fast" } },
+        providers: ["example"],
+        providerConfig: { example: { upstream: "deepseek/deepseek-v4-flash-fast" } },
       }),
     ],
     index(),
@@ -69,7 +69,7 @@ test("planCanonicalization merges a provider variant into the canonical model", 
   const [merge] = merges;
   assert.equal(merge.from, "deepseek-v4-flash-fast");
   assert.equal(merge.to, "deepseek-v4-flash");
-  assert.deepEqual(merge.data.providers, ["freebuff"]);
+  assert.deepEqual(merge.data.providers, ["example"]);
   assert.deepEqual(merge.aliases, ["deepseek-v4-flash-fast"]);
 });
 
@@ -145,18 +145,18 @@ test("applyCanonicalMerge folds providers, config and aliases", () => {
     to: "deepseek-v4-flash",
     tier: "exact",
     data: {
-      providers: ["freebuff"],
-      providerConfig: { freebuff: { upstream: "deepseek/deepseek-v4-flash-fast", free: true } },
+      providers: ["example"],
+      providerConfig: { example: { upstream: "deepseek/deepseek-v4-flash-fast", free: true } },
     },
     aliases: ["deepseek-v4-flash-fast"],
   };
 
   applyCanonicalMerge(target, merge);
-  assert.deepEqual(target.providers, ["freebuff", "openrouter"]);
+  assert.deepEqual(target.providers, ["example", "openrouter"]);
   assert.deepEqual(target.aliases, ["deepseek-v4-flash-fast", "ds-flash"]);
   assert.equal(target.providerConfig?.openrouter?.upstream, "deepseek/deepseek-v4-flash");
-  assert.equal(target.providerConfig?.freebuff?.upstream, "deepseek/deepseek-v4-flash-fast");
-  assert.equal(target.providerConfig?.freebuff?.free, true);
+  assert.equal(target.providerConfig?.example?.upstream, "deepseek/deepseek-v4-flash-fast");
+  assert.equal(target.providerConfig?.example?.free, true);
   assert.equal(target.id, "deepseek-v4-flash");
 });
 
@@ -195,7 +195,7 @@ test("applyCanonicalMerge carries generated fields the target is missing", () =>
     to: "mimo-v2-omni",
     tier: "exact",
     data: {
-      providers: ["freebuff"],
+      providers: ["example"],
       reasoning: true,
       reasoning_effort: ["low", "high"],
       modalities: { input: ["text", "image"], output: ["text"] },
@@ -211,7 +211,7 @@ test("applyCanonicalMerge carries generated fields the target is missing", () =>
   assert.deepEqual(target.limit, { context: 200000, output: 65536 });
   assert.deepEqual(target.cost, { input: 0.5, output: 1 });
   assert.equal(target.scores?.artificialAnalysis?.index, 23.9);
-  assert.deepEqual(target.providers, ["freebuff", "openrouter"]);
+  assert.deepEqual(target.providers, ["example", "openrouter"]);
   assert.equal(target.id, "mimo-v2-omni");
 });
 

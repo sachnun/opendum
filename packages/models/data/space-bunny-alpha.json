@@ -1,8 +1,5 @@
 {
   "providerConfig": {
-    "freebuff": {
-      "agent": "base2-free-space-bunny-alpha"
-    },
     "kilo_code": {
       "authless": true,
       "free": true

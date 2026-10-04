@@ -20,7 +20,7 @@ const CHATGPT_EXCLUDED_MODELS = new Set([
 ]);
 
 // Models that need a paid ChatGPT plan in Codex. They stay in the registry so
-// the dashboard can list them and dim them for free-tier accounts (the same
+// the web can list them and dim them for free-tier accounts (the same
 // pattern as Kiro paid models). Classification comes from official Codex
 // pricing docs, not from the feed's `available_in_plans` (which is unreliable
 // for free-tier gating).
@@ -109,7 +109,7 @@ function buildModelMap(models) {
  * Build per-model provider config with tier restrictions.
  *
  * Models in the paid map get `allowedTiers` restricted to non-free plans, which
- * makes the dashboard dim them for free-tier accounts (same pattern as the
+ * makes the web dim them for free-tier accounts (same pattern as the
  * Kiro provider). Everything else is usable by all tiers and gets no rule.
  */
 function buildProviderTierConfig(models) {

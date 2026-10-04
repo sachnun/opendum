@@ -1,0 +1,20 @@
+{
+  "name": "@opendum/crypto",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./cryptojs": "./src/cryptojs.ts",
+    "./signature": "./src/signature.ts"
+  },
+  "scripts": {
+    "test": "tsx --test ./src/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "tsx": "^4.23.13",
+    "typescript": "^6.0.3"
+  }
+}

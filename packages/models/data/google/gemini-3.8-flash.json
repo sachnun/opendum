@@ -1,7 +1,1 @@
-{
-  "providerConfig": {
-    "freebuff": {
-      "agent": "base2-free-gemini-3-8-flash"
-    }
-  }
-}
+{}

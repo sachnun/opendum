@@ -1,4 +1,0 @@
-import { updateApiKeyModelAccess, updateApiKeyModelAccessInputSchema } from "../../../services/api-keys";
-import { parseBody, requireWritableUserId } from "../../../utils/api";
-
-export default defineEventHandler(async (event) => updateApiKeyModelAccess(await requireWritableUserId(event), await parseBody(event, updateApiKeyModelAccessInputSchema)));

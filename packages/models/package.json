@@ -8,7 +8,8 @@
     "./families": "./src/families.ts",
     "./merge": "./src/merge.ts",
     "./probes": "./src/probes.ts",
-    "./registry": "./src/registry.ts"
+    "./registry": "./src/registry.ts",
+    "./runtime": "./src/runtime.ts"
   },
   "imports": {
     "#models/*": "./src/*"

@@ -1,7 +1,5 @@
 {
-  "providers": [
-    "freebuff"
-  ],
+  "providers": [],
   "reasoning": true,
   "reasoning_effort": [
     "low",
@@ -30,13 +28,6 @@
       "index": 24.1,
       "estimated": false,
       "version": "4.3"
-    }
-  },
-  "providerConfig": {
-    "freebuff": {
-      "upstream": "upstage/solar-mini4",
-      "contextWindow": 524288,
-      "maxOutputTokens": 131072
     }
   }
 }

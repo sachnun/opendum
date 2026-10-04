@@ -19,7 +19,7 @@ export const MODELSDEV_URL = "https://models.dev/api.json";
 export const LITELLM_URL = "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json";
 export const NVIDIA_MODELS_URL = "https://integrate.api.nvidia.com/v1/models";
 
-/** Points granted per USD, mirroring the dashboard points rate (5 points = 1 USD). */
+/** Points granted per USD, mirroring the web points rate (5 points = 1 USD). */
 export const POINTS_PER_USD = 5;
 
 /** Local provider -> models.dev provider id, for provider-scoped matching. */
@@ -195,7 +195,7 @@ function buildPoints(values: ModelCost): ModelCost | null {
 /**
  * Extract per-million-token prices and convert them to points.
  *
- * `POINTS_PER_USD` mirrors the dashboard points rate (5 points = 1 USD), so a
+ * `POINTS_PER_USD` mirrors the web points rate (5 points = 1 USD), so a
  * stored value is points per million tokens.
  */
 function pointsFrom(source: RegistryName, entry: unknown): ModelCost | null {
