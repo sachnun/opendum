@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-import { listModels } from "../../../services/models";
-import { parseQuery, requireReadableUserId } from "../../../utils/api";
+import { listModels } from "~~/server/services/models";
+import { parseQuery, requireReadableUserId } from "~~/server/utils/api";
 
 const modelsQuerySchema = z.object({
   includeStats: z.union([z.literal("true"), z.literal("false"), z.boolean()]).optional(),

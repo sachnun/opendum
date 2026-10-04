@@ -1,5 +1,5 @@
-import { listApiKeys } from "../../../services/api-keys";
-import { requireReadContext } from "../../../utils/api";
+import { listApiKeys } from "~~/server/services/api-keys";
+import { requireReadContext } from "~~/server/utils/api";
 
 export default defineEventHandler(async (event) => {
   const context = await requireReadContext(event);

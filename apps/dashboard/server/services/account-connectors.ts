@@ -2,19 +2,19 @@ import { and, count as countFn, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { db, providerAccount } from "@opendum/database";
-import { encrypt, hashString } from "../lib/encryption";
-import { clearRefreshFailCount } from "../lib/proxy/auth";
-import { fetchInternalProvider, InternalRelayNotConfiguredError } from "../lib/proxy/internal-relay";
-import { getProviderModelMap } from "../lib/proxy/models";
-import { API_BASE_URL as nvidiaApiBaseUrl } from "../lib/providers/nvidia/constants";
-import { API_BASE_URL as openRouterApiBaseUrl } from "../lib/providers/openrouter/constants";
-import { API_BASE_URL as zenmuxApiBaseUrl } from "../lib/providers/zenmux/constants";
-import { API_BASE_URL as harborApiBaseUrl } from "../lib/providers/harbor/constants";
-import { API_BASE_URL as hyperApiBaseUrl } from "../lib/providers/hyper/constants";
-import { formatProviderHttpError, isLikelyCloudflareChallenge } from "../lib/providers/provider-http-errors";
-import { getCloudflareValidationUrl } from "../lib/providers/cloudflare/constants";
-import { API_KEY_PROVIDER_KEYS, type ApiKeyProviderKey } from "../../lib/provider-accounts";
-import type { ActionResult } from "../utils/api";
+import { encrypt, hashString } from "~~/server/lib/encryption";
+import { clearRefreshFailCount } from "~~/server/lib/proxy/auth";
+import { fetchInternalProvider, InternalRelayNotConfiguredError } from "~~/server/lib/proxy/internal-relay";
+import { getProviderModelMap } from "~~/server/lib/proxy/models";
+import { API_BASE_URL as nvidiaApiBaseUrl } from "~~/server/lib/providers/nvidia/constants";
+import { API_BASE_URL as openRouterApiBaseUrl } from "~~/server/lib/providers/openrouter/constants";
+import { API_BASE_URL as zenmuxApiBaseUrl } from "~~/server/lib/providers/zenmux/constants";
+import { API_BASE_URL as harborApiBaseUrl } from "~~/server/lib/providers/harbor/constants";
+import { API_BASE_URL as hyperApiBaseUrl } from "~~/server/lib/providers/hyper/constants";
+import { formatProviderHttpError, isLikelyCloudflareChallenge } from "~~/server/lib/providers/provider-http-errors";
+import { getCloudflareValidationUrl } from "~~/server/lib/providers/cloudflare/constants";
+import { API_KEY_PROVIDER_KEYS, type ApiKeyProviderKey } from "~~/lib/provider-accounts";
+import type { ActionResult } from "~~/server/utils/api";
 
 const API_KEY_PROVIDER_ACCOUNT_EXPIRY = new Date("2100-01-01T00:00:00.000Z");
 const API_KEY_VALIDATION_TIMEOUT_MS = 15000;
@@ -24,7 +24,7 @@ const apiKeyProviderSchema = z.enum([...API_KEY_PROVIDER_KEYS]);
 export const createAccountInputSchema = z.object({ provider: z.string(), name: z.string().optional(), token: z.string(), cfAccountId: z.string().optional(), platformKey: z.string().optional() });
 type CreateAccountInput = z.infer<typeof createAccountInputSchema>;
 
-const MODELS_VALIDATION = { validationPath: "/models", requireSuccessfulStatus: true } as const;
+const MODELS_VALIDATION = { validationPath: "/models", requireSuccessfulStatus: true, skipInference: false } as const;
 const CHAT_AUTH_PROBE = { validationPath: "/chat/completions", requireSuccessfulStatus: false, skipInference: true } as const;
 
 const API_KEY_PROVIDER_SETTINGS = {

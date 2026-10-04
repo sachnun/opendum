@@ -18,9 +18,8 @@ import type {
   RefreshBufferProvider,
 } from "./types.js";
 
-const PERCH_APP_URL = "https://app.perchai.app";
-const PERCH_AUTH_CONFIG_PATH = "/api/perch-terminal/cli-auth/config";
-const PERCH_ACCOUNT_PATH = "/api/perchai/account";
+import { PERCH_ACCOUNT_PATH, PERCH_APP_URL, PERCH_AUTH_CONFIG_PATH } from "./endpoints.js";
+
 const PERCH_TURN_TICKET_PATH = "/api/perch-terminal/turn-ticket";
 const PERCH_TURN_TICKET_HEADER = "x-perch-turn-ticket";
 const PERCH_CLI_VERSION = "2.4.98";

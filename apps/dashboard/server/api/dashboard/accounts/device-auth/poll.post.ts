@@ -1,4 +1,4 @@
-import { pollDeviceAuth, pollDeviceAuthInputSchema } from "../../../../services/account-auth";
-import { parseBody, requireWritableUserId } from "../../../../utils/api";
+import { pollDeviceAuth, pollDeviceAuthInputSchema } from "~~/server/services/account-auth";
+import { parseBody, requireWritableUserId } from "~~/server/utils/api";
 
 export default defineEventHandler(async (event) => pollDeviceAuth(await requireWritableUserId(event), await parseBody(event, pollDeviceAuthInputSchema)));

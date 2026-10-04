@@ -1,5 +1,5 @@
-import { connectCustomProviderAccount, connectCustomProviderAccountSchema } from "../../../services/custom-providers";
-import { parseBody, requireWritableUserId } from "../../../utils/api";
+import { connectCustomProviderAccount, connectCustomProviderAccountSchema } from "~~/server/services/custom-providers";
+import { parseBody, requireWritableUserId } from "~~/server/utils/api";
 
 export default defineEventHandler(async (event) => {
   const input = await parseBody(event, connectCustomProviderAccountSchema);

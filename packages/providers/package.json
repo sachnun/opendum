@@ -9,6 +9,7 @@
     "./registry": "./src/registry.ts",
     "./display-names": "./src/display-names.ts",
     "./http": "./src/http.ts",
+    "./endpoints": "./src/endpoints.ts",
     "./responses-transform": "./src/responses-transform.ts"
   },
   "scripts": {

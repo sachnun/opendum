@@ -1,7 +1,7 @@
 import { and, eq, gt, gte, inArray, ne, sql } from "drizzle-orm";
 
 import { db, normalizeEmail, pointTransaction, providerEmailRegistry, proxyApiKey, user, userPointBalance, type Database } from "@opendum/database";
-import { roamingUsagePointsByApiKey } from "../lib/roaming-points";
+import { roamingUsagePointsByApiKey } from "~~/server/lib/roaming-points";
 
 export const API_KEY_UPDATE_POINT_COST = 20;
 export const DAILY_ACCESS_POINTS = 5;
@@ -71,10 +71,10 @@ async function applyPointTransactionWithClient(client: PointDatabase, input: Poi
 
   await client
     .update(pointTransaction)
-    .set({ balanceAfter: updated.balance })
+    .set({ balanceAfter: updated!.balance })
     .where(eq(pointTransaction.id, inserted.id));
 
-  return { applied: true, balance: updated.balance };
+  return { applied: true, balance: updated!.balance };
 }
 
 async function revokeUserBonusWithClient(client: PointDatabase, userId: string): Promise<number> {

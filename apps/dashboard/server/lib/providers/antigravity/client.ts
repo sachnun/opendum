@@ -1,8 +1,8 @@
 import { eq } from "drizzle-orm";
 
 import { db, providerAccount, type ProviderAccount } from "@opendum/database";
-import { decrypt, encrypt } from "../../encryption.js";
-import { fetchInternalProvider } from "../../proxy/internal-relay.js";
+import { decrypt, encrypt } from "~~/server/lib/encryption";
+import { fetchInternalProvider } from "~~/server/lib/proxy/internal-relay";
 import type { OAuthResult } from "../types.js";
 import { formatProviderHttpError } from "../provider-http-errors.js";
 import {

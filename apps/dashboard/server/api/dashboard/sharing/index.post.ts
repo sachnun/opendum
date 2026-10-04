@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-import { setUserSharingEnabled } from "../../../services/sharing";
-import { parseBody, requireWritableUserId } from "../../../utils/api";
+import { setUserSharingEnabled } from "~~/server/services/sharing";
+import { parseBody, requireWritableUserId } from "~~/server/utils/api";
 
 const sharingInputSchema = z.object({ enabled: z.boolean() });
 

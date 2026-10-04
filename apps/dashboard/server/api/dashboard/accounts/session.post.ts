@@ -1,6 +1,6 @@
 import { createError } from "h3";
-import { accountSessionInputSchema, getAccountSession } from "../../../services/accounts";
-import { parseBody, requireContext } from "../../../utils/api";
+import { accountSessionInputSchema, getAccountSession } from "~~/server/services/accounts";
+import { parseBody, requireContext } from "~~/server/utils/api";
 
 export default defineEventHandler(async (event) => {
   const context = await requireContext(event);

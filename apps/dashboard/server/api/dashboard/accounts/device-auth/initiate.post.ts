@@ -1,5 +1,5 @@
-import { initiateDeviceAuth, initiateDeviceAuthInputSchema } from "../../../../services/account-auth";
-import { parseBody, requireWritableUserId } from "../../../../utils/api";
+import { initiateDeviceAuth, initiateDeviceAuthInputSchema } from "~~/server/services/account-auth";
+import { parseBody, requireWritableUserId } from "~~/server/utils/api";
 
 export default defineEventHandler(async (event) => {
   await requireWritableUserId(event);

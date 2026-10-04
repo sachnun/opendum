@@ -10,7 +10,9 @@ import type {
   RefreshBufferProvider,
 } from "./types.js";
 
-const CLINE_API_BASE = "https://api.cline.bot/api/v1";
+import { CLINE_BASE_URL } from "./endpoints.js";
+
+const CLINE_API_BASE = CLINE_BASE_URL;
 const CLINE_REFRESH_PATH = "/auth/refresh";
 const CLINE_CHAT_PATH = "/chat/completions";
 const CLINE_ACCESS_TTL_MS = 60 * 60 * 1000;

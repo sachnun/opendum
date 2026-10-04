@@ -1,4 +1,4 @@
-import { fetchInternalProvider } from "../../proxy/internal-relay.js";
+import { fetchInternalProvider } from "~~/server/lib/proxy/internal-relay";
 import { formatProviderHttpError } from "../provider-http-errors.js";
 import type { OAuthResult } from "../types.js";
 import {

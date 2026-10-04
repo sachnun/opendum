@@ -9,10 +9,11 @@ import type {
   RefreshedCredentials,
 } from "./types.js";
 
-const WORKBUDDY_API_BASE = "https://www.workbuddy.ai";
+import { WORKBUDDY_BASE_URL, WORKBUDDY_DOMAIN } from "./endpoints.js";
+
+const WORKBUDDY_API_BASE = WORKBUDDY_BASE_URL;
 const WORKBUDDY_CHAT_PATH = "/v2/chat/completions";
 const WORKBUDDY_REFRESH_PATH = "/v2/plugin/auth/token/refresh";
-const WORKBUDDY_DOMAIN = "www.workbuddy.ai";
 const WORKBUDDY_REFRESH_SOURCE = "plugin";
 const WORKBUDDY_DEFAULT_SYSTEM = "You are a helpful assistant.";
 const WORKBUDDY_DEFAULT_MAX_TOKENS = 32768;

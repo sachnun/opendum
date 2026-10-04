@@ -1,5 +1,5 @@
-import { apiKeyIdInputSchema, deleteApiKey } from "../../../services/api-keys";
-import { parseBody, requireWritableUserId } from "../../../utils/api";
+import { apiKeyIdInputSchema, deleteApiKey } from "~~/server/services/api-keys";
+import { parseBody, requireWritableUserId } from "~~/server/utils/api";
 
 export default defineEventHandler(async (event) => {
   const input = await parseBody(event, apiKeyIdInputSchema);

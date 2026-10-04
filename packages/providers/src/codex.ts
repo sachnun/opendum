@@ -28,10 +28,12 @@ import type {
   RefreshBufferProvider,
 } from "./types.js";
 
-const CODEX_CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
-const CODEX_TOKEN_ENDPOINT = "https://auth.openai.com/oauth/token";
-const CODEX_API_BASE_URL = "https://chatgpt.com/backend-api/codex/responses";
-const CODEX_ORIGINATOR = "opencode";
+import {
+  CODEX_API_BASE_URL,
+  CODEX_CLIENT_ID,
+  CODEX_ORIGINATOR,
+  CODEX_TOKEN_ENDPOINT,
+} from "./endpoints.js";
 const CODEX_REFRESH_BUFFER_MS = 5 * 60 * 1000;
 
 export const SUPPORTED_CODEX = new Set([

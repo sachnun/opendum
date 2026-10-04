@@ -2,8 +2,8 @@ import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import { db, providerAccount } from "@opendum/database";
-import { fetchInternalQuota, InternalRelayNotConfiguredError } from "../lib/proxy/internal-relay";
-import { QUOTA_PROVIDER_KEYS, type QuotaProviderKey } from "../../lib/provider-accounts";
+import { fetchInternalQuota, InternalRelayNotConfiguredError } from "~~/server/lib/proxy/internal-relay";
+import { QUOTA_PROVIDER_KEYS, type QuotaProviderKey } from "~~/lib/provider-accounts";
 
 const MAX_QUOTA_BATCH_ACCOUNTS = 100;
 const quotaProviderSchema = z.enum([...QUOTA_PROVIDER_KEYS]);

@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { Registry } from "@opendum/models/runtime";
 import type { ModelInfo, ProviderAccessRule } from "@opendum/models/runtime";
-import { compareModelEntries } from "../../../lib/model-sort";
+import { compareModelEntries } from "~~/lib/model-sort";
 
 function resolveModelsDir(): string {
   const configured = process.env.MODELS_DIR;

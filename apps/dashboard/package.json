@@ -16,6 +16,7 @@
     "@opendum/auth": "workspace:*",
     "@opendum/database": "workspace:*",
     "@opendum/models": "workspace:*",
+    "@opendum/providers": "workspace:*",
     "@opendum/redis": "workspace:*",
     "better-auth": "^1.6.23",
     "clsx": "^2.1.1",

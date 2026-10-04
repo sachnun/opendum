@@ -1,4 +1,4 @@
-import { clearAuditUserCookie, requireMaintainerContext } from "../../../../utils/api";
+import { clearAuditUserCookie, requireMaintainerContext } from "~~/server/utils/api";
 
 export default defineEventHandler(async (event) => {
   await requireMaintainerContext(event);

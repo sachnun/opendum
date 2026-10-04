@@ -2,7 +2,7 @@ import { db, providerAccount, proxyApiKey, usageLog } from "@opendum/database";
 import { and, eq, gte, lte, sql } from "drizzle-orm";
 import { z } from "zod";
 
-import type { ActionResult } from "../utils/api";
+import type { ActionResult } from "~~/server/utils/api";
 
 const periodSchema = z.enum(["5m", "15m", "30m", "1h", "6h", "24h", "7d", "30d", "90d"]);
 const analyticsFilterSchema = z.union([

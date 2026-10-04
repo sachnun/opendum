@@ -4,10 +4,10 @@ import { z } from "zod";
 import { db, customProvider, customProviderModel, providerAccount } from "@opendum/database";
 import { stripParamInfoKey } from "@opendum/models/clean-key";
 import { buildModelIdMap } from "@opendum/models/registry";
-import { decrypt, encrypt, hashString } from "../lib/encryption";
-import { fetchInternalProvider, InternalRelayNotConfiguredError } from "../lib/proxy/internal-relay";
+import { decrypt, encrypt, hashString } from "~~/server/lib/encryption";
+import { fetchInternalProvider, InternalRelayNotConfiguredError } from "~~/server/lib/proxy/internal-relay";
 import { PROVIDER_ACCOUNT_KEYS } from "./account-providers";
-import type { ActionResult } from "../utils/api";
+import type { ActionResult } from "~~/server/utils/api";
 
 const SLUG_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/;
 const API_KEY_ACCOUNT_EXPIRY = new Date("2100-01-01T00:00:00.000Z");
@@ -88,8 +88,8 @@ function isProbablyPrivateTarget(raw: string): boolean {
   if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal")) return true;
   const literal = host.replace(/^\[|\]$/g, "");
   if (/^\d+\.\d+\.\d+\.\d+$/.test(literal)) {
-    const parts = literal.split(".").map(Number);
-    if (parts[0] === 10 || parts[0] === 127 || parts[0] === 169 && parts[1] === 254 || parts[0] === 192 && parts[1] === 168 || parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31 || parts[0] === 0 || parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127) return true;
+    const [a = 0, b = 0] = literal.split(".").map(Number);
+    if (a === 10 || a === 127 || (a === 169 && b === 254) || (a === 192 && b === 168) || (a === 172 && b >= 16 && b <= 31) || a === 0 || (a === 100 && b >= 64 && b <= 127)) return true;
   }
   if (literal.includes(":")) {
     const normalized = literal.toLowerCase();
@@ -175,6 +175,7 @@ export async function createCustomProvider(userId: string, input: z.infer<typeof
     })
     .returning({ id: customProvider.id, slug: customProvider.slug });
   const created = rows[0];
+  if (created === undefined) return { success: false, error: "Failed to create custom provider." };
   return { success: true, data: { id: created.id, slug: created.slug } };
 }
 
@@ -192,7 +193,7 @@ export async function updateCustomProvider(userId: string, input: z.infer<typeof
       ...(input.enabled != null ? { enabled: input.enabled } : {}),
     })
     .where(and(eq(customProvider.userId, userId), eq(customProvider.slug, input.slug)));
-  return { success: true };
+  return { success: true, data: undefined };
 }
 
 export async function deleteCustomProvider(userId: string, slug: string): Promise<ActionResult> {
@@ -200,7 +201,7 @@ export async function deleteCustomProvider(userId: string, slug: string): Promis
   if (!provider) return { success: false, error: `Custom provider "${slug}" not found.` };
   await db.delete(providerAccount).where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, slug)));
   await db.delete(customProvider).where(eq(customProvider.id, provider.id));
-  return { success: true };
+  return { success: true, data: undefined };
 }
 
 export async function upsertCustomModels(userId: string, slug: string, models: z.infer<typeof customModelInputSchema>[]): Promise<ActionResult<{ added: number }>> {
@@ -245,7 +246,7 @@ export async function deleteCustomModel(userId: string, slug: string, modelId: s
   await db
     .delete(customProviderModel)
     .where(and(eq(customProviderModel.providerId, provider.id), eq(customProviderModel.modelId, modelId)));
-  return { success: true };
+  return { success: true, data: undefined };
 }
 
 async function syncFromUpstream(baseUrl: string, token?: string, extraHeaders?: Record<string, string>): Promise<ActionResult<{ ids: string[] }>> {

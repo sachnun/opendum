@@ -1,6 +1,6 @@
-import { requireContext } from "../../utils/api";
-import { getUserPointStatus } from "../../services/points";
-import { getUserSharingEnabled } from "../../services/sharing";
+import { requireContext } from "~~/server/utils/api";
+import { getUserPointStatus } from "~~/server/services/points";
+import { getUserSharingEnabled } from "~~/server/services/sharing";
 
 export default defineEventHandler(async (event) => {
   const context = await requireContext(event);

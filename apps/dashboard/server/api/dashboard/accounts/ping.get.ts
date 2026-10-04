@@ -1,5 +1,5 @@
-import { getAccountPing } from "../../../services/accounts";
-import { requireReadContext } from "../../../utils/api";
+import { getAccountPing } from "~~/server/services/accounts";
+import { requireReadContext } from "~~/server/utils/api";
 
 export default defineEventHandler(async (event) => {
   const context = await requireReadContext(event);

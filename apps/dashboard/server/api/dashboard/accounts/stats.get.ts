@@ -1,4 +1,4 @@
-import { accountStatsInputSchema, getAccountStats } from "../../../services/accounts";
-import { parseQuery, requireReadableUserId } from "../../../utils/api";
+import { accountStatsInputSchema, getAccountStats } from "~~/server/services/accounts";
+import { parseQuery, requireReadableUserId } from "~~/server/utils/api";
 
 export default defineEventHandler(async (event) => getAccountStats(await requireReadableUserId(event), parseQuery(event, accountStatsInputSchema)));

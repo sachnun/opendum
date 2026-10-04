@@ -54,6 +54,29 @@ import {
 } from "@opendum/providers";
 import { cloneMap, numberAsInt, sleep, stringValue } from "./helpers.js";
 import {
+  AUTHLESS_ACCOUNT_PREFIX,
+  COOLDOWN_RECOVERY_RATIO,
+  MODEL_DEGRADED_THRESHOLD,
+  UNHEALTHY_IDLE_DECAY_MS,
+  accountAccessDenial,
+  accountNeedsCredentialRefresh,
+  cooldownRecoveryCount,
+  effectiveUnhealthyCount,
+  isSyntheticProviderAccountId,
+  modelHealthStatus,
+  normalizeAccessMode,
+  normalizeAccountIds,
+  parseRefreshErrorStatusCode,
+  prioritizeAccounts,
+  proxyAccessRuleRestrictsTier,
+  proxyTierSatisfiesRule,
+  quotaFallbackTierLocal,
+  refreshBufferFor,
+  sortAccountsByProviderPriority,
+  successRecoveryCount,
+  withTimeout,
+} from "./service-helpers.js";
+import {
   buildAccountErrorMessage,
   codexUsageLimitDisabledUntil,
   endpointPath,
@@ -86,12 +109,8 @@ import type {
   UsageCounts,
 } from "./types.js";
 
-const AUTHLESS_ACCOUNT_PREFIX = "authless:";
 const FAILED_COOLDOWN_MS = 10 * 60 * 1000;
-const UNHEALTHY_IDLE_DECAY_MS = 10 * 60 * 1000;
-const MODEL_DEGRADED_THRESHOLD = 2;
 const ACCOUNT_COOLDOWN_UNHEALTHY_THRESHOLD = 10;
-const COOLDOWN_RECOVERY_RATIO = 0.3;
 const MAX_STORED_ERROR_LEN = 10000;
 const TOKEN_REFRESH_LOCK_PREFIX = "opendum:provider-account:refresh-lock:";
 const TOKEN_REFRESH_LOCK_TTL_SECONDS = 120;
@@ -1730,287 +1749,7 @@ export class ProxyService implements StreamRecorder {
   }
 }
 
-function isSyntheticProviderAccountId(accountId: string): boolean {
-  return accountId === "opencode" || accountId.startsWith(AUTHLESS_ACCOUNT_PREFIX);
-}
 
-function normalizeAccessMode(mode: string): string {
-  return mode === "whitelist" || mode === "blacklist" ? mode : "all";
-}
-
-function normalizeAccountIds(values: string[]): string[] {
-  return [...new Set(values.map((v) => v.trim()).filter((v) => v.length > 0))].sort((a, b) => a.localeCompare(b));
-}
-
-function accountAccessDenial(
-  accountId: string,
-  access: { mode: string; accounts: string[] }
-): { message: string; code: string } | null {
-  const mode = normalizeAccessMode(access.mode);
-  const set = new Set(normalizeAccountIds(access.accounts));
-  if (mode === "whitelist" && !set.has(accountId)) {
-    return { message: "Selected provider account is not allowed for this API key.", code: "provider_account_not_whitelisted" };
-  }
-  if (mode === "blacklist" && set.has(accountId)) {
-    return { message: "Selected provider account is blocked for this API key.", code: "provider_account_blacklisted" };
-  }
-  return null;
-}
-
-function refreshBufferFor(provider: Provider): number {
-  const candidate = provider as unknown as { refreshBuffer?: () => number };
-  if (typeof candidate.refreshBuffer === "function") {
-    return candidate.refreshBuffer();
-  }
-  return 3 * 60 * 60 * 1000;
-}
-
-function accountNeedsCredentialRefresh(account: ProviderAccount, provider: Provider): boolean {
-  if (!account.expiresAt) return false;
-  return Date.now() > account.expiresAt.getTime() - refreshBufferFor(provider);
-}
-
-function parseRefreshErrorStatusCode(error: Error): number {
-  const message = error.message;
-  for (let i = 0; i + 3 <= message.length; i += 1) {
-    const ch = message[i];
-    if (ch < "4" || ch > "5") continue;
-    if (message[i + 1] < "0" || message[i + 1] > "9" || message[i + 2] < "0" || message[i + 2] > "9") continue;
-    const prevDigit = i > 0 && message[i - 1] >= "0" && message[i - 1] <= "9";
-    const nextDigit = i + 3 < message.length && message[i + 3] >= "0" && message[i + 3] <= "9";
-    if (prevDigit || nextDigit) continue;
-    const code = Number.parseInt(message.slice(i, i + 3), 10);
-    if (code >= 400 && code < 600) return code;
-  }
-  return 401;
-}
-
-type HealthRow = {
-  id: string;
-  consecutiveErrors: number;
-  status: string;
-  unhealthyCountUpdatedAt: Date | null;
-  lastErrorAt: Date | null;
-  lastSuccessAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
-  lastErrorCode: number | null;
-};
-
-function latestHealthRequestAt(row: HealthRow): Date | null {
-  let latest: Date | null = row.unhealthyCountUpdatedAt;
-  if (row.lastErrorAt && (!latest || row.lastErrorAt.getTime() > latest.getTime())) latest = row.lastErrorAt;
-  if (row.lastSuccessAt && (!latest || row.lastSuccessAt.getTime() > latest.getTime())) latest = row.lastSuccessAt;
-  if (!latest && row.updatedAt) latest = row.updatedAt;
-  if (!latest && row.createdAt) latest = row.createdAt;
-  return latest;
-}
-
-function effectiveUnhealthyCount(row: HealthRow, now: Date): number {
-  const count = row.consecutiveErrors;
-  if (count <= 0) return 0;
-  const lastRequestAt = latestHealthRequestAt(row);
-  if (!lastRequestAt || lastRequestAt.getTime() > now.getTime()) return count;
-  const decay = Math.trunc((now.getTime() - lastRequestAt.getTime()) / UNHEALTHY_IDLE_DECAY_MS);
-  if (decay <= 0) return count;
-  if (decay >= count) return 0;
-  return count - decay;
-}
-
-function modelHealthStatus(unhealthyCount: number): string {
-  return unhealthyCount >= MODEL_DEGRADED_THRESHOLD ? "degraded" : "active";
-}
-
-function cooldownRecoveryCount(unhealthyCount: number): number {
-  if (unhealthyCount <= 0) return 0;
-  const reduction = Math.round(unhealthyCount * COOLDOWN_RECOVERY_RATIO);
-  if (reduction > unhealthyCount) return 0;
-  return unhealthyCount - reduction;
-}
-
-function isImmediatelyRecoverableStatusCode(code: number): boolean {
-  return code === 408 || code === 429 || code >= 500;
-}
-
-function successRecoveryCount(row: HealthRow, now: Date): number {
-  let count = effectiveUnhealthyCount(row, now);
-  if (row.lastErrorCode !== null && !isImmediatelyRecoverableStatusCode(row.lastErrorCode)) return count;
-  if (count > 0) count -= 1;
-  return count;
-}
-
-function sortAccountsByProviderPriority(accounts: ProviderAccount[], priority: string[]): void {
-  const order = new Map<string, number>();
-  priority.forEach((provider, index) => order.set(provider, index));
-  accounts.sort((a, b) => {
-    const ai = order.get(a.provider) ?? 1 << 30;
-    const aj = order.get(b.provider) ?? 1 << 30;
-    if (ai !== aj) return ai - aj;
-    if ((a.status ?? "") !== (b.status ?? "")) return (a.status ?? "") < (b.status ?? "") ? -1 : 1;
-    return nullableTimeBefore(a.lastUsedAt, b.lastUsedAt) ? -1 : 0;
-  });
-}
-
-function prioritizeAccounts(accounts: ProviderAccount[], groupByProvider: boolean, priority: string[]): ProviderAccount[] {
-  if (!groupByProvider) return paidFirst(accounts);
-  const byProvider = new Map<string, ProviderAccount[]>();
-  for (const account of accounts) {
-    const list = byProvider.get(account.provider) ?? [];
-    list.push(account);
-    byProvider.set(account.provider, list);
-  }
-  const result: ProviderAccount[] = [];
-  for (const provider of priority) result.push(...paidFirst(byProvider.get(provider) ?? []));
-  return result;
-}
-
-function paidFirst(accounts: ProviderAccount[]): ProviderAccount[] {
-  const paid: ProviderAccount[] = [];
-  const free: ProviderAccount[] = [];
-  for (const account of accounts) {
-    if (isSyntheticProviderAccountId(account.id)) free.push(account);
-    else if (isPaidAccountTier(account.provider, account.tier ?? null)) paid.push(account);
-    else free.push(account);
-  }
-  return [...paid, ...free];
-}
-
-function isPaidAccountTier(provider: string, tier: string | null): boolean {
-  if (!tier) return false;
-  const value = tier.trim().toLowerCase();
-  switch (provider) {
-    case "antigravity":
-      return value === "paid" || value === "standard-tier" || value.startsWith("g1-");
-    case "kiro":
-      return value === "pro" || value === "pro+" || value === "pro-plus" || value === "power";
-    default:
-      break;
-  }
-  const paid = new Set([
-    "paid", "standard-tier", "plus", "pro", "pro-plus", "pro+", "prolite", "power", "team", "go",
-    "self_serve_business_usage_based", "business", "enterprise_cbp_usage_based", "enterprise", "edu",
-    "education", "hc",
-  ]);
-  return paid.has(value);
-}
-
-function nullableTimeBefore(a: Date | null | undefined, b: Date | null | undefined): boolean {
-  if (!a && !b) return false;
-  if (!a) return true;
-  if (!b) return false;
-  return a.getTime() < b.getTime();
-}
-
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("upstream request timed out")), ms);
-    promise.then(
-      (value) => {
-        clearTimeout(timer);
-        resolve(value);
-      },
-      (error) => {
-        clearTimeout(timer);
-        reject(error);
-      }
-    );
-  });
-}
-
-function normalizeAccountTierAlias(tier: string): string {
-  const normalized = tier.trim().toLowerCase().replace(/_/g, "-");
-  if (normalized === "pro-plus" || normalized === "proplus") return "pro+";
-  if (normalized === "free-tier") return "free";
-  if (["education", "educational", "edu", "free-educational-quota"].includes(normalized)) return "student";
-  return normalized;
-}
-
-function proxyTierSatisfiesRule(tier: string, minTier: string | undefined, allowedTiers: string[] | undefined): boolean {
-  const normalized = normalizeAccountTierAlias(tier);
-  if (allowedTiers && allowedTiers.length > 0) {
-    return allowedTiers.some((value) => normalizeAccountTierAlias(value) === normalized);
-  }
-  const required = (minTier ?? "").trim().toLowerCase();
-  if (!required || required === "free") return true;
-  return normalized === normalizeAccountTierAlias(required);
-}
-
-function proxyAccessRuleRestrictsTier(minTier: string | undefined, allowedTiers: string[] | undefined): boolean {
-  if (allowedTiers && allowedTiers.length > 0) return true;
-  const required = normalizeAccountTierAlias(minTier ?? "");
-  return required !== "" && required !== "free";
-}
-
-function quotaFallbackTierLocal(account: ProviderAccount): string {
-  const tier = account.tier?.trim();
-  return tier ? tier : "free";
-}
-
-export function extractSessionId(request: Request, body: Record<string, unknown>): string {
-  for (const header of [
-    "x-claude-code-session-id",
-    "session_id",
-    "x-session-id",
-    "session-id",
-    "x-session-affinity",
-    "x-client-request-id",
-  ]) {
-    const value = request.headers.get(header)?.trim();
-    if (value) return value;
-  }
-  for (const key of ["prompt_cache_key", "session_id", "sessionId", "conversation_id"]) {
-    const value = body[key];
-    if (typeof value === "string" && value.trim()) return value.trim();
-  }
-  const metadata = body.metadata;
-  if (metadata !== null && typeof metadata === "object" && !Array.isArray(metadata)) {
-    const userId = (metadata as Record<string, unknown>).user_id;
-    if (typeof userId === "string" && userId.trim()) {
-      const match = /_session_([a-f0-9-]+)$/.exec(userId);
-      if (match) return `claude:${match[1]}`;
-      return userId.trim();
-    }
-  }
-  const text = firstUserText(body);
-  if (text && text.trim().length > 20) {
-    const trimmed = text.trim().slice(0, 100);
-    return `prompt:${createHash("sha256").update(trimmed).digest("hex").slice(0, 16)}`;
-  }
-  return "";
-}
-
-function firstUserText(body: Record<string, unknown>): string {
-  const messages = body.messages;
-  if (Array.isArray(messages)) {
-    for (const raw of messages) {
-      const msg = (raw ?? {}) as Record<string, unknown>;
-      if (msg.role !== "user") continue;
-      const text = sessionTextContent(msg.content);
-      if (text) return text;
-    }
-  }
-  const input = body.input;
-  if (Array.isArray(input)) {
-    for (const raw of input) {
-      const item = (raw ?? {}) as Record<string, unknown>;
-      if (item.role !== "user") continue;
-      const text = sessionTextContent(item.content);
-      if (text) return text;
-    }
-  }
-  return "";
-}
-
-function sessionTextContent(content: unknown): string {
-  if (typeof content === "string") return content;
-  if (!Array.isArray(content)) return "";
-  const texts: string[] = [];
-  for (const raw of content) {
-    const part = (raw ?? {}) as Record<string, unknown>;
-    const text = stringValue(part.text).trim();
-    if (text) texts.push(text);
-  }
-  return texts.join("\n");
-}
+export { extractSessionId } from "./service-helpers.js";
 
 export { cloneMap, numberAsInt, creditSharingPoint, adjustRoamingPoints, roamingPoints };

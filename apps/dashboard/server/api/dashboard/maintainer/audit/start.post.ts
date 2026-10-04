@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { createError } from "h3";
 import { z } from "zod";
 
-import { parseBody, requireMaintainerContext, setAuditUserCookie } from "../../../../utils/api";
+import { parseBody, requireMaintainerContext, setAuditUserCookie } from "~~/server/utils/api";
 import { db, user } from "@opendum/database";
 
 const startAuditInputSchema = z.object({ userId: z.string().min(1) });

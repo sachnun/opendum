@@ -2,7 +2,7 @@ import { createHmac } from "node:crypto";
 import { createError } from "h3";
 import { z } from "zod";
 
-import { parseBody, requireReadableUserId } from "../../../utils/api";
+import { parseBody, requireReadableUserId } from "~~/server/utils/api";
 
 const playgroundEndpointSchema = z.enum(["chat_completions", "messages", "responses"]);
 const playgroundAuthInputSchema = z.object({

@@ -1,4 +1,3 @@
-import type { Plugin } from "vite";
 import tailwindcss from "@tailwindcss/vite";
 
 const redisXxhashStub = "\0redis-xxhash-stub";
@@ -9,6 +8,7 @@ export default defineNuxtConfig({
   sourcemap: false,
   modules: ["@nuxt/a11y", "@nuxt/eslint", "@nuxt/fonts"],
   css: ["~/assets/css/main.css"],
+  components: [{ path: "~/components", pathPrefix: false }],
   devtools: { enabled: process.env.NODE_ENV !== "production" },
   spaLoadingTemplate: "./loading.html",
   experimental: {
@@ -74,7 +74,7 @@ export default defineNuxtConfig({
     esbuild: {
       legalComments: "none",
     },
-    plugins: [tailwindcss() as unknown as Plugin],
+    plugins: [tailwindcss() as never],
   },
   typescript: {
     strict: true,

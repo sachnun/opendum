@@ -1,5 +1,5 @@
-import { getPlaygroundOptions } from "../../../services/playground";
-import { requireReadableUserId } from "../../../utils/api";
+import { getPlaygroundOptions } from "~~/server/services/playground";
+import { requireReadableUserId } from "~~/server/utils/api";
 
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig(event);

@@ -139,6 +139,9 @@ importers:
       '@opendum/models':
         specifier: workspace:*
         version: link:../../packages/models
+      '@opendum/providers':
+        specifier: workspace:*
+        version: link:../../packages/providers
       '@opendum/redis':
         specifier: workspace:*
         version: link:../../packages/redis

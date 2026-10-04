@@ -1,5 +1,5 @@
-import { claimDailyAccessPoints, getUserPointStatus } from "../../services/points";
-import { requireReadContext } from "../../utils/api";
+import { claimDailyAccessPoints, getUserPointStatus } from "~~/server/services/points";
+import { requireReadContext } from "~~/server/utils/api";
 
 export default defineEventHandler(async (event) => {
   const context = await requireReadContext(event);

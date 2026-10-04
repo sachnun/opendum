@@ -46,5 +46,4 @@ export const AUTH_HEADERS = {
 
 export const REFRESH_BUFFER_SECONDS = 60 * 60;
 
-// Default project ID fallback when discovery fails
-export const DEFAULT_PROJECT_ID = "bamboo-precept-lgxtn";
+export { ANTIGRAVITY_DEFAULT_PROJECT_ID as DEFAULT_PROJECT_ID } from "@opendum/providers/endpoints";

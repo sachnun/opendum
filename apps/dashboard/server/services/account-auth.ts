@@ -2,18 +2,18 @@ import { and, count as countFn, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { db, providerAccount } from "@opendum/database";
-import { encrypt } from "../lib/encryption";
-import { antigravityProvider } from "../lib/providers/antigravity";
-import { CLIENT_ID as antigravityClientId, REDIRECT_URI as antigravityRedirectUri, SCOPES as antigravityScopes } from "../lib/providers/antigravity/constants";
-import { AUTHORIZE_ENDPOINT as codexAuthorizeEndpoint, BROWSER_REDIRECT_URI as codexBrowserRedirectUri, CLIENT_ID as codexClientId, ORIGINATOR as codexOriginator, SCOPE as codexScope, buildOAuthResultFromChatGPTSession, codexProvider, generateCodeChallenge as generateCodexCodeChallenge, generateCodeVerifier as generateCodexCodeVerifier, initiateCodexDeviceCodeFlow, pollCodexDeviceCodeAuthorization } from "../lib/providers/codex";
-import { BROWSER_REDIRECT_URI as kiroBrowserRedirectUri, buildKiroAuthUrl, generateCodeVerifier as generateKiroCodeVerifier, kiroProvider } from "../lib/providers/kiro";
-import { initiateWorkbuddyDeviceCodeFlow, pollWorkbuddyDeviceCodeAuthorization } from "../lib/providers/workbuddy";
-import { exchangePerchOAuthCode, initiatePerchOAuth } from "../lib/providers/perch";
-import { initiateClineDeviceCodeFlow, pollClineDeviceCodeAuthorization } from "../lib/providers/cline";
-import { clearRefreshFailCount } from "../lib/proxy/auth";
-import type { OAuthResult } from "../lib/providers/types";
-import { DEVICE_PROVIDER_KEYS, OAUTH_PROVIDER_KEYS, type DeviceProviderKey, type OAuthProviderKey } from "../../lib/provider-accounts";
-import type { ActionResult } from "../utils/api";
+import { encrypt } from "~~/server/lib/encryption";
+import { antigravityProvider } from "~~/server/lib/providers/antigravity";
+import { CLIENT_ID as antigravityClientId, REDIRECT_URI as antigravityRedirectUri, SCOPES as antigravityScopes } from "~~/server/lib/providers/antigravity/constants";
+import { AUTHORIZE_ENDPOINT as codexAuthorizeEndpoint, BROWSER_REDIRECT_URI as codexBrowserRedirectUri, CLIENT_ID as codexClientId, ORIGINATOR as codexOriginator, SCOPE as codexScope, buildOAuthResultFromChatGPTSession, codexProvider, generateCodeChallenge as generateCodexCodeChallenge, generateCodeVerifier as generateCodexCodeVerifier, initiateCodexDeviceCodeFlow, pollCodexDeviceCodeAuthorization } from "~~/server/lib/providers/codex";
+import { BROWSER_REDIRECT_URI as kiroBrowserRedirectUri, buildKiroAuthUrl, generateCodeVerifier as generateKiroCodeVerifier, kiroProvider } from "~~/server/lib/providers/kiro";
+import { initiateWorkbuddyDeviceCodeFlow, pollWorkbuddyDeviceCodeAuthorization } from "~~/server/lib/providers/workbuddy";
+import { exchangePerchOAuthCode, initiatePerchOAuth } from "~~/server/lib/providers/perch";
+import { initiateClineDeviceCodeFlow, pollClineDeviceCodeAuthorization } from "~~/server/lib/providers/cline";
+import { clearRefreshFailCount } from "~~/server/lib/proxy/auth";
+import type { OAuthResult } from "~~/server/lib/providers/types";
+import { DEVICE_PROVIDER_KEYS, OAUTH_PROVIDER_KEYS, type DeviceProviderKey, type OAuthProviderKey } from "~~/lib/provider-accounts";
+import type { ActionResult } from "~~/server/utils/api";
 import { trackProviderEmail } from "./points";
 
 const GOOGLE_OAUTH_AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -255,7 +255,7 @@ export async function connectCodexSessionAccount(userId: string, input: z.infer<
 
 export async function initiateDeviceAuth(input: z.infer<typeof initiateDeviceAuthInputSchema>) {
   try {
-    const result = await DEVICE_PROVIDERS[input.provider].initiate(input);
+    const result = await DEVICE_PROVIDERS[input.provider].initiate();
     return { success: true, data: result } as const;
   } catch (error) {
     console.error("Failed to initiate provider device auth:", error);
