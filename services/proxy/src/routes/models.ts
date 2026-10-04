@@ -43,8 +43,20 @@ async function handleModels(event: H3Event, context: ProxyContext): Promise<Resp
       context.auth.isModelUsableByAccounts(canonical, availability) ||
       (roamingEnabled && context.auth.isModelUsableBySharedAccounts(canonical, availability));
     if (!usable) continue;
-    if (apiKeyModelAccessMode === "whitelist" && !apiKeyModelSet.has(canonical)) continue;
-    if (apiKeyModelAccessMode === "blacklist" && apiKeyModelSet.has(canonical)) continue;
+    const providers = Array.isArray(item.providers) ? (item.providers as string[]) : [];
+    if (apiKeyModelAccessMode === "whitelist") {
+      if (apiKeyModelSet.has(canonical)) enabled.push(item);
+      for (const provider of providers) {
+        if (apiKeyModelSet.has(`${provider}/${canonical}`)) enabled.push({ ...item, id: `${provider}/${canonical}` });
+      }
+      continue;
+    }
+    if (apiKeyModelAccessMode === "blacklist") {
+      if (apiKeyModelSet.has(canonical)) continue;
+      const remaining = providers.filter((provider) => !apiKeyModelSet.has(`${provider}/${canonical}`));
+      enabled.push(remaining.length === providers.length ? item : { ...item, providers: remaining });
+      continue;
+    }
     enabled.push(item);
   }
 

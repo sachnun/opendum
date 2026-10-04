@@ -353,7 +353,7 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
                 <ApiKeyAccessSection title="Model Access" :badge="accessModeBadge(apiKey.modelAccessMode)">
                   <ApiKeyModelAccess
                     :api-key-id="apiKey.id"
-                    :available-models="options?.availableModels ?? []"
+                    :available-models="options?.modelAccessModels ?? options?.availableModels ?? []"
                     :initial-mode="normalizeModelAccessMode(apiKey.modelAccessMode)"
                     :initial-models="apiKey.modelAccessList"
                     :readonly="isAuditMode"

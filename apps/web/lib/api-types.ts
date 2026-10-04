@@ -218,6 +218,7 @@ export interface ApiKeyListItem {
 
 export interface ApiKeyOptions {
   availableModels: string[];
+  modelAccessModels: string[];
   availableFamilies: string[];
   providerAccounts: Array<{ id: string; provider: string; name: string; email: string | null; supportedModels?: string[] | null }>;
   rateLimitsByKeyId: Record<string, Array<{ target: string; targetType: "model" | "family"; perMinute: number | null; perHour: number | null; perDay: number | null }>>;

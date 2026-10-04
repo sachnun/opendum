@@ -406,8 +406,8 @@ export class AuthService {
     if (!base.valid && base.code !== "invalid_model") return base;
 
     let isInvalid = !base.valid;
-    if (!isInvalid && mode === "whitelist") isInvalid = !modelSet.has(base.model);
-    if (!isInvalid && mode === "blacklist") isInvalid = modelSet.has(base.model);
+    if (!isInvalid && mode === "whitelist") isInvalid = !this.isModelListed(modelSet, base.model, provider);
+    if (!isInvalid && mode === "blacklist") isInvalid = this.isModelListed(modelSet, base.model, provider);
     if (!isInvalid) {
       if (await this.isModelDisabledForUser(userId, base.model)) {
         return disabled(base.provider, base.model);
@@ -656,6 +656,11 @@ export class AuthService {
       if (this.registry.isSupported(model)) result.push(model);
     }
     return uniqueSorted(result);
+  }
+
+  private isModelListed(modelSet: Set<string>, model: string, provider: string | null): boolean {
+    if (modelSet.has(model)) return true;
+    return provider !== null && modelSet.has(`${provider}/${model}`);
   }
 
   private normalizeDisabledModelList(values: string[]): string[] {

@@ -3,10 +3,10 @@ import { z } from "zod";
 
 import { db, providerAccount, proxyApiKey, proxyApiKeyRateLimit } from "@opendum/database";
 import { decrypt, encrypt, generateApiKey, getKeyPreview, hashString } from "~~/server/lib/encryption";
-import { invalidateApiKeyValidationCache } from "~~/server/lib/proxy/auth";
+import { getAccountModelAvailability, invalidateApiKeyValidationCache } from "~~/server/lib/proxy/auth";
 import { getAuthlessProviderAccounts, isSyntheticAuthlessAccount } from "~~/server/lib/proxy/authless-providers";
 import { listCustomProviderModels } from "~~/server/lib/proxy/custom-providers";
-import { getAllFamilies, getAllModels, getModelFamily, isModelSupported, resolveModelAlias } from "~~/server/lib/proxy/models";
+import { getAllFamilies, getAllModels, getModelFamily, getProvidersForModel, isModelSupported, resolveModelAlias } from "~~/server/lib/proxy/models";
 import { roamingUsagePointsByApiKey } from "~~/server/lib/roaming-points";
 import { compareModelEntries } from "~~/lib/model-sort";
 import type { ActionResult } from "~~/server/utils/api";
@@ -68,6 +68,26 @@ function compareKnownModelIds(left: string, right: string): number {
   return compareModelEntries({ id: left, family: getModelFamily(left) }, { id: right, family: getModelFamily(right) });
 }
 
+function buildModelAccessModels(models: string[], activeProviders: ReadonlySet<string>): string[] {
+  const result: string[] = [];
+  for (const model of models) {
+    result.push(model);
+    for (const provider of [...getProvidersForModel(model)].sort()) {
+      if (activeProviders.has(provider)) result.push(`${provider}/${model}`);
+    }
+  }
+  return result;
+}
+
+function isKnownModelAccessId(model: string): boolean {
+  if (isModelSupported(model)) return true;
+  const slash = model.indexOf("/");
+  if (slash <= 0) return false;
+  const provider = model.slice(0, slash);
+  const base = model.slice(slash + 1);
+  return isModelSupported(base) && getProvidersForModel(base).includes(provider);
+}
+
 async function getOwnedApiKey(userId: string, id: string) {
   const [apiKey] = await db.select().from(proxyApiKey).where(and(eq(proxyApiKey.id, id), eq(proxyApiKey.userId, userId))).limit(1);
   return apiKey ?? null;
@@ -103,6 +123,8 @@ export async function getApiKeyOptions(userId: string) {
       .orderBy(asc(providerAccount.provider), asc(providerAccount.name));
 
     const availableModels = [...getAllModels(), ...(await ownedCustomModelIds(userId))].sort(compareKnownModelIds);
+    const availability = await getAccountModelAvailability(userId);
+    const modelAccessModels = buildModelAccessModels(availableModels, availability.activeProviders);
     const availableFamilies = getAllFamilies();
     const authlessProviderAccounts = getAuthlessProviderAccounts().map(({ disabledModels: _disabledModels, ...account }) => account);
 
@@ -116,6 +138,7 @@ export async function getApiKeyOptions(userId: string) {
 
     return {
       availableModels,
+      modelAccessModels,
       availableFamilies,
       providerAccounts: [
         ...authlessProviderAccounts,
@@ -270,7 +293,7 @@ export async function updateApiKeyModelAccess(userId: string, input: UpdateApiKe
     const normalizedModels = input.mode === "all" ? [] : normalizeModelList(input.models);
     if (input.mode !== "all" && normalizedModels.length === 0) return { success: false, error: "Select at least one model" } as const;
     const customModelIds = await ownedCustomModelIds(userId);
-    const invalidModel = normalizedModels.find((model) => !isModelSupported(model) && !customModelIds.has(model));
+    const invalidModel = normalizedModels.find((model) => !isKnownModelAccessId(model) && !customModelIds.has(model));
     if (invalidModel) return { success: false, error: `Unknown model: ${invalidModel}` } as const;
     const [updated] = await db.update(proxyApiKey).set({ modelAccessMode: input.mode, modelAccessList: normalizedModels }).where(eq(proxyApiKey.id, input.id)).returning({ modelAccessMode: proxyApiKey.modelAccessMode, modelAccessList: proxyApiKey.modelAccessList });
     if (!updated) return { success: false, error: "Failed to update API key model access" } as const;
