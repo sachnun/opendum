@@ -8,15 +8,7 @@ import { stripParamInfoKey } from "#models/clean-key.ts";
 
 const KILO_CODE_MODELS_URL = "https://api.kilo.ai/api/gateway/models";
 
-const MODEL_KEY_OVERRIDES = new Map([
-  ["x-ai/grok-code-fast-1:optimized:free", "grok-code-fast-1"],
-]);
-
 function toModelKey(modelId) {
-  const override = MODEL_KEY_OVERRIDES.get(modelId);
-  if (override) return override;
-
-  // kilo-auto/* models: replace / with -
   if (modelId.startsWith("kilo-auto/")) {
     return stripParamInfoKey(modelId.replace("/", "-"));
   }
@@ -26,9 +18,10 @@ function toModelKey(modelId) {
     ? modelId.slice(modelId.indexOf("/") + 1)
     : modelId;
 
-  // Remove :free suffix for the key (but keep full ID as upstream)
-  const modelKey = withoutProvider
-    .replace(/:free$/, "")
+  // Drop any trailing parameter suffixes (e.g. ":free", ":optimized:free").
+  const withoutParams = withoutProvider.replace(/(?::[a-zA-Z0-9_-]+)+$/, "");
+
+  const modelKey = withoutParams
     .replace(/[:/]/g, "-")
     .replace(/[^a-zA-Z0-9._-]/g, "-")
     .replace(/-{2,}/g, "-");

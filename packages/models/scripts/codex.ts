@@ -10,14 +10,9 @@ const CODEX_MODELS_URL =
 
 // Codex's public models feed includes CLI/API variants that are not accepted by
 // the ChatGPT-backed Codex account flow used by this project. Filter by
-// visibility and supported_in_api; only exclude models that are known to be
-// rejected by the ChatGPT Codex backend despite being visible in the feed.
-//
-// Maintaining a small exclusion list (rather than a whitelist) means new models
-// appear automatically when OpenAI adds them to the feed with visibility "list".
-const CHATGPT_EXCLUDED_MODELS = new Set([
-  "gpt-5.2",
-]);
+// visibility and supported_in_api; models that are still rejected by the
+// ChatGPT Codex backend opt out with `"ignored": true` in their JSON file.
+const CHATGPT_SUPPORTED_VISIBILITY = "list";
 
 // Codex is included on the Free and Go plans with only a low-tier model, while
 // the frontier models require a paid ChatGPT plan. The public models.json feed
@@ -81,9 +76,8 @@ async function fetchCodexModels() {
 function filterModels(models) {
   return models.filter((m) => {
     if (!m.slug || typeof m.slug !== "string") return false;
-    if (m.visibility && m.visibility !== "list") return false;
+    if (m.visibility && m.visibility !== CHATGPT_SUPPORTED_VISIBILITY) return false;
     if (m.supported_in_api === false) return false;
-    if (CHATGPT_EXCLUDED_MODELS.has(m.slug)) return false;
     return true;
   });
 }
@@ -196,18 +190,6 @@ async function main() {
   const filtered = filterModels(allModels);
   const modelMap = buildModelMap(filtered);
   const metadataLookup = buildMetadataLookup(filtered);
-
-  const excludedInFeed = [...CHATGPT_EXCLUDED_MODELS]
-    .filter((slug) => metadataLookup.has(slug))
-    .sort((a, b) => a.localeCompare(b));
-
-  if (excludedInFeed.length > 0) {
-    console.warn(
-      `[codex] Excluded models are still listed in the source feed: ${excludedInFeed.join(
-        ", "
-      )}`
-    );
-  }
 
   let freePlanMentions = "";
   try {

@@ -25,8 +25,11 @@ import { stripParamInfoKey } from "#models/clean-key.ts";
 const KIRO_DOCS_URL = "https://kiro.dev/docs/models/";
 const PROVIDER_NAME = "kiro";
 
-// Display names to skip (not real models)
-const IGNORED_DISPLAY_NAMES = new Set(["Auto"]);
+// Display names to skip: real models carry a version/number, so names like
+// "Auto" (a routing pseudo-model) are filtered out automatically.
+function isIgnoredDisplayName(name) {
+  return !/[0-9]/.test(name);
+}
 
 // Tiers that can access premium (paid-only) models on Kiro.
 const PAID_KIRO_TIERS = ["pro", "pro+", "power", "standalone"];
@@ -325,12 +328,12 @@ async function main() {
   // 2. Determine which models are paid-only (not available on free tier)
   const paidOnlyDisplayNames = new Set(
     officialModels
-      .filter((m) => !IGNORED_DISPLAY_NAMES.has(m.name) && !m.freeAvailable && m.paidAvailable)
+      .filter((m) => !isIgnoredDisplayName(m.name) && !m.freeAvailable && m.paidAvailable)
       .map((m) => m.name)
   );
 
   if (verbose || dryRun) {
-    const freeModels = officialModels.filter((m) => !IGNORED_DISPLAY_NAMES.has(m.name) && m.freeAvailable);
+    const freeModels = officialModels.filter((m) => !isIgnoredDisplayName(m.name) && m.freeAvailable);
     const paidModels = officialModels.filter((m) => paidOnlyDisplayNames.has(m.name));
     console.log(`\n[kiro] Tier breakdown:`);
     console.log(`  Free models (${freeModels.length}): ${freeModels.map((m) => m.name).join(", ")}`);
@@ -341,7 +344,7 @@ async function main() {
   // 3. Convert display names to Kiro API model IDs
   const allKiroIds = [];
   for (const model of officialModels) {
-    if (IGNORED_DISPLAY_NAMES.has(model.name)) {
+    if (isIgnoredDisplayName(model.name)) {
       if (verbose) {
         console.log(`[kiro] Skipping "${model.name}" (ignored)`);
       }
@@ -384,7 +387,7 @@ async function main() {
   // 5. Build per-model provider config with tier restrictions for paid-only models
   const providerConfigByModel = new Map();
   for (const model of officialModels) {
-    if (IGNORED_DISPLAY_NAMES.has(model.name)) continue;
+    if (isIgnoredDisplayName(model.name)) continue;
     if (!paidOnlyDisplayNames.has(model.name)) continue;
 
     const baseId = displayNameToKiroId(model.name);

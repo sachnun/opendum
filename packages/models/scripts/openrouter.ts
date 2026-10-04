@@ -8,8 +8,6 @@ import { stripParamInfoKey } from "#models/clean-key.ts";
 
 const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
 
-const IGNORED_MODEL_KEYS = new Set(["gpt-oss-120b"]);
-
 function toModelKey(modelId) {
   const normalizedModelId = modelId.replace(/^library\//, "");
   const providerStrippedModelId =
@@ -74,10 +72,7 @@ function isFreeChatModel(model) {
 }
 
 function buildModelMap(modelIds) {
-  return buildModelIdMap(
-    modelIds.filter((modelId) => !IGNORED_MODEL_KEYS.has(toModelKey(modelId))),
-    toModelKey
-  );
+  return buildModelIdMap(modelIds, toModelKey);
 }
 
 async function fetchOpenRouterFreeModelIds() {

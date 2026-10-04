@@ -30,19 +30,14 @@ const CODEBUDDY_ONLY_IDS = new Set([
   "minimax-m3",
 ]);
 
-const WORKBUDDY_HOUSE_MODEL_IDS = new Set([
-  "default-model",
-  "fast-model",
-  "balanced-model",
-  "primary-model",
-  "deep-model",
-]);
-
 const WORKBUDDY_ONLY_SUPPLEMENTS = new Map([
   ["deepseek-v4.1-flash", { reasoning: true }],
   ["gpt-6-astra", { reasoning: true }],
   ["hy4-preview", { reasoning: true }],
 ]);
+
+// House/preset routing ids (default-model, fast-model, ...) are not real models.
+const HOUSE_MODEL_PATTERN = /(?:^|-)model$/;
 
 function isExcludedId(id) {
   if (id.includes("image")) return true;
@@ -173,9 +168,10 @@ function enrichNewModels(modelsDir, addedKeys, modelMap, metadataLookup) {
 function enforceHouseIgnored(modelsDir) {
   const index = buildModelIndex(modelsDir);
   const changed = [];
-  for (const modelKey of WORKBUDDY_HOUSE_MODEL_IDS) {
-    const entry = Object.values(index).find((item) => item.fileId === modelKey || item.id === modelKey);
-    if (!entry || entry.data.ignored === true) continue;
+  for (const entry of Object.values(index)) {
+    const modelKey = entry.id || entry.fileId;
+    if (!modelKey || !HOUSE_MODEL_PATTERN.test(modelKey)) continue;
+    if (entry.data.ignored === true) continue;
     const providers = entry.data.providers || [];
     if (providers.length > 0 && !providers.every((provider) => provider === PROVIDER_NAME)) continue;
     entry.data.ignored = true;
