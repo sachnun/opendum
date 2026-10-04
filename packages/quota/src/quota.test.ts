@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it, mock } from "node:test";
 import {
   clampFraction,
   displayNumber,
@@ -37,8 +37,10 @@ describe("quota helpers", () => {
   });
 
   it("formats time until reset", () => {
-    const future = Date.now() + 90 * 60 * 1000;
-    assert.equal(formatTimeUntilReset(future), "1h 30m");
+    mock.timers.enable({ apis: ["Date"], now: 1_000_000 });
+    assert.equal(formatTimeUntilReset(1_000_000 + 90 * 60 * 1000), "1h 30m");
+    assert.equal(formatTimeUntilReset(1_000_000 + 25 * 60 * 1000), "25m");
+    mock.timers.reset();
     assert.equal(formatTimeUntilReset(1), "resetting...");
     assert.equal(formatTimeUntilReset(0), null);
   });
