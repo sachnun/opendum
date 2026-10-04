@@ -54,9 +54,10 @@ function orderObject(value: Record<string, JsonValue>, preferredKeys: string[] =
 function orderProviderMap(value: Record<string, JsonValue>, preferredKeys: string[]): Record<string, JsonValue> {
   const result: Record<string, JsonValue> = {};
   for (const provider of Object.keys(value).sort()) {
-    result[provider] = isPlainObject(value[provider])
-      ? orderObject(value[provider], preferredKeys)
-      : orderValue(value[provider], provider);
+    const entry = value[provider];
+    result[provider] = isPlainObject(entry)
+      ? orderObject(entry, preferredKeys)
+      : orderValue(entry!, provider);
   }
   return result;
 }
@@ -227,7 +228,7 @@ export function generatedModelPath(generatedDir: string, relativeId: string): st
 function trailingDateToken(modelId: string): string | null {
   const segment = modelId.slice(modelId.lastIndexOf("/") + 1);
   const tokens = segment.split(/[-_]/);
-  const tail = tokens[tokens.length - 1].split(":")[0];
+  const tail = (tokens[tokens.length - 1] ?? "").split(":")[0] ?? "";
   return isDateToken(tail) ? tail : null;
 }
 
@@ -272,6 +273,7 @@ export function buildModelIdMap(modelIds: string[], toModelKey: (modelId: string
     candidates.sort(compareCandidatesNewestFirst);
 
     const [winner, ...losers] = candidates;
+    if (winner === undefined) continue;
     map.set(baseKey, winner.modelId);
 
     for (const loser of losers) {
@@ -378,15 +380,17 @@ export function syncProviderModels(
     const suffixMatch = modelKey.match(/^(.+?)(?:-v(\d+(?:\.\d+)*)|-(\d+))$/);
     if (suffixMatch) {
       const [, base, versionSuffix, numericSuffix] = suffixMatch;
-      const isMeaningfulSuffix =
-        Boolean(versionSuffix) ||
-        (numericSuffix && Number.parseInt(numericSuffix, 10) >= 2);
-      if (isMeaningfulSuffix && !hasMinorVersionSuffix(base, numericSuffix)) {
-        const parent =
-          index[base] ||
-          entries.find((entry) => entry.id === base) ||
-          entries.find((entry) => entry.fileId !== modelKey && (entry.data.aliases || []).includes(base));
-        if (parent) return { baseKey: base, entry: parent };
+      if (base !== undefined) {
+        const isMeaningfulSuffix =
+          Boolean(versionSuffix) ||
+          (numericSuffix !== undefined && Number.parseInt(numericSuffix, 10) >= 2);
+        if (isMeaningfulSuffix && !hasMinorVersionSuffix(base, numericSuffix)) {
+          const parent =
+            index[base] ||
+            entries.find((entry) => entry.id === base) ||
+            entries.find((entry) => entry.fileId !== modelKey && (entry.data.aliases || []).includes(base));
+          if (parent) return { baseKey: base, entry: parent };
+        }
       }
     }
     const covered =

@@ -46,7 +46,7 @@ export function pkcs7Unpad(data: Buffer, blockSize: number): Buffer {
     throw new Error("invalid PKCS7 data");
   }
   const padding = data[data.length - 1];
-  if (padding === 0 || padding > blockSize || padding > data.length) {
+  if (padding === undefined || padding === 0 || padding > blockSize || padding > data.length) {
     throw new Error("invalid PKCS7 padding");
   }
   for (const byte of data.subarray(data.length - padding)) {

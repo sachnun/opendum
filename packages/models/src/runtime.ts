@@ -631,13 +631,13 @@ function levenshteinDistance(a: string, b: string): number {
     current[0] = i + 1;
     for (let j = 0; j < right.length; j += 1) {
       const cost = left[i] === right[j] ? 0 : 1;
-      current[j + 1] = Math.min(current[j] + 1, previous[j + 1] + 1, previous[j] + cost);
+      current[j + 1] = Math.min(current[j]! + 1, previous[j + 1]! + 1, previous[j]! + cost);
     }
     const swap = previous;
     previous = current;
     current = swap;
   }
-  return previous[right.length];
+  return previous[right.length]!;
 }
 
 function compactTokenScore(term: string, candidate: string): number {

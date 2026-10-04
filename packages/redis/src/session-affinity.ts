@@ -47,7 +47,9 @@ export function preferSticky<T>(items: T[], isSticky: (item: T) => boolean): T[]
   if (items.length === 0) return items;
   const index = items.findIndex(isSticky);
   if (index <= 0) return items;
-  return [items[index], ...items.slice(0, index), ...items.slice(index + 1)];
+  const sticky = items[index];
+  if (sticky === undefined) return items;
+  return [sticky, ...items.slice(0, index), ...items.slice(index + 1)];
 }
 
 function validPair(userId: string, sessionId: string): boolean {
