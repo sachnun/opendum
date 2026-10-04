@@ -172,8 +172,8 @@ func TestNvidiaNemotronOmniAliasUsesCurrentHostedModel(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	model := "nemotron-3-nano-omni"
-	for _, alias := range []string{"nemotron-3-nano-omni-30b-a3b-reasoning", "nemotron-omni", "nano-omni"} {
+	model := "nemotron-3-nano-omni-30b-a3b-reasoning"
+	for _, alias := range []string{"nemotron-3-nano-omni", "nemotron-omni", "nano-omni"} {
 		if got := registry.ResolveAlias(alias); got != model {
 			t.Fatalf("ResolveAlias(%q) = %q, want %q", alias, got, model)
 		}
