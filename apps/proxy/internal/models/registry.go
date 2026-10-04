@@ -160,48 +160,200 @@ func Load(dir string) (*Registry, error) {
 		suggestionProviders: map[string][]suggestionCandidate{},
 	}
 
-	err := filepath.WalkDir(dir, func(path string, entry fs.DirEntry, walkErr error) error {
+	entries, err := collectModelEntries(dir, resolveGeneratedDir(dir))
+	if err != nil {
+		return nil, err
+	}
+
+	for _, entry := range entries {
+		info := entry.info
+		info.ID = strings.TrimSpace(info.ID)
+		info.Providers = compactStrings(info.Providers)
+		info.Aliases = compactStrings(info.Aliases)
+		if entry.owner != "" {
+			info.Owner = entry.owner
+		}
+		modelID := entry.fileID
+		if info.ID != "" {
+			modelID = info.ID
+		}
+		registry.mergeModelInfo(modelID, entry.fileID, info)
+		if info.Ignored {
+			registry.ignored[modelID] = struct{}{}
+		}
+	}
+
+	registry.buildAliases()
+	registry.buildSuggestionCandidates()
+	return registry, nil
+}
+
+func resolveGeneratedDir(dir string) string {
+	if configured := strings.TrimSpace(os.Getenv("MODELS_GENERATED_DIR")); configured != "" {
+		return configured
+	}
+	return filepath.Join(filepath.Dir(filepath.Clean(dir)), "generated")
+}
+
+type modelEntry struct {
+	fileID string
+	owner  string
+	info   Info
+}
+
+func collectModelEntries(authoredDir, generatedDir string) ([]modelEntry, error) {
+	authored, err := readModelEntries(authoredDir, true)
+	if err != nil {
+		return nil, err
+	}
+	generated, err := readModelEntries(generatedDir, false)
+	if err != nil {
+		return nil, err
+	}
+
+	byFileID := map[string]*modelEntry{}
+	order := []string{}
+	for _, entry := range authored {
+		if _, ok := byFileID[entry.fileID]; !ok {
+			order = append(order, entry.fileID)
+		}
+		copy := entry
+		byFileID[entry.fileID] = &copy
+	}
+	for _, entry := range generated {
+		if existing, ok := byFileID[entry.fileID]; ok {
+			mergeGeneratedInfo(existing, entry)
+			continue
+		}
+		order = append(order, entry.fileID)
+		copy := entry
+		byFileID[entry.fileID] = &copy
+	}
+
+	entries := make([]modelEntry, 0, len(order))
+	for _, fileID := range order {
+		entries = append(entries, *byFileID[fileID])
+	}
+	return entries, nil
+}
+
+func readModelEntries(dir string, required bool) ([]modelEntry, error) {
+	entries := []modelEntry{}
+	info, err := os.Stat(dir)
+	if err != nil || !info.IsDir() {
+		if required && err != nil {
+			return nil, err
+		}
+		return entries, nil
+	}
+
+	err = filepath.WalkDir(dir, func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
 			return nil
 		}
-
 		content, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}
-
-		var info Info
-		if err := json.Unmarshal(content, &info); err != nil {
+		var parsed Info
+		if err := json.Unmarshal(content, &parsed); err != nil {
 			return err
 		}
-
-		info.ID = strings.TrimSpace(info.ID)
-		info.Providers = compactStrings(info.Providers)
-		info.Aliases = compactStrings(info.Aliases)
+		owner := ""
 		if parent := filepath.Dir(path); parent != dir {
-			info.Owner = filepath.Base(parent)
+			owner = filepath.Base(parent)
 		}
-		fileID := strings.TrimSuffix(filepath.Base(path), ".json")
-		modelID := fileID
-		if info.ID != "" {
-			modelID = info.ID
-		}
-		registry.mergeModelInfo(modelID, fileID, info)
-		if info.Ignored {
-			registry.ignored[modelID] = struct{}{}
-		}
+		entries = append(entries, modelEntry{
+			fileID: strings.TrimSuffix(filepath.Base(path), ".json"),
+			owner:  owner,
+			info:   parsed,
+		})
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
+	return entries, nil
+}
 
-	registry.buildAliases()
-	registry.buildSuggestionCandidates()
-	return registry, nil
+func mergeGeneratedInfo(authored *modelEntry, generated modelEntry) {
+	if authored.info.ID == "" {
+		authored.info.ID = generated.info.ID
+	}
+	if len(authored.info.Providers) == 0 {
+		authored.info.Providers = generated.info.Providers
+	}
+	if len(generated.info.Aliases) > 0 {
+		authored.info.Aliases = append(authored.info.Aliases, generated.info.Aliases...)
+	}
+	if authored.info.Reasoning == nil {
+		authored.info.Reasoning = generated.info.Reasoning
+	}
+	if len(authored.info.ReasoningEffort) == 0 {
+		authored.info.ReasoningEffort = generated.info.ReasoningEffort
+	}
+	if authored.info.Modalities == nil {
+		authored.info.Modalities = generated.info.Modalities
+	}
+	if authored.info.Limit == nil {
+		authored.info.Limit = generated.info.Limit
+	}
+	if authored.info.Cost == nil {
+		authored.info.Cost = generated.info.Cost
+	}
+	if len(generated.info.ProviderConfig) > 0 {
+		if authored.info.ProviderConfig == nil {
+			authored.info.ProviderConfig = map[string]ProviderModelConfig{}
+		}
+		for provider, config := range generated.info.ProviderConfig {
+			existing, ok := authored.info.ProviderConfig[provider]
+			if !ok {
+				authored.info.ProviderConfig[provider] = config
+				continue
+			}
+			authored.info.ProviderConfig[provider] = mergeProviderConfig(config, existing)
+		}
+	}
+}
+
+func mergeProviderConfig(generated, authored ProviderModelConfig) ProviderModelConfig {
+	merged := generated
+	if authored.Upstream != "" {
+		merged.Upstream = authored.Upstream
+	}
+	if authored.ContextWindow != 0 {
+		merged.ContextWindow = authored.ContextWindow
+	}
+	if authored.MaxOutputTokens != 0 {
+		merged.MaxOutputTokens = authored.MaxOutputTokens
+	}
+	if authored.MinTier != "" {
+		merged.MinTier = authored.MinTier
+	}
+	if len(authored.AllowedTiers) > 0 {
+		merged.AllowedTiers = authored.AllowedTiers
+	}
+	if authored.Authless {
+		merged.Authless = true
+	}
+	if authored.Free {
+		merged.Free = true
+	}
+	if len(authored.Aliases) > 0 {
+		merged.Aliases = authored.Aliases
+	}
+	if len(authored.Custom) > 0 {
+		if merged.Custom == nil {
+			merged.Custom = map[string]any{}
+		}
+		for key, value := range authored.Custom {
+			merged.Custom[key] = value
+		}
+	}
+	return merged
 }
 
 func (r *Registry) mergeModelInfo(modelID, fileID string, info Info) {

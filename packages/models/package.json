@@ -4,14 +4,22 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./families": "./src/families.ts",
     "./clean-key": "./src/clean-key.ts",
+    "./families": "./src/families.ts",
+    "./merge": "./src/merge.ts",
+    "./probes": "./src/probes.ts",
     "./registry": "./src/registry.ts"
+  },
+  "imports": {
+    "#models/*": "./src/*"
   },
   "scripts": {
     "refresh": "tsx ./scripts/models.ts",
     "test": "tsx --test ./src/*.test.ts",
     "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "fuzzball": "^2.2.6"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
