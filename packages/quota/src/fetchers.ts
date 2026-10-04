@@ -136,16 +136,6 @@ function openRouterGroups(keyData: Json, creditsData: Json): QuotaGroupDisplay[]
   }];
 }
 
-const ANTIGRAVITY_CLAUDE_API = [
-  "claude-opus-5-5-high", "claude-opus-5-5-medium", "claude-opus-5-5-low",
-  "claude-sonnet-5-5-high", "claude-sonnet-5-5-medium", "claude-sonnet-5-5-low",
-  "claude-opus-4-6-thinking", "claude-sonnet-4-6", "gpt-oss-120b-medium",
-];
-const ANTIGRAVITY_GEMINI_API = [
-  "gemini-3.8-flash-high", "gemini-3.1-pro-high", "gemini-3.5-flash-medium",
-  "gemini-2.5-flash-thinking", "gemini-2.5-flash-lite",
-];
-
 export async function fetchAntigravityQuota(
   ctx: QuotaContext,
   account: QuotaAccount,
@@ -186,40 +176,39 @@ export async function fetchAntigravityQuota(
 
 function antigravityGroups(payload: Json): QuotaGroupDisplay[] {
   const models = parseQuotaRecord(payload.models) ?? {};
-  const configs = [
-    { name: "claude", display: "Claude", models: ANTIGRAVITY_CLAUDE_API },
-    { name: "gemini", display: "Gemini", models: ANTIGRAVITY_GEMINI_API },
+
+  const groups: Array<{ name: string; display: string; remainingFraction: number; resetIso: string | null }> = [
+    { name: "claude", display: "Claude", remainingFraction: 1, resetIso: null },
+    { name: "gemini", display: "Gemini", remainingFraction: 1, resetIso: null },
   ];
-  const groups: QuotaGroupDisplay[] = [];
-  for (const cfg of configs) {
-    let remainingFraction = 1;
-    let resetIso: string | null = null;
-    for (const apiModel of cfg.models) {
-      const modelRecord = parseQuotaRecord(models[apiModel]);
-      if (!modelRecord) continue;
-      const quotaInfo = parseQuotaRecord(modelRecord.quotaInfo);
-      if (!quotaInfo) continue;
-      if (quotaInfo.remainingFraction === undefined || quotaInfo.remainingFraction === null) remainingFraction = 0;
-      else {
-        const value = parseQuotaNumber(quotaInfo.remainingFraction);
-        if (value !== null) remainingFraction = clampFraction(value);
-      }
-      const iso = parseResetIso(quotaInfo.resetTime);
-      if (iso) resetIso = iso;
-      break;
-    }
-    groups.push({
-      name: cfg.name,
-      displayName: cfg.display,
-      remainingFraction,
-      remainingRequests: displayNumber(remainingFraction * 100),
-      maxRequests: 100,
-      usedRequests: displayNumber(100 - remainingFraction * 100),
-      resetTimeIso: resetIso,
-      resetInHuman: formatTimeUntilResetIso(resetIso),
-    });
+
+  for (const [modelId, entry] of Object.entries(models)) {
+    const group = modelId.startsWith("gemini") ? groups[1] : groups[0];
+    const modelRecord = parseQuotaRecord(entry);
+    if (!modelRecord) continue;
+    const quotaInfo = parseQuotaRecord(modelRecord.quotaInfo);
+    if (!quotaInfo) continue;
+
+    const value = quotaInfo.remainingFraction === undefined || quotaInfo.remainingFraction === null
+      ? null
+      : parseQuotaNumber(quotaInfo.remainingFraction);
+    const fraction = value === null ? 0 : clampFraction(value);
+    if (fraction < group.remainingFraction) group.remainingFraction = fraction;
+
+    const iso = parseResetIso(quotaInfo.resetTime);
+    if (iso && (!group.resetIso || iso < group.resetIso)) group.resetIso = iso;
   }
-  return groups;
+
+  return groups.map((group) => ({
+    name: group.name,
+    displayName: group.display,
+    remainingFraction: group.remainingFraction,
+    remainingRequests: displayNumber(group.remainingFraction * 100),
+    maxRequests: 100,
+    usedRequests: displayNumber(100 - group.remainingFraction * 100),
+    resetTimeIso: group.resetIso,
+    resetInHuman: formatTimeUntilResetIso(group.resetIso),
+  }));
 }
 
 export async function fetchCodexQuota(
