@@ -217,6 +217,7 @@ export class Registry {
   private readonly effective = new Map<string, ModelInfo>();
   private readonly ignored = new Set<string>();
   private readonly aliasToCanonical = new Map<string, string>();
+  private readonly foldedAliasToCanonical = new Map<string, string>();
   private readonly canonicalToAliases = new Map<string, string[]>();
   private readonly providerModelMapCache = new Map<string, Map<string, string>>();
   private readonly providerModelSetCache = new Map<string, Set<string>>();
@@ -321,6 +322,23 @@ export class Registry {
     for (const [canonical, aliases] of this.canonicalToAliases) {
       this.canonicalToAliases.set(canonical, uniqueSorted(aliases));
     }
+
+    this.buildFoldedAliases();
+  }
+
+  private buildFoldedAliases(): void {
+    const canonicals = [...this.effective.keys()].sort((a, b) => a.localeCompare(b));
+    for (const canonical of canonicals) {
+      const key = canonical.toLowerCase();
+      if (!this.foldedAliasToCanonical.has(key)) this.foldedAliasToCanonical.set(key, canonical);
+    }
+    const aliases = [...this.aliasToCanonical.keys()].sort((a, b) => a.localeCompare(b));
+    for (const alias of aliases) {
+      const key = alias.toLowerCase();
+      if (!this.foldedAliasToCanonical.has(key)) {
+        this.foldedAliasToCanonical.set(key, this.aliasToCanonical.get(alias) as string);
+      }
+    }
   }
 
   private buildSuggestionCandidates(): void {
@@ -344,7 +362,13 @@ export class Registry {
   }
 
   resolveAlias(model: string): string {
-    return this.aliasToCanonical.get(model) ?? model;
+    const trimmed = model.trim();
+    if (!trimmed) return trimmed;
+    const direct = this.aliasToCanonical.get(trimmed);
+    if (direct !== undefined) return direct;
+    const folded = this.foldedAliasToCanonical.get(trimmed.toLowerCase());
+    if (folded !== undefined) return folded;
+    return trimmed;
   }
 
   lookupKeys(model: string): string[] {
