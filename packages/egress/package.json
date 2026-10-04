@@ -6,7 +6,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./unroxy": "./src/unroxy.ts",
-    "./ssrf": "./src/ssrf.ts"
+    "./ssrf": "./src/ssrf.ts",
+    "./guard": "./src/guard.ts"
   },
   "scripts": {
     "test": "tsx --test ./src/*.test.ts",

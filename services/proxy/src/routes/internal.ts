@@ -34,7 +34,7 @@ function redisJournal(context: ProxyContext): QuotaJournal {
 
 function quotaContext(context: ProxyContext): QuotaContext {
   return {
-    fetch: (url, init) => fetch(url, init),
+    fetch: (url, init) => context.guardedFetch(url, init),
     journal: redisJournal(context),
     decrypt: (value) => decrypt(context.config.betterAuthSecret, value),
     getCredentials: (account) => context.service.quotaCredentials(account),
@@ -162,11 +162,10 @@ async function handleRefresh(event: H3Event, context: ProxyContext): Promise<Res
 
   let upstream: Response;
   try {
-    upstream = await fetch(resolved.target, {
+    upstream = await context.guardedFetch(resolved.target, {
       method: resolved.method,
       headers,
       body,
-      redirect: "manual",
       signal: AbortSignal.timeout(RELAY_TIMEOUT_MS),
     });
   } catch (error) {
