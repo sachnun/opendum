@@ -1,33 +1,4 @@
 import { stringValue } from "./helpers.js";
-import type { ErrorFormat, RouteError } from "./types.js";
-
-export function writeRouteError(
-  format: ErrorFormat,
-  error: RouteError
-): Response {
-  const type = error.type || "invalid_request_error";
-  const headers = new Headers({ "Content-Type": "application/json" });
-  if (format === "anthropic") {
-    const body: Record<string, unknown> = { type, message: error.message };
-    if (error.retryAfter != null) body.retry_after = error.retryAfter;
-    if (error.retryAfterMs != null) body.retry_after_ms = error.retryAfterMs;
-    return new Response(JSON.stringify({ type: "error", error: body }), {
-      status: error.status,
-      headers,
-    });
-  }
-  const body = {
-    error: {
-      message: error.message,
-      type,
-      param: error.param ?? null,
-      code: error.code ?? null,
-      ...(error.retryAfter != null ? { retry_after: error.retryAfter } : {}),
-      ...(error.retryAfterMs != null ? { retry_after_ms: error.retryAfterMs } : {}),
-    },
-  };
-  return new Response(JSON.stringify(body), { status: error.status, headers });
-}
 
 export function sanitizedProxyError(status: number, body: string): { message: string; type: string } {
   const type = providerErrorType(status);

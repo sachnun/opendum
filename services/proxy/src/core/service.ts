@@ -18,7 +18,6 @@ import {
   listEligibleAccounts,
   listExpiringRefreshableAccounts,
   listModelHealthByAccount,
-  listModelHealthByAccounts,
   listSharedEligibleAccounts,
   markAccountRecoveredByRotation,
   markAccountSuccess,
@@ -87,7 +86,7 @@ import type {
   UsageCounts,
 } from "./types.js";
 
-const AUTHLEless_PREFIX = "authless:";
+const AUTHLESS_ACCOUNT_PREFIX = "authless:";
 const FAILED_COOLDOWN_MS = 10 * 60 * 1000;
 const UNHEALTHY_IDLE_DECAY_MS = 10 * 60 * 1000;
 const MODEL_DEGRADED_THRESHOLD = 2;
@@ -243,11 +242,7 @@ export class ProxyService implements StreamRecorder {
       sessionId
     );
     if ("status" in attempt && typeof attempt.status === "number") {
-      const routeError = attempt as RouteError;
-      if (routeError.accountId) {
-        // account id is surfaced through the error body only
-      }
-      return this.routeError(cfg, routeError);
+      return this.routeError(cfg, attempt as RouteError);
     }
 
     const { account, response, requestStartMs, upstreamFirstResponseMs, rotationFailures, roaming } =
@@ -1736,7 +1731,7 @@ export class ProxyService implements StreamRecorder {
 }
 
 function isSyntheticProviderAccountId(accountId: string): boolean {
-  return accountId === "opencode" || accountId.startsWith(AUTHLEless_PREFIX);
+  return accountId === "opencode" || accountId.startsWith(AUTHLESS_ACCOUNT_PREFIX);
 }
 
 function normalizeAccessMode(mode: string): string {

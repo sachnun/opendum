@@ -41,14 +41,6 @@ export function cloneMapExcept(
   return out;
 }
 
-export function strPtr(value: string): string {
-  return value;
-}
-
-export function isTruthy(value: unknown): boolean {
-  return value === true;
-}
-
 export function anySlice(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
 }
@@ -71,8 +63,4 @@ export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
       reject(new Error("aborted"));
     });
   });
-}
-
-export function nowIso(date: Date): string {
-  return date.toISOString();
 }
