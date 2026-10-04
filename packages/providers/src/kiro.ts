@@ -116,10 +116,13 @@ export class KiroProvider implements Provider, CredentialRefresher, RefreshBuffe
       },
       body: JSON.stringify(payload),
     });
-    request.onUpstreamResponseStart?.();
     if (resp.status < 200 || resp.status >= 300) return resp;
+    request.onUpstreamResponseStart?.();
+    if (!resp.body) {
+      return jsonResponse(502, { error: { message: "Kiro response stream is empty", type: "api_error" } });
+    }
 
-    if (request.stream && resp.body) {
+    if (request.stream) {
       return new Response(kiroSseStream(resp.body, modelName, thinkingEnabled), {
         status: 200,
         headers: {

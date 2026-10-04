@@ -122,8 +122,8 @@ export class WorkbuddyProvider implements Provider, CredentialRefresher {
       },
       body: JSON.stringify(payload),
     });
-    request.onUpstreamResponseStart?.();
     if (resp.status < 200 || resp.status >= 300) return resp;
+    request.onUpstreamResponseStart?.();
     if (request.stream) return resp;
     const body = await resp.text();
     return jsonResponse(200, workbuddyStreamToCompletion(body, modelName));

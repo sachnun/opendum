@@ -6,6 +6,7 @@ import {
   filterKeys,
   jsonResponse,
   normalizeToolChoice,
+  numberFromAny,
   parseSseDataLines,
   stringSlice,
   stringValue,
@@ -292,8 +293,8 @@ export class CodexProvider implements Provider, CredentialRefresher, RefreshBuff
       headers,
       body: JSON.stringify(payload),
     });
-    request.onUpstreamResponseStart?.();
     if (resp.status < 200 || resp.status >= 300) return resp;
+    request.onUpstreamResponseStart?.();
     void this.updateQuotaFromHeaders(account.id, resp.headers);
     if (request.stream && resp.body) {
       return new Response(responsesSseToChatStream(resp.body, modelName), {
@@ -474,22 +475,22 @@ export function responsesStreamToCompletion(text: string, model: string): Json {
         break;
       case "response.reasoning.delta":
       case "response.reasoning_text.delta":
-        appendReasoning(`text:${event.content_index}`, stringValue(event.delta));
+        appendReasoning(`text:${numberFromAny(event.content_index)}`, stringValue(event.delta));
         break;
       case "response.reasoning_summary_text.delta":
-        appendReasoning(`summary:${event.summary_index}`, stringValue(event.delta));
+        appendReasoning(`summary:${numberFromAny(event.summary_index)}`, stringValue(event.delta));
         break;
       case "response.reasoning_text.done":
-        appendReasoning(`text:${event.content_index}`, stringValue(event.text));
+        appendReasoning(`text:${numberFromAny(event.content_index)}`, stringValue(event.text));
         break;
       case "response.reasoning_summary_text.done":
-        appendReasoning(`summary:${event.summary_index}`, stringValue(event.text));
+        appendReasoning(`summary:${numberFromAny(event.summary_index)}`, stringValue(event.text));
         break;
       case "response.reasoning_summary_part.done": {
         const part = (event.part ?? {}) as Json;
         let value = stringValue(part.text);
         if (!value) value = stringValue(event.text);
-        appendReasoning(`summary:${event.summary_index}`, value);
+        appendReasoning(`summary:${numberFromAny(event.summary_index)}`, value);
         break;
       }
       case "response.output_item.added": {
