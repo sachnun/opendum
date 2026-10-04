@@ -1,6 +1,6 @@
-import { H3, defineHandler } from "h3";
+import { H3, defineHandler, onResponse } from "h3";
 import type { ProxyContext } from "./context.js";
-import { defineCorsOptions } from "./middleware/cors.js";
+import { applyCors, defineCorsOptions } from "./middleware/cors.js";
 import { jsonResponse, notFound, unknownEndpoint } from "./routes/errors.js";
 import { registerModelsRoute } from "./routes/models.js";
 import { registerInferenceRoutes } from "./routes/inference.js";
@@ -8,6 +8,18 @@ import { registerInternalRoutes } from "./routes/internal.js";
 
 export function createServer(context: ProxyContext): H3 {
   const app = new H3();
+
+  app.use(
+    onResponse((response) => {
+      const headers = new Headers(response.headers);
+      applyCors(headers);
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers,
+      });
+    })
+  );
 
   defineCorsOptions(app);
 
