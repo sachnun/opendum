@@ -34,11 +34,6 @@ function isIgnoredDisplayName(name) {
 // Tiers that can access premium (paid-only) models on Kiro.
 const PAID_KIRO_TIERS = ["pro", "pro+", "power", "standalone"];
 
-// Display name → Kiro API model ID overrides (non-standard mappings)
-const MODEL_ID_OVERRIDES = {
-  "Claude Sonnet 4.0": "claude-sonnet-4",
-};
-
 // Models known to have a separate -1m (1M context) variant on the Kiro API.
 // The official docs may only list the base model; we add the -1m variant
 // for models where the Kiro API accepts it.
@@ -239,26 +234,71 @@ function parseTableRows(tableInnerHtml) {
 }
 
 /**
- * Convert a display name from the Kiro docs to a Kiro API model ID.
+ * Discover the official model ID catalog embedded in the Kiro docs bundle.
  *
- * Examples:
- *   "Claude Opus 4.6"   → "claude-opus-4.6"
- *   "Claude Sonnet 4.0" → "claude-sonnet-4"   (override: Kiro drops .0)
- *   "DeepSeek 3.2"      → "deepseek-3.2"
- *   "MiniMax 2.5"       → "minimax-m2.5"      (Kiro prefixes "m")
- *   "MiniMax 2.1"       → "minimax-m2.1"
- *   "Qwen3 Coder Next"  → "qwen3-coder-next"
- *   "Claude Haiku 4.5"  → "claude-haiku-4.5"
+ * The docs client bundle ships the model list as objects shaped
+ * `{"id":"claude-opus-4.6","name":"Claude Opus 4.6","provider":"anthropic",...}`.
+ * Reading those `id`s keeps the registry aligned with the published Kiro IDs
+ * instead of deriving them from display names.
  *
- * @param {string} displayName
- * @returns {string}
+ * @returns {Promise<Map<string, string>>} display name → Kiro API model ID
  */
-function displayNameToKiroId(displayName) {
-  if (MODEL_ID_OVERRIDES[displayName]) {
-    return MODEL_ID_OVERRIDES[displayName];
+async function fetchDocsCatalog() {
+  let html;
+  try {
+    const response = await fetch(KIRO_DOCS_URL, {
+      headers: { Accept: "text/html" },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+    if (!response.ok) return new Map();
+    html = await response.text();
+  } catch {
+    return new Map();
   }
 
+  const chunkPaths = [
+    ...new Set([...html.matchAll(/\/_next\/static\/chunks\/[a-zA-Z0-9._-]+\.js/g)].map((m) => m[0])),
+  ];
+  const byName = new Map();
+
+  for (const chunkPath of chunkPaths) {
+    let script;
+    try {
+      const response = await fetch(new URL(chunkPath, KIRO_DOCS_URL), {
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      });
+      if (!response.ok) continue;
+      script = await response.text();
+    } catch {
+      continue;
+    }
+
+    for (const match of script.matchAll(/\{"id":"([a-z0-9.-]+)","name":"([^"]+)","provider":"[^"]+"/g)) {
+      if (!byName.has(match[2])) byName.set(match[2], match[1]);
+    }
+  }
+
+  return byName;
+}
+
+/**
+ * Convert a display name from the Kiro docs to a Kiro API model ID.
+ *
+ * Prefers the ID published in the docs bundle, then falls back to a generic
+ * normalization for models the bundle does not list.
+ *
+ * @param {string} displayName
+ * @param {Map<string, string>} [catalog]
+ * @returns {string}
+ */
+function displayNameToKiroId(displayName, catalog) {
+  const published = catalog?.get(displayName);
+  if (published) return published;
+
   let id = displayName.toLowerCase().replace(/\s+/g, "-");
+
+  // Trailing .0 is dropped by the API: "claude-sonnet-4.0" → "claude-sonnet-4"
+  id = id.replace(/\.0(?=-|$)/g, "");
 
   // MiniMax: "minimax-2.5" → "minimax-m2.5"
   id = id.replace(/^minimax-(\d)/, "minimax-m$1");
@@ -325,6 +365,9 @@ async function main() {
     `[kiro] Found ${officialModels.length} models on docs page: ${officialModels.map((m) => m.name).join(", ")}`
   );
 
+  const catalog = await fetchDocsCatalog();
+  console.log(`[kiro] Resolved ${catalog.size} published model IDs from the docs bundle.`);
+
   // 2. Determine which models are paid-only (not available on free tier)
   const paidOnlyDisplayNames = new Set(
     officialModels
@@ -351,7 +394,7 @@ async function main() {
       continue;
     }
 
-    const baseId = displayNameToKiroId(model.name);
+    const baseId = displayNameToKiroId(model.name, catalog);
     const variants = expandVariants(baseId);
     allKiroIds.push(...variants);
 
@@ -390,7 +433,7 @@ async function main() {
     if (isIgnoredDisplayName(model.name)) continue;
     if (!paidOnlyDisplayNames.has(model.name)) continue;
 
-    const baseId = displayNameToKiroId(model.name);
+    const baseId = displayNameToKiroId(model.name, catalog);
     const variants = expandVariants(baseId);
     for (const kiroId of variants) {
       const { key } = toCanonical(kiroId);

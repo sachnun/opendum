@@ -4,9 +4,10 @@
  * Antigravity refresh script.
  *
  * Fetches the public Google Antigravity model documentation and syncs the
- * reasoning models into the JSON model registry. The parser intentionally works
- * from display names instead of a fixed model table so new Gemini/Claude/GPT-OSS
- * versions can flow through without updating a hardcoded list.
+ * reasoning models into the JSON model registry. The model list, IDs and tier
+ * availability come from the machine-readable model selector embedded in the
+ * docs page (`data-model-id` / `data-tiers`), so new Gemini/Claude/GPT-OSS
+ * versions flow through without updating a hardcoded list.
  *
  * It also refreshes the User-Agent version used by the Go proxy and web
  * Antigravity providers from the Antigravity changelog, so the hardcoded
@@ -24,7 +25,6 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildModelIndex, persistModel, syncProviderModels } from "#models/registry.ts";
 import { fetchText } from "#models/http.ts";
-import { stripParamInfoKey } from "#models/clean-key.ts";
 
 const ANTIGRAVITY_MODELS_URL = "https://antigravity.google/docs/models";
 const PROVIDER_NAME = "antigravity";
@@ -56,23 +56,17 @@ const PROXY_USER_AGENT_REGEX =
 const WEB_USER_AGENT_REGEX =
   /((?:export\s+)?const USER_AGENT\s*=\s*`antigravity\/)(\d+\.\d+\.\d+)(\s+linux\/amd64`;)/;
 
-const GEMINI_35_FLASH_LEVELS = ["minimal", "low", "medium", "high"];
 const GEMINI_3X_FLASH_LEVELS = ["low", "medium", "high"];
-const GEMINI_31_PRO_LEVELS = ["low", "medium", "high"];
 
-// Official docs expose user-facing labels, but cloudcode-pa v1internal can use
-// backend IDs that are not derivable from the display name alone.
-const DOCUMENTED_BACKEND_OVERRIDES = new Map([
-  ["Claude Sonnet 4.6 (thinking)", { key: "claude-sonnet-4-6", upstream: "claude-sonnet-4-6" }],
-  ["Claude Opus 4.6 (thinking)", { key: "claude-opus-4-6", upstream: "claude-opus-4-6-thinking" }],
-  ["Claude Sonnet 5.5 (thinking)", { key: "claude-sonnet-5-5", upstream: "claude-sonnet-5-5-medium" }],
-  ["Claude Opus 5.5 (thinking)", { key: "claude-opus-5-5", upstream: "claude-opus-5-5-medium" }],
-  ["GPT-OSS-120b", { key: "gpt-oss-120b", upstream: "gpt-oss-120b-medium" }],
-]);
-
-const MODEL_ALIASES_BY_KEY = new Map([
-  ["gemini-3.5-flash", GEMINI_35_FLASH_LEVELS.map((level) => `gemini-3.5-flash-${level}`)],
-  ["gemini-3.1-pro", GEMINI_31_PRO_LEVELS.map((level) => `gemini-3.1-pro-${level}`)],
+// cloudcode-pa appends an effort/reasoning SKU to the documented model ID.
+// Gemini models derive it from their documented level; Claude and GPT-OSS use
+// a fixed default SKU that the public docs do not list.
+const DOCUMENTED_EFFORT_SUFFIX = new Map([
+  ["claude-opus-4-6", "thinking"],
+  ["claude-sonnet-4-6", ""],
+  ["claude-opus-5-5", "medium"],
+  ["claude-sonnet-5-5", "medium"],
+  ["gpt-oss-120b", "medium"],
 ]);
 
 function leveledFlashModelKey(modelKey) {
@@ -92,221 +86,108 @@ function leveledFlashAliases(modelKey) {
   return GEMINI_3X_FLASH_LEVELS.map((level) => `${modelKey}-${level}`);
 }
 
-// Models can opt in/out by editing their JSON file directly. There is no
-// longer a hard-coded preserved list here; a model's registry state is
-// driven by the `providers` array on disk and the antigravity docs.
-
-function htmlToReasoningModelMarkdown(html) {
-  const sectionMatch = html.match(
-    /<h2[^>]*id=["']reasoning-model["'][^>]*>[\s\S]*?<\/h2>\s*([\s\S]*?)(?:<h2[^>]*>|$)/i
-  );
-  if (!sectionMatch) {
-    return "";
-  }
-
-  const tableMatch = sectionMatch[1].match(/<table[^>]*>([\s\S]*?)<\/table>/i);
-  if (!tableMatch) {
-    return "";
-  }
-
-  const rows = [];
-  const trMatches = tableMatch[1].matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi);
-  for (const tr of trMatches) {
-    const cells = [...tr[1].matchAll(/<(th|td)[^>]*>([\s\S]*?)<\/\1>/gi)]
-      .map((m) => m[2].replace(/<[^>]+>/g, "").trim())
-      .filter(Boolean);
-    if (cells.length > 0) {
-      rows.push(`| ${cells.join(" | ")} |`);
-    }
-  }
-
-  return `## Reasoning Model\n\n${rows.join("\n")}\n`;
-}
-
-function parseReasoningModelNames(markdown) {
-  const section = markdown.match(/## Reasoning Model\s+([\s\S]*?)(?:\n## |$)/);
-  if (!section) {
-    throw new Error("Could not find Reasoning Model section in Antigravity docs.");
-  }
-
-  const models = [];
-  let pastHeader = false;
-  for (const line of section[1].split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed.startsWith("|") || /^\|[\s:-]+\|/.test(trimmed)) continue;
-
-    if (!pastHeader) {
-      const firstCol = trimmed.match(/^\|\s+(.+?)\s+\|/);
-      if (firstCol && /model/i.test(firstCol[1].trim())) continue;
-      pastHeader = true;
-    }
-
-    const match = trimmed.match(/^\|\s+(.+?)\s+\|/);
-    if (!match) continue;
-
-    const name = stripMarkdown(match[1]).trim();
-    if (!name) continue;
-
-    if (/^nano banana/i.test(name)) continue;
-    models.push(name);
-  }
-
-  const unique = [...new Set(models)];
-  if (unique.length === 0) {
-    throw new Error("No Antigravity reasoning models found in official docs.");
-  }
-
-  return unique;
-}
-
-function stripMarkdown(value) {
+function decodeHtmlEntities(value) {
   return value
-    .replace(/\*+/g, "")
-    .replace(/`/g, "")
-    .replace(/\\(?=\s|$)/g, "")
-    .trim();
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">");
 }
 
-function parseReasoningModelAvailability(markdown) {
-  const result = new Map();
-  const section = markdown.match(/## Reasoning Model\s+([\s\S]*?)(?:\n## |$)/);
-  if (!section) return result;
-
-  let pastHeader = false;
-  for (const line of section[1].split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed.startsWith("|") || /^\|[\s:-]+\|/.test(trimmed)) continue;
-
-    const cells = trimmed.replace(/^\|/, "").replace(/\|$/, "").split("|").map((cell) => cell.trim());
-    if (cells.length < 2) continue;
-
-    if (!pastHeader) {
-      if (/model/i.test(stripMarkdown(cells[0]))) continue;
-      pastHeader = true;
-    }
-
-    const name = stripMarkdown(cells[0]).trim();
-    if (!name || /^nano banana/i.test(name)) continue;
-    result.set(name, /\u2705|\u2713|yes|true/i.test(cells[1] ?? ""));
+/**
+ * Parse the model selector widget embedded in the Antigravity docs page.
+ *
+ * Each row carries the published model ID, display name, plan availability and
+ * (for leveled models) the selectable reasoning levels.
+ *
+ * @param {string} html
+ * @returns {Array<{ id: string, name: string, tiers: Record<string, boolean>, defaultLevel: string, levels: string[] }>}
+ */
+function parseModelSelectorWidget(html) {
+  const groupIndex = html.indexOf("model-selector-group");
+  if (groupIndex < 0) {
+    throw new Error(
+      "Could not find the Antigravity model selector in the official docs. The page structure may have changed."
+    );
   }
 
-  return result;
+  const entries = [];
+  for (const row of html.slice(groupIndex).split(/<div class="model-item-row/).slice(1)) {
+    const id = row.match(/data-model-id="([^"]+)"/)?.[1];
+    if (!id) continue;
+
+    const name = decodeHtmlEntities(
+      row.match(/<span class="model-name">([^<]*)<\/span>/)?.[1] ?? ""
+    ).trim();
+    const tiersRaw = decodeHtmlEntities(row.match(/data-tiers="([^"]*)"/)?.[1] ?? "");
+    let tiers = {};
+    try {
+      tiers = JSON.parse(tiersRaw);
+    } catch {
+      tiers = {};
+    }
+
+    const defaultLevel = decodeHtmlEntities(
+      row.match(/data-level-display="[^"]*">([^<]*)</)?.[1] ?? ""
+    ).trim();
+    const levels = [...row.matchAll(/data-level-btn="([^"]+)"/g)].map((m) => m[1].trim());
+
+    entries.push({ id, name, tiers, defaultLevel, levels });
+    if (entries.length >= 50) break;
+  }
+
+  const unique = new Map();
+  for (const entry of entries) {
+    if (!unique.has(entry.id)) unique.set(entry.id, entry);
+  }
+
+  const models = [...unique.values()];
+  if (models.length === 0) {
+    throw new Error("No Antigravity models found in the official docs model selector.");
+  }
+  return models;
 }
 
-function buildAntigravityTierConfig(modelMap, documentedModelKeys, discovered, availabilityByDisplayName) {
-  const freeByKey = new Map();
-  for (const entry of discovered) {
-    const isFree = availabilityByDisplayName.get(entry.displayName) === true;
-    if (isFree) freeByKey.set(entry.key, true);
-    else if (!freeByKey.has(entry.key)) freeByKey.set(entry.key, false);
-  }
-
-  const config = new Map();
-  for (const key of modelMap.keys()) {
-    if (!documentedModelKeys.has(key)) continue;
-    if (freeByKey.get(key) === true) continue;
-    config.set(key, { allowedTiers: ANTIGRAVITY_PAID_TIERS });
-  }
-  return config;
+function keyFromDocsId(id) {
+  if (id.startsWith("claude-")) return id.replace(/\.(?=\d)/g, "-");
+  if (/^gemini-\d+(?:\.\d+)*-pro$/.test(id)) return `${id}-preview`;
+  return id;
 }
 
-function modelIDFromDisplayName(displayName) {
-  const cleaned = displayName
-    .replace(/\([^)]*\)/g, " ")
-    .replace(/\bpreview\b/gi, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  const lower = cleaned.toLowerCase();
-  const gptOSS = lower.match(/\bgpt\s*[- ]?\s*oss\s*[- ]?\s*(\d+)\s*b\b/);
-  if (gptOSS) return `gpt-oss-${gptOSS[1]}b`;
-
-  let id = lower
-    .replace(/\b(google|anthropic|openai)\b/g, "")
-    .replace(/\b(claude|gemini)\s+(opus|sonnet|haiku|flash|pro)/g, "$1-$2")
-    .replace(/\s+/g, "-")
-    .replace(/[^a-z0-9._-]+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
-
-  if (id.startsWith("claude-")) {
-    id = id.replace(/\.(?=\d)/g, "-");
-  }
-
-  return stripParamInfoKey(id);
+function aliasesForWidgetEntry(entry) {
+  return entry.levels.map((level) => `${entry.id}-${level.toLowerCase()}`);
 }
 
-function canonicalizeDiscoveredModel(displayName) {
-  const lower = displayName.toLowerCase();
-  const override = DOCUMENTED_BACKEND_OVERRIDES.get(displayName);
-  if (override) {
-    return {
-      displayName,
-      key: override.key,
-      upstream: override.upstream,
-      thinking: lower.includes("thinking"),
-    };
+function canonicalizeWidgetModel(entry) {
+  const key = keyFromDocsId(entry.id);
+  let upstream;
+
+  if (leveledFlashModelKey(key)) {
+    upstream = leveledFlashUpstream(key);
+  } else if (/^gemini-\d+(?:\.\d+)*-pro$/.test(entry.id)) {
+    upstream = entry.id;
+  } else {
+    const suffix = DOCUMENTED_EFFORT_SUFFIX.get(key) ?? "";
+    upstream = suffix ? `${key}-${suffix}` : key;
   }
 
-  const base = modelIDFromDisplayName(displayName);
-  if (!base) return null;
-
-  const entry = {
-    displayName,
-    key: base,
-    upstream: base,
-    thinking: lower.includes("thinking"),
-  };
-
-  if (base.startsWith("gemini-")) {
-    if (base === "gemini-3-pro") {
-      entry.key = "gemini-3.1-pro-preview";
-      entry.upstream = lower.includes("low") ? "gemini-3.1-pro-low" : "gemini-3.1-pro-high";
-      return entry;
-    }
-    if (/^gemini-\d+(?:\.\d+)*-pro$/.test(base) && lower.includes("low")) {
-      entry.key = `${base}-preview`;
-      entry.upstream = `${base}-low`;
-      return entry;
-    }
-    if (/^gemini-\d+(?:\.\d+)*-pro$/.test(base) && lower.includes("high")) {
-      entry.key = `${base}-preview`;
-      entry.upstream = `${base}-high`;
-      return entry;
-    }
-    if (base === "gemini-3-flash") {
-      entry.key = "gemini-3-flash-preview";
-      entry.upstream = "gemini-3-flash";
-      return entry;
-    }
-  }
-
-  if (leveledFlashModelKey(entry.key)) {
-    entry.upstream = leveledFlashUpstream(entry.key);
-  }
-
-  if (base.startsWith("claude-") && lower.includes("thinking")) {
-    entry.key = base;
-    entry.upstream = `${base}-thinking`;
-  }
-
-  return entry;
+  return { displayName: entry.name, key, upstream };
 }
 
-function buildDiscoveredModelMap(displayNames) {
+function buildDiscoveredModelMap(widgetEntries) {
   const map = new Map();
   const ranks = new Map();
   const discovered = [];
 
-  for (const displayName of displayNames) {
-    const entry = canonicalizeDiscoveredModel(displayName);
-    if (!entry) continue;
-    discovered.push(entry);
+  for (const entry of widgetEntries) {
+    const model = canonicalizeWidgetModel(entry);
+    discovered.push(model);
 
-    const rank = upstreamRank(entry.upstream);
-    if (!map.has(entry.key) || rank > (ranks.get(entry.key) ?? 0)) {
-      map.set(entry.key, entry.upstream);
-      ranks.set(entry.key, rank);
+    const rank = upstreamRank(model.upstream);
+    if (!map.has(model.key) || rank > (ranks.get(model.key) ?? 0)) {
+      map.set(model.key, model.upstream);
+      ranks.set(model.key, rank);
     }
   }
 
@@ -322,6 +203,23 @@ function upstreamRank(upstream) {
   if (/-medium$/.test(upstream)) return 2;
   if (/-low$/.test(upstream)) return 1;
   return 0;
+}
+
+function buildAntigravityTierConfig(modelMap, documentedModelKeys, widgetEntries) {
+  const freeByKey = new Map();
+  for (const entry of widgetEntries) {
+    const key = keyFromDocsId(entry.id);
+    if (entry.tiers?.freeAndPlus === true) freeByKey.set(key, true);
+    else if (!freeByKey.has(key)) freeByKey.set(key, false);
+  }
+
+  const config = new Map();
+  for (const key of modelMap.keys()) {
+    if (!documentedModelKeys.has(key)) continue;
+    if (freeByKey.get(key) === true) continue;
+    config.set(key, { allowedTiers: ANTIGRAVITY_PAID_TIERS });
+  }
+  return config;
 }
 
 // Preserve any existing model file that already has the antigravity
@@ -379,7 +277,7 @@ function isGeminiImageModel(modelKey) {
   return modelKey.includes("image");
 }
 
-function enrichModelMetadata(result, documentedModelKeys) {
+function enrichModelMetadata(result, documentedModelKeys, aliasesByKey) {
   const index = buildModelIndex(modelsDir);
   const changedKeys = new Set([...result.added, ...result.updated]);
 
@@ -409,7 +307,7 @@ function enrichModelMetadata(result, documentedModelKeys) {
       changed = true;
     }
 
-    const desiredAliases = MODEL_ALIASES_BY_KEY.get(modelKey) || leveledFlashAliases(modelKey);
+    const desiredAliases = aliasesByKey.get(modelKey) ?? leveledFlashAliases(modelKey);
     if (desiredAliases.length > 0) {
       const aliases = new Set(data.aliases || []);
       for (const alias of desiredAliases) {
@@ -524,7 +422,6 @@ function syncJson(modelMap, dryRun, tierConfig) {
     providerConfigByModel: tierConfig,
     managedProviderConfigKeys: ["allowedTiers"],
   });
-  return { ...result, modelMap };
 }
 
 function parseLatestVersion(html) {
@@ -629,9 +526,9 @@ async function main() {
   });
 
   console.log("[antigravity] Fetching official Antigravity model docs ...");
-  let markdown;
+  let html;
   try {
-    markdown = await fetchText(ANTIGRAVITY_MODELS_URL, { label: "Antigravity model docs" });
+    html = await fetchText(ANTIGRAVITY_MODELS_URL, { label: "Antigravity model docs" });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (message.includes("404")) {
@@ -641,13 +538,14 @@ async function main() {
     throw error;
   }
 
-  const reasoningMarkdown = htmlToReasoningModelMarkdown(markdown);
-  const availabilityByDisplayName = parseReasoningModelAvailability(reasoningMarkdown);
-  const displayNames = parseReasoningModelNames(reasoningMarkdown);
-  const { modelMap, discovered } = buildDiscoveredModelMap(displayNames);
+  const widgetEntries = parseModelSelectorWidget(html);
+  const { modelMap, discovered } = buildDiscoveredModelMap(widgetEntries);
   const documentedModelKeys = new Set(modelMap.keys());
+  const aliasesByKey = new Map(
+    widgetEntries.map((entry) => [keyFromDocsId(entry.id), aliasesForWidgetEntry(entry)])
+  );
   const extras = mergePreservedExtras(modelMap);
-  const tierConfig = buildAntigravityTierConfig(modelMap, documentedModelKeys, discovered, availabilityByDisplayName);
+  const tierConfig = buildAntigravityTierConfig(modelMap, documentedModelKeys, widgetEntries);
   console.log(
     `[antigravity] Found ${discovered.length} documented reasoning models ` +
       `and preserved ${extras.length} JSON-configured extras.`
@@ -674,7 +572,7 @@ async function main() {
   const result = syncJson(modelMap, dryRun, tierConfig);
 
   if (!dryRun && (result.added.length > 0 || result.updated.length > 0)) {
-    enrichModelMetadata(result, documentedModelKeys);
+    enrichModelMetadata(result, documentedModelKeys, aliasesByKey);
   }
 
   if (
