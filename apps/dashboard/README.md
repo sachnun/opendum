@@ -41,9 +41,21 @@ outside `app/` so it is not auto-imported and stays unit-testable.
 | --- | --- |
 | `pnpm dev` | Nuxt dev server |
 | `pnpm build` | Production build |
-| `pnpm typecheck` | `vue-tsc` over generated Nuxt types |
+| `pnpm typecheck` | `vue-tsc` over the generated Nuxt app and server projects |
 | `pnpm lint` | `nuxt prepare` + ESLint |
-| `pnpm test` | Node test runner over `lib/*.test.ts` |
+| `pnpm test` | Unit tests (`lib/*.test.ts`) and Nuxt component tests (`tests/nuxt/*.spec.ts`) |
+| `pnpm test:unit` | Unit tests only |
+| `pnpm test:nuxt` | Component tests only (Vitest + `@nuxt/test-utils`) |
+
+## Testing
+
+| Kind | Location | Runner |
+| --- | --- | --- |
+| Pure helper unit tests | `lib/*.test.ts` | `tsx --test` |
+| Component tests | `tests/nuxt/*.spec.ts` | Vitest (`environment: "nuxt"`) |
+
+Component tests use `mountSuspended` from `@nuxt/test-utils/runtime`; `tests/setup.ts`
+installs `fake-indexeddb` because happy-dom has no IndexedDB.
 
 ## Notes
 

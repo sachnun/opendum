@@ -58,3 +58,6 @@ PLAN.md
 
 # typescript
 *.tsbuildinfo
+
+# nuxt test-utils generated
+apps/dashboard/.nuxtrc

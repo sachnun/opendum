@@ -46,6 +46,9 @@ jobs:
       - name: Lint dashboard
         run: pnpm --filter @opendum/dashboard lint
 
+      - name: Test dashboard
+        run: pnpm --filter @opendum/dashboard test
+
       - name: Typecheck dashboard
         run: pnpm --filter @opendum/dashboard typecheck
 
