@@ -8,6 +8,11 @@
 
 import { fetchJson } from "./http.ts";
 import { buildIndex, resolveCandidates, type IndexedModel } from "./similarity.ts";
+import {
+  MODELSDEV_CANONICAL_URL,
+  buildCanonicalIndex,
+  type CanonicalIndex,
+} from "./canonical.ts";
 
 export const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
 export const MODELSDEV_URL = "https://models.dev/api.json";
@@ -64,6 +69,11 @@ export interface RegistryIndex {
 }
 
 export type Registries = Partial<Record<RegistryName, RegistryIndex>>;
+
+export interface ExternalCatalogs {
+  registries: Registries;
+  canonical: CanonicalIndex;
+}
 
 export interface ModelMetadataInput {
   id: string;
@@ -422,17 +432,12 @@ function groupByProvider(
   return result;
 }
 
-/**
- * Fetch every external registry.
- *
- * Sources are optional: a failure yields `undefined` so a refresh never aborts
- * because one upstream is unavailable.
- */
 export async function fetchExternalRegistries(
   options: { logger?: (message: string) => void } = {},
-): Promise<Registries> {
+): Promise<ExternalCatalogs> {
   const logger = options.logger ?? (() => {});
   const registries: Registries = {};
+  let canonicalModels: unknown;
 
   for (const source of SOURCES) {
     try {
@@ -443,13 +448,31 @@ export async function fetchExternalRegistries(
         index: buildIndex(entries, source.name),
         byProvider: groupByProvider(entries, source.name),
       };
+      if (source.name === "modelsdev") canonicalModels = payload;
       logger(`[metadata] ${source.name}: ${entries.length} entries`);
     } catch (error) {
       logger(`[metadata] ${source.name} unavailable: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
-  return registries;
+  let canonicalModelsJson: unknown;
+  try {
+    canonicalModelsJson = await fetchJson(MODELSDEV_CANONICAL_URL, { label: "models.dev canonical models" });
+    const count = Object.keys(asRecord(canonicalModelsJson) ?? {}).length;
+    logger(`[metadata] canonical models: ${count} entries`);
+  } catch (error) {
+    logger(`[metadata] canonical models unavailable: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  const canonical = buildCanonicalIndex({
+    models: canonicalModelsJson,
+    providers: canonicalModels,
+    openrouter: registries.openrouter?.entries.map(
+      (item) => (item as { entry?: unknown }).entry,
+    ),
+  });
+
+  return { registries, canonical };
 }
 
 function pickHit<TEntry>(

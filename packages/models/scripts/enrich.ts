@@ -14,12 +14,14 @@
  */
 
 import { basename, dirname, join, resolve } from "node:path";
-import { existsSync, mkdirSync, renameSync } from "node:fs";
+import { existsSync, mkdirSync, renameSync, rmSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { inferModelFolder } from "../src/families.ts";
-import { buildModelIndex, writeModelJson } from "../src/registry.ts";
-import type { ModelData } from "../src/types.ts";
+import { inferModelFolder } from "#models/families.ts";
+import { buildModelIndex, persistModel } from "#models/registry.ts";
+import { applyCanonicalMerge, planCanonicalization } from "#models/canonicalize.ts";
+import { modelProbes } from "#models/probes.ts";
+import type { ModelData } from "#models/types.ts";
 import {
   buildModelPatch,
   fetchExternalRegistries,
@@ -27,25 +29,13 @@ import {
   type ModelMetadataInput,
   type ModelMetadataPatch,
   type Registries,
-} from "../src/metadata.ts";
+} from "#models/metadata.ts";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const modelsDir = resolve(scriptDir, "../data");
 
 const MANAGED_PROVIDER_KEYS = ["contextWindow", "maxOutputTokens"] as const;
 
-
-function modelCandidates(id: string, fileId: string, data: ModelData): Set<string> {
-  const candidates = new Set<string>([id, fileId]);
-  for (const alias of data.aliases ?? []) candidates.add(alias);
-  for (const config of Object.values(data.providerConfig ?? {})) {
-    const upstream = config.upstream;
-    if (typeof upstream !== "string") continue;
-    candidates.add(upstream);
-    candidates.add(upstream.split("/").pop() ?? upstream);
-  }
-  return candidates;
-}
 
 function sameValue(left: unknown, right: unknown): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
@@ -122,6 +112,8 @@ interface Stats {
   providerLimits: number;
   unmatched: string[];
   divergent: Array<{ id: string; min: number; max: number }>;
+  canonicalized: Array<{ from: string; to: string; tier: string }>;
+  ambiguous: string[];
 }
 
 function reportRegistries(registries: Registries): void {
@@ -138,6 +130,15 @@ function reportStats(stats: Stats, updatedCount: number, dryRun: boolean): void 
     + `  modalities: ${stats.modalities}  cost: ${stats.cost}  providerLimits: ${stats.providerLimits}`,
   );
   console.log(`[metadata] updated: ${updatedCount}${dryRun ? " (dry run)" : ""}`);
+  console.log(`[metadata] canonicalized: ${stats.canonicalized.length}${dryRun ? " (dry run)" : ""}`);
+
+  for (const item of stats.canonicalized) {
+    console.log(`  ${item.from} -> ${item.to} [${item.tier}]`);
+  }
+
+  if (stats.ambiguous.length > 0) {
+    console.log(`[metadata] unresolved canonical ids (${stats.ambiguous.length}): ${stats.ambiguous.join(", ")}`);
+  }
 
   if (stats.unmatched.length > 0) {
     console.log(`[metadata] unmatched (${stats.unmatched.length}): ${stats.unmatched.join(", ")}`);
@@ -148,6 +149,62 @@ function reportStats(stats: Stats, updatedCount: number, dryRun: boolean): void 
     for (const item of stats.divergent) {
       console.log(`  ${item.id}: ${item.min}..${item.max}`);
     }
+  }
+}
+
+function canonicalizeIds(
+  canonical: Awaited<ReturnType<typeof fetchExternalRegistries>>["canonical"],
+  stats: Stats,
+  dryRun: boolean,
+): void {
+  const index = buildModelIndex(modelsDir);
+  const models = Object.values(index).map((entry) => ({
+    id: entry.id,
+    relativeId: entry.relativeId,
+    fileId: entry.fileId,
+    path: entry.path,
+    data: entry.data as ModelData,
+  }));
+  const byModelId = new Map(models.map((model) => [model.id, model]));
+  const plan = planCanonicalization(models, canonical);
+
+  const targets = new Map<string, { relativeId: string; data: ModelData }>();
+  for (const action of plan.actions) {
+    if (action.kind !== "rename") continue;
+    const aliases = new Set(action.data.aliases ?? []);
+    aliases.add(action.from);
+    if (action.fileId !== action.from) aliases.add(action.fileId);
+    aliases.delete(action.to);
+    action.data.id = action.to;
+    action.data.aliases = [...aliases].sort();
+    targets.set(action.to, { relativeId: action.relativeId, data: action.data });
+    stats.canonicalized.push({ from: action.from, to: action.to, tier: action.tier });
+  }
+
+  for (const action of plan.actions) {
+    if (action.kind !== "merge") continue;
+    const target = targets.get(action.to) ?? byModelId.get(action.to);
+    if (!target) {
+      stats.ambiguous.push(`${action.from} (missing merge target ${action.to})`);
+      continue;
+    }
+    applyCanonicalMerge(target.data as ModelData, action);
+    stats.canonicalized.push({ from: action.from, to: action.to, tier: `merge:${action.tier}` });
+    if (dryRun) continue;
+    persistModel({ modelsDir, relativeId: target.relativeId }, target.data as ModelData);
+    rmSync(action.path, { force: true });
+  }
+
+  stats.ambiguous.push(...plan.unresolved);
+  if (plan.conflicts.length > 0) {
+    console.log(
+      `[metadata] canonical merges refused to protect authored config (${plan.conflicts.length}): ${plan.conflicts.join(", ")}`,
+    );
+  }
+
+  if (dryRun) return;
+  for (const [relativeId, target] of targets) {
+    persistModel({ modelsDir, relativeId: target.relativeId }, target.data);
   }
 }
 
@@ -174,13 +231,13 @@ async function main(): Promise<void> {
   const dryRun = process.argv.includes("--dry-run");
   const verbose = process.argv.includes("--verbose") || process.argv.includes("-v");
 
-  const registries = await fetchExternalRegistries({ logger: (message) => console.log(message) });
+  const catalogs = await fetchExternalRegistries({ logger: (message) => console.log(message) });
+  const registries = catalogs.registries;
   if (Object.values(registries).every((registry) => registry === undefined)) {
     throw new Error("No external registry available, aborting metadata refresh");
   }
   reportRegistries(registries);
 
-  const index = buildModelIndex(modelsDir);
   const stats: Stats = {
     models: 0,
     reasoning: 0,
@@ -191,8 +248,14 @@ async function main(): Promise<void> {
     providerLimits: 0,
     unmatched: [],
     divergent: [],
+    canonicalized: [],
+    ambiguous: [],
   };
   const updated: string[] = [];
+
+  canonicalizeIds(catalogs.canonical, stats, dryRun);
+
+  const index = buildModelIndex(modelsDir);
 
   for (const [fileId, entry] of Object.entries(index)) {
     const data = entry.data as ModelData;
@@ -205,7 +268,7 @@ async function main(): Promise<void> {
     const id = entry.id || fileId;
     const model: ModelMetadataInput = {
       id,
-      candidates: modelCandidates(id, fileId, data),
+      candidates: modelProbes({ id, fileId, data }),
       providers,
     };
 
@@ -235,7 +298,7 @@ async function main(): Promise<void> {
 
     if (applyMetadata(data, patch)) {
       updated.push(id);
-      if (!dryRun) writeModelJson(entry.path, data);
+      if (!dryRun) persistModel(entry, data);
       if (verbose) {
         console.log(`[metadata] ${id} reasoning=${patch.reasoning} limit=${JSON.stringify(patch.limits)}`);
       }
