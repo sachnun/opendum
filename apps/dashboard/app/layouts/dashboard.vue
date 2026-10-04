@@ -1,14 +1,17 @@
 <script setup lang="ts">
-import type {
-  ModelFamilyCounts,
-  NavItem,
-  NavSubItem,
-  ProviderAccountCounts,
-  ProviderAccountIndicator,
-  ProviderAccountIndicators,
-} from "../../lib/navigation";
-import type { AccountOverviewData, AccountOverviewDeltaData, AccountOverviewResponse, AccountPingData, MeData, PointStatusData } from "../../lib/api-types";
-import { MODEL_FAMILY_NAV_ITEMS, categorizeModelFamily } from "../../lib/model-families";
+import {
+  emptyShellAccountSummary,
+  emptyModelFamilyCounts,
+  toShellAccountSummary,
+  isAccountOverviewDelta,
+  normalizeModelFamilyCounts,
+  subItemHref,
+  isSwitchSubItem,
+  type ShellAccountSummary,
+} from "~~/lib/dashboard-shell";
+
+import type { NavItem, NavSubItem, ProviderAccountIndicator } from "../../lib/navigation";
+import type { AccountOverviewData, AccountOverviewResponse, MeData, PointStatusData } from "../../lib/api-types";
 import { primaryNavigation } from "../../lib/navigation";
 import { signOut, useSession } from "../../lib/auth-client";
 import { buildProviderHrefMap, getProviderAccountPath, PROVIDER_ACCOUNT_DEFINITIONS } from "../../lib/provider-accounts";
@@ -38,31 +41,15 @@ const userEmail = computed(() => session.value?.user?.email || "");
 const userImage = computed(() => avatarUrl(session.value?.user?.image || ""));
 const userInitial = computed(() => (session.value?.user?.name?.[0] || "U").toUpperCase());
 
-const emptyAccountCounts = Object.fromEntries(
-  PROVIDER_ACCOUNT_DEFINITIONS.map((definition) => [definition.key, 0])
-) as unknown as ProviderAccountCounts;
 
-const emptyAccountIndicators = Object.fromEntries(
-  PROVIDER_ACCOUNT_DEFINITIONS.map((definition) => [definition.key, "normal"])
-) as unknown as ProviderAccountIndicators;
 
-interface ShellAccountSummary {
-  accountCounts: ProviderAccountCounts;
-  activeAccountCounts: ProviderAccountCounts;
-  accountIndicators: ProviderAccountIndicators;
-  pinnedProviders: string[];
-  hasConnectedAccounts: boolean;
-}
 
-const emptyShellAccountSummary: ShellAccountSummary = {
-  accountCounts: { ...emptyAccountCounts },
-  activeAccountCounts: { ...emptyAccountCounts },
-  accountIndicators: { ...emptyAccountIndicators },
-  pinnedProviders: [],
-  hasConnectedAccounts: false,
-};
 
-const emptyModelFamilyCounts = Object.fromEntries(MODEL_FAMILY_NAV_ITEMS.map((family) => [family.anchorId, 0])) as ModelFamilyCounts;
+
+
+
+
+
 const cachedPinnedProviders = useState<string[] | null>(stateKeys.pinnedProviders, () => null);
 
 const supportNavigation = computed<NavItem[]>(() => [
@@ -125,35 +112,9 @@ watch(me, (value) => {
   sharingEnabled.value = (value as MeData | null | undefined)?.sharing?.enabled ?? false;
 }, { immediate: true });
 
-function toShellAccountSummary(summary: AccountOverviewData | AccountPingData): ShellAccountSummary {
-  const nextAccountCounts: ProviderAccountCounts = { ...emptyAccountCounts };
-  const nextActiveAccountCounts: ProviderAccountCounts = { ...emptyAccountCounts };
-  const nextAccountIndicators: ProviderAccountIndicators = { ...emptyAccountIndicators };
-  let hasConnectedAccounts = "hasConnectedAccounts" in summary ? summary.hasConnectedAccounts : false;
 
-  for (const [key, providerSummary] of Object.entries(summary.summaries) as Array<[string, { connected?: number; active: number; indicator: ProviderAccountIndicator } | undefined]>) {
-    if (!providerSummary) continue;
 
-    const connected = providerSummary.connected ?? providerSummary.active;
-    if (connected > 0) hasConnectedAccounts = true;
 
-    nextAccountCounts[key] = connected;
-    nextActiveAccountCounts[key] = providerSummary.active;
-    nextAccountIndicators[key] = providerSummary.indicator;
-  }
-
-  return {
-    accountCounts: nextAccountCounts,
-    activeAccountCounts: nextActiveAccountCounts,
-    accountIndicators: nextAccountIndicators,
-    pinnedProviders: summary.pinnedProviders,
-    hasConnectedAccounts,
-  };
-}
-
-function isAccountOverviewDelta(summary: AccountOverviewResponse): summary is AccountOverviewDeltaData {
-  return "delta" in summary && summary.delta === true;
-}
 
 function applyAccountOverviewResponse(summary: AccountOverviewResponse): AccountOverviewData {
   if (!isAccountOverviewDelta(summary)) {
@@ -227,20 +188,7 @@ function customHrefCounts<V>(counts: Record<string, V>): Record<string, V> {
   return result;
 }
 
-function normalizeModelFamilyCounts(counts: Record<string, number>) {
-  const nextCounts = { ...emptyModelFamilyCounts };
-  const anchorByFamily = new Map(MODEL_FAMILY_NAV_ITEMS.map((family) => [family.name, family.anchorId]));
 
-  for (const [rawFamily, count] of Object.entries(counts)) {
-    const family = categorizeModelFamily(rawFamily);
-    const anchorId = anchorByFamily.get(family);
-    if (anchorId) {
-      nextCounts[anchorId] = (nextCounts[anchorId] ?? 0) + count;
-    }
-  }
-
-  return nextCounts;
-}
 
 const { data: defaultModelFamilyCounts } = useCachedData(dataKeys.shellModelFamilyCounts, async () => {
   const counts = await api.models.familyCounts();
@@ -318,13 +266,7 @@ function toggleSupportItem(item: NavItem) {
   supportItemOpen[item.name] = !isSupportItemOpen(item);
 }
 
-function subItemHref(subItem: NavSubItem) {
-  if (subItem.anchorId) {
-    return `${subItem.href}#${subItem.anchorId}`;
-  }
 
-  return subItem.href;
-}
 
 function isSubItemActive(subItem: NavSubItem) {
   if (subItem.anchorId) {
@@ -364,9 +306,7 @@ function modelCountFor(subItem: NavSubItem) {
   return subItem.anchorId ? (modelFamilyCounts.value[subItem.anchorId] ?? 0) : 0;
 }
 
-function isSwitchSubItem(subItem: NavSubItem) {
-  return subItem.control === "switch";
-}
+
 
 function isSwitchSubItemToggleDisabled(subItem: NavSubItem) {
   return isSwitchSubItem(subItem) && (isAuditMode.value || sharingUpdating.value);
