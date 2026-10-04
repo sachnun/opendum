@@ -5,6 +5,8 @@
  * timeout behaviour stays consistent.
  */
 
+import pRetry from "p-retry";
+
 export const MAX_FETCH_ATTEMPTS = 3;
 export const FETCH_TIMEOUT_MS = 20_000;
 
@@ -33,10 +35,8 @@ export async function fetchWithRetry(
     headers = {},
   } = options;
 
-  let lastError: unknown = null;
-
-  for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    try {
+  return pRetry(
+    async () => {
       const response = await fetch(url, {
         headers: { Accept: "application/json", ...headers },
         signal: AbortSignal.timeout(timeout),
@@ -47,13 +47,9 @@ export async function fetchWithRetry(
       }
 
       return responseType === "text" ? await response.text() : await response.json();
-    } catch (error) {
-      lastError = error;
-      if (attempt < attempts) await sleep(attempt * 1_000);
-    }
-  }
-
-  throw lastError instanceof Error ? lastError : new Error(`Failed to fetch ${label}`);
+    },
+    { retries: Math.max(0, attempts - 1), minTimeout: 1_000, factor: 2, randomize: false },
+  );
 }
 
 export function fetchJson(url: string, options: FetchOptions = {}): Promise<unknown> {

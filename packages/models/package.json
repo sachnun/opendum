@@ -21,7 +21,8 @@
   },
   "dependencies": {
     "@opendum/extension": "workspace:*",
-    "fuzzball": "^2.2.6"
+    "fuzzball": "^2.2.6",
+    "p-retry": "^6.2.0"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",

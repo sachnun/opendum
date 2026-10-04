@@ -23,7 +23,8 @@
     "@opendum/egress": "workspace:*",
     "@opendum/extension": "workspace:*",
     "@opendum/models": "workspace:*",
-    "@opendum/redis": "workspace:*"
+    "@opendum/redis": "workspace:*",
+    "eventsource-parser": "^3.1.0"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",

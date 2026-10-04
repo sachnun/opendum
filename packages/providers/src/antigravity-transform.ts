@@ -6,6 +6,7 @@ import {
   randomId,
   stringValue,
 } from "./helpers.js";
+import { sseDataLines } from "./sse.js";
 import {
   RETIRED_MODEL_PATTERN,
   anySlice,
@@ -591,13 +592,7 @@ async function* transformGeminiSse(
     pending.push(`data: ${JSON.stringify(chunk)}\n\n`);
   };
 
-  const reader = source.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  const handleLine = async (line: string): Promise<void> => {
-    const trimmed = line.trim();
-    if (!trimmed.startsWith("data:")) return;
-    const dataText = trimmed.slice("data:".length).trim();
+  const handleData = async (dataText: string): Promise<void> => {
     if (!dataText || dataText === "[DONE]") return;
     let parsed: unknown;
     try {
@@ -630,25 +625,9 @@ async function* transformGeminiSse(
     }
   };
 
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-      for (const line of lines) {
-        await handleLine(line);
-        for (const chunk of pending.splice(0)) yield chunk;
-      }
-    }
-    buffer += decoder.decode();
-    if (buffer) {
-      await handleLine(buffer);
-      for (const chunk of pending.splice(0)) yield chunk;
-    }
-  } finally {
-    reader.releaseLock();
+  for await (const data of sseDataLines(source)) {
+    await handleData(data);
+    for (const chunk of pending.splice(0)) yield chunk;
   }
 
   if (trackedUsage) writeChunk({}, null, trackedUsage);
@@ -694,13 +673,7 @@ export async function geminiStreamToOpenAiCompletionImpl(
   let usage: Json | null = null;
   let finish = "stop";
   const toolIndex = { value: 0 };
-  const reader = source.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  const handleLine = async (line: string): Promise<boolean> => {
-    const trimmed = line.trim();
-    if (!trimmed.startsWith("data:")) return false;
-    const dataText = trimmed.slice("data:".length).trim();
+  const handleData = async (dataText: string): Promise<boolean> => {
     if (!dataText || dataText === "[DONE]") return false;
     let parsed: unknown;
     try {
@@ -723,21 +696,8 @@ export async function geminiStreamToOpenAiCompletionImpl(
     if (mapped) finish = mapped;
     return false;
   };
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-      for (const line of lines) {
-        if (await handleLine(line)) break;
-      }
-    }
-    buffer += decoder.decode();
-    if (buffer) await handleLine(buffer);
-  } finally {
-    reader.releaseLock();
+  for await (const data of sseDataLines(source)) {
+    if (await handleData(data)) break;
   }
   const message: Json = { role: "assistant", content: null };
   if (content) message.content = content;

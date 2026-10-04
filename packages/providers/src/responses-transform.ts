@@ -13,6 +13,7 @@ import {
   uniqueStrings,
 } from "./helpers.js";
 import { convertResponsesInputImageURLsToBase64 } from "./images.js";
+import { sseDataLines } from "./sse.js";
 
 type Json = Record<string, unknown>;
 
@@ -176,33 +177,6 @@ export function toChatCallId(id: string): string {
   if (id.startsWith("call_")) return id;
   if (id.startsWith("fc_") || id.startsWith("fc-")) return `call_${id.slice(3)}`;
   return `call_${id}`;
-}
-
-async function* sseDataLines(source: ReadableStream<Uint8Array>): AsyncGenerator<string> {
-  const reader = source.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  const emit = function* (chunk: string): Generator<string> {
-    for (const line of chunk.split("\n")) {
-      const trimmed = line.trim();
-      if (!trimmed.startsWith("data:")) continue;
-      yield trimmed.slice("data:".length).trim();
-    }
-  };
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-      for (const data of emit(lines.join("\n"))) yield data;
-    }
-    buffer += decoder.decode();
-    for (const data of emit(buffer)) yield data;
-  } finally {
-    reader.releaseLock();
-  }
 }
 
 function toStream(events: AsyncIterable<string>): ReadableStream<Uint8Array> {

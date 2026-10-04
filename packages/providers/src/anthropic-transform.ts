@@ -7,6 +7,7 @@ import {
   stringValue,
 } from "./helpers.js";
 import { convertImageURLsToBase64, type ImageFetch } from "./images.js";
+import { sseDataLines } from "./sse.js";
 
 type Json = Record<string, unknown>;
 
@@ -367,34 +368,6 @@ export function anthropicUsageToChatUsage(raw: unknown): Json {
     out.prompt_tokens_details = { cached_tokens: cached, cache_write_tokens: write };
   }
   return out;
-}
-
-async function* sseDataLines(source: ReadableStream<Uint8Array>): AsyncGenerator<string> {
-  const reader = source.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed.startsWith("data:")) continue;
-        yield trimmed.slice("data:".length).trim();
-      }
-    }
-    buffer += decoder.decode();
-    for (const line of buffer.split("\n")) {
-      const trimmed = line.trim();
-      if (!trimmed.startsWith("data:")) continue;
-      yield trimmed.slice("data:".length).trim();
-    }
-  } finally {
-    reader.releaseLock();
-  }
 }
 
 async function* transformAnthropicMessagesSseToChat(
