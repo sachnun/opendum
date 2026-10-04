@@ -60,6 +60,7 @@ import {
   endpointPath,
   isAntigravityResourceExhausted,
   prefixWithProvider,
+  retryMetadata,
   sanitizedProxyError,
   shouldRotate,
 } from "./errors.js";
@@ -199,10 +200,13 @@ export class ProxyService implements StreamRecorder {
         authResult.rateLimitRules
       );
       if (!rl.allowed) {
+        const retry = retryMetadata(rl.retryAfterSeconds * 1000);
         return this.routeError(cfg, {
           status: cfg.rateLimitStatusCode,
           message: `Rate limit exceeded for ${validation.model}: ${rl.current}/${rl.limit} requests per ${rl.exceededWindow}. Retry after ${rl.retryAfterSeconds}s.`,
           type: "rate_limit_error",
+          retryAfter: retry.retryAfter,
+          retryAfterMs: retry.retryAfterMs,
         });
       }
     }
@@ -287,6 +291,9 @@ export class ProxyService implements StreamRecorder {
   routeError(cfg: EndpointAdapter, error: RouteError): Response {
     const headers = new Headers({ "Content-Type": "application/json" });
     if (error.accountId) headers.set("X-Provider-Account-Id", error.accountId);
+    if (error.retryAfterMs != null && error.retryAfterMs > 0) {
+      headers.set("Retry-After", String(Math.max(1, Math.ceil(error.retryAfterMs / 1000))));
+    }
     if (cfg.format === "anthropic") {
       const body: Record<string, unknown> = { type: error.type || "invalid_request_error", message: error.message };
       if (error.retryAfter != null) body.retry_after = error.retryAfter;
