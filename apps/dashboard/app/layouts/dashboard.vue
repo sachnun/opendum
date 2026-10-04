@@ -18,7 +18,19 @@ import { avatarUrl } from "../../lib/utils";
 const route = useRoute();
 const { data: session } = await useSession(useFetch);
 
-const mobileOpen = ref(false);
+const {
+  mobileOpen,
+  mobileSidebarDragX,
+  isMobileSidebarDragging,
+  openMobileSidebar,
+  closeMobileSidebar,
+  resetMobileSidebarSwipe,
+  handleMobileOverlayClick,
+  handleMobileSheetPointerDownOutside,
+  handleMobileOverlayPointerDown,
+  handleMobileOverlayPointerMove,
+  finishMobileOverlaySwipe,
+} = useMobileSidebar();
 const userMenuOpen = ref(false);
 const modelSearchFocused = ref(false);
 const auditDialogOpen = ref(false);
@@ -29,10 +41,7 @@ const supportItemOpen = reactive<Record<string, boolean>>({ Tools: false });
 const pointMenuOpen = ref(false);
 const mainContent = ref<HTMLElement | null>(null);
 const activeAnchorId = ref<string | null>(null);
-const mobileSidebarDragX = ref(0);
-const isMobileSidebarDragging = ref(false);
-const isDesktopViewport = ref(true);
-let desktopViewportQuery: MediaQueryList | null = null;
+const { isDesktopViewport } = useDesktopViewport();
 
 const userLabel = computed(() => session.value?.user?.name || session.value?.user?.email || "Account");
 const userEmail = computed(() => session.value?.user?.email || "");
@@ -203,17 +212,12 @@ const PENDING_SCROLL_RETRIES = 20;
 const PENDING_SCROLL_DELAY_MS = 60;
 const ACCOUNT_SUMMARY_REFRESH_MS = 30_000;
 const POINT_STATUS_REFRESH_MS = 15_000;
-const MOBILE_SIDEBAR_SWIPE_CLOSE_THRESHOLD_PX = 96;
 let accountSummaryRefreshTimer: ReturnType<typeof setInterval> | null = null;
 let accountSummaryRefreshInFlight: Promise<void> | null = null;
 let accountSummaryRefreshQueued = false;
 let pointStatusRefreshTimer: ReturnType<typeof setInterval> | null = null;
 let pointStatusRefreshInFlight: Promise<void> | null = null;
 let pointStatusRefreshQueued = false;
-let mobileSidebarSwipeStartX: number | null = null;
-let mobileSidebarSwipePointerId: number | null = null;
-let suppressNextMobileOverlayClick = false;
-let mobileSidebarSwipeResetTimer: ReturnType<typeof setTimeout> | null = null;
 
 const pinnedProviderHrefs = computed(() => {
   const hrefs = new Set<string>();
@@ -417,99 +421,6 @@ function handleNavClick(item?: NavItem | NavSubItem, event?: MouseEvent) {
   closeMobileSidebar();
 }
 
-function resetMobileSidebarSwipe() {
-  if (mobileSidebarSwipeResetTimer) {
-    clearTimeout(mobileSidebarSwipeResetTimer);
-    mobileSidebarSwipeResetTimer = null;
-  }
-
-  mobileSidebarSwipeStartX = null;
-  mobileSidebarSwipePointerId = null;
-  isMobileSidebarDragging.value = false;
-  mobileSidebarDragX.value = 0;
-}
-
-function closeMobileSidebar(raw?: unknown) {
-  const keepDragOffset = (raw as { keepDragOffset?: boolean } | undefined)?.keepDragOffset ?? false;
-  mobileOpen.value = false;
-
-  if (keepDragOffset) {
-    mobileSidebarSwipeStartX = null;
-    mobileSidebarSwipePointerId = null;
-    isMobileSidebarDragging.value = false;
-    mobileSidebarSwipeResetTimer = setTimeout(resetMobileSidebarSwipe, 350);
-    return;
-  }
-
-  resetMobileSidebarSwipe();
-}
-
-function openMobileSidebar() {
-  resetMobileSidebarSwipe();
-  mobileOpen.value = true;
-}
-
-function handleMobileOverlayClick(event: MouseEvent) {
-  if (suppressNextMobileOverlayClick) {
-    suppressNextMobileOverlayClick = false;
-    event.preventDefault();
-    event.stopPropagation();
-    return;
-  }
-
-  if (isMobileSidebarDragging.value || mobileSidebarDragX.value !== 0) {
-    event.preventDefault();
-    event.stopPropagation();
-    return;
-  }
-
-  closeMobileSidebar();
-}
-
-function handleMobileSheetPointerDownOutside(event: Event) {
-  if (mobileSidebarSwipeStartX === null) return;
-  event.preventDefault();
-}
-
-function handleMobileOverlayPointerDown(event: PointerEvent) {
-  if (!mobileOpen.value) return;
-  if (event.pointerType === "mouse" && event.button !== 0) return;
-
-  mobileSidebarSwipeStartX = event.clientX;
-  mobileSidebarSwipePointerId = event.pointerId;
-  isMobileSidebarDragging.value = false;
-  mobileSidebarDragX.value = 0;
-}
-
-function handleMobileOverlayPointerMove(event: PointerEvent) {
-  if (mobileSidebarSwipeStartX === null || mobileSidebarSwipePointerId !== event.pointerId) return;
-
-  const deltaX = event.clientX - mobileSidebarSwipeStartX;
-  if (deltaX >= 0) {
-    if (isMobileSidebarDragging.value) event.preventDefault();
-    mobileSidebarDragX.value = 0;
-    return;
-  }
-
-  isMobileSidebarDragging.value = true;
-  mobileSidebarDragX.value = deltaX;
-  event.preventDefault();
-}
-
-function finishMobileOverlaySwipe(event?: PointerEvent) {
-  if (event && mobileSidebarSwipePointerId !== event.pointerId) return;
-
-  const wasDragging = isMobileSidebarDragging.value;
-  const shouldClose = Math.abs(mobileSidebarDragX.value) >= MOBILE_SIDEBAR_SWIPE_CLOSE_THRESHOLD_PX;
-  if (shouldClose) {
-    closeMobileSidebar({ keepDragOffset: true });
-    return;
-  }
-
-  resetMobileSidebarSwipe();
-  suppressNextMobileOverlayClick = wasDragging;
-}
-
 async function refreshAccountSummaryOnce() {
   if (!shouldRefreshAccountSummary.value) return;
 
@@ -622,17 +533,9 @@ function handleVisibilityChange() {
   void refreshPointStatusOnce();
 }
 
-function syncDesktopViewport(event: MediaQueryListEvent | MediaQueryList) {
-  isDesktopViewport.value = event.matches;
-}
-
 onMounted(() => {
   startPointStatusRefresh();
   schedulePrefetch();
-
-  desktopViewportQuery = window.matchMedia("(min-width: 768px)");
-  syncDesktopViewport(desktopViewportQuery);
-  desktopViewportQuery.addEventListener("change", syncDesktopViewport);
 
   document.addEventListener("visibilitychange", handleVisibilityChange);
 
@@ -721,7 +624,6 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
-  desktopViewportQuery?.removeEventListener("change", syncDesktopViewport);
   document.removeEventListener("visibilitychange", handleVisibilityChange);
   stopAccountSummaryRefresh();
   stopPointStatusRefresh();
