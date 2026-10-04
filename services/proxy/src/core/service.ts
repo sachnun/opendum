@@ -82,6 +82,7 @@ import type {
   ParsedEndpointRequest,
   ResponseContext,
   RouteError,
+  StreamCompletion,
   StreamRecorder,
   UsageCounts,
 } from "./types.js";
@@ -117,6 +118,16 @@ type AccountErrorContext = {
   endpoint: string;
   messages: unknown;
   parameters: Record<string, unknown>;
+};
+
+type RoamingCompletionContext = {
+  account: ProviderAccount;
+  authResult: AuthResult;
+  validation: ModelValidationResult;
+  roaming: PointReservation | null;
+  rotationFailures: AccountRotationFailure[];
+  usage: UsageCounts;
+  startMs: number;
 };
 
 export class ProxyService implements StreamRecorder {
@@ -256,15 +267,98 @@ export class ProxyService implements StreamRecorder {
     };
 
     if (parsedRequest.stream) {
+      responseCtx.onStreamComplete = (reason) => {
+        this.handleStreamCompletion(reason, {
+          account,
+          authResult,
+          validation,
+          roaming,
+          rotationFailures,
+          usage: responseCtx.usage,
+          startMs,
+        });
+      };
       const result = await cfg.handleStream(responseCtx, this);
-      if (roaming) await this.settleRoamingPointAsync(account.userId, roaming, validation.model, responseCtx.usage);
-      void this.markAccountsRecoveredByRotationDeferred(rotationFailures);
+      if (!responseCtx.streamHandled) {
+        if (roaming) await this.settleRoamingPointAsync(account.userId, roaming, validation.model, responseCtx.usage);
+        void this.markAccountsRecoveredByRotationDeferred(rotationFailures);
+      }
       return result;
     }
-    const result = await cfg.handleNonStream(responseCtx, this);
+    let result: Response;
+    try {
+      result = await cfg.handleNonStream(responseCtx, this);
+    } catch (error) {
+      return this.handleNonStreamFailure(cfg, error, {
+        account,
+        authResult,
+        validation,
+        roaming,
+        rotationFailures,
+        usage: responseCtx.usage,
+        startMs,
+      });
+    }
     if (roaming) await this.settleRoamingPointAsync(account.userId, roaming, validation.model, responseCtx.usage);
     void this.markAccountsRecoveredByRotationDeferred(rotationFailures);
     return result;
+  }
+
+  private handleStreamCompletion(reason: StreamCompletion, context: RoamingCompletionContext): void {
+    const { account, authResult, validation, roaming, rotationFailures, usage, startMs } = context;
+    if (roaming) {
+      if (reason === "success") {
+        void this.settleRoamingPointAsync(account.userId, roaming, validation.model, usage);
+      } else {
+        void this.refundRoamingPointAsync(roaming);
+      }
+    }
+    if (reason === "error") {
+      void this.recordResponseHandlerFailure(account, authResult, validation, 500, "upstream stream failed", startMs);
+    }
+    if (reason !== "cancel") void this.markAccountsRecoveredByRotationDeferred(rotationFailures);
+  }
+
+  private async handleNonStreamFailure(
+    cfg: EndpointAdapter,
+    error: unknown,
+    context: RoamingCompletionContext
+  ): Promise<Response> {
+    const { account, authResult, validation, roaming, rotationFailures, startMs } = context;
+    const message = error instanceof Error ? error.message : String(error);
+    if (roaming) await this.refundRoamingPointAsync(roaming);
+    await this.recordResponseHandlerFailure(account, authResult, validation, 500, message, startMs);
+    void this.markAccountsRecoveredByRotationDeferred(rotationFailures);
+    return this.routeError(cfg, {
+      status: 500,
+      message: prefixWithProvider(account.provider, message),
+      type: "api_error",
+      accountId: account.id,
+    });
+  }
+
+  private async refundRoamingPointAsync(reservation: PointReservation): Promise<void> {
+    try {
+      await refundRoamingPoint(this.database, reservation);
+    } catch {
+      return;
+    }
+  }
+
+  private async recordResponseHandlerFailure(
+    account: ProviderAccount,
+    authResult: AuthResult,
+    validation: ModelValidationResult,
+    statusCode: number,
+    message: string,
+    startMs: number
+  ): Promise<void> {
+    try {
+      await this.markAccountFailed(account.id, validation.model, statusCode, message);
+      await this.logUsage(authResult, account, validation, statusCode, Date.now() - startMs);
+    } catch {
+      return;
+    }
   }
 
   private async settleRoamingPointAsync(

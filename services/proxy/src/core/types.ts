@@ -31,6 +31,8 @@ export type UsageCounts = {
   cacheWriteTokens: number;
 };
 
+export type StreamCompletion = "success" | "cancel" | "error";
+
 export type ResponseContext = {
   response: Response;
   accountId: string;
@@ -44,6 +46,8 @@ export type ResponseContext = {
   usage: UsageCounts;
   request?: Request;
   tools?: unknown;
+  streamHandled?: boolean;
+  onStreamComplete?: (reason: StreamCompletion) => void;
 };
 
 export type EndpointAdapter = {

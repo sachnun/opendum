@@ -2,7 +2,7 @@ import { numberAsInt, stringValue } from "./helpers.js";
 import { SseScanner } from "./sse.js";
 import { transformOpenAIToAnthropic } from "./endpoints.js";
 import { OpenAIStreamUsageTracker, usageCacheCounts, usageFromJson, usageObject } from "./usage.js";
-import type { ResponseContext, StreamRecorder } from "./types.js";
+import type { ResponseContext, StreamCompletion, StreamRecorder } from "./types.js";
 
 type Json = Record<string, unknown>;
 
@@ -13,33 +13,37 @@ export async function passthroughStream(ctx: ResponseContext, recorder: StreamRe
   if (!body) return ctx.response;
   const tracker = new OpenAIStreamUsageTracker();
   const reader = body.getReader();
-  let usageRecorded = false;
-  const finish = (): void => {
-    if (usageRecorded) return;
-    usageRecorded = true;
+  ctx.streamHandled = true;
+  let settled = false;
+  const finish = (reason: StreamCompletion): void => {
+    if (settled) return;
+    settled = true;
     tracker.flush();
     ctx.usage.inputTokens = tracker.inputTokens;
     ctx.usage.outputTokens = tracker.outputTokens;
     ctx.usage.cachedTokens = tracker.cachedTokens;
     ctx.usage.cacheWriteTokens = tracker.cacheWriteTokens;
-    if (ctx.provider === "hyper" && (tracker.hypercreditsRemaining !== null || tracker.hypercreditsCost > 0)) {
-      recorder.storeHypercreditsUsage(ctx.accountId, tracker.hypercreditsRemaining, tracker.hypercreditsCost);
+    if (reason === "success") {
+      if (ctx.provider === "hyper" && (tracker.hypercreditsRemaining !== null || tracker.hypercreditsCost > 0)) {
+        recorder.storeHypercreditsUsage(ctx.accountId, tracker.hypercreditsRemaining, tracker.hypercreditsCost);
+      }
+      recorder.recordSuccessfulRequest({
+        accountId: ctx.accountId,
+        provider: ctx.provider,
+        model: ctx.model,
+        userId: ctx.userId,
+        apiKeyId: ctx.apiKeyId,
+        inputTokens: tracker.inputTokens,
+        outputTokens: tracker.outputTokens,
+        cachedTokens: tracker.cachedTokens,
+        cacheWriteTokens: tracker.cacheWriteTokens,
+        durationMs: Date.now() - ctx.startMs,
+        stream: true,
+        requestStartMs: ctx.requestStartMs,
+        upstreamFirstResponseMs: ctx.upstreamFirstResponseMs,
+      });
     }
-    recorder.recordSuccessfulRequest({
-      accountId: ctx.accountId,
-      provider: ctx.provider,
-      model: ctx.model,
-      userId: ctx.userId,
-      apiKeyId: ctx.apiKeyId,
-      inputTokens: tracker.inputTokens,
-      outputTokens: tracker.outputTokens,
-      cachedTokens: tracker.cachedTokens,
-      cacheWriteTokens: tracker.cacheWriteTokens,
-      durationMs: Date.now() - ctx.startMs,
-      stream: true,
-      requestStartMs: ctx.requestStartMs,
-      upstreamFirstResponseMs: ctx.upstreamFirstResponseMs,
-    });
+    ctx.onStreamComplete?.(reason);
   };
 
   const stream = new ReadableStream<Uint8Array>({
@@ -48,12 +52,12 @@ export async function passthroughStream(ctx: ResponseContext, recorder: StreamRe
       try {
         result = await reader.read();
       } catch {
-        finish();
+        finish("error");
         controller.error(new Error("upstream stream failed"));
         return;
       }
       if (result.done) {
-        finish();
+        finish("success");
         controller.close();
         return;
       }
@@ -61,7 +65,7 @@ export async function passthroughStream(ctx: ResponseContext, recorder: StreamRe
       controller.enqueue(result.value);
     },
     async cancel() {
-      finish();
+      finish("cancel");
       try {
         await reader.cancel();
       } catch {
@@ -429,39 +433,48 @@ export async function anthropicStream(ctx: ResponseContext, recorder: StreamReco
   const messageId = `msg_${new Date().toISOString().replace(/\D/g, "").slice(0, 14)}`;
   const encoder = new TextEncoder();
   const reader = body.getReader();
+  ctx.streamHandled = true;
   const tracker = new AnthropicStreamTracker(
     (event, data) => {
-      controller?.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+      if (!controller) return;
+      try {
+        controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+      } catch {
+        return;
+      }
     },
     ctx.model,
     ctx.provider === "kiro"
   );
   let controller: ReadableStreamDefaultController<Uint8Array> | null = null;
-  let finished = false;
+  let settled = false;
 
-  const finish = (): void => {
-    if (finished) return;
-    finished = true;
-    tracker.finish();
+  const finish = (reason: StreamCompletion): void => {
+    if (settled) return;
+    settled = true;
+    if (reason === "success") tracker.finish();
     ctx.usage.inputTokens = tracker.inputTokens;
     ctx.usage.outputTokens = tracker.outputTokens;
     ctx.usage.cachedTokens = tracker.cachedTokens;
     ctx.usage.cacheWriteTokens = tracker.cacheWriteTokens;
-    recorder.recordSuccessfulRequest({
-      accountId: ctx.accountId,
-      provider: ctx.provider,
-      model: ctx.model,
-      userId: ctx.userId,
-      apiKeyId: ctx.apiKeyId,
-      inputTokens: tracker.inputTokens,
-      outputTokens: tracker.outputTokens,
-      cachedTokens: tracker.cachedTokens,
-      cacheWriteTokens: tracker.cacheWriteTokens,
-      durationMs: Date.now() - ctx.startMs,
-      stream: true,
-      requestStartMs: ctx.requestStartMs,
-      upstreamFirstResponseMs: ctx.upstreamFirstResponseMs,
-    });
+    if (reason === "success") {
+      recorder.recordSuccessfulRequest({
+        accountId: ctx.accountId,
+        provider: ctx.provider,
+        model: ctx.model,
+        userId: ctx.userId,
+        apiKeyId: ctx.apiKeyId,
+        inputTokens: tracker.inputTokens,
+        outputTokens: tracker.outputTokens,
+        cachedTokens: tracker.cachedTokens,
+        cacheWriteTokens: tracker.cacheWriteTokens,
+        durationMs: Date.now() - ctx.startMs,
+        stream: true,
+        requestStartMs: ctx.requestStartMs,
+        upstreamFirstResponseMs: ctx.upstreamFirstResponseMs,
+      });
+    }
+    ctx.onStreamComplete?.(reason);
   };
 
   const stream = new ReadableStream<Uint8Array>({
@@ -490,12 +503,12 @@ export async function anthropicStream(ctx: ResponseContext, recorder: StreamReco
       try {
         result = await reader.read();
       } catch {
-        finish();
+        finish("error");
         nextController.error(new Error("upstream stream failed"));
         return;
       }
       if (result.done) {
-        finish();
+        finish("success");
         nextController.close();
         return;
       }
@@ -503,7 +516,7 @@ export async function anthropicStream(ctx: ResponseContext, recorder: StreamReco
       tracker.process(decoder.decode(result.value, { stream: true }));
     },
     async cancel() {
-      finish();
+      finish("cancel");
       try {
         await reader.cancel();
       } catch {

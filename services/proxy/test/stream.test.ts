@@ -14,6 +14,19 @@ function sseResponse(chunks: string[]): Response {
   return new Response(body, { status: 200 });
 }
 
+function sseResponseThenError(chunk: string, error: Error): Response {
+  const encoder = new TextEncoder();
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(encoder.encode(chunk));
+    },
+    pull(controller) {
+      controller.error(error);
+    },
+  });
+  return new Response(body, { status: 200 });
+}
+
 function context(response: Response, provider = "openai", usage?: UsageCounts): ResponseContext {
   return {
     response,
@@ -49,6 +62,7 @@ function recorder(): { recorder: StreamRecorder; recorded: Array<{ inputTokens: 
 describe("passthroughStream", () => {
   it("forwards chunks and records usage", async () => {
     const usage: UsageCounts = { inputTokens: 0, outputTokens: 0, cachedTokens: 0, cacheWriteTokens: 0 };
+    let completion = "";
     const ctx = context(
       sseResponse([
         'data: {"choices":[{"delta":{"content":"hel"}}]}\n\n',
@@ -58,8 +72,12 @@ describe("passthroughStream", () => {
       "openai",
       usage
     );
+    ctx.onStreamComplete = (reason) => {
+      completion = reason;
+    };
     const { recorder: rec, recorded } = recorder();
     const response = await passthroughStream(ctx, rec);
+    assert.equal(ctx.streamHandled, true);
     const text = await response.text();
     assert.match(text, /hel/);
     assert.match(text, /lo/);
@@ -68,6 +86,43 @@ describe("passthroughStream", () => {
     assert.equal(usage.outputTokens, 2);
     assert.equal(recorded.length, 1);
     assert.equal(recorded[0].stream, true);
+    assert.equal(completion, "success");
+  });
+
+  it("reports an error completion instead of recording success", async () => {
+    let completion = "";
+    const ctx = context(sseResponseThenError('data: {"choices":[{"delta":{"content":"hi"}}]}\n\n', new Error("boom")));
+    ctx.onStreamComplete = (reason) => {
+      completion = reason;
+    };
+    const { recorder: rec, recorded } = recorder();
+    const response = await passthroughStream(ctx, rec);
+    await assert.rejects(async () => {
+      await response.text();
+    });
+    assert.equal(completion, "error");
+    assert.equal(recorded.length, 0);
+  });
+
+  it("reports a cancel completion when the client disconnects", async () => {
+    let completion = "";
+    const ctx = context(
+      sseResponse([
+        'data: {"choices":[{"delta":{"content":"hi"}}]}\n\n',
+        "data: [DONE]\n\n",
+      ])
+    );
+    ctx.onStreamComplete = (reason) => {
+      completion = reason;
+    };
+    const { recorder: rec, recorded } = recorder();
+    const response = await passthroughStream(ctx, rec);
+    const reader = response.body?.getReader();
+    assert.ok(reader);
+    await reader.read();
+    await reader.cancel();
+    assert.equal(completion, "cancel");
+    assert.equal(recorded.length, 0);
   });
 
   it("records hypercredits for hyper", async () => {
