@@ -1,7 +1,7 @@
-import { getQuotaJson, putQuotaCache } from "../../cache.js";
-import { baseQuotaInfo, errorQuotaInfo, formatTimeUntilReset, parseQuotaNumber, parseQuotaRecord, parseQuotaString } from "../../helpers.js";
-import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay, QuotaProvider } from "../../types.js";
-import { quotaFallbackTier, type Json } from "../common.js";
+import { getQuotaJson, putQuotaCache } from "#quota/lib/cache.ts";
+import { baseQuotaInfo, errorQuotaInfo, formatTimeUntilReset, parseQuotaNumber, parseQuotaRecord, parseQuotaString } from "#quota/lib/helpers.ts";
+import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay, QuotaProvider } from "#quota/types.ts";
+import { quotaFallbackTier, type Json } from "#quota/providers/common.ts";
 
 export const provider: QuotaProvider = {
   name: "codex",

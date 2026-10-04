@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { discoverQuotaProviders } from "./extension.js";
+import { discoverQuotaProviders } from "#quota/extension.ts";
 
 test("discovers quota providers from folders", async () => {
   const providers = await discoverQuotaProviders();

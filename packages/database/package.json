@@ -1,6 +1,5 @@
 {
   "name": "@opendum/database",
-  "version": "0.1.0",
   "type": "module",
   "private": true,
   "main": "./src/index.ts",
@@ -30,5 +29,8 @@
     "drizzle-kit": "^0.31.10",
     "tsx": "^4.23.13",
     "typescript": "^6.0.3"
+  },
+  "imports": {
+    "#database/*": "./src/*"
   }
 }

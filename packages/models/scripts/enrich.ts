@@ -20,11 +20,11 @@ import { basename, dirname, join, resolve } from "node:path";
 import { existsSync, mkdirSync, renameSync, rmSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { inferModelFolder } from "#models/families.ts";
-import { buildModelIndex, persistModel, renameModelFiles, resolveGeneratedDir } from "#models/registry.ts";
-import { applyCanonicalMerge, planCanonicalization } from "#models/canonicalize.ts";
-import { modelProbes } from "#models/probes.ts";
-import type { ModelData } from "#models/types.ts";
+import { inferModelFolder } from "#models/model/families.ts";
+import { buildModelIndex, persistModel, renameModelFiles, resolveGeneratedDir } from "#models/registry/registry.ts";
+import { applyCanonicalMerge, planCanonicalization } from "#models/model/canonicalize.ts";
+import { modelProbes } from "#models/model/probes.ts";
+import type { ModelData } from "#models/model/types.ts";
 import {
   buildModelPatch,
   fetchExternalRegistries,
@@ -32,7 +32,7 @@ import {
   type ModelMetadataInput,
   type ModelMetadataPatch,
   type Registries,
-} from "#models/metadata.ts";
+} from "#models/model/metadata.ts";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const modelsDir = resolve(scriptDir, "../data");

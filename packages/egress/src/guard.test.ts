@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { createGuardedFetch } from "./guard.js";
+import { createGuardedFetch } from "#egress/guard.ts";
 
 function messageOf(error: unknown): string {
   if (!(error instanceof Error)) return String(error);

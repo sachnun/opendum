@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { Registry } from "@opendum/models/runtime";
-import { ProviderRegistry } from "./registry.js";
-import { discoverProviderExtensions } from "./extension/index.js";
+import { ProviderRegistry } from "#providers/registry.ts";
+import { discoverProviderExtensions } from "#providers/extension/index.ts";
 
 const EXPECTED = [
   "antigravity",

@@ -1,7 +1,6 @@
 {
   "name": "@opendum/redis",
   "private": true,
-  "version": "0.1.0",
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
@@ -21,5 +20,8 @@
     "@types/node": "^26.1.1",
     "tsx": "^4.23.13",
     "typescript": "^6.0.3"
+  },
+  "imports": {
+    "#redis/*": "./src/*"
   }
 }

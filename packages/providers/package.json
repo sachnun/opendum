@@ -1,17 +1,16 @@
 {
   "name": "@opendum/providers",
   "private": true,
-  "version": "0.1.0",
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./types": "./src/types.ts",
+    "./types": "./src/model/types.ts",
     "./registry": "./src/registry.ts",
     "./extension": "./src/extension/index.ts",
-    "./display-names": "./src/display-names.ts",
-    "./http": "./src/http.ts",
-    "./endpoints": "./src/endpoints.ts",
-    "./responses-transform": "./src/responses-transform.ts"
+    "./display-names": "./src/model/display-names.ts",
+    "./http": "./src/api/http.ts",
+    "./endpoints": "./src/api/endpoints.ts",
+    "./responses-transform": "./src/transform/responses.ts"
   },
   "scripts": {
     "test": "tsx --test \"./src/**/*.test.ts\"",
@@ -30,5 +29,8 @@
     "@types/node": "^26.1.1",
     "tsx": "^4.23.13",
     "typescript": "^6.0.3"
+  },
+  "imports": {
+    "#providers/*": "./src/*"
   }
 }

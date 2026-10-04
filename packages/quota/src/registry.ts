@@ -1,4 +1,4 @@
-import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaProvider } from "./types.js";
+import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaProvider } from "#quota/types.ts";
 
 const PROVIDERS = new Map<string, QuotaProvider>();
 

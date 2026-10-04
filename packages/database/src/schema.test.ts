@@ -8,7 +8,7 @@ import { isTable, getTableName } from "drizzle-orm";
 import { getTableConfig, IndexedColumn, type PgTable } from "drizzle-orm/pg-core";
 import { SQL } from "drizzle-orm";
 
-import * as schema from "./schema/index.js";
+import * as schema from "#database/schema/index.ts";
 
 type DefaultValue =
   | { kind: "none" }

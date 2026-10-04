@@ -1,7 +1,7 @@
 import { createId } from "@paralleldrive/cuid2";
 import type { InferSelectModel } from "drizzle-orm";
 import { boolean, index, integer, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
-import { user } from "./auth.js";
+import { user } from "#database/schema/auth.ts";
 
 export const providerEmailRegistry = pgTable(
   "provider_email_registry",

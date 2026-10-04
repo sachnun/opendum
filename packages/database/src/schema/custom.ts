@@ -1,6 +1,6 @@
 import { createId } from "@paralleldrive/cuid2";
 import { boolean, index, jsonb, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
-import { user } from "./auth.js";
+import { user } from "#database/schema/auth.ts";
 
 export const customProvider = pgTable(
   "custom_provider",

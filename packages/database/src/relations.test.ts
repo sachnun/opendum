@@ -12,8 +12,8 @@ import {
 } from "drizzle-orm";
 import { getTableConfig } from "drizzle-orm/pg-core";
 
-import * as relations from "./relations.js";
-import * as schema from "./schema/index.js";
+import * as relations from "#database/relations.ts";
+import * as schema from "#database/schema/index.ts";
 
 interface ResolvedRelation {
   kind: "one" | "many";

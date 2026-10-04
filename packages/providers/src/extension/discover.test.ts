@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { discoverProviderExtensions } from "./index.js";
+import { discoverProviderExtensions } from "#providers/extension/index.ts";
 
 test("discovers provider extensions from folders", async () => {
   const extensions = await discoverProviderExtensions();

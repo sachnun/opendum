@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { decrypt, encrypt, hashString } from "./cryptojs.js";
+import { decrypt, encrypt, hashString } from "#crypto/cryptojs.ts";
 
 describe("cryptojs", () => {
   const secret = "test-secret";

@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
-import { db, type Database } from "../client.js";
-import { proxyApiKey, proxyApiKeyRateLimit } from "../schema/keys.js";
+import { db, type Database } from "#database/client.ts";
+import { proxyApiKey, proxyApiKeyRateLimit } from "#database/schema/keys.ts";
 
 export async function getAPIKeyByHash(keyHash: string, database: Database = db) {
   const [row] = await database

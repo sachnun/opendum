@@ -1,5 +1,5 @@
-import type { ProviderExtension } from "../../extension/types.js";
-import { PerchProvider } from "../../perch.js";
+import type { ProviderExtension } from "#providers/extension/types.ts";
+import { PerchProvider } from "#providers/providers/perch/provider.ts";
 
 export const extension: ProviderExtension = {
   name: "perch",

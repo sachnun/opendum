@@ -20,9 +20,9 @@ import {
   getProviderUpstream,
   syncProviderModels,
   persistModel,
-} from "#models/registry.ts";
-import { fetchJson, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "#models/http.ts";
-import { stripParamInfoKey } from "#models/clean-key.ts";
+} from "#models/registry/registry.ts";
+import { fetchJson, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "#models/lib/http.ts";
+import { stripParamInfoKey } from "#models/model/clean-key.ts";
 
 const PROVIDER_NAME = "workers_ai";
 const WORKERS_AI_MODELS_API_URL = "https://api.github.com/repos/cloudflare/cloudflare-docs/contents/src/content/workers-ai-models?ref=production";

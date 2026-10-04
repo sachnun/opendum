@@ -1,11 +1,11 @@
 import { and, asc, eq, inArray, isNull, lte, ne, notInArray, or, sql } from "drizzle-orm";
-import { db, type Database } from "../client.js";
+import { db, type Database } from "#database/client.ts";
 import {
   providerAccount,
   providerAccountDisabledModel,
   providerAccountModelHealth,
-} from "../schema/accounts.js";
-import { userSharingSetting } from "../schema/usage.js";
+} from "#database/schema/accounts.ts";
+import { userSharingSetting } from "#database/schema/usage.ts";
 
 export type EligibleAccountParams = {
   userId: string;

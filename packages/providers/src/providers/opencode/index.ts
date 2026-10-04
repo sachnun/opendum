@@ -1,5 +1,5 @@
-import type { ProviderExtension } from "../../extension/types.js";
-import { OpencodeProvider } from "../../opencode.js";
+import type { ProviderExtension } from "#providers/extension/types.ts";
+import { OpencodeProvider } from "#providers/providers/opencode/provider.ts";
 
 export const extension: ProviderExtension = {
   name: "opencode",

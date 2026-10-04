@@ -1,5 +1,5 @@
-import type { ProviderExtension } from "../extension/types.js";
-import { OpenAICompatibleProvider } from "../openai-compatible.js";
+import type { ProviderExtension } from "#providers/extension/types.ts";
+import { OpenAICompatibleProvider } from "#providers/providers/openai-compatible.ts";
 
 export type OpenAICompatibleExtensionConfig = {
   name: string;

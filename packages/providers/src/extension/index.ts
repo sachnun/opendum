@@ -1,7 +1,7 @@
 import { discoverModules } from "@opendum/extension";
-import type { ProviderExtension } from "./types.js";
+import type { ProviderExtension } from "#providers/extension/types.ts";
 
-export * from "./types.js";
+export * from "#providers/extension/types.ts";
 export { discoverModules } from "@opendum/extension";
 export type { Discoverable, DiscoverOptions } from "@opendum/extension";
 

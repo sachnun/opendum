@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { test } from "node:test";
-import { discoverModules } from "./index.js";
+import { discoverModules } from "#extension/index.ts";
 
 function fixture(files: Record<string, string>): URL {
   const dir = mkdtempSync(join(tmpdir(), "opendum-extension-"));

@@ -1,7 +1,7 @@
-import { encodeQuery, getQuotaJson, putQuotaCache } from "../../cache.js";
-import { baseQuotaInfo, clampFraction, displayNumber, errorQuotaInfo, firstNonEmpty, formatTimeUntilResetIso, parseQuotaArray, parseQuotaNumber, parseQuotaRecord, parseQuotaString, parseResetIso } from "../../helpers.js";
-import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay, QuotaProvider } from "../../types.js";
-import type { Json } from "../common.js";
+import { encodeQuery, getQuotaJson, putQuotaCache } from "#quota/lib/cache.ts";
+import { baseQuotaInfo, clampFraction, displayNumber, errorQuotaInfo, firstNonEmpty, formatTimeUntilResetIso, parseQuotaArray, parseQuotaNumber, parseQuotaRecord, parseQuotaString, parseResetIso } from "#quota/lib/helpers.ts";
+import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay, QuotaProvider } from "#quota/types.ts";
+import type { Json } from "#quota/providers/common.ts";
 
 export const provider: QuotaProvider = {
   name: "kiro",

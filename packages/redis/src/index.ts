@@ -1,4 +1,4 @@
-export { closeRedis, openRedis } from "./client.js";
-export type { OpendumRedis } from "./client.js";
-export * from "./keys.js";
-export { SessionAffinity, preferSticky } from "./session-affinity.js";
+export { closeRedis, openRedis } from "#redis/client.ts";
+export type { OpendumRedis } from "#redis/client.ts";
+export * from "#redis/keys.ts";
+export { SessionAffinity, preferSticky } from "#redis/session-affinity.ts";

@@ -1,5 +1,5 @@
-import type { ProviderExtension } from "../../extension/types.js";
-import { WorkbuddyProvider } from "../../workbuddy.js";
+import type { ProviderExtension } from "#providers/extension/types.ts";
+import { WorkbuddyProvider } from "#providers/providers/workbuddy/provider.ts";
 
 export const extension: ProviderExtension = {
   name: "workbuddy",

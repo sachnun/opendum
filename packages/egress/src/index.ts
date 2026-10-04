@@ -1,5 +1,5 @@
-export { DEFAULT_UNROXY_BASE_URL, UnroxyEgress } from "./unroxy.js";
-export type { Egress, EgressFetcher, UnroxyEgressOptions } from "./unroxy.js";
-export { PrivateHostError, assertPublicHost, isPrivateHost, isPrivateIp } from "./ssrf.js";
-export { createGuardedFetch } from "./guard.js";
-export type { GuardedFetch, GuardedFetcher, GuardedFetchOptions } from "./guard.js";
+export { DEFAULT_UNROXY_BASE_URL, UnroxyEgress } from "#egress/unroxy.ts";
+export type { Egress, EgressFetcher, UnroxyEgressOptions } from "#egress/unroxy.ts";
+export { PrivateHostError, assertPublicHost, isPrivateHost, isPrivateIp } from "#egress/ssrf.ts";
+export { createGuardedFetch } from "#egress/guard.ts";
+export type { GuardedFetch, GuardedFetcher, GuardedFetchOptions } from "#egress/guard.ts";

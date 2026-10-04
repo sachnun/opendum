@@ -1,5 +1,5 @@
 import { discoverModules } from "@opendum/extension";
-import type { QuotaProvider } from "./types.js";
+import type { QuotaProvider } from "#quota/types.ts";
 
 export function discoverQuotaProviders(): Promise<QuotaProvider[]> {
   return discoverModules<QuotaProvider>({

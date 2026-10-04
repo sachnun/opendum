@@ -5,8 +5,8 @@ import type { ModelSource } from "./source.js";
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildModelIdMap, syncProviderModels } from "#models/registry.ts";
-import { fetchText } from "#models/http.ts";
+import { buildModelIdMap, syncProviderModels } from "#models/registry/registry.ts";
+import { fetchText } from "#models/lib/http.ts";
 
 const PROVIDER_NAME = "harbor";
 const HARBOR_MODELS_URL = "https://tokenharbor.ai/models";

@@ -1,6 +1,6 @@
-import { baseQuotaInfo, clampFraction, displayNumber, errorQuotaInfo, expiredQuotaInfo, parseQuotaNumber, parseQuotaRecord } from "../../helpers.js";
-import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay, QuotaProvider } from "../../types.js";
-import { fetchJsonData, type Json } from "../common.js";
+import { baseQuotaInfo, clampFraction, displayNumber, errorQuotaInfo, expiredQuotaInfo, parseQuotaNumber, parseQuotaRecord } from "#quota/lib/helpers.ts";
+import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay, QuotaProvider } from "#quota/types.ts";
+import { fetchJsonData, type Json } from "#quota/providers/common.ts";
 
 export const provider: QuotaProvider = {
   name: "openrouter",

@@ -1,5 +1,5 @@
-import type { OpendumRedis } from "./client.js";
-import { sessionAffinityKey } from "./keys.js";
+import type { OpendumRedis } from "#redis/client.ts";
+import { sessionAffinityKey } from "#redis/keys.ts";
 
 const DEFAULT_TTL_SECONDS = 2 * 60 * 60;
 

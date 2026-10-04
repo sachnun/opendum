@@ -5,9 +5,9 @@ import type { ModelSource } from "./source.js";
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildModelIndex, syncProviderModels } from "#models/registry.ts";
-import { fetchText } from "#models/http.ts";
-import { normalizeName } from "#models/similarity.ts";
+import { buildModelIndex, syncProviderModels } from "#models/registry/registry.ts";
+import { fetchText } from "#models/lib/http.ts";
+import { normalizeName } from "#models/model/similarity.ts";
 
 const PROVIDER_NAME = "perch";
 

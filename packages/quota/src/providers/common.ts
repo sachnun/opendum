@@ -1,5 +1,5 @@
-import { getQuotaJson, putQuotaCache } from "../cache.js";
-import type { QuotaAccount, QuotaContext } from "../types.js";
+import { getQuotaJson, putQuotaCache } from "#quota/lib/cache.ts";
+import type { QuotaAccount, QuotaContext } from "#quota/types.ts";
 
 export type Json = Record<string, unknown>;
 

@@ -22,7 +22,7 @@ import {
   type CustomProviderModelRecord,
   type CustomProviderReader,
   createCustomStore,
-} from "./custom-store.js";
+} from "#auth/custom-store.ts";
 import {
   type AccountAccess,
   type AccountModelAvailability,
@@ -32,7 +32,7 @@ import {
   type RateLimitRule,
   emptyAuthResult,
   emptyAvailability,
-} from "./types.js";
+} from "#auth/types.ts";
 
 const VALID_TTL_SECONDS = 45;
 const INVALID_TTL_SECONDS = 10;

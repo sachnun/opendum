@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { normalizeEmail } from "./email.js";
+import { normalizeEmail } from "#database/email.ts";
 
 test("normalizeEmail trims and lowercases", () => {
   assert.equal(normalizeEmail("  User@Example.COM "), "user@example.com");

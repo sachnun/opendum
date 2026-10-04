@@ -1,5 +1,5 @@
-import type { ProviderExtension } from "../../extension/types.js";
-import { ClineProvider } from "../../cline.js";
+import type { ProviderExtension } from "#providers/extension/types.ts";
+import { ClineProvider } from "#providers/providers/cline/provider.ts";
 
 export const extension: ProviderExtension = {
   name: "cline",

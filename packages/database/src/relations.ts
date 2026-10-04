@@ -16,7 +16,7 @@ import {
   disabledModel,
   customProvider,
   customProviderModel,
-} from "./schema/index.js";
+} from "#database/schema/index.ts";
 
 export const userRelations = relations(user, ({ one, many }) => ({
   accounts: many(account),

@@ -13,5 +13,5 @@ export function resolveGeneratedModelsDir(cwd: string = process.cwd()): string {
   return resolve(cwd, MODELS_GENERATED_DIR);
 }
 
-export { FAMILY_RULES, inferFamilyFromFolder, inferModelFolder } from "./families.ts";
-export type { FamilyRule } from "./families.ts";
+export { FAMILY_RULES, inferFamilyFromFolder, inferModelFolder } from "#models/model/families.ts";
+export type { FamilyRule } from "#models/model/families.ts";

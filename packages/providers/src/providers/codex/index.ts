@@ -1,5 +1,5 @@
-import type { ProviderExtension } from "../../extension/types.js";
-import { CodexProvider } from "../../codex.js";
+import type { ProviderExtension } from "#providers/extension/types.ts";
+import { CodexProvider } from "#providers/providers/codex/provider.ts";
 
 export const extension: ProviderExtension = {
   name: "codex",

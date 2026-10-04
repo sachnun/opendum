@@ -5,9 +5,9 @@ import type { ModelSource } from "./source.js";
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildModelIdMap, syncProviderModels } from "#models/registry.ts";
-import { fetchJson } from "#models/http.ts";
-import { stripParamInfoKey } from "#models/clean-key.ts";
+import { buildModelIdMap, syncProviderModels } from "#models/registry/registry.ts";
+import { fetchJson } from "#models/lib/http.ts";
+import { stripParamInfoKey } from "#models/model/clean-key.ts";
 
 const PROVIDER_NAME = "cline";
 // Cline exposes its curated free model list on the recommended-models

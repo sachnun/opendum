@@ -26,8 +26,8 @@ import type { ModelSource } from "./source.js";
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildModelIndex, persistModel, syncProviderModels } from "#models/registry.ts";
-import { fetchText } from "#models/http.ts";
+import { buildModelIndex, persistModel, syncProviderModels } from "#models/registry/registry.ts";
+import { fetchText } from "#models/lib/http.ts";
 
 const ANTIGRAVITY_MODELS_URL = "https://antigravity.google/docs/models";
 const PROVIDER_NAME = "antigravity";

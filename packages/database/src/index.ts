@@ -1,6 +1,6 @@
-export * from "./schema/index.js";
-export * as schema from "./schema/index.js";
-export * from "./relations.js";
-export * as relations from "./relations.js";
-export * from "./email.js";
-export * from "./client.js";
+export * from "#database/schema/index.ts";
+export * as schema from "#database/schema/index.ts";
+export * from "#database/relations.ts";
+export * as relations from "#database/relations.ts";
+export * from "#database/email.ts";
+export * from "#database/client.ts";

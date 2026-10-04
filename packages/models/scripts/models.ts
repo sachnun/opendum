@@ -3,7 +3,7 @@
 import { writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildModelIndex, pruneDeadModelEntries } from "#models/registry.ts";
+import { buildModelIndex, pruneDeadModelEntries } from "#models/registry/registry.ts";
 import { discoverSources, orderSources } from "./runner.js";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));

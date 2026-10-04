@@ -1,9 +1,9 @@
 import type { Registry } from "@opendum/models/runtime";
 import type { OpendumRedis } from "@opendum/redis";
-import { createTransport, type EgressFetch, type Logger, type MutableTransport } from "./http.js";
-import type { FallbackState } from "./fallback.js";
-import type { AuthlessProvider, CredentialRefresher, Provider } from "./types.js";
-import type { ProviderDeps, ProviderExtension } from "./extension/types.js";
+import { createTransport, type EgressFetch, type Logger, type MutableTransport } from "#providers/api/http.ts";
+import type { FallbackState } from "#providers/lib/fallback.ts";
+import type { AuthlessProvider, CredentialRefresher, Provider } from "#providers/model/types.ts";
+import type { ProviderDeps, ProviderExtension } from "#providers/extension/types.ts";
 
 export type ProviderRegistryOptions = {
   models: Registry;

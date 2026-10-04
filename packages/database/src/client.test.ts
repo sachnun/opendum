@@ -1,18 +1,18 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 
-import * as relations from "./relations.js";
-import * as schema from "./schema/index.js";
+import * as relations from "#database/relations.ts";
+import * as schema from "#database/schema/index.ts";
 
 const UNREACHABLE_URL = "postgres://opendum:opendum@127.0.0.1:1/opendum";
 
 let originalDatabaseUrl: string | undefined;
-let client: typeof import("./client.js");
+let client: typeof import("#database/client.ts");
 
 before(async () => {
   originalDatabaseUrl = process.env.DATABASE_URL;
   process.env.DATABASE_URL = UNREACHABLE_URL;
-  client = await import("./client.js");
+  client = await import("#database/client.ts");
 });
 
 after(() => {

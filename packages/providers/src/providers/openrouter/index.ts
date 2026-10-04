@@ -1,6 +1,6 @@
-import type { ProviderExtension } from "../../extension/types.js";
-import { SUPPORTED_OPENROUTER } from "../../openai-compatible.js";
-import { openAICompatibleExtension } from "../openai-compatible-extension.js";
+import type { ProviderExtension } from "#providers/extension/types.ts";
+import { SUPPORTED_OPENROUTER } from "#providers/providers/openai-compatible.ts";
+import { openAICompatibleExtension } from "#providers/providers/openai-compatible-extension.ts";
 
 export const extension: ProviderExtension = openAICompatibleExtension({
   name: "openrouter",

@@ -6,7 +6,7 @@ import {
   fetch as undiciFetch,
   type RequestInit as UndiciRequestInit,
 } from "undici";
-import { PrivateHostError, isPrivateIp } from "./ssrf.js";
+import { PrivateHostError, isPrivateIp } from "#egress/ssrf.ts";
 
 export type GuardedFetchOptions = {
   headersTimeout?: number;

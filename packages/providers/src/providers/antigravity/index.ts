@@ -1,5 +1,5 @@
-import type { ProviderExtension } from "../../extension/types.js";
-import { AntigravityProvider } from "../../antigravity.js";
+import type { ProviderExtension } from "#providers/extension/types.ts";
+import { AntigravityProvider } from "#providers/providers/antigravity/provider.ts";
 
 export const extension: ProviderExtension = {
   name: "antigravity",

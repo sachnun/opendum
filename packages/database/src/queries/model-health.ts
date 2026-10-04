@@ -1,6 +1,6 @@
 import { and, eq, inArray, isNotNull, lte, sql } from "drizzle-orm";
-import { db, type Database } from "../client.js";
-import { providerAccount, providerAccountModelHealth } from "../schema/accounts.js";
+import { db, type Database } from "#database/client.ts";
+import { providerAccount, providerAccountModelHealth } from "#database/schema/accounts.ts";
 
 export async function bumpAccountRequestCount(
   params: { id: string; at: Date },

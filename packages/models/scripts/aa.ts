@@ -7,11 +7,11 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { buildAaIndex, parseLeaderboard, resolveAaScore } from "#models/aa.ts";
-import { modelProbes } from "#models/probes.ts";
-import { fetchText } from "#models/http.ts";
-import { buildModelIndex, generatedModelPath, readModelJson, writeGeneratedModelJson } from "#models/registry.ts";
-import type { ModelData } from "#models/types.ts";
+import { buildAaIndex, parseLeaderboard, resolveAaScore } from "#models/registry/aa.ts";
+import { modelProbes } from "#models/model/probes.ts";
+import { fetchText } from "#models/lib/http.ts";
+import { buildModelIndex, generatedModelPath, readModelJson, writeGeneratedModelJson } from "#models/registry/registry.ts";
+import type { ModelData } from "#models/model/types.ts";
 
 const LEADERBOARD_URL = "https://artificialanalysis.ai/leaderboards/models";
 const USER_AGENT = "Mozilla/5.0 (compatible; opendum-model-sync)";

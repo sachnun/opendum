@@ -9,8 +9,8 @@ import { homedir, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { buildModelIndex, persistModel, syncProviderModels } from "#models/registry.ts";
-import { fetchJson } from "#models/http.ts";
+import { buildModelIndex, persistModel, syncProviderModels } from "#models/registry/registry.ts";
+import { fetchJson } from "#models/lib/http.ts";
 
 const PROVIDER_NAME = "workbuddy";
 const WORKBUDDY_NPM_PACKAGE = "@tencent-ai/codebuddy-code";
