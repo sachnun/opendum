@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
-import { readdirSync, writeFileSync } from "node:fs";
+import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { spawn } from "node:child_process";
-import { basename, dirname, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildModelIndex, pruneDeadModelEntries } from "#models/registry.ts";
 
@@ -16,6 +16,11 @@ function refreshScripts(): string[] {
   return readdirSync(scriptDir, { withFileTypes: true })
     .filter((entry) => entry.isFile() && entry.name.endsWith(".ts") && entry.name !== SELF)
     .map((entry) => entry.name)
+    .filter(
+      (name) =>
+        TAIL_SCRIPTS.includes(name) ||
+        readFileSync(join(scriptDir, name), "utf-8").includes("syncProviderModels("),
+    )
     .sort((left, right) => {
       const rank = Number(TAIL_SCRIPTS.includes(left)) - Number(TAIL_SCRIPTS.includes(right));
       return rank !== 0 ? rank : left.localeCompare(right);
