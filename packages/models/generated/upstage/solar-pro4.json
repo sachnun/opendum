@@ -1,7 +1,5 @@
 {
-  "providers": [
-    "freebuff"
-  ],
+  "providers": [],
   "reasoning": false,
   "reasoning_effort": [
     "low",
@@ -32,13 +30,6 @@
       "index": 28.2,
       "estimated": true,
       "version": "4.3"
-    }
-  },
-  "providerConfig": {
-    "freebuff": {
-      "upstream": "upstage/solar-pro4",
-      "contextWindow": 524288,
-      "maxOutputTokens": 131072
     }
   }
 }

@@ -1,7 +1,5 @@
 {
-  "providers": [
-    "freebuff"
-  ],
+  "providers": [],
   "reasoning": true,
   "reasoning_effort": [
     "low",
@@ -24,12 +22,5 @@
     "input": 0.076,
     "output": 0.9,
     "cacheRead": 0.075
-  },
-  "providerConfig": {
-    "freebuff": {
-      "upstream": "deepseek/deepseek-v4-flash-fast",
-      "contextWindow": 1048576,
-      "maxOutputTokens": 384000
-    }
   }
 }

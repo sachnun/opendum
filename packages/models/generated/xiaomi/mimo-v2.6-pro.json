@@ -1,7 +1,5 @@
 {
-  "providers": [
-    "freebuff"
-  ],
+  "providers": [],
   "reasoning": true,
   "reasoning_effort": [
     "low",
@@ -35,13 +33,6 @@
       "index": 46.3,
       "estimated": false,
       "version": "4.3"
-    }
-  },
-  "providerConfig": {
-    "freebuff": {
-      "upstream": "mimo/mimo-v2.6-pro",
-      "contextWindow": 1048576,
-      "maxOutputTokens": 131072
     }
   }
 }

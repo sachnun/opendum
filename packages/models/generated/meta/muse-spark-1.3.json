@@ -3,7 +3,6 @@
   "providers": [
     "opencode",
     "cline",
-    "freebuff",
     "zenmux"
   ],
   "aliases": [
@@ -52,11 +51,6 @@
   "providerConfig": {
     "cline": {
       "upstream": "cline-free/muse-spark-1.3-contributor",
-      "contextWindow": 1048576,
-      "maxOutputTokens": 131072
-    },
-    "freebuff": {
-      "upstream": "meta/muse-spark-1.3-contributor",
       "contextWindow": 1048576,
       "maxOutputTokens": 131072
     },
