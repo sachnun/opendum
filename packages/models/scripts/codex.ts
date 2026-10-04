@@ -3,7 +3,7 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildModelIndex, persistModel, syncProviderModels } from "#models/registry.ts";
-import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "#models/http.ts";
+import { sleep, fetchText, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "#models/http.ts";
 
 const CODEX_MODELS_URL =
   "https://raw.githubusercontent.com/openai/codex/main/codex-rs/models-manager/models.json";
@@ -19,11 +19,12 @@ const CHATGPT_EXCLUDED_MODELS = new Set([
   "gpt-5.2",
 ]);
 
-// Models that need a paid ChatGPT plan in Codex. They stay in the registry so
-// the web can list them and dim them for free-tier accounts (the same
-// pattern as Kiro paid models). Classification comes from official Codex
-// pricing docs, not from the feed's `available_in_plans` (which is unreliable
-// for free-tier gating).
+// Codex is included on the Free and Go plans with only a low-tier model, while
+// the frontier models require a paid ChatGPT plan. The public models.json feed
+// lists "free" for every model, so it cannot drive tier gating; the plan
+// breakdown comes from the Codex pricing docs instead.
+const CODEX_PRICING_DOCS_URL = "https://learn.chatgpt.com/docs/pricing.md";
+const FREE_PLAN_NAMES = new Set(["Free", "Go"]);
 const PAID_CODEX_TIERS = [
   "plus",
   "pro",
@@ -33,10 +34,6 @@ const PAID_CODEX_TIERS = [
   "team",
   "student",
 ];
-const PAID_CHATGPT_MODELS = new Map([
-  ["gpt-6-astra", PAID_CODEX_TIERS],
-  ["gpt-5.6-sol", PAID_CODEX_TIERS],
-]);
 
 /**
  * Fetch the public models.json from the openai/codex GitHub repo.
@@ -105,21 +102,49 @@ function buildModelMap(models) {
   return new Map([...map.entries()].sort(([a], [b]) => a.localeCompare(b)));
 }
 
+function normalizeModelName(value) {
+  return String(value ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+/**
+ * Fetch the Codex pricing docs and join the model mentions from the Free/Go
+ * plan cards. Any Codex model whose name is not mentioned there requires a paid
+ * ChatGPT plan.
+ */
+async function fetchFreePlanModelNames() {
+  const markdown = await fetchText(CODEX_PRICING_DOCS_URL, {
+    label: "Codex pricing docs",
+    headers: { Accept: "text/markdown" },
+  });
+
+  const mentions = [];
+  for (const [, body] of markdown.matchAll(/<PricingCard([\s\S]*?)<\/PricingCard>/g)) {
+    const name = (body.match(/name="([^"]+)"/) ?? [])[1] ?? "";
+    if (!FREE_PLAN_NAMES.has(name)) continue;
+    for (const line of body.split(/\r?\n/)) {
+      const bullet = line.match(/^\s*-\s+(.*)$/);
+      if (bullet) mentions.push(normalizeModelName(bullet[1]));
+    }
+  }
+
+  return mentions.join(" ");
+}
+
 /**
  * Build per-model provider config with tier restrictions.
  *
- * Models in the paid map get `allowedTiers` restricted to non-free plans, which
- * makes the web dim them for free-tier accounts (same pattern as the
- * Kiro provider). Everything else is usable by all tiers and gets no rule.
+ * Models not advertised on the Free/Go plan get `allowedTiers` restricted to
+ * paid plans, which makes the web dim them for free-tier accounts (same pattern
+ * as Kiro). If the docs cannot be read, no gating is applied.
  */
-function buildProviderTierConfig(models) {
+function buildProviderTierConfig(models, freePlanMentions) {
   const providerConfigByModel = new Map();
+  if (!freePlanMentions) return providerConfigByModel;
 
   for (const model of models) {
-    const tiers = PAID_CHATGPT_MODELS.get(model.slug);
-    if (tiers) {
-      providerConfigByModel.set(model.slug, { allowedTiers: tiers });
-    }
+    const name = normalizeModelName(model.display_name || model.slug);
+    if (name && freePlanMentions.includes(name)) continue;
+    providerConfigByModel.set(model.slug, { allowedTiers: PAID_CODEX_TIERS });
   }
 
   return providerConfigByModel;
@@ -184,7 +209,18 @@ async function main() {
     );
   }
 
-  const providerConfigByModel = buildProviderTierConfig(filtered);
+  let freePlanMentions = "";
+  try {
+    freePlanMentions = await fetchFreePlanModelNames();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[codex] Could not load pricing docs for tier gating (${message}); skipping gating.`);
+  }
+
+  const providerConfigByModel = buildProviderTierConfig(filtered, freePlanMentions);
+  if (providerConfigByModel.size > 0) {
+    console.log(`[codex] Paid-plan models (gated by allowedTiers): ${[...providerConfigByModel.keys()].join(", ")}`);
+  }
   const result = syncProviderModels(modelsDir, "codex", modelMap, {
     providerConfigByModel,
     managedProviderConfigKeys: ["allowedTiers"],

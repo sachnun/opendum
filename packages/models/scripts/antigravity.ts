@@ -29,6 +29,8 @@ import { stripParamInfoKey } from "#models/clean-key.ts";
 const ANTIGRAVITY_MODELS_URL = "https://antigravity.google/docs/models";
 const PROVIDER_NAME = "antigravity";
 
+const ANTIGRAVITY_PAID_TIERS = ["g1-pro-tier", "g1-ultra-tier", "standard-tier", "paid"];
+
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const packageDir = resolve(scriptDir, "..");
 const repoRoot = resolve(packageDir, "../..");
@@ -163,6 +165,49 @@ function stripMarkdown(value) {
     .replace(/`/g, "")
     .replace(/\\(?=\s|$)/g, "")
     .trim();
+}
+
+function parseReasoningModelAvailability(markdown) {
+  const result = new Map();
+  const section = markdown.match(/## Reasoning Model\s+([\s\S]*?)(?:\n## |$)/);
+  if (!section) return result;
+
+  let pastHeader = false;
+  for (const line of section[1].split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("|") || /^\|[\s:-]+\|/.test(trimmed)) continue;
+
+    const cells = trimmed.replace(/^\|/, "").replace(/\|$/, "").split("|").map((cell) => cell.trim());
+    if (cells.length < 2) continue;
+
+    if (!pastHeader) {
+      if (/model/i.test(stripMarkdown(cells[0]))) continue;
+      pastHeader = true;
+    }
+
+    const name = stripMarkdown(cells[0]).trim();
+    if (!name || /^nano banana/i.test(name)) continue;
+    result.set(name, /\u2705|\u2713|yes|true/i.test(cells[1] ?? ""));
+  }
+
+  return result;
+}
+
+function buildAntigravityTierConfig(modelMap, documentedModelKeys, discovered, availabilityByDisplayName) {
+  const freeByKey = new Map();
+  for (const entry of discovered) {
+    const isFree = availabilityByDisplayName.get(entry.displayName) === true;
+    if (isFree) freeByKey.set(entry.key, true);
+    else if (!freeByKey.has(entry.key)) freeByKey.set(entry.key, false);
+  }
+
+  const config = new Map();
+  for (const key of modelMap.keys()) {
+    if (!documentedModelKeys.has(key)) continue;
+    if (freeByKey.get(key) === true) continue;
+    config.set(key, { allowedTiers: ANTIGRAVITY_PAID_TIERS });
+  }
+  return config;
 }
 
 function modelIDFromDisplayName(displayName) {
@@ -408,7 +453,7 @@ function inferMetadata(modelKey) {
   return null;
 }
 
-function syncJson(modelMap, dryRun) {
+function syncJson(modelMap, dryRun, tierConfig) {
   if (dryRun) {
     console.log("[antigravity] Dry run - no JSON files modified.");
 
@@ -475,7 +520,10 @@ function syncJson(modelMap, dryRun) {
     return { added: wouldAdd, removed: wouldRemove, updated: wouldUpdate };
   }
 
-  return syncProviderModels(modelsDir, PROVIDER_NAME, modelMap);
+  return syncProviderModels(modelsDir, PROVIDER_NAME, modelMap, {
+    providerConfigByModel: tierConfig,
+    managedProviderConfigKeys: ["allowedTiers"],
+  });
   return { ...result, modelMap };
 }
 
@@ -593,14 +641,20 @@ async function main() {
     throw error;
   }
 
-  const displayNames = parseReasoningModelNames(htmlToReasoningModelMarkdown(markdown));
+  const reasoningMarkdown = htmlToReasoningModelMarkdown(markdown);
+  const availabilityByDisplayName = parseReasoningModelAvailability(reasoningMarkdown);
+  const displayNames = parseReasoningModelNames(reasoningMarkdown);
   const { modelMap, discovered } = buildDiscoveredModelMap(displayNames);
   const documentedModelKeys = new Set(modelMap.keys());
   const extras = mergePreservedExtras(modelMap);
+  const tierConfig = buildAntigravityTierConfig(modelMap, documentedModelKeys, discovered, availabilityByDisplayName);
   console.log(
     `[antigravity] Found ${discovered.length} documented reasoning models ` +
       `and preserved ${extras.length} JSON-configured extras.`
   );
+  if (tierConfig.size > 0) {
+    console.log(`[antigravity] Paid-only models (gated by allowedTiers): ${[...tierConfig.keys()].join(", ")}`);
+  }
 
   if (verbose || dryRun) {
     console.log("\n[antigravity] Documented model mapping (display → canonical → upstream):");
@@ -617,7 +671,7 @@ async function main() {
     console.log();
   }
 
-  const result = syncJson(modelMap, dryRun);
+  const result = syncJson(modelMap, dryRun, tierConfig);
 
   if (!dryRun && (result.added.length > 0 || result.updated.length > 0)) {
     enrichModelMetadata(result, documentedModelKeys);
