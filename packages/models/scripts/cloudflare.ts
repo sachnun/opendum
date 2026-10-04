@@ -16,10 +16,10 @@ import {
   buildModelIndex,
   getProviderUpstream,
   syncProviderModels,
-  writeModelJson,
-} from "../src/registry.ts";
-import { fetchJson, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "../src/http.ts";
-import { stripParamInfoKey } from "../src/clean-key.ts";
+  persistModel,
+} from "#models/registry.ts";
+import { fetchJson, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "#models/http.ts";
+import { stripParamInfoKey } from "#models/clean-key.ts";
 
 const PROVIDER_NAME = "workers_ai";
 const WORKERS_AI_MODELS_API_URL = "https://api.github.com/repos/cloudflare/cloudflare-docs/contents/src/content/workers-ai-models?ref=production";
@@ -204,7 +204,7 @@ function applyMetadata(modelsDir, metadata) {
     }
 
     if (changed) {
-      writeModelJson(entry.path, entry.data);
+      persistModel(entry, entry.data);
       updated += 1;
     }
   }

@@ -2,9 +2,9 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildModelIndex, syncProviderModels, writeModelJson } from "../src/registry.ts";
-import { fetchJson } from "../src/http.ts";
-import { stripParamInfoKey } from "../src/clean-key.ts";
+import { buildModelIndex, persistModel, syncProviderModels } from "#models/registry.ts";
+import { fetchJson } from "#models/http.ts";
+import { stripParamInfoKey } from "#models/clean-key.ts";
 
 const PROVIDER_NAME = "hyper";
 const HYPER_MODELS_URL = "https://hyper.charm.land/v1/models";
@@ -83,7 +83,7 @@ function enrichNewModels(modelsDir, addedKeys, modelMap, metadataLookup) {
       data.reasoning = true;
     }
 
-    writeModelJson(entry.path, data);
+    persistModel(entry, data);
   }
 }
 

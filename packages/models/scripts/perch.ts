@@ -2,9 +2,9 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildModelIndex, syncProviderModels } from "../src/registry.ts";
-import { fetchText } from "../src/http.ts";
-import { normalizeName } from "../src/similarity.ts";
+import { buildModelIndex, syncProviderModels } from "#models/registry.ts";
+import { fetchText } from "#models/http.ts";
+import { normalizeName } from "#models/similarity.ts";
 
 const PROVIDER_NAME = "perch";
 

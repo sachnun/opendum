@@ -22,9 +22,9 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildModelIndex, syncProviderModels, writeModelJson } from "../src/registry.ts";
-import { fetchText } from "../src/http.ts";
-import { stripParamInfoKey } from "../src/clean-key.ts";
+import { buildModelIndex, persistModel, syncProviderModels } from "#models/registry.ts";
+import { fetchText } from "#models/http.ts";
+import { stripParamInfoKey } from "#models/clean-key.ts";
 
 const ANTIGRAVITY_MODELS_URL = "https://antigravity.google/docs/models";
 const PROVIDER_NAME = "antigravity";
@@ -476,7 +476,7 @@ function enrichModelMetadata(result, documentedModelKeys) {
 
     const nextMeta = inferMetadata(modelKey);
     if (!nextMeta) {
-      if (changed) writeModelJson(entry.path, data);
+      if (changed) persistModel(entry, data);
       continue;
     }
 
@@ -503,7 +503,7 @@ function enrichModelMetadata(result, documentedModelKeys) {
     }
 
     if (changed) {
-      writeModelJson(entry.path, data);
+      persistModel(entry, data);
     }
   }
 }

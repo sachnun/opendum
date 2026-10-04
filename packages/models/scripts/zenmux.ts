@@ -2,9 +2,9 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildModelIdMap, syncProviderModels } from "../src/registry.ts";
-import { fetchJson } from "../src/http.ts";
-import { stripParamInfoKey } from "../src/clean-key.ts";
+import { buildModelIdMap, syncProviderModels } from "#models/registry.ts";
+import { fetchJson } from "#models/http.ts";
+import { stripParamInfoKey } from "#models/clean-key.ts";
 
 const PROVIDER_NAME = "zenmux";
 const ZENMUX_PLANS_URL = "https://zenmux.ai/api/subscription/public/get_all_plans";
