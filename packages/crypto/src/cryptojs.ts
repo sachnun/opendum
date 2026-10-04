@@ -75,6 +75,7 @@ export function decrypt(passphrase: string, ciphertext: string): string {
   }
 
   const decipher = createDecipheriv("aes-256-cbc", key, iv);
+  decipher.setAutoPadding(false);
   const plaintext = Buffer.concat([decipher.update(payload), decipher.final()]);
   return pkcs7Unpad(plaintext, BLOCK_SIZE).toString("utf8");
 }
@@ -84,6 +85,7 @@ export function encrypt(passphrase: string, plaintext: string): string {
   const { key, iv } = evpBytesToKey(Buffer.from(passphrase, "utf8"), salt, KEY_LENGTH, BLOCK_SIZE);
   const padded = pkcs7Pad(Buffer.from(plaintext, "utf8"), BLOCK_SIZE);
   const cipher = createCipheriv("aes-256-cbc", key, iv);
+  cipher.setAutoPadding(false);
   const payload = Buffer.concat([cipher.update(padded), cipher.final()]);
   return Buffer.concat([OPENSSL_SALT_HEADER, salt, payload]).toString("base64");
 }
