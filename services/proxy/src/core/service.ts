@@ -380,6 +380,16 @@ export class ProxyService implements StreamRecorder {
       createdAt: row.createdAt,
       isActive: row.isActive,
     };
+    const coolingDown = await this.refreshAccountHealthFromModels(account.id, new Date());
+    if (coolingDown) {
+      return {
+        status: 400,
+        message: "Selected provider account is temporarily disabled",
+        type: "invalid_request_error",
+        param: "model",
+        code: "provider_account_temporarily_disabled",
+      };
+    }
     if (!allowInactive) {
       if (!account.isActive) {
         return {
