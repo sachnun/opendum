@@ -5,7 +5,7 @@ export default defineEventHandler((event) => {
   if (pathname !== V1_PREFIX && !pathname.startsWith(`${V1_PREFIX}/`)) return;
 
   const config = useRuntimeConfig(event);
-  const proxyUrl = String(config.proxyUrl || config.public.proxyUrl || "").trim().replace(/\/+$/, "");
+  const proxyUrl = String(config.public.proxyUrl || "").trim().replace(/\/+$/, "");
   const target = proxyUrl ? ` Use ${proxyUrl}${pathname} instead.` : "";
 
   setResponseStatus(event, 404);

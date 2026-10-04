@@ -20,7 +20,7 @@ export class InternalRelayNotConfiguredError extends Error {
 }
 
 function getProxyBaseUrl() {
-  const value = (process.env.NUXT_PROXY_URL || process.env.NUXT_PUBLIC_PROXY_URL)?.trim().replace(/\/+$/, "");
+  const value = process.env.NUXT_PUBLIC_PROXY_URL?.trim().replace(/\/+$/, "");
   return value || null;
 }
 

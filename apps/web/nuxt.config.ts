@@ -15,7 +15,6 @@ export default defineNuxtConfig({
     spaLoadingTemplateLocation: "within",
   },
   runtimeConfig: {
-    proxyUrl: "",
     public: {
       proxyUrl: "",
     },
