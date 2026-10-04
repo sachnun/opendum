@@ -349,9 +349,6 @@ importers:
       '@opendum/redis':
         specifier: workspace:*
         version: link:../redis
-      '@opendum/streaming':
-        specifier: workspace:*
-        version: link:../streaming
     devDependencies:
       '@types/node':
         specifier: ^26.1.1
@@ -394,22 +391,6 @@ importers:
         specifier: ^6.0.3
         version: 6.0.3
 
-  packages/streaming:
-    dependencies:
-      eventsource-parser:
-        specifier: ^3.1.0
-        version: 3.1.1
-    devDependencies:
-      '@types/node':
-        specifier: ^26.1.1
-        version: 26.5.1
-      tsx:
-        specifier: ^4.23.13
-        version: 4.23.13
-      typescript:
-        specifier: ^6.0.3
-        version: 6.0.3
-
   services/proxy:
     dependencies:
       '@opendum/auth':
@@ -439,9 +420,6 @@ importers:
       '@opendum/redis':
         specifier: workspace:*
         version: link:../../packages/redis
-      '@opendum/streaming':
-        specifier: workspace:*
-        version: link:../../packages/streaming
       h3:
         specifier: ^2.0.1
         version: 2.0.1(crossws@0.4.12(srvx@0.11.22))

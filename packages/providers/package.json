@@ -20,8 +20,7 @@
     "@opendum/database": "workspace:*",
     "@opendum/egress": "workspace:*",
     "@opendum/models": "workspace:*",
-    "@opendum/redis": "workspace:*",
-    "@opendum/streaming": "workspace:*"
+    "@opendum/redis": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
