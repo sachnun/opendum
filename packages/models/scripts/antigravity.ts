@@ -42,7 +42,7 @@ const VERSION_FETCH_TIMEOUT_MS = 15_000;
 
 const PROXY_PROVIDER_PATH = resolve(
   repoRoot,
-  "apps/proxy/internal/providers/google_code_assist.go"
+  "packages/providers/src/antigravity.ts"
 );
 const DASHBOARD_CONSTANTS_PATH = resolve(
   repoRoot,
@@ -50,7 +50,7 @@ const DASHBOARD_CONSTANTS_PATH = resolve(
 );
 
 const PROXY_USER_AGENT_REGEX =
-  /((?:const\s+antigravityUserAgent\s*=\s*"antigravity\/))(\d+\.\d+\.\d+)(\s+")/;
+  /(antigravity\/)(\d+\.\d+\.\d+)(\s)/;
 const DASHBOARD_USER_AGENT_REGEX =
   /((?:export\s+)?const USER_AGENT\s*=\s*`antigravity\/)(\d+\.\d+\.\d+)(\s+linux\/amd64`;)/;
 
@@ -533,7 +533,7 @@ function updateVersion(newVersion) {
 async function syncUserAgent(dryRun) {
   const currentVersion = getCurrentVersion();
   if (!currentVersion) {
-    console.warn("[antigravity] Could not find User-Agent version in Go proxy provider, skipping.");
+    console.warn("[antigravity] Could not find User-Agent version in the proxy provider, skipping.");
     return;
   }
 
