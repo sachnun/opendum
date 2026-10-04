@@ -3,8 +3,8 @@
   "private": true,
   "packageManager": "pnpm@12.3.4",
   "scripts": {
-    "dev": "(pnpm --filter @opendum/dashboard dev & TOKEN_REFRESH_INTERVAL_SECONDS=0 pnpm --filter @opendum/proxy dev)",
-    "build": "pnpm --filter @opendum/dashboard build && pnpm --filter @opendum/proxy typecheck",
+    "dev": "(pnpm --filter @opendum/web dev & TOKEN_REFRESH_INTERVAL_SECONDS=0 pnpm --filter @opendum/proxy dev)",
+    "build": "pnpm --filter @opendum/web build && pnpm --filter @opendum/proxy typecheck",
     "db:push": "pnpm --filter @opendum/database db:push",
     "db:generate": "pnpm --filter @opendum/database db:generate",
     "db:migrate": "pnpm --filter @opendum/database db:migrate",

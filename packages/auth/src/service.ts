@@ -812,7 +812,7 @@ function disabled(provider: string | null, model: string): ModelValidationResult
   return invalid(
     provider,
     model,
-    `Model "${model}" is disabled. Enable it from Dashboard > Models first.`,
+    `Model "${model}" is disabled. Enable it from Web > Models first.`,
     "model",
     "model_disabled"
   );

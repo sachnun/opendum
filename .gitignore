@@ -50,9 +50,6 @@ Thumbs.db
 # vercel
 .vercel/
 
-# agent instructions
-AGENTS.md
-
 # local plan notes
 PLAN.md
 
@@ -60,4 +57,4 @@ PLAN.md
 *.tsbuildinfo
 
 # nuxt test-utils generated
-apps/dashboard/.nuxtrc
+apps/web/.nuxtrc

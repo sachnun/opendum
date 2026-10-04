@@ -74,9 +74,6 @@ jobs:
           curl -fsSL https://raw.githubusercontent.com/koyeb/koyeb-cli/master/install.sh | sh
           echo "$HOME/.koyeb/bin" >> "$GITHUB_PATH"
 
-      # Secrets (DATABASE_URL, REDIS_URL, BETTER_AUTH_SECRET) are managed
-      # once in the Koyeb dashboard and referenced by the service as
-      # {{secret.NAME}}. This workflow only ships code and non-secret env.
       - name: Deploy proxy to Koyeb
         run: |
           set -euo pipefail
@@ -99,7 +96,6 @@ jobs:
             --env HOST=0.0.0.0
             --env TOKEN_REFRESH_INTERVAL_SECONDS=600
           )
-          # Free instances only support scale-to-zero (min 0). Paid types keep min 1.
           if [ "$KOYEB_INSTANCE_TYPE" = "free" ]; then
             SCALE_ARGS=(--min-scale 0 --max-scale 1)
           else

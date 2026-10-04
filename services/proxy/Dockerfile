@@ -7,7 +7,7 @@ WORKDIR /app
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
 COPY packages ./packages
 COPY services ./services
-COPY apps/dashboard/package.json ./apps/dashboard/package.json
+COPY apps/web/package.json ./apps/web/package.json
 
 RUN pnpm install --frozen-lockfile --filter @opendum/proxy...
 

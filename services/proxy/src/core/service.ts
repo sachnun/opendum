@@ -674,7 +674,7 @@ export class ProxyService implements StreamRecorder {
           }
           return {
             status: cfg.noAccountsStatusCode,
-            message: "No active accounts available for this model. Please add an account in the dashboard.",
+            message: "No active accounts available for this model. Please add an account in the web UI.",
             type: "configuration_error",
           };
         }

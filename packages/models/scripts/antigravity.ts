@@ -8,7 +8,7 @@
  * from display names instead of a fixed model table so new Gemini/Claude/GPT-OSS
  * versions can flow through without updating a hardcoded list.
  *
- * It also refreshes the User-Agent version used by the Go proxy and dashboard
+ * It also refreshes the User-Agent version used by the Go proxy and web
  * Antigravity providers from the Antigravity changelog, so the hardcoded
  * version does not go stale between releases.
  *
@@ -44,14 +44,14 @@ const PROXY_PROVIDER_PATH = resolve(
   repoRoot,
   "packages/providers/src/antigravity.ts"
 );
-const DASHBOARD_CONSTANTS_PATH = resolve(
+const WEB_CONSTANTS_PATH = resolve(
   repoRoot,
-  "apps/dashboard/server/lib/providers/antigravity/constants.ts"
+  "apps/web/server/lib/providers/antigravity/constants.ts"
 );
 
 const PROXY_USER_AGENT_REGEX =
   /(antigravity\/)(\d+\.\d+\.\d+)(\s)/;
-const DASHBOARD_USER_AGENT_REGEX =
+const WEB_USER_AGENT_REGEX =
   /((?:export\s+)?const USER_AGENT\s*=\s*`antigravity\/)(\d+\.\d+\.\d+)(\s+linux\/amd64`;)/;
 
 const GEMINI_35_FLASH_LEVELS = ["minimal", "low", "medium", "high"];
@@ -522,7 +522,7 @@ function getCurrentVersion() {
 function updateVersion(newVersion) {
   for (const [filePath, regex] of [
     [PROXY_PROVIDER_PATH, PROXY_USER_AGENT_REGEX],
-    [DASHBOARD_CONSTANTS_PATH, DASHBOARD_USER_AGENT_REGEX],
+    [WEB_CONSTANTS_PATH, WEB_USER_AGENT_REGEX],
   ]) {
     const source = readFileSync(filePath, "utf-8");
     const updated = source.replace(regex, `$1${newVersion}$3`);
