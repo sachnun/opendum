@@ -54,28 +54,6 @@ const PROXY_USER_AGENT_REGEX =
 const DASHBOARD_USER_AGENT_REGEX =
   /((?:export\s+)?const USER_AGENT\s*=\s*`antigravity\/)(\d+\.\d+\.\d+)(\s+linux\/amd64`;)/;
 
-const GEMINI_LEVEL_THINKING = {
-  high: "high",
-  low: "low",
-  medium: "medium",
-  none: "minimal",
-  xhigh: "high",
-};
-
-const GEMINI_FLASH_BUDGETS = {
-  high: 24576,
-  low: 6144,
-  medium: 12288,
-  xhigh: 24576,
-};
-
-const GEMINI_PRO_BUDGETS = {
-  high: 32768,
-  low: 8192,
-  medium: 16384,
-  xhigh: 32768,
-};
-
 const GEMINI_35_FLASH_LEVELS = ["minimal", "low", "medium", "high"];
 const GEMINI_3X_FLASH_LEVELS = ["low", "medium", "high"];
 const GEMINI_31_PRO_LEVELS = ["low", "medium", "high"];
@@ -115,25 +93,6 @@ function leveledFlashAliases(modelKey) {
 // Models can opt in/out by editing their JSON file directly. There is no
 // longer a hard-coded preserved list here; a model's registry state is
 // driven by the `providers` array on disk and the antigravity docs.
-
-const MANAGED_PROVIDER_CONFIG_KEYS = [
-  "anthropic_beta",
-  "anthropic_beta_thinking",
-  "convert_external_images",
-  "force_stream_non_stream",
-  "inject_thought_signature",
-  "sanitize_tool_blocks",
-  "scrub_model_artifacts",
-  "signature_family",
-  "strict_thought_signatures",
-  "strict_tool_schema",
-  "system_instruction",
-  "thinking_budgets",
-  "thinking_format",
-  "thinking_levels",
-  "thinking_model",
-  "top_p_min_095",
-];
 
 function htmlToReasoningModelMarkdown(html) {
   const sectionMatch = html.match(
@@ -328,9 +287,10 @@ function mergePreservedExtras(modelMap) {
   const index = buildModelIndex(modelsDir);
   const extras = [];
 
-  for (const [key, entry] of Object.entries(index)) {
+  for (const [, entry] of Object.entries(index)) {
     const providers = entry.data.providers || [];
     if (!providers.includes(PROVIDER_NAME)) continue;
+    const key = entry.fileId;
     if (modelMap.has(key)) continue;
 
     const upstream = getExistingProviderUpstream(entry, PROVIDER_NAME) || key;
@@ -370,93 +330,8 @@ function getExistingProviderUpstream(entry, provider) {
   return entry.id || entry.fileId;
 }
 
-function buildProviderConfigByModel(modelMap, thinkingClaudeModelKeys = new Set()) {
-  const config = new Map();
-  const index = buildModelIndex(modelsDir);
-
-  for (const [key, upstream] of modelMap.entries()) {
-    const existing = findModelEntry(index, key);
-    const existingProviderConfig = existing?.data.providerConfig?.[PROVIDER_NAME] || {};
-    if (existing && !isManagedModel(key)) {
-      config.set(key, Object.fromEntries(MANAGED_PROVIDER_CONFIG_KEYS.map((managedKey) => [managedKey, existingProviderConfig[managedKey]])));
-      continue;
-    }
-
-    if (key.startsWith("gemini-")) {
-      config.set(key, geminiProviderConfig(key));
-      continue;
-    }
-
-    if (key.startsWith("claude-")) {
-      config.set(key, claudeProviderConfig(upstream, thinkingClaudeModelKeys.has(key)));
-      continue;
-    }
-  }
-
-  return config;
-}
-
-function isManagedModel(modelKey) {
-  return modelKey.startsWith("gemini-") && !isGeminiImageModel(modelKey) ||
-    modelKey.startsWith("claude-");
-}
-
-function geminiProviderConfig(modelKey) {
-  const config = {
-    inject_thought_signature: true,
-    scrub_model_artifacts: true,
-    signature_family: signatureFamily(modelKey),
-  };
-
-  if (isGeminiTextReasoningModel(modelKey)) {
-    config.system_instruction = true;
-  }
-
-  if (usesGeminiLevelThinking(modelKey)) {
-    config.thinking_format = "level";
-    config.thinking_levels = GEMINI_LEVEL_THINKING;
-  } else if (!isGeminiImageModel(modelKey)) {
-    config.thinking_format = "budget";
-    config.thinking_budgets = modelKey.includes("pro")
-      ? GEMINI_PRO_BUDGETS
-      : GEMINI_FLASH_BUDGETS;
-  }
-
-  return config;
-}
-
-function claudeProviderConfig(upstream, documentedThinking = false) {
-  const thinking = documentedThinking || upstream.endsWith("-thinking");
-  return {
-    anthropic_beta: true,
-    ...(thinking ? { anthropic_beta_thinking: true } : {}),
-    convert_external_images: true,
-    force_stream_non_stream: true,
-    sanitize_tool_blocks: true,
-    signature_family: "claude",
-    strict_thought_signatures: true,
-    strict_tool_schema: true,
-    system_instruction: true,
-    ...(thinking ? { thinking_model: true } : {}),
-    top_p_min_095: true,
-  };
-}
-
-function usesGeminiLevelThinking(modelKey) {
-  return /^gemini-3/.test(modelKey) && !modelKey.includes("pro") && !isGeminiImageModel(modelKey);
-}
-
-function isGeminiTextReasoningModel(modelKey) {
-  return /^gemini-3/.test(modelKey) && !isGeminiImageModel(modelKey);
-}
-
 function isGeminiImageModel(modelKey) {
   return modelKey.includes("image");
-}
-
-function signatureFamily(modelKey) {
-  if (modelKey.includes("pro")) return "gemini-pro";
-  return "gemini-flash";
 }
 
 function enrichModelMetadata(result, documentedModelKeys) {
@@ -533,7 +408,7 @@ function inferMetadata(modelKey) {
   return null;
 }
 
-function syncJson(modelMap, providerConfigByModel, dryRun) {
+function syncJson(modelMap, dryRun) {
   if (dryRun) {
     console.log("[antigravity] Dry run - no JSON files modified.");
 
@@ -578,13 +453,8 @@ function syncJson(modelMap, providerConfigByModel, dryRun) {
         continue;
       }
 
-      const cfg = existing.data.providerConfig?.[PROVIDER_NAME] || {};
-      const extraConfig = providerConfigByModel.get(key) || {};
       const existingUpstream = getExistingProviderUpstream(existing, PROVIDER_NAME);
-      if (
-        existingUpstream !== upstream ||
-        MANAGED_PROVIDER_CONFIG_KEYS.some((managedKey) => JSON.stringify(cfg[managedKey]) !== JSON.stringify(extraConfig[managedKey]))
-      ) {
+      if (existingUpstream !== upstream) {
         wouldUpdate.push(key);
       }
     }
@@ -605,10 +475,7 @@ function syncJson(modelMap, providerConfigByModel, dryRun) {
     return { added: wouldAdd, removed: wouldRemove, updated: wouldUpdate };
   }
 
-  return syncProviderModels(modelsDir, PROVIDER_NAME, modelMap, {
-    providerConfigByModel,
-    managedProviderConfigKeys: MANAGED_PROVIDER_CONFIG_KEYS,
-  });
+  return syncProviderModels(modelsDir, PROVIDER_NAME, modelMap);
   return { ...result, modelMap };
 }
 
@@ -730,13 +597,6 @@ async function main() {
   const { modelMap, discovered } = buildDiscoveredModelMap(displayNames);
   const documentedModelKeys = new Set(modelMap.keys());
   const extras = mergePreservedExtras(modelMap);
-  const thinkingClaudeModelKeys = new Set(
-    discovered
-      .filter((entry) => entry.key.startsWith("claude-") && entry.thinking)
-      .map((entry) => entry.key)
-  );
-  const providerConfigByModel = buildProviderConfigByModel(modelMap, thinkingClaudeModelKeys);
-
   console.log(
     `[antigravity] Found ${discovered.length} documented reasoning models ` +
       `and preserved ${extras.length} JSON-configured extras.`
@@ -757,7 +617,7 @@ async function main() {
     console.log();
   }
 
-  const result = syncJson(modelMap, providerConfigByModel, dryRun);
+  const result = syncJson(modelMap, dryRun);
 
   if (!dryRun && (result.added.length > 0 || result.updated.length > 0)) {
     enrichModelMetadata(result, documentedModelKeys);

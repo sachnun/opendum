@@ -16,9 +16,8 @@
   ],
   "modalities": {
     "input": [
-      "audio",
-      "image",
-      "text"
+      "text",
+      "image"
     ],
     "output": [
       "text"
