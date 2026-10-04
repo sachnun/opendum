@@ -136,6 +136,16 @@ test("renameModelFiles keeps the folder and refuses to clobber", () => {
   });
 });
 
+test("buildModelIndex needs the generated half to expose providers", () => {
+  withTempDir((dataDir, generatedDir) => {
+    syncProviderModels(dataDir, "openrouter", new Map([["mock-model", "vendor/mock-model"]]));
+    assert.deepEqual(buildModelIndex(dataDir)["mock-model"].data.providers, ["openrouter"]);
+
+    const authoredOnly = buildModelIndex(dataDir, { generatedDir: join(generatedDir, "absent") });
+    assert.equal(authoredOnly["mock-model"], undefined);
+  });
+});
+
 test("pruneDeadModelEntries drops uncurated dead entries and keeps the rest", () => {
   withTempDir((dataDir, generatedDir) => {
     writeGeneratedModelJson(join(generatedDir, "dead.json"), { providers: [] });
