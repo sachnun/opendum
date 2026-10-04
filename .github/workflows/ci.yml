@@ -60,17 +60,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Setup Go
-        uses: actions/setup-go@v7
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
         with:
-          go-version-file: apps/proxy/go.mod
-          cache-dependency-path: apps/proxy/go.sum
+          node-version: 24
+          cache: pnpm
 
-      - name: Vet proxy
-        run: go -C apps/proxy vet ./...
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
-      - name: Test proxy
-        run: go -C apps/proxy test ./...
+      - name: Typecheck
+        run: pnpm --filter @opendum/proxy typecheck
 
-      - name: Build proxy
-        run: go -C apps/proxy build ./...
+      - name: Test
+        run: pnpm --filter @opendum/proxy test

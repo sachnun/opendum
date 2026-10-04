@@ -6,8 +6,8 @@ on:
       - main
     paths:
       - .github/workflows/deploy-proxy.yml
-      - apps/proxy/**
-      - packages/models/**
+      - services/proxy/**
+      - packages/**
   workflow_run:
     workflows:
       - Refresh Provider Models
@@ -44,14 +44,20 @@ jobs:
         with:
           ref: main
 
-      - name: Setup Go
-        uses: actions/setup-go@v7
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
         with:
-          go-version-file: apps/proxy/go.mod
-          cache-dependency-path: apps/proxy/go.sum
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Test proxy
-        run: go -C apps/proxy test ./...
+        run: pnpm --filter @opendum/proxy test
 
       - name: Validate Koyeb configuration
         run: |
@@ -61,7 +67,7 @@ jobs:
           test -n "$KOYEB_REGION"
           test -n "$KOYEB_INSTANCE_TYPE"
           test -n "$KOYEB_ORG_ID"
-          test -f apps/proxy/Dockerfile
+          test -f services/proxy/Dockerfile
 
       - name: Install Koyeb CLI
         run: |
@@ -81,7 +87,7 @@ jobs:
             --git "$GIT_REPO"
             --git-branch main
             --git-builder docker
-            --git-docker-dockerfile apps/proxy/Dockerfile
+            --git-docker-dockerfile services/proxy/Dockerfile
             --type web
             --instance-type "$KOYEB_INSTANCE_TYPE"
             --regions "$KOYEB_REGION"

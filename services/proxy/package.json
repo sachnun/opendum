@@ -1,0 +1,33 @@
+{
+  "name": "@opendum/proxy",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "start": "tsx src/main.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@opendum/auth": "workspace:*",
+    "@opendum/config": "workspace:*",
+    "@opendum/crypto": "workspace:*",
+    "@opendum/database": "workspace:*",
+    "@opendum/egress": "workspace:*",
+    "@opendum/models": "workspace:*",
+    "@opendum/providers": "workspace:*",
+    "@opendum/quota": "workspace:*",
+    "@opendum/redis": "workspace:*",
+    "@opendum/streaming": "workspace:*",
+    "h3": "^2.0.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "tsx": "^4.23.13",
+    "typescript": "^6.0.3",
+    "vitest": "^5.0.3"
+  }
+}
