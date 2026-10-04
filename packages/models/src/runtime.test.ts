@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { Registry, suggestionScoreFor } from "./runtime.ts";
@@ -39,5 +42,37 @@ describe("access rules and case folding", () => {
     assert.equal(registry.resolveAlias(`  ${sample}  `), sample);
     assert.equal(registry.resolveAlias(sample.toUpperCase()), sample);
     assert.equal(registry.resolveAlias(sample), registry.resolveAlias(sample.toUpperCase()));
+  });
+});
+
+describe("provider config merge", () => {
+  it("keeps provider flags outside the known fields", () => {
+    const root = mkdtempSync(join(tmpdir(), "opendum-models-"));
+    const authoredDir = join(root, "data");
+    const generatedDir = join(root, "generated");
+    mkdirSync(authoredDir, { recursive: true });
+    mkdirSync(generatedDir, { recursive: true });
+    writeFileSync(
+      join(authoredDir, "muse-spark-1.3.json"),
+      JSON.stringify({ providerConfig: { opencode: { responses_api: true } } })
+    );
+    writeFileSync(
+      join(generatedDir, "muse-spark-1.3.json"),
+      JSON.stringify({
+        providers: ["opencode"],
+        providerConfig: {
+          opencode: { upstream: "muse-spark-1.3-free", contextWindow: 1000, maxOutputTokens: 100 },
+        },
+      })
+    );
+
+    const merged = Registry.load(authoredDir);
+    const cfg = merged.providerModelConfig("muse-spark-1.3", "opencode");
+    assert.equal(cfg?.upstream, "muse-spark-1.3-free");
+    assert.equal(cfg?.contextWindow, 1000);
+    assert.equal(cfg?.maxOutputTokens, 100);
+    const custom = cfg?.custom as Record<string, unknown> | undefined;
+    assert.equal(custom?.responses_api, true);
+    assert.notEqual(cfg?.responses_api, false);
   });
 });

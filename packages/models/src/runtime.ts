@@ -161,6 +161,18 @@ function mergeGeneratedInfo(authored: ModelEntry, generated: ModelEntry): void {
   }
 }
 
+const KNOWN_PROVIDER_CONFIG_KEYS = new Set([
+  "upstream",
+  "contextWindow",
+  "maxOutputTokens",
+  "minTier",
+  "allowedTiers",
+  "authless",
+  "free",
+  "aliases",
+  "custom",
+]);
+
 function mergeProviderConfig(
   generated: ProviderModelConfig,
   authored: ProviderModelConfig
@@ -174,9 +186,19 @@ function mergeProviderConfig(
   if (authored.authless) merged.authless = true;
   if (authored.free) merged.free = true;
   if ((authored.aliases ?? []).length > 0) merged.aliases = authored.aliases;
-  if (authored.custom && Object.keys(authored.custom).length > 0) {
-    merged.custom = { ...(merged.custom ?? {}), ...authored.custom };
+
+  // Provider flags outside the known fields (for example opencode's
+  // responses_api) are preserved under `custom`, matching the Go registry.
+  const custom: Record<string, unknown> = { ...(merged.custom ?? {}) };
+  for (const [key, value] of Object.entries(authored)) {
+    if (KNOWN_PROVIDER_CONFIG_KEYS.has(key)) continue;
+    delete merged[key];
+    custom[key] = value;
   }
+  if (authored.custom && Object.keys(authored.custom).length > 0) {
+    for (const [key, value] of Object.entries(authored.custom)) custom[key] = value;
+  }
+  if (Object.keys(custom).length > 0) merged.custom = custom;
   return merged;
 }
 
