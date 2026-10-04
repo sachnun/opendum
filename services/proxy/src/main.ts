@@ -22,19 +22,28 @@ async function main(): Promise<void> {
   console.log(`Opendum proxy listening on ${config.host}:${config.port}`);
 
   let shuttingDown = false;
-  const shutdown = (signal: string) => {
+  const shutdown = async (signal: string): Promise<void> => {
     if (shuttingDown) return;
     shuttingDown = true;
     console.log(`Received ${signal}, shutting down`);
     refreshController.abort();
-    void disposeContext(context).finally(() => {
-      server.close();
-      process.exit(0);
-    });
+    const forced = setTimeout(() => {
+      void server.close(true);
+    }, 15_000);
+    forced.unref?.();
+    try {
+      await server.close();
+    } catch {
+      // the server is already closing
+    } finally {
+      clearTimeout(forced);
+    }
+    await disposeContext(context);
+    process.exit(0);
   };
 
-  process.on("SIGINT", () => shutdown("SIGINT"));
-  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => void shutdown("SIGINT"));
+  process.on("SIGTERM", () => void shutdown("SIGTERM"));
 }
 
 main().catch((error: unknown) => {
