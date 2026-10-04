@@ -1,0 +1,19 @@
+{
+  "id": "MiniMax-M2.1",
+  "providers": [
+    "kiro",
+    "zenmux"
+  ],
+  "aliases": [
+    "minimax-m2.1"
+  ],
+  "reasoning": true,
+  "providerConfig": {
+    "kiro": {
+      "upstream": "minimax-m2.1"
+    },
+    "zenmux": {
+      "upstream": "minimax/minimax-m2.1"
+    }
+  }
+}

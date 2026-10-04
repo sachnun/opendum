@@ -1,0 +1,68 @@
+{
+  "providers": [
+    "zenmux",
+    "kiro",
+    "codex",
+    "workbuddy",
+    "perch"
+  ],
+  "reasoning": true,
+  "reasoning_effort": [
+    "low",
+    "medium",
+    "high",
+    "xhigh",
+    "max"
+  ],
+  "modalities": {
+    "input": [
+      "image",
+      "pdf",
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 1050000,
+    "output": 128000
+  },
+  "cost": {
+    "input": 1,
+    "output": 6,
+    "cacheRead": 0.1,
+    "cacheWrite": 1.25
+  },
+  "scores": {
+    "artificialAnalysis": {
+      "index": 37.3,
+      "estimated": false,
+      "version": "4.3"
+    }
+  },
+  "providerConfig": {
+    "codex": {
+      "contextWindow": 1050000,
+      "maxOutputTokens": 128000
+    },
+    "kiro": {
+      "contextWindow": 1050000,
+      "maxOutputTokens": 128000
+    },
+    "perch": {
+      "upstream": "gpt-5-6-luna",
+      "contextWindow": 1050000,
+      "maxOutputTokens": 128000
+    },
+    "workbuddy": {
+      "contextWindow": 1050000,
+      "maxOutputTokens": 128000
+    },
+    "zenmux": {
+      "upstream": "openai/gpt-5.6-luna",
+      "contextWindow": 1050000,
+      "maxOutputTokens": 128000
+    }
+  }
+}

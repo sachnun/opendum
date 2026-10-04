@@ -1,8 +1,9 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
-import { basename, join } from "node:path";
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 
 import { aliasesFromUpstream, isDateToken } from "./clean-key.ts";
 import { inferModelFolder } from "./families.ts";
+import { mergeModelData, splitModelData } from "./merge.ts";
 import type { JsonValue, ModelData, ModelIndex, ModelIndexEntry } from "./types.ts";
 
 const MODEL_FILE_EXTENSION = ".json";
@@ -18,11 +19,13 @@ const MODEL_PROPERTY_ORDER = [
   "modalities",
   "limit",
   "cost",
+  "scores",
   "providerConfig",
 ];
 
 const PROVIDER_CONFIG_PROPERTY_ORDER = ["upstream", "contextWindow", "maxOutputTokens", "authless", "free", "minTier", "allowedTiers", "aliases"];
 const COST_PROPERTY_ORDER = ["input", "output", "cacheRead", "cacheWrite"];
+const SCORE_PROPERTY_ORDER = ["index", "estimated", "version"];
 const FIRST_PROVIDERS = new Set(["opencode"]);
 
 function isPlainObject(value: unknown): value is Record<string, JsonValue> {
@@ -68,12 +71,23 @@ function orderProviders(value: string[]): string[] {
 
 function orderValue(value: JsonValue, key?: string): JsonValue {
   if (key === "providers" && Array.isArray(value)) return orderProviders(value as string[]);
+  if (key === "aliases" && Array.isArray(value)) return [...(value as string[])].sort();
   if (Array.isArray(value)) return value.map((item) => orderValue(item));
   if (!isPlainObject(value)) return value;
 
   if (key === "providerConfig") return orderProviderMap(value, PROVIDER_CONFIG_PROPERTY_ORDER);
   if (key === "cost") return orderObject(value, COST_PROPERTY_ORDER);
+  if (key === "scores") return orderScores(value);
   return orderObject(value);
+}
+
+function orderScores(value: JsonValue): JsonValue {
+  if (!isPlainObject(value)) return value;
+  const result: Record<string, JsonValue> = {};
+  for (const key of Object.keys(value).sort()) {
+    result[key] = orderObject(value[key] as Record<string, JsonValue>, SCORE_PROPERTY_ORDER);
+  }
+  return result;
 }
 
 function normalizeModelData(data: ModelData): Record<string, JsonValue> {
@@ -83,7 +97,7 @@ function normalizeModelData(data: ModelData): Record<string, JsonValue> {
   return orderObject(data as Record<string, JsonValue>, MODEL_PROPERTY_ORDER);
 }
 
-function readModelJson(content: string): ModelData {
+export function readModelJson(content: string): ModelData {
   return JSON.parse(content) as ModelData;
 }
 
@@ -102,9 +116,47 @@ export function writeModelJson(filePath: string, data: ModelData): void {
   writeFileSync(filePath, `${content}\n`);
 }
 
-function collectModelFiles(modelsDir: string): string[] {
+export function writeGeneratedModelJson(filePath: string, data: ModelData): void {
+  mkdirSync(dirname(filePath), { recursive: true });
+  writeModelJson(filePath, data);
+}
+
+export function writeSplitModel(
+  modelsDir: string,
+  fileId: string,
+  data: ModelData,
+  options: { generatedDir?: string } = {},
+): { authoredPath: string; generatedPath: string } {
+  const generatedDir = options.generatedDir ?? resolveGeneratedDir(modelsDir);
+  const { generated, authored } = splitModelData(data);
+  const authoredPath = join(modelsDir, fileId + MODEL_FILE_EXTENSION);
+  const generatedPath = join(generatedDir, fileId + MODEL_FILE_EXTENSION);
+
+  if (Object.keys(authored).length > 0) {
+    mkdirSync(dirname(authoredPath), { recursive: true });
+    writeModelJson(authoredPath, authored);
+  } else if (existsSync(authoredPath)) {
+    rmSync(authoredPath, { force: true });
+  }
+
+  if (Object.keys(generated).length > 0) {
+    writeGeneratedModelJson(generatedPath, generated);
+  } else if (existsSync(generatedPath)) {
+    rmSync(generatedPath, { force: true });
+  }
+
+  return { authoredPath, generatedPath };
+}
+
+export function collectModelFiles(modelsDir: string): string[] {
   const files: string[] = [];
-  for (const entry of readdirSync(modelsDir)) {
+  let entries: string[];
+  try {
+    entries = readdirSync(modelsDir);
+  } catch {
+    return files;
+  }
+  for (const entry of entries) {
     const fullPath = join(modelsDir, entry);
     const stat = statSync(fullPath);
     if (stat.isDirectory()) {
@@ -120,16 +172,56 @@ function collectModelFiles(modelsDir: string): string[] {
   return files;
 }
 
-/** Build index: modelId -> { path, data } */
-export function buildModelIndex(modelsDir: string): ModelIndex {
-  const index: ModelIndex = {};
+export function resolveGeneratedDir(modelsDir: string): string {
+  const configured = process.env.MODELS_GENERATED_DIR;
+  if (configured) return resolve(configured);
+  return join(dirname(modelsDir), "generated");
+}
+
+function readModelData(filePath: string): ModelData {
+  return readModelJson(readFileSync(filePath, "utf-8"));
+}
+
+function collectByFileId(modelsDir: string): Map<string, string> {
+  const byFileId = new Map<string, string>();
   for (const filePath of collectModelFiles(modelsDir)) {
-    const fileId = basename(filePath, MODEL_FILE_EXTENSION);
-    const content = readFileSync(filePath, "utf-8");
-    const data = readModelJson(content);
-    index[fileId] = { id: getModelPublicId(data, fileId), fileId, path: filePath, data };
+    const relativePath = relative(modelsDir, filePath);
+    byFileId.set(
+      relativePath.replace(/\.json$/, "").split(sep).join("/"),
+      filePath,
+    );
+  }
+  return byFileId;
+}
+
+export function buildModelIndex(modelsDir: string, options: { generatedDir?: string } = {}): ModelIndex {
+  const generatedDir = options.generatedDir ?? resolveGeneratedDir(modelsDir);
+  const authoredFiles = collectByFileId(modelsDir);
+  const generatedFiles = collectByFileId(generatedDir);
+  const index: ModelIndex = {};
+
+  for (const relativeId of new Set([...authoredFiles.keys(), ...generatedFiles.keys()])) {
+    const authoredPath = authoredFiles.get(relativeId);
+    const generatedPath = generatedFiles.get(relativeId);
+    const authored = authoredPath ? readModelData(authoredPath) : undefined;
+    const generated = generatedPath ? readModelData(generatedPath) : undefined;
+    const data = mergeModelData(generated, authored);
+    index[relativeId] = {
+      id: getModelPublicId(data, basename(relativeId)),
+      fileId: basename(relativeId),
+      relativeId,
+      path: authoredPath ?? generatedPath!,
+      generatedPath,
+      modelsDir,
+      generatedDir,
+      data,
+    };
   }
   return index;
+}
+
+export function generatedModelPath(generatedDir: string, relativeId: string): string {
+  return join(generatedDir, relativeId + MODEL_FILE_EXTENSION);
 }
 
 function trailingDateToken(modelId: string): string | null {
@@ -195,6 +287,30 @@ export function buildModelIdMap(modelIds: string[], toModelKey: (modelId: string
   }
 
   return new Map([...map.entries()].sort(([a], [b]) => a.localeCompare(b)));
+}
+
+export function persistModel(entry: Pick<ModelIndexEntry, "modelsDir" | "relativeId">, data: ModelData): void {
+  writeSplitModel(entry.modelsDir, entry.relativeId, data);
+}
+
+function hasCuratedData(data: ModelData): boolean {
+  const authored = splitModelData(data).authored as Record<string, unknown>;
+  delete authored.ignored;
+  return Object.keys(authored).length > 0;
+}
+
+export function pruneDeadModelEntries(modelsDir: string): string[] {
+  const index = buildModelIndex(modelsDir);
+  const removed: string[] = [];
+
+  for (const entry of Object.values(index)) {
+    if ((entry.data.providers ?? []).length > 0) continue;
+    if (hasCuratedData(entry.data)) continue;
+    writeSplitModel(entry.modelsDir, entry.relativeId, {});
+    removed.push(entry.id);
+  }
+
+  return removed.sort();
 }
 
 /**
@@ -279,7 +395,7 @@ export function syncProviderModels(
     }
     if (changed) {
       parent.entry.data.aliases = [...existingAliases].sort();
-      writeModelJson(parent.entry.path, parent.entry.data);
+      persistModel(parent.entry, parent.entry.data);
       updated.push(parent.baseKey);
     }
     modelMap.delete(modelKey);
@@ -340,7 +456,7 @@ export function syncProviderModels(
       }
     }
 
-    writeModelJson(entry.path, entry.data);
+    persistModel(entry, entry.data);
     removed.push(modelId);
   }
 
@@ -382,7 +498,7 @@ export function syncProviderModels(
       }
 
       if (changed) {
-        writeModelJson(existing.path, existing.data);
+        persistModel(existing, existing.data);
         updated.push(modelKey);
       }
     } else {
@@ -437,7 +553,7 @@ export function syncProviderModels(
         }
 
         if (touched) {
-          writeModelJson(filePath, existing);
+          persistModel({ modelsDir, relativeId: folder ? `${folder}/${modelKey}` : modelKey }, existing);
           updated.push(modelKey);
         }
         continue;
@@ -457,7 +573,7 @@ export function syncProviderModels(
         };
       }
 
-      writeModelJson(filePath, data);
+      persistModel({ modelsDir, relativeId: folder ? `${folder}/${modelKey}` : modelKey }, data);
       added.push(modelKey);
     }
   }

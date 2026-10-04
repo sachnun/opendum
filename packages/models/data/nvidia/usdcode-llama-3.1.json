@@ -1,9 +1,0 @@
-{
-  "providers": [],
-  "aliases": [
-    "usdcode-llama-3.1-70b-instruct",
-    "usdcode-llama-3.1-instruct"
-  ],
-  "ignored": true,
-  "providerConfig": {}
-}

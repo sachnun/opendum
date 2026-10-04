@@ -38,11 +38,17 @@ jobs:
         run: |
           echo 'msg<<EOF' >> "$GITHUB_OUTPUT"
           echo 'chore: refresh provider model registry' >> "$GITHUB_OUTPUT"
-          echo '' >> "$GITHUB_OUTPUT"
-          if [ -f "$RUNNER_TEMP/summary.md" ]; then
+          if [ -s "$RUNNER_TEMP/summary.md" ]; then
+            echo '' >> "$GITHUB_OUTPUT"
             cat "$RUNNER_TEMP/summary.md" >> "$GITHUB_OUTPUT"
           fi
           echo 'EOF' >> "$GITHUB_OUTPUT"
+
+      - name: Publish refresh summary
+        run: |
+          if [ -s "$RUNNER_TEMP/summary.md" ]; then
+            cat "$RUNNER_TEMP/summary.md" >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Commit and push changes
         uses: stefanzweifel/git-auto-commit-action@v7

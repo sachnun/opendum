@@ -380,7 +380,7 @@ func TestAntigravitySystemInstructionAndThinking(t *testing.T) {
 	generation := payload["generationConfig"].(map[string]any)
 	thinking := generation["thinkingConfig"].(map[string]any)
 	cfg, _ := registry.ProviderModelConfig(thinkingModel, "antigravity")
-	levels := customMap(cfg, "thinking_levels")
+	levels := customMap(withProviderDefaults(registry, thinkingModel, "antigravity", cfg), "thinking_levels")
 	if thinking["thinkingLevel"] != levels["medium"] || thinking["includeThoughts"] != true {
 		t.Fatalf("thinking config = %#v", thinking)
 	}
@@ -393,6 +393,7 @@ func TestAntigravityGemini35FlashComesFromRegistry(t *testing.T) {
 	if !ok {
 		t.Fatal("missing antigravity config for gemini-3.5-flash")
 	}
+	cfg = withProviderDefaults(registry, "gemini-3.5-flash", "antigravity", cfg)
 	if got := provider.resolveModel("gemini-3.5-flash"); got != "gemini-3.5-flash-medium" {
 		t.Fatalf("resolveModel = %q, want gemini-3.5-flash-medium", got)
 	}
@@ -1103,12 +1104,29 @@ func firstProviderConfigModel(t *testing.T, registry *models.Registry, provider 
 	t.Helper()
 	for _, model := range registry.AllModels() {
 		cfg, ok := registry.ProviderModelConfig(model, provider)
-		if ok && match(cfg) {
+		if ok && match(withProviderDefaults(registry, model, provider, cfg)) {
 			return model
 		}
 	}
 	t.Fatalf("missing provider config for %s", provider)
 	return ""
+}
+
+func withProviderDefaults(registry *models.Registry, model, provider string, cfg models.ProviderModelConfig) models.ProviderModelConfig {
+	if provider != "antigravity" {
+		return cfg
+	}
+	custom := map[string]any{}
+	for key, value := range cfg.Custom {
+		custom[key] = value
+	}
+	for _, key := range antigravityManagedKeys {
+		if value, ok := antigravityConfigValue(registry, model, key); ok {
+			custom[key] = value
+		}
+	}
+	cfg.Custom = custom
+	return cfg
 }
 
 func anyProviderModel(t *testing.T, registry *models.Registry, provider string) string {

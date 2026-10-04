@@ -1,8 +1,0 @@
-{
-  "providers": [],
-  "aliases": [
-    "mistralai-mistral-large-3-675b-instruct-2512"
-  ],
-  "ignored": true,
-  "reasoning": false
-}

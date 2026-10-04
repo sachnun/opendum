@@ -1,0 +1,43 @@
+{
+  "providers": [
+    "kiro",
+    "perch"
+  ],
+  "reasoning": true,
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 202752,
+    "output": 16384
+  },
+  "cost": {
+    "input": 3,
+    "output": 9.6,
+    "cacheRead": 0.6,
+    "cacheWrite": 0
+  },
+  "scores": {
+    "artificialAnalysis": {
+      "index": 27.9,
+      "estimated": true,
+      "version": "4.3"
+    }
+  },
+  "providerConfig": {
+    "kiro": {
+      "contextWindow": 202752,
+      "maxOutputTokens": 16384
+    },
+    "perch": {
+      "upstream": "glm-5",
+      "contextWindow": 202752,
+      "maxOutputTokens": 16384
+    }
+  }
+}

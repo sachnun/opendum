@@ -1,0 +1,43 @@
+{
+  "id": "gemma-4-31b-it",
+  "providers": [
+    "perch"
+  ],
+  "aliases": [
+    "gemma-4-31b"
+  ],
+  "reasoning": true,
+  "modalities": {
+    "input": [
+      "image",
+      "text",
+      "video"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 262144,
+    "output": 32768
+  },
+  "cost": {
+    "input": 0.45,
+    "output": 1.7,
+    "cacheRead": 0.25
+  },
+  "scores": {
+    "artificialAnalysis": {
+      "index": 14.7,
+      "estimated": false,
+      "version": "4.3"
+    }
+  },
+  "providerConfig": {
+    "perch": {
+      "upstream": "gemma-4-31b",
+      "contextWindow": 262144,
+      "maxOutputTokens": 32768
+    }
+  }
+}

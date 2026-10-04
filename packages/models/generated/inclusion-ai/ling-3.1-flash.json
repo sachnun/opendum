@@ -1,0 +1,46 @@
+{
+  "providers": [
+    "opencode",
+    "kilo_code"
+  ],
+  "reasoning": true,
+  "reasoning_effort": [
+    "high"
+  ],
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 262144,
+    "output": 32768
+  },
+  "cost": {
+    "input": 0.375,
+    "output": 1.1,
+    "cacheRead": 0.075
+  },
+  "scores": {
+    "artificialAnalysis": {
+      "index": 41.1,
+      "estimated": false,
+      "version": "4.3"
+    }
+  },
+  "providerConfig": {
+    "kilo_code": {
+      "upstream": "inclusionai/ling-3.1-flash",
+      "contextWindow": 262144,
+      "maxOutputTokens": 32768
+    },
+    "opencode": {
+      "upstream": "ling-3.1-flash-free",
+      "contextWindow": 262144,
+      "maxOutputTokens": 32768
+    }
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "providers": [
+    "kiro"
+  ],
+  "reasoning": false,
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 262144,
+    "output": 65536
+  },
+  "cost": {
+    "input": 0.6,
+    "output": 2.74,
+    "cacheRead": 0.35
+  },
+  "scores": {
+    "artificialAnalysis": {
+      "index": 9.2,
+      "estimated": false,
+      "version": "4.3"
+    }
+  },
+  "providerConfig": {
+    "kiro": {
+      "contextWindow": 262144,
+      "maxOutputTokens": 65536
+    }
+  }
+}

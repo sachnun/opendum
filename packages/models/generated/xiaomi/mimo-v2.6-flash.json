@@ -1,0 +1,59 @@
+{
+  "providers": [
+    "opencode",
+    "harbor",
+    "cline"
+  ],
+  "reasoning": true,
+  "reasoning_effort": [
+    "low",
+    "medium",
+    "high",
+    "xhigh",
+    "max"
+  ],
+  "modalities": {
+    "input": [
+      "audio",
+      "image",
+      "text",
+      "video"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 1048576,
+    "output": 131072
+  },
+  "cost": {
+    "input": 0.7,
+    "output": 1.4,
+    "cacheRead": 0.014
+  },
+  "scores": {
+    "artificialAnalysis": {
+      "index": 37.9,
+      "estimated": false,
+      "version": "4.3"
+    }
+  },
+  "providerConfig": {
+    "cline": {
+      "upstream": "cline-free/mimo-v2.6-flash",
+      "contextWindow": 1048576,
+      "maxOutputTokens": 131072
+    },
+    "harbor": {
+      "upstream": "mimo-v2.6-flash:free",
+      "contextWindow": 1048576,
+      "maxOutputTokens": 131072
+    },
+    "opencode": {
+      "upstream": "mimo-v2.6-flash-free",
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000
+    }
+  }
+}

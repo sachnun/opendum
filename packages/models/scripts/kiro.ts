@@ -18,9 +18,9 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { syncProviderModels } from "../src/registry.ts";
-import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "../src/http.ts";
-import { stripParamInfoKey } from "../src/clean-key.ts";
+import { syncProviderModels } from "#models/registry.ts";
+import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "#models/http.ts";
+import { stripParamInfoKey } from "#models/clean-key.ts";
 
 const KIRO_DOCS_URL = "https://kiro.dev/docs/models/";
 const PROVIDER_NAME = "kiro";

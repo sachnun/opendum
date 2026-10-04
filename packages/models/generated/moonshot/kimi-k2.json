@@ -1,0 +1,44 @@
+{
+  "id": "kimi-k2-thinking",
+  "providers": [
+    "hyper"
+  ],
+  "aliases": [
+    "kimi-k2",
+    "kimi-k2-0905",
+    "kimi-k2-instruct",
+    "kimi-k2-instruct-0905"
+  ],
+  "reasoning": true,
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 262144,
+    "output": 26214
+  },
+  "cost": {
+    "input": 3,
+    "output": 12.5,
+    "cacheRead": 1.5
+  },
+  "scores": {
+    "artificialAnalysis": {
+      "index": 22,
+      "estimated": true,
+      "version": "4.3"
+    }
+  },
+  "providerConfig": {
+    "hyper": {
+      "upstream": "kimi-k2-thinking",
+      "contextWindow": 262144,
+      "maxOutputTokens": 26214
+    }
+  }
+}

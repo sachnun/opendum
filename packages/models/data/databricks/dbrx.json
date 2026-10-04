@@ -1,15 +1,3 @@
 {
-  "providers": [
-    "nvidia_nim"
-  ],
-  "aliases": [
-    "dbrx-instruct",
-    "databricks/dbrx-instruct"
-  ],
-  "ignored": true,
-  "providerConfig": {
-    "nvidia_nim": {
-      "upstream": "databricks/dbrx-instruct"
-    }
-  }
+  "ignored": true
 }

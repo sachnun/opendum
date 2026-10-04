@@ -1,0 +1,15 @@
+{
+  "id": "MiniMax-M2.5",
+  "providers": [
+    "kiro"
+  ],
+  "aliases": [
+    "minimax-m2.5"
+  ],
+  "reasoning": true,
+  "providerConfig": {
+    "kiro": {
+      "upstream": "minimax-m2.5"
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "aliases": [
+    "nemotron-4-340b-instruct",
+    "nemotron-4-instruct",
+    "nvidia-nemotron-4-340b-instruct",
+    "nvidia/nemotron-4-340b-instruct"
+  ],
+  "reasoning": false,
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "nvidia/nemotron-4-340b-instruct"
+    }
+  }
+}

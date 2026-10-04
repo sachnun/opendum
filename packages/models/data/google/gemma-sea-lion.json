@@ -1,25 +1,3 @@
 {
-  "providers": [
-    "workers_ai"
-  ],
-  "aliases": [
-    "gemma-sea-lion-v4-27b-it",
-    "@cf/aisingapore/gemma-sea-lion-v4-27b-it",
-    "gemma-sea-lion-it"
-  ],
-  "ignored": true,
-  "reasoning": false,
-  "modalities": {
-    "input": [
-      "text"
-    ],
-    "output": [
-      "text"
-    ]
-  },
-  "providerConfig": {
-    "workers_ai": {
-      "upstream": "@cf/aisingapore/gemma-sea-lion-v4-27b-it"
-    }
-  }
+  "ignored": true
 }

@@ -1,0 +1,67 @@
+{
+  "id": "nemotron-3-ultra-550b-a55b",
+  "providers": [
+    "opencode",
+    "kilo_code",
+    "nvidia_nim",
+    "openrouter"
+  ],
+  "aliases": [
+    "nemotron-3-ultra",
+    "nemotron-3-ultra-free",
+    "nvidia-nemotron-3-ultra-550b-a55b",
+    "nvidia/nemotron-3-ultra-550b-a55b",
+    "nvidia/nemotron-3-ultra-550b-a55b:free"
+  ],
+  "reasoning": true,
+  "reasoning_effort": [
+    "medium",
+    "high"
+  ],
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 1000000,
+    "output": 128000
+  },
+  "cost": {
+    "input": 2.5,
+    "output": 11,
+    "cacheRead": 0.5
+  },
+  "scores": {
+    "artificialAnalysis": {
+      "index": 22.9,
+      "estimated": false,
+      "version": "4.3"
+    }
+  },
+  "providerConfig": {
+    "kilo_code": {
+      "upstream": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 65536
+    },
+    "nvidia_nim": {
+      "upstream": "nvidia/nemotron-3-ultra-550b-a55b",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 65536
+    },
+    "opencode": {
+      "upstream": "nemotron-3-ultra-free",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 128000
+    },
+    "openrouter": {
+      "upstream": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "contextWindow": 262144,
+      "maxOutputTokens": 16384
+    }
+  }
+}

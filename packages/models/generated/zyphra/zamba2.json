@@ -1,0 +1,15 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "aliases": [
+    "zamba2-7b-instruct",
+    "zamba2-instruct",
+    "zyphra/zamba2-7b-instruct"
+  ],
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "zyphra/zamba2-7b-instruct"
+    }
+  }
+}

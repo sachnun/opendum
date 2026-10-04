@@ -1,0 +1,44 @@
+{
+  "id": "hy3",
+  "providers": [
+    "workbuddy"
+  ],
+  "aliases": [
+    "hy3-paid"
+  ],
+  "reasoning": true,
+  "reasoning_effort": [
+    "low",
+    "high"
+  ],
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 262144,
+    "output": 128000
+  },
+  "cost": {
+    "input": 0.65,
+    "output": 2.64,
+    "cacheRead": 0.165
+  },
+  "scores": {
+    "artificialAnalysis": {
+      "index": 25.3,
+      "estimated": false,
+      "version": "4.3"
+    }
+  },
+  "providerConfig": {
+    "workbuddy": {
+      "contextWindow": 262144,
+      "maxOutputTokens": 128000
+    }
+  }
+}

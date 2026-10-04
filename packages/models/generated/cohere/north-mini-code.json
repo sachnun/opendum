@@ -1,0 +1,49 @@
+{
+  "id": "north-mini-code-1-0",
+  "providers": [
+    "kilo_code",
+    "openrouter"
+  ],
+  "aliases": [
+    "north-mini-code"
+  ],
+  "reasoning": true,
+  "reasoning_effort": [
+    "high"
+  ],
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 256000,
+    "output": 64000
+  },
+  "cost": {
+    "input": 0,
+    "output": 0
+  },
+  "scores": {
+    "artificialAnalysis": {
+      "index": 9.9,
+      "estimated": false,
+      "version": "4.3"
+    }
+  },
+  "providerConfig": {
+    "kilo_code": {
+      "upstream": "cohere/north-mini-code:free",
+      "contextWindow": 256000,
+      "maxOutputTokens": 64000
+    },
+    "openrouter": {
+      "upstream": "cohere/north-mini-code:free",
+      "contextWindow": 256000,
+      "maxOutputTokens": 64000
+    }
+  }
+}

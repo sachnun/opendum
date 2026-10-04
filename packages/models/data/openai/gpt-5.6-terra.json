@@ -1,61 +1,12 @@
 {
-  "providers": [
-    "kiro",
-    "codex",
-    "workbuddy",
-    "perch"
-  ],
-  "reasoning": true,
-  "reasoning_effort": [
-    "low",
-    "medium",
-    "high",
-    "xhigh",
-    "max"
-  ],
-  "modalities": {
-    "input": [
-      "image",
-      "pdf",
-      "text"
-    ],
-    "output": [
-      "text"
-    ]
-  },
-  "limit": {
-    "context": 1050000,
-    "output": 128000
-  },
-  "cost": {
-    "input": 10,
-    "output": 60,
-    "cacheRead": 1,
-    "cacheWrite": 12.5
-  },
   "providerConfig": {
-    "codex": {
-      "contextWindow": 1050000,
-      "maxOutputTokens": 128000
-    },
     "kiro": {
-      "contextWindow": 1050000,
-      "maxOutputTokens": 128000,
       "allowedTiers": [
         "pro",
         "pro+",
         "power",
         "standalone"
       ]
-    },
-    "perch": {
-      "upstream": "gpt-5-6-terra",
-      "contextWindow": 1050000,
-      "maxOutputTokens": 128000
-    },
-    "workbuddy": {
-      "contextWindow": 1050000,
-      "maxOutputTokens": 128000
     }
   }
 }

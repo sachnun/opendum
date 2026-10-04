@@ -1,0 +1,72 @@
+{
+  "id": "qwen3.8-27b",
+  "providers": [
+    "hyper",
+    "kilo_code",
+    "openrouter",
+    "workers_ai"
+  ],
+  "aliases": [
+    "@cf-qwen-qwen3.8-27b",
+    "@cf/qwen/qwen3.8-27b",
+    "qwen-qwen3.8-27b:free",
+    "qwen/qwen3.8-27b:free",
+    "qwen3.8",
+    "qwen3.8-2.4t-a95b",
+    "qwen3.8-27b"
+  ],
+  "reasoning": true,
+  "reasoning_effort": [
+    "low",
+    "medium",
+    "high"
+  ],
+  "modalities": {
+    "input": [
+      "image",
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 1000000,
+    "output": 262144
+  },
+  "cost": {
+    "input": 1,
+    "output": 12.5,
+    "cacheRead": 0.25,
+    "cacheWrite": 2.65625
+  },
+  "scores": {
+    "artificialAnalysis": {
+      "index": 33.7,
+      "estimated": false,
+      "version": "4.3"
+    }
+  },
+  "providerConfig": {
+    "hyper": {
+      "upstream": "qwen3.8-27b",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 128000
+    },
+    "kilo_code": {
+      "upstream": "qwen/qwen3.8-27b:free",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 131072
+    },
+    "openrouter": {
+      "upstream": "qwen/qwen3.8-27b:free",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 131072
+    },
+    "workers_ai": {
+      "upstream": "@cf/qwen/qwen3.8-27b",
+      "contextWindow": 262144,
+      "maxOutputTokens": 262144
+    }
+  }
+}

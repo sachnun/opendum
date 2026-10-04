@@ -42,6 +42,29 @@ test("similarityScore is exact for equal and high for containment", () => {
   assert.ok(similarityScore("totally-unrelated", "mock-model-sonnet-x") < 0.5);
 });
 
+test("similarityScore tolerates reordered tokens", () => {
+  assert.ok(similarityScore("claude-haiku-4-5", "claude-4-5-haiku") >= 0.9);
+  assert.ok(similarityScore("gemma-4-e2b", "gemma-4-e2b-it") >= 0.9);
+});
+
+test("similarityScore stays below the default threshold for unrelated ids", () => {
+  const threshold = 0.72;
+  assert.ok(similarityScore("ox", "voxtral-mini-3b-2507") < threshold);
+  assert.ok(similarityScore("atria-dawn", "lyria-3-pro-preview") < threshold);
+});
+
+test("resolveCandidates requires a shared family below the strong-score bar", () => {
+  const index = buildIndex<number>([{ id: "vendor/mimo-2.6-flash", entry: 1 }], "test");
+  assert.equal(resolveCandidates(["ling-2.6-flash"], index).match, null, "different families must not match");
+  assert.equal(resolveCandidates(["ling-2.6-flash"], index, { threshold: 0.1 }).match, null);
+});
+
+test("similarityScore only rewards token-aligned containment", () => {
+  assert.equal(similarityScore("mock-model-a", "mock-model-a-mini"), 0.95);
+  assert.ok(similarityScore("ox", "voxtral-mini") < 0.72, "mid-token substrings must not count");
+  assert.equal(similarityScore("qwen3", "qwen3-next"), 0.95);
+});
+
 test("isCompatible rejects differing version numbers", () => {
   assert.equal(isCompatible("mock-model-4-31b", "mock-model-3-12b"), false);
   assert.equal(isCompatible("mock-model-4-31b", "mock-model-4-31b-thinking"), true);

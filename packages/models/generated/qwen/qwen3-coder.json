@@ -1,0 +1,47 @@
+{
+  "id": "qwen3-coder-30b-a3b-instruct",
+  "providers": [
+    "perch"
+  ],
+  "aliases": [
+    "Qwen-Qwen3-Coder-480B-A35B-Instruct",
+    "Qwen/Qwen3-Coder-30B-A3B-Instruct",
+    "Qwen/Qwen3-Coder-480B-A35B-Instruct",
+    "qwen/qwen3-coder-480b-a35b-instruct",
+    "qwen/qwen3-coder:free",
+    "qwen3-coder",
+    "qwen3-coder-480b-a35b-instruct"
+  ],
+  "reasoning": false,
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 128000,
+    "output": 65536
+  },
+  "cost": {
+    "input": 0.35,
+    "output": 1.4,
+    "cacheRead": 0.25
+  },
+  "scores": {
+    "artificialAnalysis": {
+      "index": 9.6,
+      "estimated": true,
+      "version": "4.3"
+    }
+  },
+  "providerConfig": {
+    "perch": {
+      "upstream": "qwen3-coder",
+      "contextWindow": 128000,
+      "maxOutputTokens": 65536
+    }
+  }
+}

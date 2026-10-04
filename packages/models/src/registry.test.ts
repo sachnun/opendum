@@ -1,18 +1,22 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { buildModelIdMap, buildModelIndex, getProviderUpstream, syncProviderModels, writeModelJson } from "./registry.ts";
+import { buildModelIdMap, buildModelIndex, getProviderUpstream, pruneDeadModelEntries, syncProviderModels, writeGeneratedModelJson, writeModelJson } from "./registry.ts";
 import type { ModelData } from "./types.ts";
 
-function withTempDir<T>(run: (dir: string) => T): T {
-  const dir = mkdtempSync(join(tmpdir(), "models-registry-"));
+function withTempDir<T>(run: (dataDir: string, generatedDir: string) => T): T {
+  const root = mkdtempSync(join(tmpdir(), "models-registry-"));
+  const dataDir = join(root, "data");
+  const generatedDir = join(root, "generated");
+  mkdirSync(dataDir, { recursive: true });
+  mkdirSync(generatedDir, { recursive: true });
   try {
-    return run(dir);
+    return run(dataDir, generatedDir);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true });
   }
 }
 
@@ -53,8 +57,8 @@ test("getProviderUpstream falls back to the model id", () => {
 });
 
 test("writeModelJson drops family and orders keys deterministically", () => {
-  withTempDir((dir) => {
-    const path = join(dir, "model.json");
+  withTempDir((dataDir) => {
+    const path = join(dataDir, "model.json");
     writeModelJson(path, {
       id: "mock-model",
       providers: ["zeta", "opencode"],
@@ -70,55 +74,98 @@ test("writeModelJson drops family and orders keys deterministically", () => {
   });
 });
 
+function mergedData(dataDir: string, relativeId: string): ModelData {
+  const entry = buildModelIndex(dataDir)[relativeId];
+  assert.ok(entry, `missing model ${relativeId}`);
+  return entry.data;
+}
+
 test("syncProviderModels adds, updates and removes provider entries", () => {
-  withTempDir((dir) => {
+  withTempDir((dataDir) => {
     const map = new Map([["mock-model", "vendor/mock-model"]]);
-    const added = syncProviderModels(dir, "openrouter", map);
+    const added = syncProviderModels(dataDir, "openrouter", map);
     assert.deepEqual(added.added, ["mock-model"]);
 
-    const data = JSON.parse(readFileSync(join(dir, "mock-model.json"), "utf-8")) as ModelData;
+    const data = mergedData(dataDir, "mock-model");
     assert.deepEqual(data.providers, ["openrouter"]);
     assert.equal(data.providerConfig?.openrouter?.upstream, "vendor/mock-model");
 
-    const unchanged = syncProviderModels(dir, "openrouter", new Map([["mock-model", "vendor/mock-model"]]));
+    const unchanged = syncProviderModels(dataDir, "openrouter", new Map([["mock-model", "vendor/mock-model"]]));
     assert.deepEqual(unchanged.added, []);
     assert.deepEqual(unchanged.updated, []);
 
-    const removed = syncProviderModels(dir, "openrouter", new Map());
+    const removed = syncProviderModels(dataDir, "openrouter", new Map());
     assert.deepEqual(removed.removed, ["mock-model"]);
   });
 });
 
+test("syncProviderModels writes derived fields to generated only", () => {
+  withTempDir((dataDir, generatedDir) => {
+    syncProviderModels(dataDir, "openrouter", new Map([["mock-model", "vendor/mock-model"]]));
+    const generated = JSON.parse(readFileSync(join(generatedDir, "mock-model.json"), "utf-8")) as ModelData;
+    assert.deepEqual(generated.providers, ["openrouter"]);
+    assert.equal(generated.providerConfig?.openrouter?.upstream, "vendor/mock-model");
+  });
+});
+
+test("pruneDeadModelEntries drops uncurated dead entries and keeps the rest", () => {
+  withTempDir((dataDir, generatedDir) => {
+    writeGeneratedModelJson(join(generatedDir, "dead.json"), { providers: [] });
+    writeGeneratedModelJson(join(generatedDir, "live.json"), { providers: ["openrouter"] });
+    writeModelJson(join(dataDir, "ignored-dead.json"), { ignored: true });
+    writeModelJson(join(dataDir, "curated-dead.json"), {
+      ignored: true,
+      providerConfig: { freebuff: { agent: "base2-free" } },
+    });
+
+    assert.deepEqual(pruneDeadModelEntries(dataDir), ["dead", "ignored-dead"]);
+
+    const index = buildModelIndex(dataDir);
+    assert.equal(index["dead"], undefined);
+    assert.equal(index["ignored-dead"], undefined);
+    assert.ok(index["live"]);
+    assert.ok(index["curated-dead"]);
+  });
+});
+
+test("syncProviderModels removes the file once the last provider leaves", () => {
+  withTempDir((dataDir, generatedDir) => {
+    syncProviderModels(dataDir, "openrouter", new Map([["mock-model", "vendor/mock-model"]]));
+    syncProviderModels(dataDir, "openrouter", new Map());
+    assert.equal(buildModelIndex(dataDir)["mock-model"], undefined);
+    assert.throws(() => readFileSync(join(generatedDir, "mock-model.json")));
+  });
+});
+
 test("syncProviderModels adds aliases to a colliding parent", () => {
-  withTempDir((dir) => {
-    writeModelJson(join(dir, "base-model.json"), { id: "base-model", providers: ["openrouter"] });
-    const result = syncProviderModels(dir, "openrouter", new Map([["base-model-2", "vendor/base-model-2"]]));
-    const parent = JSON.parse(readFileSync(join(dir, "base-model.json"), "utf-8")) as ModelData;
+  withTempDir((dataDir) => {
+    syncProviderModels(dataDir, "openrouter", new Map([["base-model", "vendor/base-model"]]));
+    const result = syncProviderModels(dataDir, "openrouter", new Map([["base-model-2", "vendor/base-model-2"]]));
+    const parent = Object.values(buildModelIndex(dataDir)).find((entry) => entry.id === "base-model");
+    assert.ok(parent, "parent model must exist");
     assert.deepEqual(result.added, [], "collision should merge instead of adding a new file");
-    assert.ok((parent.aliases ?? []).length > 0, "parent should gain aliases");
+    assert.ok((parent.data.aliases ?? []).length > 0, "parent should gain aliases");
   });
 });
 
 test("syncProviderModels keeps minor versions as separate models", () => {
-  withTempDir((dir) => {
-    writeModelJson(join(dir, "claude-opus-5.json"), { id: "claude-opus-5", providers: ["kiro"] });
-    const result = syncProviderModels(dir, "antigravity", new Map([["claude-opus-5-5", "claude-opus-5-5-medium"]]));
+  withTempDir((dataDir) => {
+    syncProviderModels(dataDir, "kiro", new Map([["claude-opus-5", "claude-opus-5"]]));
+    const result = syncProviderModels(dataDir, "antigravity", new Map([["claude-opus-5-5", "claude-opus-5-5-medium"]]));
 
     assert.deepEqual(result.added, ["claude-opus-5-5"]);
-    const base = JSON.parse(readFileSync(join(dir, "claude-opus-5.json"), "utf-8")) as ModelData;
-    assert.deepEqual(base.providers, ["kiro"], "base model must stay untouched");
+    assert.deepEqual(mergedData(dataDir, "anthropic/claude-opus-5").providers, ["kiro"], "base model must stay untouched");
 
-    const newerEntry = Object.values(buildModelIndex(dir)).find((entry) => entry.id === "claude-opus-5-5");
-    assert.ok(newerEntry, "newer minor version must exist as its own model");
-    assert.deepEqual(newerEntry.data.providers, ["antigravity"]);
-    assert.equal(newerEntry.data.providerConfig?.antigravity?.upstream, "claude-opus-5-5-medium");
+    const newer = mergedData(dataDir, "anthropic/claude-opus-5-5");
+    assert.deepEqual(newer.providers, ["antigravity"]);
+    assert.equal(newer.providerConfig?.antigravity?.upstream, "claude-opus-5-5-medium");
   });
 });
 
 test("syncProviderModels still folds real revision suffixes into the parent", () => {
-  withTempDir((dir) => {
-    writeModelJson(join(dir, "mock-model.json"), { id: "mock-model", providers: ["openrouter"] });
-    const result = syncProviderModels(dir, "openrouter", new Map([["mock-model-2", "vendor/mock-model-2"]]));
+  withTempDir((dataDir) => {
+    syncProviderModels(dataDir, "openrouter", new Map([["mock-model", "vendor/mock-model"]]));
+    const result = syncProviderModels(dataDir, "openrouter", new Map([["mock-model-2", "vendor/mock-model-2"]]));
     assert.deepEqual(result.added, [], "revision suffix should merge into the parent");
   });
 });

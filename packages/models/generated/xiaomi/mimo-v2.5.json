@@ -1,0 +1,54 @@
+{
+  "id": "mimo-v2.5",
+  "providers": [
+    "opencode",
+    "freebuff"
+  ],
+  "aliases": [
+    "mimo",
+    "mimo-v2.5-free",
+    "xiaomi-mimo-v2.5",
+    "xiaomi/mimo-v2.5"
+  ],
+  "reasoning": true,
+  "modalities": {
+    "input": [
+      "audio",
+      "image",
+      "text",
+      "video"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 262144,
+    "output": 32000
+  },
+  "cost": {
+    "input": 0.7,
+    "output": 1.4,
+    "cacheRead": 0.014,
+    "cacheWrite": 0
+  },
+  "scores": {
+    "artificialAnalysis": {
+      "index": 25.2,
+      "estimated": true,
+      "version": "4.3"
+    }
+  },
+  "providerConfig": {
+    "freebuff": {
+      "upstream": "mimo/mimo-v2.5",
+      "contextWindow": 262144,
+      "maxOutputTokens": 16384
+    },
+    "opencode": {
+      "upstream": "mimo-v2.5-free",
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000
+    }
+  }
+}

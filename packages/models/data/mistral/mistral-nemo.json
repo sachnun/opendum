@@ -1,17 +1,3 @@
 {
-  "providers": [
-    "nvidia_nim"
-  ],
-  "aliases": [
-    "mistral-nemo-12b-instruct",
-    "nv-mistralai/mistral-nemo-12b-instruct",
-    "mistral-nemo-instruct"
-  ],
-  "ignored": true,
-  "reasoning": false,
-  "providerConfig": {
-    "nvidia_nim": {
-      "upstream": "nv-mistralai/mistral-nemo-12b-instruct"
-    }
-  }
+  "ignored": true
 }

@@ -1,9 +1,0 @@
-{
-  "providers": [],
-  "aliases": [
-    "mixtral-8x22b-instruct-v0.1",
-    "mixtral-8x22b-instruct"
-  ],
-  "ignored": true,
-  "providerConfig": {}
-}

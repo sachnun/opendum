@@ -2,9 +2,9 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildModelIdMap, syncProviderModels } from "../src/registry.ts";
-import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "../src/http.ts";
-import { stripParamInfoKey } from "../src/clean-key.ts";
+import { buildModelIdMap, syncProviderModels } from "#models/registry.ts";
+import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "#models/http.ts";
+import { stripParamInfoKey } from "#models/clean-key.ts";
 
 const KILO_CODE_MODELS_URL = "https://api.kilo.ai/api/gateway/models";
 

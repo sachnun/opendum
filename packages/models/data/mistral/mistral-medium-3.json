@@ -1,9 +1,0 @@
-{
-  "providers": [],
-  "aliases": [
-    "mistral-medium-3-instruct"
-  ],
-  "ignored": false,
-  "reasoning": false,
-  "providerConfig": {}
-}

@@ -1,0 +1,47 @@
+{
+  "id": "mistral-small-3-1-24b-instruct-2503",
+  "providers": [
+    "workers_ai"
+  ],
+  "aliases": [
+    "@cf-mistralai-mistral-small-3.1-24b-instruct",
+    "@cf/mistralai/mistral-small-3.1-24b-instruct",
+    "mistral-small-3.1",
+    "mistral-small-3.1-24b-instruct",
+    "mistral-small-3.1-24b-instruct-2503",
+    "mistral-small-3.1-instruct",
+    "mistralai-mistral-small-3.1-24b-instruct-2503",
+    "mistralai/mistral-small-3.1-24b-instruct-2503"
+  ],
+  "reasoning": false,
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 128000,
+    "output": 128000
+  },
+  "cost": {
+    "input": 1.755,
+    "output": 2.775
+  },
+  "scores": {
+    "artificialAnalysis": {
+      "index": 7.1,
+      "estimated": false,
+      "version": "4.3"
+    }
+  },
+  "providerConfig": {
+    "workers_ai": {
+      "upstream": "@cf/mistralai/mistral-small-3.1-24b-instruct",
+      "contextWindow": 128000,
+      "maxOutputTokens": 128000
+    }
+  }
+}

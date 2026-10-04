@@ -1,40 +1,8 @@
 {
-  "providers": [
-    "kilo_code",
-    "openrouter"
-  ],
-  "reasoning": true,
-  "reasoning_effort": [
-    "high"
-  ],
-  "modalities": {
-    "input": [
-      "text"
-    ],
-    "output": [
-      "text"
-    ]
-  },
-  "limit": {
-    "context": 256000,
-    "output": 64000
-  },
-  "cost": {
-    "input": 0,
-    "output": 0
-  },
   "providerConfig": {
     "kilo_code": {
-      "upstream": "cohere/north-mini-code:free",
-      "contextWindow": 256000,
-      "maxOutputTokens": 64000,
       "authless": true,
       "free": true
-    },
-    "openrouter": {
-      "upstream": "cohere/north-mini-code:free",
-      "contextWindow": 256000,
-      "maxOutputTokens": 64000
     }
   }
 }

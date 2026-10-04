@@ -3,9 +3,9 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { syncProviderModels } from "../src/registry.ts";
-import { fetchText, fetchJson } from "../src/http.ts";
-import { stripParamInfoKey } from "../src/clean-key.ts";
+import { syncProviderModels } from "#models/registry.ts";
+import { fetchText, fetchJson } from "#models/http.ts";
+import { stripParamInfoKey } from "#models/clean-key.ts";
 
 const OPENCODE_MODELS_URL = "https://opencode.ai/zen/v1/models";
 const OPENCODE_ZEN_DOCS_URL = "https://raw.githubusercontent.com/anomalyco/opencode/dev/packages/web/src/content/docs/zen.mdx";

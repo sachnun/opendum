@@ -1,9 +1,0 @@
-{
-  "providers": [],
-  "aliases": [
-    "llama-3-taiwan-70b-instruct",
-    "llama-3-taiwan-instruct"
-  ],
-  "ignored": true,
-  "providerConfig": {}
-}

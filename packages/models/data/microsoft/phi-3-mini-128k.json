@@ -1,9 +1,0 @@
-{
-  "providers": [],
-  "aliases": [
-    "phi-3-mini-128k-instruct"
-  ],
-  "ignored": false,
-  "reasoning": false,
-  "providerConfig": {}
-}

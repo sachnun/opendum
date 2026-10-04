@@ -1,0 +1,51 @@
+{
+  "providers": [
+    "codex",
+    "perch"
+  ],
+  "reasoning": true,
+  "reasoning_effort": [
+    "low",
+    "medium",
+    "high",
+    "xhigh",
+    "max"
+  ],
+  "modalities": {
+    "input": [
+      "image",
+      "pdf",
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 1050000,
+    "output": 128000
+  },
+  "cost": {
+    "input": 10,
+    "output": 50,
+    "cacheRead": 1,
+    "cacheWrite": 12.5
+  },
+  "scores": {
+    "artificialAnalysis": {
+      "index": 47.6,
+      "estimated": false,
+      "version": "4.3"
+    }
+  },
+  "providerConfig": {
+    "codex": {
+      "contextWindow": 1050000,
+      "maxOutputTokens": 128000
+    },
+    "perch": {
+      "contextWindow": 1050000,
+      "maxOutputTokens": 128000
+    }
+  }
+}

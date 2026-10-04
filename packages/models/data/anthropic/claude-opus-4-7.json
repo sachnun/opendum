@@ -1,44 +1,6 @@
 {
-  "providers": [
-    "kiro"
-  ],
-  "aliases": [
-    "claude-opus-4.7",
-    "claude-opus4.7"
-  ],
-  "reasoning": true,
-  "reasoning_effort": [
-    "low",
-    "medium",
-    "high",
-    "xhigh",
-    "max"
-  ],
-  "modalities": {
-    "input": [
-      "image",
-      "pdf",
-      "text"
-    ],
-    "output": [
-      "text"
-    ]
-  },
-  "limit": {
-    "context": 1000000,
-    "output": 128000
-  },
-  "cost": {
-    "input": 25,
-    "output": 125,
-    "cacheRead": 2.5,
-    "cacheWrite": 31.25
-  },
   "providerConfig": {
     "kiro": {
-      "upstream": "claude-opus-4.7",
-      "contextWindow": 1000000,
-      "maxOutputTokens": 128000,
       "allowedTiers": [
         "pro",
         "pro+",

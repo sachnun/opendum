@@ -1,0 +1,35 @@
+{
+  "id": "llama-3.2-1b",
+  "providers": [
+    "workers_ai"
+  ],
+  "aliases": [
+    "llama-3.2"
+  ],
+  "reasoning": false,
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 60000,
+    "output": 60000
+  },
+  "cost": {
+    "input": 0.135,
+    "output": 0.5,
+    "cacheRead": 0.5,
+    "cacheWrite": 0.5
+  },
+  "providerConfig": {
+    "workers_ai": {
+      "upstream": "@cf/meta/llama-3.2-1b-instruct",
+      "contextWindow": 60000,
+      "maxOutputTokens": 60000
+    }
+  }
+}

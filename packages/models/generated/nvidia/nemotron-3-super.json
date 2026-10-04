@@ -1,0 +1,73 @@
+{
+  "id": "nemotron-3-super-120b-a12b",
+  "providers": [
+    "kilo_code",
+    "openrouter",
+    "perch",
+    "workers_ai",
+    "nvidia_nim"
+  ],
+  "aliases": [
+    "@cf-nvidia-nemotron-3-120b-a12b",
+    "@cf/nvidia/nemotron-3-120b-a12b",
+    "nemotron-3-super",
+    "nvidia-nemotron-3-super-120b-a12b",
+    "nvidia/nemotron-3-super-120b-a12b",
+    "nvidia/nemotron-3-super-120b-a12b:free"
+  ],
+  "reasoning": true,
+  "reasoning_effort": [
+    "low",
+    "medium"
+  ],
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 1000000,
+    "output": 256000
+  },
+  "cost": {
+    "input": 0.4,
+    "output": 2.25
+  },
+  "scores": {
+    "artificialAnalysis": {
+      "index": 12.8,
+      "estimated": false,
+      "version": "4.3"
+    }
+  },
+  "providerConfig": {
+    "kilo_code": {
+      "upstream": "nvidia/nemotron-3-super-120b-a12b:free",
+      "contextWindow": 262144,
+      "maxOutputTokens": 235929
+    },
+    "nvidia_nim": {
+      "upstream": "nvidia/nemotron-3-super-120b-a12b",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 32000
+    },
+    "openrouter": {
+      "upstream": "nvidia/nemotron-3-super-120b-a12b:free",
+      "contextWindow": 262144,
+      "maxOutputTokens": 235929
+    },
+    "perch": {
+      "upstream": "nemotron-super",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 32000
+    },
+    "workers_ai": {
+      "upstream": "@cf/nvidia/nemotron-3-120b-a12b",
+      "contextWindow": 256000,
+      "maxOutputTokens": 256000
+    }
+  }
+}

@@ -2,9 +2,9 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { syncProviderModels } from "../src/registry.ts";
-import { fetchText } from "../src/http.ts";
-import { stripParamInfoKey } from "../src/clean-key.ts";
+import { syncProviderModels } from "#models/registry.ts";
+import { fetchText } from "#models/http.ts";
+import { stripParamInfoKey } from "#models/clean-key.ts";
 
 const PROVIDER_NAME = "freebuff";
 const RAW_BASE = "https://raw.githubusercontent.com/CodebuffAI/codebuff/main/common/src/constants";

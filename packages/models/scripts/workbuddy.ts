@@ -6,8 +6,8 @@ import { homedir, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { buildModelIndex, syncProviderModels, writeModelJson } from "../src/registry.ts";
-import { fetchJson } from "../src/http.ts";
+import { buildModelIndex, persistModel, syncProviderModels } from "#models/registry.ts";
+import { fetchJson } from "#models/http.ts";
 
 const PROVIDER_NAME = "workbuddy";
 const WORKBUDDY_NPM_PACKAGE = "@tencent-ai/codebuddy-code";
@@ -166,7 +166,7 @@ function enrichNewModels(modelsDir, addedKeys, modelMap, metadataLookup) {
     const data = entry.data;
     data.reasoning = meta.reasoning;
 
-    writeModelJson(entry.path, data);
+    persistModel(entry, data);
   }
 }
 
@@ -179,7 +179,7 @@ function enforceHouseIgnored(modelsDir) {
     const providers = entry.data.providers || [];
     if (providers.length > 0 && !providers.every((provider) => provider === PROVIDER_NAME)) continue;
     entry.data.ignored = true;
-    writeModelJson(entry.path, entry.data);
+    persistModel(entry, entry.data);
     changed.push(modelKey);
   }
   return changed;
