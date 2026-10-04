@@ -26,7 +26,6 @@ const MODEL_PROPERTY_ORDER = [
 const PROVIDER_CONFIG_PROPERTY_ORDER = ["upstream", "contextWindow", "maxOutputTokens", "authless", "free", "minTier", "allowedTiers", "aliases"];
 const COST_PROPERTY_ORDER = ["input", "output", "cacheRead", "cacheWrite"];
 const SCORE_PROPERTY_ORDER = ["index", "estimated", "version"];
-const FIRST_PROVIDERS = new Set(["opencode"]);
 
 function isPlainObject(value: unknown): value is Record<string, JsonValue> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -62,16 +61,7 @@ function orderProviderMap(value: Record<string, JsonValue>, preferredKeys: strin
   return result;
 }
 
-function orderProviders(value: string[]): string[] {
-  return [...value].sort((a, b) => {
-    const aFirst = FIRST_PROVIDERS.has(a) ? 0 : 1;
-    const bFirst = FIRST_PROVIDERS.has(b) ? 0 : 1;
-    return aFirst - bFirst;
-  });
-}
-
 function orderValue(value: JsonValue, key?: string): JsonValue {
-  if (key === "providers" && Array.isArray(value)) return orderProviders(value as string[]);
   if (key === "aliases" && Array.isArray(value)) return [...(value as string[])].sort();
   if (Array.isArray(value)) return value.map((item) => orderValue(item));
   if (!isPlainObject(value)) return value;
@@ -495,7 +485,7 @@ export function syncProviderModels(
 
       if (!providers.includes(providerName)) {
         providers.push(providerName);
-        existing.data.providers = orderProviders(providers);
+        existing.data.providers = providers;
         changed = true;
       }
 
@@ -547,7 +537,7 @@ export function syncProviderModels(
         let touched = false;
 
         if (!existingProviders.includes(providerName)) {
-          existing.providers = orderProviders([...existingProviders, providerName]);
+          existing.providers = [...existingProviders, providerName];
           touched = true;
         }
 

@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 
 import type { Provider, ProviderAccount } from "@opendum/providers";
 import { cloneMap, numberAsInt, stringValue } from "./helpers.js";
+import type { ProviderRoutingOptions, ProviderScore } from "./provider-performance.js";
 
 export const AUTHLESS_ACCOUNT_PREFIX = "authless:";
 export const UNHEALTHY_IDLE_DECAY_MS = 10 * 60 * 1000;
@@ -129,7 +130,12 @@ export function sortAccountsByProviderPriority(accounts: ProviderAccount[], prio
   });
 }
 
-export function prioritizeAccounts(accounts: ProviderAccount[], groupByProvider: boolean, priority: string[]): ProviderAccount[] {
+export function prioritizeAccounts(
+  accounts: ProviderAccount[],
+  groupByProvider: boolean,
+  priority: string[],
+  routing?: ProviderRoutingOptions
+): ProviderAccount[] {
   if (!groupByProvider) return paidFirst(accounts);
   const byProvider = new Map<string, ProviderAccount[]>();
   for (const account of accounts) {
@@ -137,9 +143,64 @@ export function prioritizeAccounts(accounts: ProviderAccount[], groupByProvider:
     list.push(account);
     byProvider.set(account.provider, list);
   }
+  const ordered = orderProvidersByPerformance([...byProvider.keys()], priority, routing);
   const result: ProviderAccount[] = [];
-  for (const provider of priority) result.push(...paidFirst(byProvider.get(provider) ?? []));
+  for (const provider of ordered) result.push(...paidFirst(byProvider.get(provider) ?? []));
   return result;
+}
+
+export function orderProvidersByPerformance(
+  present: string[],
+  priority: string[],
+  routing?: ProviderRoutingOptions,
+  random: () => number = Math.random
+): string[] {
+  const known = new Set(present);
+  const base = priority.filter((provider) => known.has(provider));
+  for (const provider of present) {
+    if (!priority.includes(provider)) base.push(provider);
+  }
+  if (!routing) return base;
+
+  const scored = present
+    .map((provider) => ({ provider, score: routing.scores.get(provider)?.score ?? Number.NaN }))
+    .filter((entry) => Number.isFinite(entry.score))
+    .sort((a, b) => a.score - b.score);
+  if (scored.length === 0) return base;
+
+  const threshold = scored[0]!.score * (1 + routing.bufferRatio);
+  const pool = scored.filter((entry) => entry.score <= threshold).map((entry) => entry.provider);
+  const poolSet = new Set(pool);
+  const rest = base.filter((provider) => !poolSet.has(provider));
+
+  const explore = rest.length > 0 && random() < routing.explorationRate;
+  const head = explore
+    ? rest[Math.min(rest.length - 1, Math.floor(random() * rest.length))]!
+    : weightedPick(pool, routing.scores, random);
+  if (!head) return base;
+
+  return [
+    head,
+    ...pool.filter((provider) => provider !== head),
+    ...rest.filter((provider) => provider !== head),
+  ];
+}
+
+function weightedPick(providers: string[], scores: Map<string, ProviderScore>, random: () => number): string {
+  if (providers.length === 0) return "";
+  let total = 0;
+  const weights = providers.map((provider) => {
+    const score = scores.get(provider)?.score ?? 0;
+    const weight = score > 0 ? 1 / score : 1;
+    total += weight;
+    return weight;
+  });
+  let cursor = random() * total;
+  for (let index = 0; index < providers.length; index += 1) {
+    cursor -= weights[index] ?? 0;
+    if (cursor <= 0) return providers[index]!;
+  }
+  return providers[providers.length - 1]!;
 }
 
 export function paidFirst(accounts: ProviderAccount[]): ProviderAccount[] {

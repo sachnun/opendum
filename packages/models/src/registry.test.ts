@@ -67,7 +67,7 @@ test("writeModelJson drops family and orders keys deterministically", () => {
     });
     const written = readFileSync(path, "utf-8");
     assert.ok(!written.includes("family"), "family field must be removed");
-    assert.match(written, /"providers": \[\s*"opencode",\s*"zeta"\s*\]/);
+    assert.match(written, /"providers": \[\s*"zeta",\s*"opencode"\s*\]/);
     assert.ok(written.indexOf('"id"') < written.indexOf('"providers"'));
     assert.ok(written.indexOf('"input"') < written.indexOf('"cacheWrite"'));
     assert.ok(written.endsWith("\n"));

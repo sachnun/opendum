@@ -77,6 +77,10 @@ import {
   withTimeout,
 } from "./service-helpers.js";
 import {
+  ProviderPerformance,
+  type ProviderRoutingOptions,
+} from "./provider-performance.js";
+import {
   buildAccountErrorMessage,
   codexUsageLimitDisabledUntil,
   endpointPath,
@@ -157,6 +161,7 @@ export class ProxyService implements StreamRecorder {
   private readonly secret: string;
   private readonly requestTimeoutMs: number;
   private readonly affinity: SessionAffinity;
+  private readonly performance: ProviderPerformance;
 
   constructor(options: ProxyServiceOptions) {
     this.database = options.database;
@@ -167,6 +172,7 @@ export class ProxyService implements StreamRecorder {
     this.secret = options.betterAuthSecret;
     this.requestTimeoutMs = options.requestTimeoutMs;
     this.affinity = new SessionAffinity(options.redis, options.providers.names());
+    this.performance = new ProviderPerformance(options.redis);
   }
 
   async handle(
@@ -916,7 +922,8 @@ export class ProxyService implements StreamRecorder {
   ): Promise<{ account: ProviderAccount | null; configured: boolean }> {
     const eligible = await this.getEligibleAccounts(userId, model, provider, exclude, excludeProviders, accountAccess);
     if (eligible.length === 0) return { account: null, configured: false };
-    let prioritized = prioritizeAccounts(eligible, provider === null, this.models.providersForModel(model));
+    const routing = await this.performanceRouting(model, provider === null);
+    let prioritized = prioritizeAccounts(eligible, provider === null, this.models.providersForModel(model), routing);
     const stickyId = await this.affinity.lookup(userId, sessionId);
     if (stickyId && !isSyntheticProviderAccountId(stickyId)) {
       prioritized = preferSticky(prioritized, (account) => account.id === stickyId);
@@ -959,8 +966,16 @@ export class ProxyService implements StreamRecorder {
     const disabledSet = new Set(disabled.map((row) => row.providerAccountId));
     const enabled = rows.filter((row) => !disabledSet.has(row.id) && this.canAccountUseModel(row, model));
     if (enabled.length === 0) return { account: null, configured: true };
-    const prioritized = prioritizeAccounts(enabled, provider === null, targetProviders);
+    const routing = await this.performanceRouting(model, provider === null);
+    const prioritized = prioritizeAccounts(enabled, provider === null, targetProviders, routing);
     return { account: await this.pickHealthyAccount(prioritized, model), configured: true };
+  }
+
+  private async performanceRouting(model: string, enabled: boolean): Promise<ProviderRoutingOptions | undefined> {
+    if (!enabled) return undefined;
+    const scores = await this.performance.scoresForModel(this.models.resolveAlias(model));
+    if (scores.size === 0) return undefined;
+    return this.performance.routingOptions(scores);
   }
 
   private async pickHealthyAccount(
@@ -1261,20 +1276,6 @@ export class ProxyService implements StreamRecorder {
     }
   }
 
-  private async recordLatency(provider: string, model: string, stream: boolean, latencyMs: number): Promise<void> {
-    if (latencyMs <= 0) return;
-    const mode = stream ? "stream" : "nonstream";
-    const key = `opendum:latency:${provider}:${model.trim().toLowerCase()}:${mode}`;
-    const now = Date.now();
-    try {
-      await this.redis.zAdd(key, { score: now, value: `${latencyMs}:${now}` });
-      await this.redis.zRemRangeByRank(key, 0, -101);
-      await this.redis.expire(key, 24 * 60 * 60);
-    } catch {
-      return;
-    }
-  }
-
   private validatePlaygroundAuth(
     request: Request | undefined
   ): { handled: boolean; result: AuthResult } {
@@ -1371,14 +1372,13 @@ export class ProxyService implements StreamRecorder {
     void (async () => {
       try {
         await this.markAccountSuccess(params.accountId, params.model);
-        if (params.upstreamFirstResponseMs > params.requestStartMs) {
-          await this.recordLatency(
-            params.provider,
-            params.model,
-            params.stream,
-            params.upstreamFirstResponseMs - params.requestStartMs
-          );
-        }
+        await this.performance.record({
+          provider: params.provider,
+          model: this.models.resolveAlias(params.model),
+          ttftMs: params.upstreamFirstResponseMs > params.requestStartMs ? params.upstreamFirstResponseMs - params.requestStartMs : 0,
+          outputTokens: params.outputTokens,
+          durationMs: params.durationMs,
+        });
         await this.logUsageRaw({
           userId: params.userId,
           providerAccountId: params.accountId,
