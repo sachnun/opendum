@@ -224,3 +224,72 @@ func TestBuildAliasesIsDeterministicAndPrefersCanonicalIDs(t *testing.T) {
 		t.Fatalf("deepseek-v4-flash = %q, want itself because it is a canonical id", got)
 	}
 }
+
+func TestResolveAliasIsCaseInsensitive(t *testing.T) {
+	registry, err := Load(filepath.Join("..", "..", "..", "..", "packages", "models", "data"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := map[string]string{
+		"MiniMax-M3":                    "MiniMax-M3",
+		"minimax-m3":                    "MiniMax-M3",
+		"MINIMAX-M3":                    "MiniMax-M3",
+		"mInImAx-M3":                    "MiniMax-M3",
+		"MiniMax-M2.7":                  "MiniMax-M2.7",
+		"minimax-m2.7":                  "MiniMax-M2.7",
+		"gemma-4-E2B-it":                "gemma-4-E2B-it",
+		"GEMMA-4-E2B-IT":                "gemma-4-E2B-it",
+		"gemma-4-e2b":                   "gemma-4-E2B-it",
+		"  MiniMax-M3  ":                "MiniMax-M3",
+		"deepseek-ai/DeepSeek-V4-Flash": "deepseek-v4-flash",
+	}
+
+	for input, want := range tests {
+		if got := registry.ResolveAlias(input); got != want {
+			t.Fatalf("ResolveAlias(%q) = %q, want %q", input, got, want)
+		}
+		if !registry.IsSupported(input) {
+			t.Fatalf("IsSupported(%q) = false, want true", input)
+		}
+	}
+}
+
+func TestResolveAliasCaseFoldPrefersCanonicalIDs(t *testing.T) {
+	newRegistry := func() *Registry {
+		return &Registry{
+			effective: map[string]Info{
+				"Foo": {Aliases: []string{"shared"}},
+				"foo": {Aliases: []string{"shared"}},
+			},
+			aliasToCanonical:   map[string]string{},
+			canonicalToAliases: map[string][]string{},
+		}
+	}
+
+	first := newRegistry()
+	first.buildAliases()
+	for i := 0; i < 20; i++ {
+		other := newRegistry()
+		other.buildAliases()
+		for input, canonical := range map[string]string{
+			"Foo":    "Foo",
+			"foo":    "foo",
+			"FOO":    "Foo",
+			"fOo":    "Foo",
+			"Shared": "Foo",
+			"SHARED": "Foo",
+		} {
+			if got := other.ResolveAlias(input); got != canonical {
+				t.Fatalf("ResolveAlias(%q) = %q, want %q", input, got, canonical)
+			}
+		}
+	}
+
+	if got := first.ResolveAlias("foo"); got != "foo" {
+		t.Fatalf("ResolveAlias(foo) = %q, want exact canonical foo", got)
+	}
+	if got := first.ResolveAlias("FOO"); got != "Foo" {
+		t.Fatalf("ResolveAlias(FOO) = %q, want sorted-first canonical Foo", got)
+	}
+}

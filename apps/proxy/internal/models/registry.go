@@ -131,15 +131,16 @@ type Info struct {
 }
 
 type Registry struct {
-	models              map[string]Info
-	ignored             map[string]struct{}
-	effective           map[string]Info
-	aliasToCanonical    map[string]string
-	canonicalToAliases  map[string][]string
-	providerModelMap    map[string]map[string]string
-	providerModelSet    map[string]map[string]struct{}
-	suggestionModels    []suggestionCandidate
-	suggestionProviders map[string][]suggestionCandidate
+	models                 map[string]Info
+	ignored                map[string]struct{}
+	effective              map[string]Info
+	aliasToCanonical       map[string]string
+	foldedAliasToCanonical map[string]string
+	canonicalToAliases     map[string][]string
+	providerModelMap       map[string]map[string]string
+	providerModelSet       map[string]map[string]struct{}
+	suggestionModels       []suggestionCandidate
+	suggestionProviders    map[string][]suggestionCandidate
 }
 
 type suggestionCandidate struct {
@@ -150,14 +151,15 @@ type suggestionCandidate struct {
 
 func Load(dir string) (*Registry, error) {
 	registry := &Registry{
-		models:              map[string]Info{},
-		ignored:             map[string]struct{}{},
-		effective:           map[string]Info{},
-		aliasToCanonical:    map[string]string{},
-		canonicalToAliases:  map[string][]string{},
-		providerModelMap:    map[string]map[string]string{},
-		providerModelSet:    map[string]map[string]struct{}{},
-		suggestionProviders: map[string][]suggestionCandidate{},
+		models:                 map[string]Info{},
+		ignored:                map[string]struct{}{},
+		effective:              map[string]Info{},
+		aliasToCanonical:       map[string]string{},
+		foldedAliasToCanonical: map[string]string{},
+		canonicalToAliases:     map[string][]string{},
+		providerModelMap:       map[string]map[string]string{},
+		providerModelSet:       map[string]map[string]struct{}{},
+		suggestionProviders:    map[string][]suggestionCandidate{},
 	}
 
 	entries, err := collectModelEntries(dir, resolveGeneratedDir(dir))
@@ -489,6 +491,38 @@ func (r *Registry) buildAliases() {
 	for canonical := range r.canonicalToAliases {
 		r.canonicalToAliases[canonical] = uniqueSorted(r.canonicalToAliases[canonical])
 	}
+
+	r.buildFoldedAliases()
+}
+
+func (r *Registry) buildFoldedAliases() {
+	folded := make(map[string]string, len(r.aliasToCanonical))
+
+	canonicals := make([]string, 0, len(r.effective))
+	for canonical := range r.effective {
+		canonicals = append(canonicals, canonical)
+	}
+	sort.Strings(canonicals)
+	for _, canonical := range canonicals {
+		key := strings.ToLower(canonical)
+		if _, exists := folded[key]; !exists {
+			folded[key] = canonical
+		}
+	}
+
+	aliases := make([]string, 0, len(r.aliasToCanonical))
+	for alias := range r.aliasToCanonical {
+		aliases = append(aliases, alias)
+	}
+	sort.Strings(aliases)
+	for _, alias := range aliases {
+		key := strings.ToLower(alias)
+		if _, exists := folded[key]; !exists {
+			folded[key] = r.aliasToCanonical[alias]
+		}
+	}
+
+	r.foldedAliasToCanonical = folded
 }
 
 // assignAlias records alias -> canonical unless the alias is a canonical model
@@ -524,7 +558,14 @@ func (r *Registry) buildSuggestionCandidates() {
 }
 
 func (r *Registry) ResolveAlias(model string) string {
+	model = strings.TrimSpace(model)
+	if model == "" {
+		return model
+	}
 	if canonical, ok := r.aliasToCanonical[model]; ok {
+		return canonical
+	}
+	if canonical, ok := r.foldedAliasToCanonical[strings.ToLower(model)]; ok {
 		return canonical
 	}
 	return model
