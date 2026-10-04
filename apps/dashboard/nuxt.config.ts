@@ -35,7 +35,6 @@ function buildModelRegistryModule(): string {
   const familyByFileId = collectFamilyByFileId(dataDir);
   const imports: string[] = [];
   const entries: string[] = [];
-  const generatedEntries: string[] = [];
   const byFileId = new Map<string, { authored?: string; generated?: string }>();
 
   for (const filePath of authoredFiles) {
