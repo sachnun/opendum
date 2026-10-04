@@ -24,6 +24,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isEmpty(value: unknown): boolean {
   if (value === undefined || value === null) return true;
+  if (Array.isArray(value)) return value.length === 0;
   if (isRecord(value)) return Object.keys(value).length === 0;
   return false;
 }

@@ -38,9 +38,10 @@ test("mergeModelData handles one-sided and empty input", () => {
   assert.deepEqual(mergeModelData({ providerConfig: {} }, { providerConfig: {} }), {});
 });
 
-test("mergeModelData preserves meaningful empty arrays", () => {
-  assert.deepEqual(mergeModelData({ providers: [] }, undefined), { providers: [] });
-  assert.deepEqual(mergeModelData({ providers: ["kiro"] }, { providers: [] }), { providers: [] });
+test("mergeModelData drops empty arrays", () => {
+  assert.deepEqual(mergeModelData({ providers: [] }, undefined), {});
+  assert.deepEqual(mergeModelData({ aliases: [] }, undefined), {});
+  assert.deepEqual(mergeModelData({ providers: ["kiro"] }, undefined).providers, ["kiro"]);
 });
 
 test("splitModelData routes fields by ownership", () => {
