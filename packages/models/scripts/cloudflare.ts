@@ -25,11 +25,6 @@ const PROVIDER_NAME = "workers_ai";
 const WORKERS_AI_MODELS_API_URL = "https://api.github.com/repos/cloudflare/cloudflare-docs/contents/src/content/workers-ai-models?ref=production";
 const FETCH_CONCURRENCY = 8;
 
-const MODEL_KEY_OVERRIDES = {
-  "@cf/meta/llama-3.1-8b-instruct-fast": "llama-3.1-8b-instruct",
-  "@cf/qwen/qwen2.5-coder-32b-instruct": "qwen2.5-coder-32b",
-};
-
 const EXCLUDED_MODEL_KEY_TOKENS = ["guard"];
 
 async function mapWithConcurrency(items, concurrency, mapper) {
@@ -87,7 +82,6 @@ function normalizeModelKey(value) {
 
 function toModelKey(model, slug, reverseMap) {
   const upstream = typeof model?.name === "string" ? model.name.trim() : "";
-  if (MODEL_KEY_OVERRIDES[upstream]) return MODEL_KEY_OVERRIDES[upstream];
   if (reverseMap.has(upstream)) return reverseMap.get(upstream);
   if (slug) return normalizeModelKey(slug);
 

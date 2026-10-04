@@ -15,34 +15,13 @@ const WORKBUDDY_PRODUCT_MEMBER = "package/product.json";
 
 const MIN_EXPECTED_MODELS = 20;
 
-const CODEBUDDY_ONLY_IDS = new Set([
-  "default-model-lite",
-  "gpt-5.1-codex",
-  "gpt-5.1-codex-mini",
-  "gemini-3.1-pro",
-  "gemini-3.0-flash",
-  "gemini-2.5-flash",
-  "gemini-2.5-pro",
-  "gemini-3.1-flash-lite",
-  "deepseek-v3-2-volc",
-  "glm-5.0",
-  "kimi-k2.5",
-  "minimax-m3",
-]);
-
-const WORKBUDDY_ONLY_SUPPLEMENTS = new Map([
-  ["deepseek-v4.1-flash", { reasoning: true }],
-  ["gpt-6-astra", { reasoning: true }],
-  ["hy4-preview", { reasoning: true }],
-]);
-
 // House/preset routing ids (default-model, fast-model, ...) are not real models.
 const HOUSE_MODEL_PATTERN = /(?:^|-)model$/;
 
 function isExcludedId(id) {
   if (id.includes("image")) return true;
   if (id.startsWith("hunyuan-video")) return true;
-  return CODEBUDDY_ONLY_IDS.has(id);
+  return false;
 }
 
 async function fetchWorkbuddyCatalog() {
@@ -130,12 +109,6 @@ function buildModelMap(catalog) {
     metadataLookup.set(id, local);
   }
 
-  for (const id of WORKBUDDY_ONLY_SUPPLEMENTS.keys()) {
-    if (!modelMap.has(id)) {
-      modelMap.set(id, id);
-    }
-  }
-
   if (modelMap.size === 0) {
     throw new Error("WorkBuddy catalog produced no models");
   }
@@ -154,8 +127,7 @@ function enrichNewModels(modelsDir, addedKeys, modelMap, metadataLookup) {
 
     const upstreamName = modelMap.get(modelKey);
     const catalogEntry = upstreamName ? metadataLookup.get(upstreamName) : null;
-    const supplement = WORKBUDDY_ONLY_SUPPLEMENTS.get(modelKey);
-    const meta = catalogEntry ? metaFromCatalogEntry(catalogEntry) : supplement;
+    const meta = catalogEntry ? metaFromCatalogEntry(catalogEntry) : null;
     if (!meta) continue;
 
     const data = entry.data;

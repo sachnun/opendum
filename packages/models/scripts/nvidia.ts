@@ -14,13 +14,6 @@ const NVIDIA_MODEL_DOCS_URLS = [
   "https://docs.api.nvidia.com/nim/reference/visual-models-apis",
 ];
 
-const MODEL_KEY_OVERRIDES = {
-  "baichuan-inc/baichuan2-13b-chat": "baichuan2-13b-chat",
-  "nvidia/nvidia-nemotron-nano-9b-v2": "nemotron-nano-9b-v2",
-  "qwen/qwen2.5-coder-32b-instruct": "qwen2.5-coder-32b",
-  "qwen/qwen2.5-coder-7b-instruct": "qwen2.5-coder-7b",
-};
-
 const EXCLUDED_MODEL_KEY_TOKENS = [
   "detection",
   "embed",
@@ -38,10 +31,6 @@ const EXCLUDED_MODEL_KEY_TOKENS = [
 
 function toModelKey(modelId) {
   const normalizedModelId = modelId.replace(/^library\//, "");
-  const overriddenKey = MODEL_KEY_OVERRIDES[normalizedModelId];
-  if (overriddenKey) {
-    return overriddenKey;
-  }
 
   const slashIndex = normalizedModelId.indexOf("/");
   const baseModelId = slashIndex === -1
