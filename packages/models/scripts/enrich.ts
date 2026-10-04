@@ -18,7 +18,7 @@ import { existsSync, mkdirSync, renameSync, rmSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import { inferModelFolder } from "#models/families.ts";
-import { buildModelIndex, persistModel } from "#models/registry.ts";
+import { buildModelIndex, persistModel, renameModelFiles, resolveGeneratedDir } from "#models/registry.ts";
 import { applyCanonicalMerge, planCanonicalization } from "#models/canonicalize.ts";
 import { modelProbes } from "#models/probes.ts";
 import type { ModelData } from "#models/types.ts";
@@ -203,8 +203,12 @@ function canonicalizeIds(
   }
 
   if (dryRun) return;
+  const generatedDir = resolveGeneratedDir(modelsDir);
   for (const [relativeId, target] of targets) {
     persistModel({ modelsDir, relativeId: target.relativeId }, target.data);
+  }
+  for (const [nextFileId, target] of targets) {
+    renameModelFiles({ modelsDir, generatedDir, relativeId: target.relativeId }, nextFileId);
   }
 }
 

@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 
 import { aliasesFromUpstream, isDateToken } from "./clean-key.ts";
@@ -291,6 +291,28 @@ export function buildModelIdMap(modelIds: string[], toModelKey: (modelId: string
 
 export function persistModel(entry: Pick<ModelIndexEntry, "modelsDir" | "relativeId">, data: ModelData): void {
   writeSplitModel(entry.modelsDir, entry.relativeId, data);
+}
+
+export function renameModelFiles(
+  entry: Pick<ModelIndexEntry, "modelsDir" | "generatedDir" | "relativeId">,
+  nextFileId: string,
+): string {
+  const folder = dirname(entry.relativeId);
+  const nextRelativeId = folder === "." ? nextFileId : join(folder, nextFileId);
+  if (nextRelativeId === entry.relativeId) return entry.relativeId;
+
+  const pairs = [entry.modelsDir, entry.generatedDir].map((base) => ({
+    from: join(base, entry.relativeId + MODEL_FILE_EXTENSION),
+    to: join(base, nextRelativeId + MODEL_FILE_EXTENSION),
+  }));
+  if (pairs.some(({ to }) => existsSync(to))) return entry.relativeId;
+
+  for (const { from, to } of pairs) {
+    if (!existsSync(from)) continue;
+    mkdirSync(dirname(to), { recursive: true });
+    renameSync(from, to);
+  }
+  return nextRelativeId;
 }
 
 function hasCuratedData(data: ModelData): boolean {

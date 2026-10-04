@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { buildModelIdMap, buildModelIndex, getProviderUpstream, pruneDeadModelEntries, syncProviderModels, writeGeneratedModelJson, writeModelJson } from "./registry.ts";
+import { buildModelIdMap, buildModelIndex, getProviderUpstream, pruneDeadModelEntries, renameModelFiles, syncProviderModels, writeGeneratedModelJson, writeModelJson } from "./registry.ts";
 import type { ModelData } from "./types.ts";
 
 function withTempDir<T>(run: (dataDir: string, generatedDir: string) => T): T {
@@ -105,6 +105,34 @@ test("syncProviderModels writes derived fields to generated only", () => {
     const generated = JSON.parse(readFileSync(join(generatedDir, "mock-model.json"), "utf-8")) as ModelData;
     assert.deepEqual(generated.providers, ["openrouter"]);
     assert.equal(generated.providerConfig?.openrouter?.upstream, "vendor/mock-model");
+  });
+});
+
+test("renameModelFiles moves both halves and keeps the folder", () => {
+  withTempDir((dataDir, generatedDir) => {
+    writeGeneratedModelJson(join(generatedDir, "gemma-3.json"), { providers: ["openrouter"] });
+    writeModelJson(join(dataDir, "gemma-3.json"), { ignored: true });
+
+    const next = renameModelFiles({ modelsDir: dataDir, generatedDir, relativeId: "gemma-3" }, "gemma-3-12b-it");
+    assert.equal(next, "gemma-3-12b-it");
+    assert.throws(() => readFileSync(join(generatedDir, "gemma-3.json")));
+    assert.throws(() => readFileSync(join(dataDir, "gemma-3.json")));
+    assert.deepEqual(JSON.parse(readFileSync(join(generatedDir, "gemma-3-12b-it.json"), "utf-8")).providers, ["openrouter"]);
+    assert.deepEqual(JSON.parse(readFileSync(join(dataDir, "gemma-3-12b-it.json"), "utf-8")), { ignored: true });
+  });
+});
+
+test("renameModelFiles keeps the folder and refuses to clobber", () => {
+  withTempDir((dataDir, generatedDir) => {
+    writeGeneratedModelJson(join(generatedDir, "vendor/old.json"), { providers: ["openrouter"] });
+    writeGeneratedModelJson(join(generatedDir, "vendor/new.json"), { providers: ["kiro"] });
+
+    const next = renameModelFiles({ modelsDir: dataDir, generatedDir, relativeId: "vendor/old" }, "new");
+    assert.equal(next, "vendor/old");
+    assert.deepEqual(JSON.parse(readFileSync(join(generatedDir, "vendor/new.json"), "utf-8")).providers, ["kiro"]);
+
+    const moved = renameModelFiles({ modelsDir: dataDir, generatedDir, relativeId: "vendor/old" }, "renamed");
+    assert.equal(moved, "vendor/renamed");
   });
 });
 
