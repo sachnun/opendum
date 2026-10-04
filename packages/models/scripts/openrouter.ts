@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+import { isDirectRun, runSourceCli } from "./cli.js";
+import type { ModelSource } from "./source.js";
+
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildModelIdMap, syncProviderModels } from "#models/registry.ts";
@@ -118,7 +121,7 @@ async function fetchOpenRouterFreeModelIds() {
     : new Error("Failed to fetch OpenRouter free model list");
 }
 
-async function main() {
+async function run() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
   const modelsDir = resolve(scriptDir, "../data");
 
@@ -134,7 +137,7 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
-});
+
+export const source: ModelSource = { name: "openrouter", run };
+
+if (isDirectRun(import.meta.url)) runSourceCli(source);

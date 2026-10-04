@@ -1,5 +1,8 @@
 #!/usr/bin/env -S npx tsx
 
+import { isDirectRun, runSourceCli } from "./cli.js";
+import type { ModelSource } from "./source.js";
+
 /**
  * Enrich the local model registry with external metadata and normalize file
  * placement.
@@ -231,7 +234,7 @@ function relocateRootFiles(dryRun: boolean): string[] {
   return moved;
 }
 
-async function main(): Promise<void> {
+async function run(): Promise<void> {
   const dryRun = process.argv.includes("--dry-run");
   const verbose = process.argv.includes("--verbose") || process.argv.includes("-v");
 
@@ -318,7 +321,7 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error: unknown) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
-});
+
+export const source: ModelSource = { name: "enrich", order: 1, run };
+
+if (isDirectRun(import.meta.url)) runSourceCli(source);

@@ -16,10 +16,11 @@
   },
   "scripts": {
     "refresh": "tsx ./scripts/models.ts",
-    "test": "tsx --test ./src/*.test.ts",
+    "test": "tsx --test \"./src/**/*.test.ts\" \"./scripts/**/*.test.ts\"",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@opendum/extension": "workspace:*",
     "fuzzball": "^2.2.6"
   },
   "devDependencies": {

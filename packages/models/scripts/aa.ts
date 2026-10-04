@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+import { isDirectRun, runSourceCli } from "./cli.js";
+import type { ModelSource } from "./source.js";
+
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -14,7 +17,7 @@ const LEADERBOARD_URL = "https://artificialanalysis.ai/leaderboards/models";
 const USER_AGENT = "Mozilla/5.0 (compatible; opendum-model-sync)";
 const MIN_EXPECTED_MODELS = 100;
 
-async function main(): Promise<void> {
+async function run(): Promise<void> {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
   const modelsDir = resolve(scriptDir, "../data");
   const dryRun = process.argv.includes("--dry-run");
@@ -83,7 +86,7 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error: unknown) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
-});
+
+export const source: ModelSource = { name: "aa", order: 1, run };
+
+if (isDirectRun(import.meta.url)) runSourceCli(source);

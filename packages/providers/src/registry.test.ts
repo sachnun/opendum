@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { ProviderRegistry } from "./registry.js";
 import type { Registry } from "@opendum/models/runtime";
+import { ProviderRegistry } from "./registry.js";
+import { discoverProviderExtensions } from "./extension/index.js";
 
 const EXPECTED = [
   "antigravity",
@@ -21,10 +22,11 @@ const EXPECTED = [
 ];
 
 describe("provider registry", () => {
-  it("registers every expected provider", () => {
+  it("registers every expected provider", async () => {
     const registry = new ProviderRegistry({
       models: {} as Registry,
       fallback: null,
+      extensions: await discoverProviderExtensions(),
     });
     const names = registry.names();
     for (const name of EXPECTED) {
@@ -33,8 +35,12 @@ describe("provider registry", () => {
     assert.equal(names.length, EXPECTED.length);
   });
 
-  it("reports credential refreshers", () => {
-    const registry = new ProviderRegistry({ models: {} as Registry, fallback: null });
+  it("reports credential refreshers", async () => {
+    const registry = new ProviderRegistry({
+      models: {} as Registry,
+      fallback: null,
+      extensions: await discoverProviderExtensions(),
+    });
     const refreshable = registry.refreshableProviderNames();
     for (const name of ["antigravity", "cline", "codex", "kiro", "perch", "workbuddy"]) {
       assert.ok(refreshable.includes(name), `missing refresher: ${name}`);

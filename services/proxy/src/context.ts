@@ -6,6 +6,9 @@ import { resolveModelsDir } from "@opendum/models";
 import { Registry as ModelRegistry } from "@opendum/models/runtime";
 import { UnroxyEgress, assertPublicHost, createGuardedFetch, type GuardedFetch } from "@opendum/egress";
 import { ProviderRegistry, RedisFallbackRouter, type EgressFetch } from "@opendum/providers";
+import { discoverProviderExtensions } from "@opendum/providers/extension";
+import { registerQuotaProviders } from "@opendum/quota";
+import { discoverQuotaProviders } from "@opendum/quota/extension";
 import { db } from "@opendum/database";
 import type { ProxyConfig } from "./config.js";
 import { ProxyService } from "./core/service.js";
@@ -82,9 +85,12 @@ export async function createContext(config: ProxyConfig): Promise<ProxyContext> 
     fallback: new RedisFallbackRouter(redis),
     redis,
     directFetch,
+    extensions: await discoverProviderExtensions(),
   });
   const egressFetch: EgressFetch = (url, init) => egress.fetch(url, init);
   providers.setEgress(egressFetch, true);
+
+  registerQuotaProviders(await discoverQuotaProviders());
 
   const service = new ProxyService({
     database: db,

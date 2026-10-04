@@ -334,8 +334,23 @@ importers:
         specifier: ^6.0.3
         version: 6.0.3
 
+  packages/extension:
+    devDependencies:
+      '@types/node':
+        specifier: ^26.1.1
+        version: 26.5.1
+      tsx:
+        specifier: ^4.23.13
+        version: 4.23.13
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+
   packages/models:
     dependencies:
+      '@opendum/extension':
+        specifier: workspace:*
+        version: link:../extension
       fuzzball:
         specifier: ^2.2.6
         version: 2.2.6
@@ -361,6 +376,9 @@ importers:
       '@opendum/egress':
         specifier: workspace:*
         version: link:../egress
+      '@opendum/extension':
+        specifier: workspace:*
+        version: link:../extension
       '@opendum/models':
         specifier: workspace:*
         version: link:../models
@@ -379,6 +397,10 @@ importers:
         version: 6.0.3
 
   packages/quota:
+    dependencies:
+      '@opendum/extension':
+        specifier: workspace:*
+        version: link:../extension
     devDependencies:
       '@types/node':
         specifier: ^26.1.1

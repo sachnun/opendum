@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+import { isDirectRun, runSourceCli } from "./cli.js";
+import type { ModelSource } from "./source.js";
+
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
@@ -153,7 +156,7 @@ function enforceHouseIgnored(modelsDir) {
   return changed;
 }
 
-async function main() {
+async function run() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
   const modelsDir = resolve(scriptDir, "../data");
 
@@ -173,7 +176,7 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
-});
+
+export const source: ModelSource = { name: "workbuddy", run };
+
+if (isDirectRun(import.meta.url)) runSourceCli(source);

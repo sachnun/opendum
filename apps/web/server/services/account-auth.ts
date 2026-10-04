@@ -3,20 +3,12 @@ import { z } from "zod";
 
 import { db, providerAccount } from "@opendum/database";
 import { encrypt } from "~~/server/lib/encryption";
-import { antigravityProvider } from "~~/server/lib/providers/antigravity";
-import { CLIENT_ID as antigravityClientId, REDIRECT_URI as antigravityRedirectUri, SCOPES as antigravityScopes } from "~~/server/lib/providers/antigravity/constants";
-import { AUTHORIZE_ENDPOINT as codexAuthorizeEndpoint, BROWSER_REDIRECT_URI as codexBrowserRedirectUri, CLIENT_ID as codexClientId, ORIGINATOR as codexOriginator, SCOPE as codexScope, buildOAuthResultFromChatGPTSession, codexProvider, generateCodeChallenge as generateCodexCodeChallenge, generateCodeVerifier as generateCodexCodeVerifier, initiateCodexDeviceCodeFlow, pollCodexDeviceCodeAuthorization } from "~~/server/lib/providers/codex";
-import { BROWSER_REDIRECT_URI as kiroBrowserRedirectUri, buildKiroAuthUrl, generateCodeVerifier as generateKiroCodeVerifier, kiroProvider } from "~~/server/lib/providers/kiro";
-import { initiateWorkbuddyDeviceCodeFlow, pollWorkbuddyDeviceCodeAuthorization } from "~~/server/lib/providers/workbuddy";
-import { exchangePerchOAuthCode, initiatePerchOAuth } from "~~/server/lib/providers/perch";
-import { initiateClineDeviceCodeFlow, pollClineDeviceCodeAuthorization } from "~~/server/lib/providers/cline";
 import { clearRefreshFailCount } from "~~/server/lib/proxy/auth";
 import type { OAuthResult } from "~~/server/lib/providers/types";
+import { PROVIDER_CONNECTORS, type AccountConnector } from "~~/server/lib/providers";
 import { DEVICE_PROVIDER_KEYS, OAUTH_PROVIDER_KEYS, type DeviceProviderKey, type OAuthProviderKey } from "~~/lib/provider-accounts";
 import type { ActionResult } from "~~/server/utils/api";
 import { trackProviderEmail } from "./points";
-
-const GOOGLE_OAUTH_AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 
 export const getAuthUrlInputSchema = z.object({ provider: z.enum([...OAUTH_PROVIDER_KEYS]) });
 export const exchangeOAuthInputSchema = z.object({ provider: z.enum([...OAUTH_PROVIDER_KEYS]), callbackUrl: z.string(), state: z.string().nullable().optional(), codeVerifier: z.string().nullable().optional() });
@@ -25,121 +17,11 @@ export const pollDeviceAuthInputSchema = z.object({ provider: z.enum([...DEVICE_
 export const connectCodexSessionInputSchema = z.object({ sessionJson: z.string().min(1, "Session JSON is required") });
 
 type ProviderAccountKey = OAuthProviderKey | DeviceProviderKey;
-type AuthUrlResult = { authUrl: string; state: string | null; codeVerifier: string | null };
 type OAuthAccountOptions = {
   email?: string;
   accountId?: string | null;
   dedupeByAccountId?: boolean;
 };
-
-const GOOGLE_OAUTH_CONFIG = {
-  antigravity: { clientId: antigravityClientId, redirectUri: antigravityRedirectUri, scopes: antigravityScopes },
-};
-
-function generateOAuthState(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
-  return Buffer.from(bytes).toString("base64url");
-}
-
-function buildGoogleOAuthUrl(): string {
-  const config = GOOGLE_OAUTH_CONFIG.antigravity;
-  const params = new URLSearchParams({ client_id: config.clientId, redirect_uri: config.redirectUri, response_type: "code", scope: config.scopes.join(" "), access_type: "offline", prompt: "consent" });
-  return `${GOOGLE_OAUTH_AUTHORIZE_URL}?${params.toString()}`;
-}
-
-async function buildCodexOAuthUrl(state: string) {
-  const codeVerifier = generateCodexCodeVerifier();
-  const codeChallenge = await generateCodexCodeChallenge(codeVerifier);
-  const params = new URLSearchParams({ response_type: "code", client_id: codexClientId, redirect_uri: codexBrowserRedirectUri, scope: codexScope, code_challenge: codeChallenge, code_challenge_method: "S256", id_token_add_organizations: "true", codex_cli_simplified_flow: "true", state, originator: codexOriginator });
-  return { authUrl: `${codexAuthorizeEndpoint}?${params.toString()}`, state, codeVerifier };
-}
-
-async function buildKiroOAuthUrl(state: string) {
-  const codeVerifier = generateKiroCodeVerifier();
-  return { authUrl: await buildKiroAuthUrl(state, codeVerifier), state, codeVerifier };
-}
-
-const OAUTH_PROVIDERS: Record<OAuthProviderKey, {
-  label: string;
-  accountIdPrefix?: string;
-  requiresCodeVerifier?: boolean;
-  buildAuthUrl: () => Promise<AuthUrlResult>;
-  exchangeCode: (code: string, codeVerifier?: string | null) => Promise<OAuthResult>;
-}> = {
-  antigravity: {
-    label: "Antigravity",
-    buildAuthUrl: async () => ({ authUrl: buildGoogleOAuthUrl(), state: null, codeVerifier: null }),
-    exchangeCode: (code) => antigravityProvider.exchangeCode(code, antigravityRedirectUri),
-  },
-  codex: {
-    label: "Codex",
-    accountIdPrefix: "codex",
-    requiresCodeVerifier: true,
-    buildAuthUrl: () => buildCodexOAuthUrl(generateOAuthState()),
-    exchangeCode: (code, codeVerifier) => codexProvider.exchangeCode(code, codexBrowserRedirectUri, codeVerifier ?? undefined),
-  },
-  kiro: {
-    label: "Kiro",
-    accountIdPrefix: "kiro",
-    requiresCodeVerifier: true,
-    buildAuthUrl: () => buildKiroOAuthUrl(generateOAuthState()),
-    exchangeCode: (code, codeVerifier) => kiroProvider.exchangeCode(code, kiroBrowserRedirectUri, codeVerifier ?? undefined),
-  },
-  perch: {
-    label: "Perch",
-    requiresCodeVerifier: true,
-    buildAuthUrl: async () => {
-      const result = await initiatePerchOAuth();
-      return { authUrl: result.authUrl, state: null, codeVerifier: result.codeVerifier };
-    },
-    exchangeCode: (code, codeVerifier) => exchangePerchOAuthCode(code, codeVerifier ?? ""),
-  },
-};
-
-const DEVICE_PROVIDERS = {
-  codex: {
-    label: "Codex",
-    emailPrefix: "codex",
-    initiate: initiateCodexDeviceCodeFlow,
-    poll: (input: z.infer<typeof pollDeviceAuthInputSchema>) => pollCodexDeviceCodeAuthorization(input.deviceCode, input.userCode ?? ""),
-  },
-  workbuddy: {
-    label: "WorkBuddy",
-    emailPrefix: "workbuddy",
-    initiate: async () => {
-      const result = await initiateWorkbuddyDeviceCodeFlow();
-      return {
-        deviceCode: result.deviceCode,
-        userCode: result.userCode,
-        verificationUrl: result.verificationUrl,
-        verificationUrlComplete: result.verificationUrlComplete,
-        expiresIn: result.expiresIn,
-        interval: result.interval,
-      };
-    },
-    poll: async (input: z.infer<typeof pollDeviceAuthInputSchema>) => {
-      return pollWorkbuddyDeviceCodeAuthorization(input.deviceCode);
-    },
-  },
-  cline: {
-    label: "Cline",
-    emailPrefix: "cline",
-    initiate: async () => {
-      const result = await initiateClineDeviceCodeFlow();
-      return {
-        deviceCode: result.deviceCode,
-        userCode: result.userCode,
-        verificationUrl: result.verificationUrl,
-        verificationUrlComplete: result.verificationUrlComplete,
-        expiresIn: result.expiresIn,
-        interval: result.interval,
-      };
-    },
-    poll: async (input: z.infer<typeof pollDeviceAuthInputSchema>) => {
-      return pollClineDeviceCodeAuthorization(input.deviceCode);
-    },
-  },
-} satisfies Record<DeviceProviderKey, { label: string; emailPrefix: string; initiate: (input: z.infer<typeof initiateDeviceAuthInputSchema>) => Promise<unknown>; poll: (input: z.infer<typeof pollDeviceAuthInputSchema>) => Promise<unknown> }>;
 
 function parseOAuthCallbackUrl(callbackUrl: string, providerLabel: string): ActionResult<{ code: string; state: string | null }> {
   if (!callbackUrl || typeof callbackUrl !== "string") return { success: false, error: "Callback URL is required" };
@@ -186,33 +68,8 @@ async function upsertOAuthAccount(userId: string, provider: ProviderAccountKey, 
   return { success: true, data: { email, isUpdate: false } };
 }
 
-function oauthAccountOptions(provider: OAuthProviderKey, config: (typeof OAUTH_PROVIDERS)[OAuthProviderKey], oauthResult: OAuthResult): OAuthAccountOptions | undefined {
-  if (provider === "codex") {
-    const chatgptAccountId = oauthResult.accountId || null;
-    const workspaceAccountId = oauthResult.workspaceId || chatgptAccountId || null;
-    const isPersonalAccount = !workspaceAccountId || workspaceAccountId === chatgptAccountId;
-    return {
-      email: oauthResult.email && isPersonalAccount ? oauthResult.email : workspaceAccountId ? `codex-${workspaceAccountId}` : `codex-${Date.now()}`,
-      accountId: chatgptAccountId,
-      dedupeByAccountId: !workspaceAccountId || workspaceAccountId === chatgptAccountId,
-    };
-  }
-
-  if (provider === "kiro") {
-    return {
-      email: oauthResult.email || `kiro-${Date.now()}`,
-      accountId: oauthResult.accountId || null,
-      dedupeByAccountId: false,
-    };
-  }
-
-  if (!config.accountIdPrefix) return undefined;
-  const accountId = oauthResult.accountId || null;
-  return { email: accountId ? `${config.accountIdPrefix}-${accountId}` : `${config.accountIdPrefix}-${Date.now()}`, accountId, dedupeByAccountId: true };
-}
-
-function validateOAuthContext(config: (typeof OAUTH_PROVIDERS)[OAuthProviderKey], input: z.infer<typeof exchangeOAuthInputSchema>, parsedState: string | null): ActionResult<void> | null {
-  if (!config.requiresCodeVerifier) return null;
+function validateOAuthContext(connector: AccountConnector, input: z.infer<typeof exchangeOAuthInputSchema>, parsedState: string | null): ActionResult<void> | null {
+  if (!connector.requiresCodeVerifier) return null;
   if (parsedState !== input.state) return { success: false, error: "Invalid OAuth state. Please restart authentication." };
   if (!input.codeVerifier) return { success: false, error: "Missing authentication context. Please restart authentication." };
   return null;
@@ -220,7 +77,9 @@ function validateOAuthContext(config: (typeof OAUTH_PROVIDERS)[OAuthProviderKey]
 
 export async function getAccountAuthUrl(input: z.infer<typeof getAuthUrlInputSchema>) {
   try {
-    return { success: true, data: await OAUTH_PROVIDERS[input.provider].buildAuthUrl() } as const;
+    const connector = PROVIDER_CONNECTORS[input.provider];
+    if (!connector?.buildAuthUrl) throw new Error(`${input.provider} does not support OAuth authorization`);
+    return { success: true, data: await connector.buildAuthUrl() } as const;
   } catch (error) {
     console.error("Failed to build provider auth URL:", error);
     return { success: false, error: error instanceof Error ? error.message : "Failed to build login URL" } as const;
@@ -229,14 +88,15 @@ export async function getAccountAuthUrl(input: z.infer<typeof getAuthUrlInputSch
 
 export async function exchangeOAuthAccount(userId: string, input: z.infer<typeof exchangeOAuthInputSchema>) {
   try {
-    const config = OAUTH_PROVIDERS[input.provider];
-    const parsedUrl = parseOAuthCallbackUrl(input.callbackUrl, config.label);
+    const connector = PROVIDER_CONNECTORS[input.provider];
+    if (!connector?.exchangeCode) throw new Error(`${input.provider} does not support OAuth exchange`);
+    const parsedUrl = parseOAuthCallbackUrl(input.callbackUrl, connector.label);
     if (!parsedUrl.success) return parsedUrl;
-    const invalidContext = validateOAuthContext(config, input, parsedUrl.data.state);
+    const invalidContext = validateOAuthContext(connector, input, parsedUrl.data.state);
     if (invalidContext) return invalidContext;
 
-    const oauthResult = await config.exchangeCode(parsedUrl.data.code, input.codeVerifier);
-    return await upsertOAuthAccount(userId, input.provider, config.label, oauthResult, oauthAccountOptions(input.provider, config, oauthResult));
+    const oauthResult = await connector.exchangeCode(parsedUrl.data.code, input.codeVerifier);
+    return await upsertOAuthAccount(userId, input.provider, connector.label, oauthResult, connector.accountOptions?.(oauthResult));
   } catch (error) {
     console.error("Failed to exchange provider OAuth code:", error);
     return { success: false, error: error instanceof Error ? error.message : "Failed to connect account" } as const;
@@ -245,8 +105,10 @@ export async function exchangeOAuthAccount(userId: string, input: z.infer<typeof
 
 export async function connectCodexSessionAccount(userId: string, input: z.infer<typeof connectCodexSessionInputSchema>) {
   try {
-    const oauthResult = buildOAuthResultFromChatGPTSession(input.sessionJson);
-    return await upsertOAuthAccount(userId, "codex", "Codex", oauthResult, oauthAccountOptions("codex", OAUTH_PROVIDERS.codex, oauthResult));
+    const connector = PROVIDER_CONNECTORS.codex;
+    if (!connector?.connectSession) throw new Error("Codex session connection is not available");
+    const oauthResult = connector.connectSession(input.sessionJson);
+    return await upsertOAuthAccount(userId, "codex", connector.label, oauthResult, connector.accountOptions?.(oauthResult));
   } catch (error) {
     console.error("Failed to connect Codex ChatGPT session:", error);
     return { success: false, error: error instanceof Error ? error.message : "Failed to connect account" } as const;
@@ -255,8 +117,9 @@ export async function connectCodexSessionAccount(userId: string, input: z.infer<
 
 export async function initiateDeviceAuth(input: z.infer<typeof initiateDeviceAuthInputSchema>) {
   try {
-    const result = await DEVICE_PROVIDERS[input.provider].initiate();
-    return { success: true, data: result } as const;
+    const connector = PROVIDER_CONNECTORS[input.provider];
+    if (!connector?.device) throw new Error(`${input.provider} does not support device authorization`);
+    return { success: true, data: await connector.device.initiate() } as const;
   } catch (error) {
     console.error("Failed to initiate provider device auth:", error);
     return { success: false, error: error instanceof Error ? error.message : "Failed to start device login" } as const;
@@ -265,14 +128,14 @@ export async function initiateDeviceAuth(input: z.infer<typeof initiateDeviceAut
 
 export async function pollDeviceAuth(userId: string, input: z.infer<typeof pollDeviceAuthInputSchema>) {
   try {
-    const config = DEVICE_PROVIDERS[input.provider];
-    const result = await config.poll(input);
+    const connector = PROVIDER_CONNECTORS[input.provider];
+    if (!connector?.device) throw new Error(`${input.provider} does not support device authorization`);
+    const result = await connector.device.poll(input);
     if ("pending" in result) return { success: true, data: { status: "pending" as const, retryAfterSeconds: "retryAfterSeconds" in result ? result.retryAfterSeconds : undefined } } as const;
     if ("error" in result) return { success: true, data: { status: "error" as const, message: result.error } } as const;
 
-    const provider = input.provider;
-    const email = result.email || `${config.emailPrefix}-${Date.now()}`;
-    const saved = await upsertOAuthAccount(userId, provider, config.label, result, provider === "codex" ? oauthAccountOptions(provider, OAUTH_PROVIDERS.codex, result) : { email });
+    const email = result.email || `${connector.device.emailPrefix}-${Date.now()}`;
+    const saved = await upsertOAuthAccount(userId, input.provider, connector.label, result, connector.accountOptions?.(result) ?? { email });
     if (!saved.success) return saved;
     return { success: true, data: { status: "success" as const, ...saved.data } } as const;
   } catch (error) {

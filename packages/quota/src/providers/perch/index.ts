@@ -1,25 +1,18 @@
-import { getQuotaJson, putQuotaCache } from "./cache.js";
-import {
-  baseQuotaInfo,
-  clampFraction,
-  displayNumber,
-  errorQuotaInfo,
-  expiredQuotaInfo,
-  formatFloat,
-  formatTimeUntilResetIso,
-  parseQuotaNumber,
-  parseQuotaRecord,
-  parseResetIso,
-} from "./helpers.js";
-import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay } from "./types.js";
+import { getQuotaJson, putQuotaCache } from "../../cache.js";
+import { baseQuotaInfo, clampFraction, displayNumber, errorQuotaInfo, expiredQuotaInfo, formatFloat, formatTimeUntilResetIso, parseQuotaNumber, parseQuotaRecord, parseResetIso } from "../../helpers.js";
+import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay, QuotaProvider } from "../../types.js";
+import type { Json } from "../common.js";
 
-type Json = Record<string, unknown>;
+export const provider: QuotaProvider = {
+  name: "perch",
+  fetch: (ctx, account, token, forceRefresh) => fetchPerchQuota(ctx, account, token, forceRefresh),
+};
 
 const PERCH_ACCOUNT_URL = "https://app.perchai.app/api/perchai/account";
 const PERCH_MONTHLY_PT_FALLBACK = 20000;
 const PERCH_PT_PER_USD = 1000;
 
-export async function fetchPerchQuota(
+async function fetchPerchQuota(
   ctx: QuotaContext,
   account: QuotaAccount,
   accessToken: string,

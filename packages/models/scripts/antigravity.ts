@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+import { isDirectRun, runSourceCli } from "./cli.js";
+import type { ModelSource } from "./source.js";
+
 /**
  * Antigravity refresh script.
  *
@@ -516,7 +519,7 @@ async function syncUserAgent(dryRun) {
   }
 }
 
-async function main() {
+async function run() {
   const dryRun = process.argv.includes("--dry-run");
   const verbose = process.argv.includes("--verbose") || process.argv.includes("-v");
 
@@ -594,7 +597,7 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
-});
+
+export const source: ModelSource = { name: "antigravity", run };
+
+if (isDirectRun(import.meta.url)) runSourceCli(source);

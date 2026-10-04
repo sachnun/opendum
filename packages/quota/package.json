@@ -5,11 +5,15 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./extension": "./src/extension.ts",
     "./types": "./src/types.ts"
   },
   "scripts": {
     "test": "tsx --test ./src/*.test.ts",
     "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@opendum/extension": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",

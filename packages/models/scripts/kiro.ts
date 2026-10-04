@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+import { isDirectRun, runSourceCli } from "./cli.js";
+import type { ModelSource } from "./source.js";
+
 /**
  * Kiro model discovery script.
  *
@@ -353,7 +356,7 @@ function toCanonical(kiroModelId) {
   return { key, upstream: kiroModelId };
 }
 
-async function main() {
+async function run() {
   const dryRun = process.argv.includes("--dry-run");
   const verbose =
     process.argv.includes("--verbose") || process.argv.includes("-v");
@@ -490,7 +493,7 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
-});
+
+export const source: ModelSource = { name: "kiro", run };
+
+if (isDirectRun(import.meta.url)) runSourceCli(source);

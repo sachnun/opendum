@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+import { isDirectRun, runSourceCli } from "./cli.js";
+import type { ModelSource } from "./source.js";
+
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -190,7 +193,7 @@ function buildProviderConfigByModel(modelMap, endpointByModelId) {
   return configByModel;
 }
 
-async function main() {
+async function run() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
   const modelsDir = resolve(scriptDir, "../data");
 
@@ -214,7 +217,7 @@ async function main() {
   });
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
-});
+
+export const source: ModelSource = { name: "opencode", run };
+
+if (isDirectRun(import.meta.url)) runSourceCli(source);

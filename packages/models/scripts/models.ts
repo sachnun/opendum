@@ -1,31 +1,13 @@
 #!/usr/bin/env node
 
-import { readFileSync, readdirSync, writeFileSync } from "node:fs";
-import { spawn } from "node:child_process";
-import { basename, dirname, join, resolve } from "node:path";
+import { writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildModelIndex, pruneDeadModelEntries } from "#models/registry.ts";
+import { discoverSources, orderSources } from "./runner.js";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const modelsDir = resolve(scriptDir, "../data");
-const SELF = basename(fileURLToPath(import.meta.url));
-
-const TAIL_SCRIPTS = ["aa.ts", "enrich.ts"];
-
-function refreshScripts(): string[] {
-  return readdirSync(scriptDir, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.endsWith(".ts") && entry.name !== SELF)
-    .map((entry) => entry.name)
-    .filter(
-      (name) =>
-        TAIL_SCRIPTS.includes(name) ||
-        readFileSync(join(scriptDir, name), "utf-8").includes("syncProviderModels("),
-    )
-    .sort((left, right) => {
-      const rank = Number(TAIL_SCRIPTS.includes(left)) - Number(TAIL_SCRIPTS.includes(right));
-      return rank !== 0 ? rank : left.localeCompare(right);
-    });
-}
 
 function refreshedProviders(): string[] {
   const providers = new Set<string>();
@@ -33,30 +15,6 @@ function refreshedProviders(): string[] {
     for (const provider of entry.data.providers ?? []) providers.add(provider);
   }
   return [...providers].sort();
-}
-
-function runScript(scriptName: string): Promise<void> {
-  const scriptPath = resolve(scriptDir, scriptName);
-  return new Promise((resolvePromise, rejectPromise) => {
-    const child = spawn(process.execPath, ["--import", "tsx", scriptPath], {
-      stdio: "inherit",
-    });
-
-    child.on("error", rejectPromise);
-    child.on("close", (code, signal) => {
-      if (signal) {
-        rejectPromise(new Error(`${scriptName} exited with signal ${signal}`));
-        return;
-      }
-
-      if (typeof code === "number" && code !== 0) {
-        rejectPromise(new Error(`${scriptName} exited with code ${code}`));
-        return;
-      }
-
-      resolvePromise();
-    });
-  });
 }
 
 function snapshotProviderModels(before: string[]) {
@@ -98,33 +56,32 @@ function generateSummary(before: Map<string, Set<string>>, after: Map<string, Se
   if (added.length) {
     const lines = added
       .sort((a, b) => a.model.localeCompare(b.model))
-      .map((e) => `+ ${e.model} (${e.provider})`);
+      .map((entry) => `+ ${entry.model} (${entry.provider})`);
     sections.push(`Added ${added.length} model${added.length === 1 ? "" : "s"}\n${lines.join("\n")}`);
   }
 
   if (removed.length) {
     const lines = removed
       .sort((a, b) => a.model.localeCompare(b.model))
-      .map((e) => `- ${e.model} (${e.provider})`);
+      .map((entry) => `- ${entry.model} (${entry.provider})`);
     sections.push(`Removed ${removed.length} model${removed.length === 1 ? "" : "s"}\n${lines.join("\n")}`);
   }
 
-  return sections.length > 0 ? sections.join("\n\n") + "\n" : "";
+  return sections.length > 0 ? `${sections.join("\n\n")}\n` : "";
 }
 
 async function main(): Promise<void> {
   const providers = refreshedProviders();
   const before = snapshotProviderModels(providers);
-
   const failures: string[] = [];
 
-  for (const scriptName of refreshScripts()) {
+  for (const source of orderSources(await discoverSources())) {
     try {
-      await runScript(scriptName);
+      await source.run();
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
       console.error(reason);
-      failures.push(scriptName);
+      failures.push(source.name);
     }
   }
 
