@@ -1,5 +1,5 @@
 import { formatDistanceToNowStrict } from "date-fns";
-import type { ProviderDetailData, QuotaGroupDisplay } from "~~/lib/api-types";
+import type { ProviderDetailData, QuotaGroupDisplay } from "./api-types";
 
 export type ParsedErrorDetails = {
   error: string | null;
