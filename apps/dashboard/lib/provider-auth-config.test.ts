@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { callbackPlaceholder, providerConfigs, providerOptions } from "./provider-auth";
+import { callbackPlaceholder, providerConfigs, providerOptions } from "./provider-auth-config";
 
 describe("add account dialog config", () => {
   it("exposes provider options with configs", () => {

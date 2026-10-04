@@ -31,7 +31,7 @@ import {
   applyRouteSelectorToRequestBody,
   adaptRequestOverridesForEndpoint,
   formatToolArguments,
-} from "../../lib/playground";
+} from "../../lib/playground-protocol";
 import type {
   ReasoningEffort,
   PlaygroundEndpoint,
@@ -41,7 +41,7 @@ import type {
   ParsedCompletionData,
   ResponseMetrics,
   PlaygroundSettings,
-} from "../../lib/playground";
+} from "../../lib/playground-protocol";
 
 definePageMeta({ middleware: "auth", layout: "dashboard" });
 

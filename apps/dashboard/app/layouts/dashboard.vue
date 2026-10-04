@@ -6,7 +6,7 @@ import {
   isAccountOverviewDelta,
   normalizeModelFamilyCounts,
   type ShellAccountSummary,
-} from "~~/lib/account-summary";
+} from "~~/lib/account-overview";
 
 import type { NavItem, NavSubItem, ProviderAccountIndicator } from "../../lib/navigation";
 import type { AccountOverviewData, AccountOverviewResponse, MeData, PointStatusData } from "../../lib/api-types";

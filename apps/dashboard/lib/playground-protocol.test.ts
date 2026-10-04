@@ -10,7 +10,7 @@ import {
   getErrorMessageFromText,
   normalizeTokenValue,
   parseAdditionalParameters,
-} from "./playground";
+} from "./playground-protocol";
 
 const settings = {
   endpoint: "chat_completions" as const,
