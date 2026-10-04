@@ -116,8 +116,8 @@ export class ProviderRegistry {
     this.providers.set(provider.name, provider);
   }
 
-  setEgress(egress: EgressFetch | null, ready: boolean, rotate: (region?: string) => void): void {
-    this.transport.setEgress(egress, ready, rotate);
+  setEgress(egress: EgressFetch | null, ready: boolean): void {
+    this.transport.setEgress(egress, ready);
   }
 
   egressReady(): boolean {

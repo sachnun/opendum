@@ -2,17 +2,16 @@ import type { FallbackState } from "./fallback.js";
 import { NoFallbackState, shouldUseFallbackEndpoint } from "./fallback.js";
 
 export type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
-export type EgressFetch = (url: string, init?: RequestInit, region?: string) => Promise<Response>;
+export type EgressFetch = (url: string, init?: RequestInit) => Promise<Response>;
 
 export type UpstreamTransport = {
   readonly direct: FetchLike;
   readonly egress: EgressFetch | null;
   egressReady(): boolean;
-  rotate(region?: string): void;
 };
 
 export type MutableTransport = UpstreamTransport & {
-  setEgress(egress: EgressFetch | null, ready: boolean, rotate: (region?: string) => void): void;
+  setEgress(egress: EgressFetch | null, ready: boolean): void;
 };
 
 export type Logger = (message: string, meta?: Record<string, unknown>) => void;
@@ -21,10 +20,9 @@ const EGRESS_MAX_TRIES = 3;
 const EGRESS_FORBIDDEN_TRIES = 2;
 
 export function createTransport(direct: FetchLike): MutableTransport {
-  const state: { egress: EgressFetch | null; ready: boolean; rotate: (region?: string) => void } = {
+  const state: { egress: EgressFetch | null; ready: boolean } = {
     egress: null,
     ready: false,
-    rotate: () => undefined,
   };
 
   return {
@@ -33,11 +31,9 @@ export function createTransport(direct: FetchLike): MutableTransport {
       return state.egress;
     },
     egressReady: () => state.egress !== null && state.ready,
-    rotate: (region?: string) => state.rotate(region),
-    setEgress(egress, ready, rotate) {
+    setEgress(egress, ready) {
       state.egress = egress;
       state.ready = ready;
-      state.rotate = rotate;
     },
   };
 }
@@ -212,12 +208,11 @@ async function postEgressWithRotation(
       throw lastError;
     }
     if (lastResponse) await lastResponse.body?.cancel();
-    options.logger?.("egress rotate", {
+    options.logger?.("egress retry", {
       provider: options.provider,
       attempt: attempt + 1,
       status: lastResponse?.status ?? 0,
     });
-    transport.rotate();
   }
 }
 

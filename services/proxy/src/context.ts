@@ -23,8 +23,6 @@ export type ProxyContext = {
 };
 
 function resolveModelsDirForService(): string {
-  const configured = process.env.MODELS_DIR;
-  if (configured) return configured;
   const candidates = [
     resolve(process.cwd(), "../../packages/models/data"),
     resolve(process.cwd(), "packages/models/data"),
@@ -66,11 +64,11 @@ async function fetchThroughRedirects(
 }
 
 export async function createContext(config: ProxyConfig): Promise<ProxyContext> {
-  const models = ModelRegistry.load(config.modelsDir ?? resolveModelsDirForService());
+  const models = ModelRegistry.load(resolveModelsDirForService());
   const redis = await openRedis(config.redisUrl);
   const auth = new AuthService(models, redis);
 
-  const egress = new UnroxyEgress({ url: config.unroxyUrl, preferred: config.psiphonRegion });
+  const egress = new UnroxyEgress();
   const guard = createGuardedFetch({
     headersTimeout: config.requestTimeoutMs > 0 ? config.requestTimeoutMs : undefined,
   });
@@ -85,13 +83,8 @@ export async function createContext(config: ProxyConfig): Promise<ProxyContext> 
     redis,
     directFetch,
   });
-  const egressFetch: EgressFetch = (url, init, region) =>
-    egress.fetch(url, init as never, region ? { region } : undefined) as unknown as Promise<Response>;
-  providers.setEgress(
-    egressFetch,
-    true,
-    () => undefined
-  );
+  const egressFetch: EgressFetch = (url, init) => egress.fetch(url, init);
+  providers.setEgress(egressFetch, true);
 
   const service = new ProxyService({
     database: db,

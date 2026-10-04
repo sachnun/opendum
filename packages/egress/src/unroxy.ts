@@ -1,63 +1,36 @@
-import { ProxyAgent, fetch as undiciFetch, type RequestInit } from "undici";
-
-export type EgressRequestOptions = {
-  region?: string;
-};
-
-export type EgressFetcher = (
-  input: string | URL,
-  init?: RequestInit,
-  options?: EgressRequestOptions
-) => Promise<Response>;
+export type EgressFetcher = (input: string | URL, init?: RequestInit) => Promise<Response>;
 
 export interface Egress {
-  readonly preferred: string;
+  readonly baseUrl: string;
   fetch: EgressFetcher;
-  dispatcher(region?: string): ProxyAgent;
   close(): Promise<void>;
 }
 
 export type UnroxyEgressOptions = {
-  url: string;
-  preferred: string;
+  baseUrl?: string;
 };
 
+export const DEFAULT_UNROXY_BASE_URL = "https://unroxy.koyeb.app/";
+
+function normalizeBaseUrl(value: string): string {
+  const trimmed = value.trim();
+  if (trimmed === "") return DEFAULT_UNROXY_BASE_URL;
+  return trimmed.endsWith("/") ? trimmed : `${trimmed}/`;
+}
+
 export class UnroxyEgress implements Egress {
-  readonly preferred: string;
-  private readonly baseUrl: URL;
-  private readonly agents = new Map<string, ProxyAgent>();
+  readonly baseUrl: string;
 
-  constructor(options: UnroxyEgressOptions) {
-    this.baseUrl = new URL(options.url);
-    this.preferred = options.preferred.trim().toUpperCase() || "US";
+  constructor(options: UnroxyEgressOptions = {}) {
+    this.baseUrl = normalizeBaseUrl(options.baseUrl ?? DEFAULT_UNROXY_BASE_URL);
   }
 
-  dispatcher(region?: string): ProxyAgent {
-    const key = (region ?? this.preferred).trim().toUpperCase() || this.preferred;
-    const cached = this.agents.get(key);
-    if (cached) return cached;
-    const url = new URL(this.baseUrl);
-    url.username = key.toLowerCase();
-    url.password = "";
-    const agent = new ProxyAgent(url.toString());
-    this.agents.set(key, agent);
-    return agent;
-  }
-
-  fetch(
-    input: string | URL,
-    init: RequestInit = {},
-    options: EgressRequestOptions = {}
-  ): Promise<Response> {
-    return undiciFetch(input, {
-      ...init,
-      dispatcher: this.dispatcher(options.region),
-    }) as unknown as Promise<Response>;
+  fetch(input: string | URL, init?: RequestInit): Promise<Response> {
+    const target = typeof input === "string" ? input : input.toString();
+    return fetch(`${this.baseUrl}${target}`, init);
   }
 
   async close(): Promise<void> {
-    const agents = [...this.agents.values()];
-    this.agents.clear();
-    await Promise.all(agents.map((agent) => agent.close()));
+    return;
   }
 }
