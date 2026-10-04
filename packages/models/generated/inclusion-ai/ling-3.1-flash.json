@@ -24,13 +24,6 @@
     "output": 1.1,
     "cacheRead": 0.075
   },
-  "scores": {
-    "artificialAnalysis": {
-      "index": 41.1,
-      "estimated": false,
-      "version": "4.3"
-    }
-  },
   "providerConfig": {
     "kilo_code": {
       "upstream": "inclusionai/ling-3.1-flash",
