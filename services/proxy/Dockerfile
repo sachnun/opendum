@@ -12,8 +12,6 @@ COPY apps/web/package.json ./apps/web/package.json
 RUN pnpm install --frozen-lockfile --filter @opendum/proxy...
 
 ENV NODE_ENV=production
-ENV HOST=0.0.0.0
-ENV PORT=8000
 
 EXPOSE 8000
 

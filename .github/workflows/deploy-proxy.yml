@@ -92,9 +92,6 @@ jobs:
             --routes "/:8000"
             --checks "8000:http:/health"
             --checks-grace-period "8000=30"
-            --env PORT=8000
-            --env HOST=0.0.0.0
-            --env TOKEN_REFRESH_INTERVAL_SECONDS=600
           )
           if [ "$KOYEB_INSTANCE_TYPE" = "free" ]; then
             SCALE_ARGS=(--min-scale 0 --max-scale 1)

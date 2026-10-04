@@ -1,16 +1,10 @@
 import { z } from "zod";
 
 export const envSchema = z.object({
-  HOST: z.string().min(1).default("0.0.0.0"),
-  PORT: z.coerce.number().int().positive().default(4001),
   DATABASE_URL: z.string().min(1),
   REDIS_URL: z.string().min(1),
   BETTER_AUTH_SECRET: z.string().min(1),
-  MODELS_DIR: z.string().min(1).optional(),
-  UNROXY_URL: z.string().min(1).default("http://127.0.0.1:8080"),
-  PSIPHON_REGION: z.string().min(1).default("US"),
-  REQUEST_TIMEOUT_SECONDS: z.coerce.number().int().nonnegative().default(90),
-  TOKEN_REFRESH_INTERVAL_SECONDS: z.coerce.number().int().nonnegative().default(600),
+  NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 });
 
 export type Env = z.infer<typeof envSchema>;

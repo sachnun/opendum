@@ -5,8 +5,6 @@ import type { ModelInfo, ProviderAccessRule } from "@opendum/models/runtime";
 import { compareModelEntries } from "~~/lib/model-sort";
 
 function resolveModelsDir(): string {
-  const configured = process.env.MODELS_DIR;
-  if (configured) return configured;
   const candidates = [
     resolve(process.cwd(), "../../packages/models/data"),
     resolve(process.cwd(), "../packages/models/data"),
