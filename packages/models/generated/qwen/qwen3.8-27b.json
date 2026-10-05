@@ -2,8 +2,6 @@
   "id": "qwen3.8-27b",
   "providers": [
     "hyper",
-    "kilo_code",
-    "openrouter",
     "workers_ai"
   ],
   "aliases": [
@@ -52,16 +50,6 @@
       "upstream": "qwen3.8-27b",
       "contextWindow": 1000000,
       "maxOutputTokens": 128000
-    },
-    "kilo_code": {
-      "upstream": "qwen/qwen3.8-27b:free",
-      "contextWindow": 1000000,
-      "maxOutputTokens": 131072
-    },
-    "openrouter": {
-      "upstream": "qwen/qwen3.8-27b:free",
-      "contextWindow": 1000000,
-      "maxOutputTokens": 131072
     },
     "workers_ai": {
       "upstream": "@cf/qwen/qwen3.8-27b",
