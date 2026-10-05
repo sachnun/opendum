@@ -1,26 +1,13 @@
 #!/usr/bin/env -S npx tsx
 
-import { isDirectRun, runSourceCli } from "./cli.js";
-import type { ModelSource } from "./source.js";
+import { isDirectRun, runSourceCli } from "./cli.ts";
+import type { ModelSource } from "./source.ts";
 
-/**
- * Enrich the local model registry with external metadata and normalize file
- * placement.
- *
- * Fills `reasoning`, `reasoning_effort`, `modalities`, `limit`, `cost`, and the per-provider
- * `contextWindow` / `maxOutputTokens` by matching local model ids against
- * OpenRouter, models.dev, LiteLLM, and NVIDIA NIM. Also moves root-level model
- * files into their inferred family folder.
- *
- * Runs as the final step of the provider refresh:
- *   pnpm run models:refresh
- */
 
-import { basename, dirname, join, resolve } from "node:path";
-import { existsSync, mkdirSync, renameSync, rmSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { rmSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { inferModelFolder } from "#models/model/families.ts";
 import { buildModelIndex, persistModel, renameModelFiles, resolveGeneratedDir } from "#models/registry/registry.ts";
 import { applyCanonicalMerge, planCanonicalization } from "#models/model/canonicalize.ts";
 import { modelProbes } from "#models/model/probes.ts";
@@ -33,6 +20,7 @@ import {
   type ModelMetadataPatch,
   type Registries,
 } from "#models/model/metadata.ts";
+import { relocateRootFiles } from "./lib/enrich-files.ts";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const modelsDir = resolve(scriptDir, "../data");
@@ -215,25 +203,6 @@ function canonicalizeIds(
   }
 }
 
-function relocateRootFiles(dryRun: boolean): string[] {
-  const index = buildModelIndex(modelsDir);
-  const moved: string[] = [];
-  for (const [fileId, entry] of Object.entries(index)) {
-    if (dirname(entry.path) !== modelsDir) continue;
-    const id = entry.id || fileId;
-    const folder = inferModelFolder(id);
-    if (!folder) continue;
-    const target = join(modelsDir, folder, basename(entry.path));
-    if (existsSync(target)) continue;
-    moved.push(`${id} -> ${folder}/`);
-    if (!dryRun) {
-      mkdirSync(join(modelsDir, folder), { recursive: true });
-      renameSync(entry.path, target);
-    }
-  }
-  return moved;
-}
-
 async function run(): Promise<void> {
   const dryRun = process.argv.includes("--dry-run");
   const verbose = process.argv.includes("--verbose") || process.argv.includes("-v");
@@ -314,7 +283,7 @@ async function run(): Promise<void> {
 
   reportStats(stats, updated.length, dryRun);
 
-  const moved = relocateRootFiles(dryRun);
+  const moved = relocateRootFiles(modelsDir, dryRun);
   if (moved.length > 0) {
     console.log(`[metadata] relocated ${moved.length} model files into family folders${dryRun ? " (dry run)" : ""}:`);
     for (const item of moved) console.log(`  ${item}`);

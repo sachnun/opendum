@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { get, set } from "idb-keyval";
-import { getProviderLabel } from "~~/lib/provider-accounts";
-import type { ModelSearchItem } from "~~/lib/api-types";
+import { getProviderLabel } from "#shared/provider-accounts";
+import type { ModelSearchItem } from "#shared/api";
 import { createIdbStore } from "~/utils/idb";
 
 type ModelListItem = ModelSearchItem;

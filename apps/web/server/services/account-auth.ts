@@ -6,9 +6,9 @@ import { encrypt } from "~~/server/lib/encryption";
 import { clearRefreshFailCount } from "~~/server/lib/proxy/auth";
 import type { OAuthResult } from "~~/server/lib/providers/types";
 import { PROVIDER_CONNECTORS, type AccountConnector } from "~~/server/lib/providers";
-import { DEVICE_PROVIDER_KEYS, OAUTH_PROVIDER_KEYS, type DeviceProviderKey, type OAuthProviderKey } from "~~/lib/provider-accounts";
+import { DEVICE_PROVIDER_KEYS, OAUTH_PROVIDER_KEYS, type DeviceProviderKey, type OAuthProviderKey } from "#shared/provider-accounts";
 import type { ActionResult } from "~~/server/utils/api";
-import { trackProviderEmail } from "./points";
+import { trackProviderEmail } from "./points.ts";
 
 export const getAuthUrlInputSchema = z.object({ provider: z.enum([...OAUTH_PROVIDER_KEYS]) });
 export const exchangeOAuthInputSchema = z.object({ provider: z.enum([...OAUTH_PROVIDER_KEYS]), callbackUrl: z.string(), state: z.string().nullable().optional(), codeVerifier: z.string().nullable().optional() });

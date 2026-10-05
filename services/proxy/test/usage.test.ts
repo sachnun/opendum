@@ -6,7 +6,7 @@ import {
   usageCacheCounts,
   usageFromJson,
   usageObject,
-} from "../src/core/usage.js";
+} from "../src/core/metering/usage.ts";
 
 describe("usageObject", () => {
   it("reads direct and nested usage", () => {

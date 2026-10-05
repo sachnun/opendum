@@ -1,6 +1,6 @@
 import type { Ref } from "vue";
 
-import type { NavItem, NavSubItem } from "~~/lib/navigation";
+import type { NavItem, NavSubItem } from "#shared/navigation";
 
 const HEADER_OFFSET = 112;
 const PENDING_NAV_ANCHOR_KEY = "opendum:pending-nav-anchor";

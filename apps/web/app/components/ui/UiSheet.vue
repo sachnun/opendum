@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { StyleValue } from "vue";
 import { DialogContent, DialogOverlay, DialogPortal, DialogRoot } from "reka-ui";
-import { cn } from "~~/lib/utils";
+import { cn } from "#shared/utils";
 
 type SheetSide = "top" | "right" | "bottom" | "left";
 

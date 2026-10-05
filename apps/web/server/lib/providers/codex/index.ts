@@ -5,9 +5,9 @@ import {
   generateCodeVerifier,
   initiateCodexDeviceCodeFlow,
   pollCodexDeviceCodeAuthorization,
-} from "./client.js";
-import { AUTHORIZE_ENDPOINT, BROWSER_REDIRECT_URI, CLIENT_ID, ORIGINATOR, SCOPE } from "./constants.js";
-import { generateOAuthState, type AccountConnector } from "../connector.js";
+} from "./client.ts";
+import { AUTHORIZE_ENDPOINT, BROWSER_REDIRECT_URI, CLIENT_ID, ORIGINATOR, SCOPE } from "./constants.ts";
+import { generateOAuthState, type AccountConnector } from "../connector.ts";
 
 export {
   buildOAuthResultFromChatGPTSession,
@@ -16,8 +16,8 @@ export {
   generateCodeVerifier,
   initiateCodexDeviceCodeFlow,
   pollCodexDeviceCodeAuthorization,
-} from "./client.js";
-export * from "./constants.js";
+} from "./client.ts";
+export { AUTHORIZE_ENDPOINT, BROWSER_REDIRECT_URI, CLIENT_ID, DEVICE_CODE_ENDPOINT, DEVICE_REDIRECT_URI, DEVICE_TOKEN_ENDPOINT, DEVICE_VERIFICATION_URL, ORIGINATOR, REFRESH_BUFFER_SECONDS, SCOPE, TOKEN_ENDPOINT, CODEX_CHAT_USER_AGENT } from "./constants.ts";
 
 export const connector: AccountConnector = {
   name: "codex",

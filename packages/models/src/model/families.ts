@@ -1,9 +1,3 @@
-/**
- * Model family inference.
- *
- * Maps a model key or data folder to a vendor family name. Shared by the
- * refresh scripts (to choose a folder) and the web (to group models).
- */
 
 export interface FamilyRule {
   test: RegExp;

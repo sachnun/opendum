@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { AccountOverviewData } from "~~/lib/api-types";
+import type { AccountOverviewData } from "#shared/api";
 
 type ProviderOverview = AccountOverviewData["summaries"][string];
 type StatDeltaTone = "positive" | "negative" | "neutral";

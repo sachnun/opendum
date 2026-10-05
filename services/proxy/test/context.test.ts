@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { beforeEach, describe, it, vi } from "vitest";
-import type { ProxyConfig } from "../src/config.js";
+import type { ProxyConfig } from "../src/config.ts";
 
 const mocks = vi.hoisted(() => ({
   openRedis: vi.fn(),
@@ -34,9 +34,9 @@ vi.mock("@opendum/providers/extension", () => ({ discoverProviderExtensions: moc
 vi.mock("@opendum/quota", () => ({ registerQuotaProviders: mocks.registerQuotaProviders }));
 vi.mock("@opendum/quota/extension", () => ({ discoverQuotaProviders: mocks.discoverQuotaProviders }));
 vi.mock("@opendum/database", () => ({ db: mocks.db }));
-vi.mock("../src/core/service.js", () => ({ ProxyService: mocks.proxyService }));
+vi.mock("../src/core/service.ts", () => ({ ProxyService: mocks.proxyService }));
 
-import { createContext, disposeContext } from "../src/context.js";
+import { createContext, disposeContext } from "../src/context.ts";
 
 function config(overrides: Partial<ProxyConfig> = {}): ProxyConfig {
   return {

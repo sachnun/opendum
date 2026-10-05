@@ -1,76 +1,24 @@
 #!/usr/bin/env node
 
-import { isDirectRun, runSourceCli } from "./cli.js";
-import type { ModelSource } from "./source.js";
+import { isDirectRun, runSourceCli } from "./cli.ts";
+import type { ModelSource } from "./source.ts";
 
-/**
- * Kiro model discovery script.
- *
- * Scrapes the official Kiro documentation page (https://kiro.dev/docs/models/)
- * to discover the current list of officially supported models, then syncs
- * them into the JSON model registry.
- *
- * This ensures only models actually listed in the official Kiro docs are
- * registered as Kiro-provided, preventing INVALID_MODEL_ID errors from
- * model IDs that the Kiro API may not accept for all accounts/regions.
- *
- * Usage:
- *   node scripts/kiro.ts
- *   node scripts/kiro.ts --dry-run
- */
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { syncProviderModels } from "#models/registry/registry.ts";
 import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "#models/lib/http.ts";
-import { stripParamInfoKey } from "#models/model/clean-key.ts";
+import { displayNameToKiroId, expandVariants, parseModelsFromHtml, toCanonical } from "./lib/kiro-parse.ts";
 
 const KIRO_DOCS_URL = "https://kiro.dev/docs/models/";
 const PROVIDER_NAME = "kiro";
 
-// Display names to skip: real models carry a version/number, so names like
-// "Auto" (a routing pseudo-model) are filtered out automatically.
 function isIgnoredDisplayName(name) {
   return !/[0-9]/.test(name);
 }
 
-// Tiers that can access premium (paid-only) models on Kiro.
 const PAID_KIRO_TIERS = ["pro", "pro+", "power", "standalone"];
 
-// Models known to have a separate -1m (1M context) variant on the Kiro API.
-// The official docs may only list the base model; we add the -1m variant
-// for models where the Kiro API accepts it.
-const MODELS_WITH_1M_VARIANT = new Set([
-  "claude-opus-4.6",
-  "claude-sonnet-4.6",
-  "claude-sonnet-4.5",
-]);
-
-/**
- * Strip HTML tags and decode common HTML entities.
- * @param {string} html
- * @returns {string}
- */
-function stripHtml(html) {
-  return html
-    .replace(/<sup[^>]*>[\s\S]*?<\/sup>/gi, "")
-    .replace(/<[^>]*>/g, "")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#x27;/g, "'")
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, " ")
-    .trim();
-}
-
-/**
- * Fetch the official Kiro models page and extract model info from the
- * "Quick comparison" HTML table.
- *
- * @returns {Promise<Array<{name: string, contextWindow: string, region: string}>>}
- */
 async function fetchOfficialModels() {
   let lastError = null;
 
@@ -107,145 +55,6 @@ async function fetchOfficialModels() {
     : new Error("Failed to fetch Kiro models page");
 }
 
-/**
- * Parse model data from the HTML of the Kiro models docs page.
- *
- * Looks for the "Quick comparison" table (the one with "Context window"
- * in its header) and extracts model names, context windows, and regions.
- *
- * @param {string} html  Full HTML of kiro.dev/docs/models/
- * @returns {Array<{name: string, contextWindow: string, region: string}>}
- */
-function parseModelsFromHtml(html) {
-  const tables = [];
-  const tableRegex = /<table[^>]*>([\s\S]*?)<\/table>/gi;
-  let tableMatch;
-  while ((tableMatch = tableRegex.exec(html)) !== null) {
-    tables.push(tableMatch[1]);
-  }
-
-  if (tables.length === 0) {
-    throw new Error(
-      "No tables found on Kiro docs page. The page structure may have changed."
-    );
-  }
-
-  // Find the comparison table by its header cells: it must have both a
-  // "Model" column and a context column ("Context window" or "Context").
-  let comparisonTable = null;
-  for (const table of tables) {
-    const candidateRows = parseTableRows(table);
-    if (candidateRows.length === 0) continue;
-
-    const candidateHeader = candidateRows[0].map((h) => h.toLowerCase());
-    const hasModel = candidateHeader.some(
-      (h) => h === "model" || h.includes("model")
-    );
-    const hasContext = candidateHeader.some((h) => h.includes("context"));
-
-    if (hasModel && hasContext) {
-      comparisonTable = table;
-      break;
-    }
-  }
-
-  if (!comparisonTable) {
-    throw new Error(
-      'Could not find "Quick comparison" table on Kiro docs page. ' +
-        "The page structure may have changed."
-    );
-  }
-
-  const rows = parseTableRows(comparisonTable);
-  if (rows.length < 2) {
-    throw new Error("Models table has fewer than 2 rows (header + data).");
-  }
-
-  const header = rows[0].map((h) => h.toLowerCase());
-  const nameIdx = header.findIndex(
-    (h) => h === "model" || h.includes("model")
-  );
-  const ctxIdx = header.findIndex((h) => h.includes("context"));
-  const regionIdx = header.findIndex((h) => h.includes("region"));
-  const freeIdx = header.findIndex((h) => h === "free");
-  const proIdx = header.findIndex((h) => h === "pro");
-  const proPlusIdx = header.findIndex((h) => h === "pro+" || h === "pro plus" || (h.startsWith("pro") && h.includes("+")));
-  const powerIdx = header.findIndex((h) => h === "power");
-
-  if (nameIdx < 0) {
-    throw new Error("Could not find 'Model' column in comparison table.");
-  }
-
-  const models = [];
-  for (let i = 1; i < rows.length; i++) {
-    const row = rows[i];
-    const name = row[nameIdx]?.trim();
-    if (!name) continue;
-
-    const freeCell = freeIdx >= 0 ? (row[freeIdx]?.trim() || "") : "";
-    const proCell = proIdx >= 0 ? (row[proIdx]?.trim() || "") : "";
-    const proPlusCell = proPlusIdx >= 0 ? (row[proPlusIdx]?.trim() || "") : "";
-    const powerCell = powerIdx >= 0 ? (row[powerIdx]?.trim() || "") : "";
-
-    // A model is free-available if the Free column has content (e.g. ✓)
-    const freeAvailable = freeCell.length > 0;
-    // If any paid column has content, the model is available on that tier
-    const paidAvailable = proCell.length > 0 || proPlusCell.length > 0 || powerCell.length > 0;
-
-    models.push({
-      name,
-      contextWindow: ctxIdx >= 0 ? (row[ctxIdx]?.trim() || "") : "",
-      region: regionIdx >= 0 ? (row[regionIdx]?.trim() || "") : "",
-      freeAvailable,
-      paidAvailable,
-    });
-  }
-
-  if (models.length === 0) {
-    throw new Error("No models found in comparison table.");
-  }
-
-  return models;
-}
-
-/**
- * Parse <tr>/<td>/<th> cells from table HTML.
- *
- * @param {string} tableInnerHtml
- * @returns {string[][]}
- */
-function parseTableRows(tableInnerHtml) {
-  const rows = [];
-  const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
-  let rowMatch;
-
-  while ((rowMatch = rowRegex.exec(tableInnerHtml)) !== null) {
-    const cells = [];
-    const cellRegex = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
-    let cellMatch;
-
-    while ((cellMatch = cellRegex.exec(rowMatch[1])) !== null) {
-      cells.push(stripHtml(cellMatch[1]));
-    }
-
-    if (cells.length > 0) {
-      rows.push(cells);
-    }
-  }
-
-  return rows;
-}
-
-/**
- * Discover the official model ID catalog embedded in the Kiro docs bundle.
- *
- * The docs client bundle ships the model list as objects shaped
- * `{"id":"claude-opus-4.6","name":"Claude Opus 4.6","provider":"anthropic",...}`.
- * Reading those `id`s keeps the registry aligned with the published Kiro IDs
- * instead of deriving them from display names.
- *
- * @returns {Promise<Map<string, string>>} display name → Kiro API model ID
- */
 async function fetchDocsCatalog() {
   let html;
   try {
@@ -284,84 +93,11 @@ async function fetchDocsCatalog() {
   return byName;
 }
 
-/**
- * Convert a display name from the Kiro docs to a Kiro API model ID.
- *
- * Prefers the ID published in the docs bundle, then falls back to a generic
- * normalization for models the bundle does not list.
- *
- * @param {string} displayName
- * @param {Map<string, string>} [catalog]
- * @returns {string}
- */
-function displayNameToKiroId(displayName, catalog) {
-  const published = catalog?.get(displayName);
-  if (published) return published;
-
-  let id = displayName.toLowerCase().replace(/\s+/g, "-");
-
-  // Trailing .0 is dropped by the API: "claude-sonnet-4.0" → "claude-sonnet-4"
-  id = id.replace(/\.0(?=-|$)/g, "");
-
-  // MiniMax: "minimax-2.5" → "minimax-m2.5"
-  id = id.replace(/^minimax-(\d)/, "minimax-m$1");
-
-  return id;
-}
-
-/**
- * Generate all Kiro API model IDs for a given base model,
- * including -1m (1M context) variants where applicable.
- *
- * @param {string} kiroId  Base Kiro model ID
- * @returns {string[]}
- */
-function expandVariants(kiroId) {
-  const ids = [kiroId];
-
-  if (MODELS_WITH_1M_VARIANT.has(kiroId)) {
-    ids.push(`${kiroId}-1m`);
-  }
-
-  return ids;
-}
-
-/**
-  * Convert a Kiro API model ID to a canonical JSON model key.
- *
- * Kiro uses dots in version numbers:
- *   "claude-sonnet-4.5"  → "claude-sonnet-4-5"
- *   "deepseek-3.2"       → "deepseek-v3.2"
- *   "minimax-m2.1"       → "minimax-m2.1"   (kept as-is)
- *   "qwen3-coder-next"   → "qwen3-coder-next"
- *
- * @param {string} kiroModelId
- * @returns {{ key: string, upstream: string }}
- */
-function toCanonical(kiroModelId) {
-  let key = kiroModelId;
-
-  // Claude: "claude-sonnet-4.5" → "claude-sonnet-4-5"
-  if (key.startsWith("claude-")) {
-    key = key.replace(/(\d+)\.(\d+)/g, "$1-$2");
-  }
-
-  // DeepSeek: "deepseek-3.2" → "deepseek-v3.2"
-  if (key.startsWith("deepseek-") && /^deepseek-\d/.test(key)) {
-    key = key.replace(/^deepseek-/, "deepseek-v");
-  }
-
-  key = stripParamInfoKey(key).replace(/[^a-z0-9.-]/g, "");
-
-  return { key, upstream: kiroModelId };
-}
-
 async function run() {
   const dryRun = process.argv.includes("--dry-run");
   const verbose =
     process.argv.includes("--verbose") || process.argv.includes("-v");
 
-  // 1. Fetch models from official Kiro docs
   console.log(`[kiro] Fetching models from ${KIRO_DOCS_URL} ...`);
   const officialModels = await fetchOfficialModels();
   console.log(
@@ -371,7 +107,6 @@ async function run() {
   const catalog = await fetchDocsCatalog();
   console.log(`[kiro] Resolved ${catalog.size} published model IDs from the docs bundle.`);
 
-  // 2. Determine which models are paid-only (not available on free tier)
   const paidOnlyDisplayNames = new Set(
     officialModels
       .filter((m) => !isIgnoredDisplayName(m.name) && !m.freeAvailable && m.paidAvailable)
@@ -387,7 +122,6 @@ async function run() {
     console.log();
   }
 
-  // 3. Convert display names to Kiro API model IDs
   const allKiroIds = [];
   for (const model of officialModels) {
     if (isIgnoredDisplayName(model.name)) {
@@ -411,7 +145,6 @@ async function run() {
 
   console.log(`[kiro] Generated ${allKiroIds.length} Kiro API model IDs.`);
 
-  // 4. Build model map: canonical key → Kiro upstream name
   const modelMap = new Map();
   for (const kiroId of allKiroIds) {
     const { key, upstream } = toCanonical(kiroId);
@@ -430,7 +163,6 @@ async function run() {
     console.log();
   }
 
-  // 5. Build per-model provider config with tier restrictions for paid-only models
   const providerConfigByModel = new Map();
   for (const model of officialModels) {
     if (isIgnoredDisplayName(model.name)) continue;
@@ -459,7 +191,6 @@ async function run() {
     return;
   }
 
-  // 6. Sync into JSON files
   const scriptDir = dirname(fileURLToPath(import.meta.url));
   const modelsDir = resolve(scriptDir, "../data");
 

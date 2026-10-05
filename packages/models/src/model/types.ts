@@ -1,9 +1,3 @@
-/**
- * Model registry data shapes.
- *
- * These describe the JSON files under `data/` and the derived index used by
- * the refresh scripts.
- */
 
 interface ModelModalities {
   input: string[];

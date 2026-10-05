@@ -34,38 +34,31 @@ export const providerAccount = pgTable(
     provider: text("provider").notNull(),
     name: text("name").notNull(),
 
-    // Encrypted credentials (AES-256)
     accessToken: text("accessToken").notNull(),
     refreshToken: text("refreshToken").notNull(),
     expiresAt: timestamp("expiresAt").notNull(),
 
-    // Provider-specific fields
     apiKey: text("apiKey"),
     projectId: text("projectId"),
     tier: text("tier"),
     accountId: text("accountId"),
 
-    // Account info
     email: text("email"),
     isActive: boolean("isActive").notNull().default(true),
     disabledUntil: timestamp("disabledUntil"),
 
-    // Usage tracking
     lastUsedAt: timestamp("lastUsedAt"),
     requestCount: integer("requestCount").notNull().default(0),
 
-    // Error tracking
     errorCount: integer("errorCount").notNull().default(0),
     consecutiveErrors: integer("consecutiveErrors").notNull().default(0),
     lastErrorAt: timestamp("lastErrorAt"),
     lastErrorCode: integer("lastErrorCode"),
     lastRecoveredByRotationAt: timestamp("lastRecoveredByRotationAt"),
 
-    // Health status
     status: text("status").notNull().default("active"),
     statusChangedAt: timestamp("statusChangedAt"),
 
-    // Success metrics
     successCount: integer("successCount").notNull().default(0),
     lastSuccessAt: timestamp("lastSuccessAt"),
 
@@ -116,9 +109,6 @@ export const providerAccountModelHealth = pgTable(
     lastSuccessAt: timestamp("lastSuccessAt"),
     unhealthyCountUpdatedAt: timestamp("unhealthyCountUpdatedAt"),
 
-    // Per-model quota lock. A provider can reject one model for billing while
-    // still serving cheaper models on the same account, so the lock is scoped
-    // to the model instead of deactivating the account.
     quotaLockedUntil: timestamp("quotaLockedUntil"),
     quotaLockReason: text("quotaLockReason"),
 

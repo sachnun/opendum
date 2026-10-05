@@ -10,8 +10,8 @@
     "pretest": "pnpm family-ranking",
     "pretest:unit": "pnpm family-ranking",
     "family-ranking": "tsx ./scripts/family-ranking.ts",
-    "test": "tsx --test ./lib/*.test.ts && vitest run",
-    "test:unit": "tsx --test ./lib/*.test.ts",
+    "test": "tsx --test ./shared/*.test.ts ./shared/*/*.test.ts && vitest run",
+    "test:unit": "tsx --test ./shared/*.test.ts ./shared/*/*.test.ts",
     "test:nuxt": "vitest run",
     "lint": "nuxt prepare && eslint .",
     "typecheck": "nuxt prepare && vue-tsc --noEmit -p .nuxt/tsconfig.app.json && vue-tsc --noEmit -p .nuxt/tsconfig.server.json"
@@ -47,6 +47,7 @@
     "@types/node": "catalog:",
     "@vue/test-utils": "^2.5.1",
     "eslint": "catalog:",
+    "eslint-plugin-no-comments": "catalog:",
     "fake-indexeddb": "^6.2.5",
     "happy-dom": "^20.14.5",
     "tailwindcss": "^4.3.2",

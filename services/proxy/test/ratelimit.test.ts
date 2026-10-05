@@ -8,7 +8,7 @@ import {
   checkAndIncrementAPIKeyRateLimit,
   matchRateLimitRule,
   windowBucket,
-} from "../src/core/ratelimit.js";
+} from "../src/core/metering/ratelimit.ts";
 
 function registry(families: Record<string, string> = {}): Registry {
   return { modelFamily: (model: string) => families[model] ?? "" } as unknown as Registry;

@@ -1,4 +1,4 @@
-import type { OAuthResult } from "./types.js";
+import type { OAuthResult } from "./types.ts";
 
 export type AuthUrlResult = {
   authUrl: string;

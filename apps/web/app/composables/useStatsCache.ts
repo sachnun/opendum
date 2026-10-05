@@ -1,6 +1,6 @@
 import { getMany, setMany } from "idb-keyval";
-import type { ProviderStats } from "../../lib/api-types";
-import { createIdbStore } from "../utils/idb";
+import type { ProviderStats } from "#shared/api";
+import { createIdbStore } from "../utils/idb.ts";
 
 type CachedAccountStats = {
   accountId: string;

@@ -6,8 +6,8 @@ import {
   parseRequiredModel,
   parseStreamParam,
   responsesConfig,
-} from "../src/core/endpoints.js";
-import type { ParsedEndpointRequest, RouteError } from "../src/core/types.js";
+} from "../src/core/transport/endpoints.ts";
+import type { ParsedEndpointRequest, RouteError } from "../src/core/types.ts";
 
 type Json = Record<string, unknown>;
 

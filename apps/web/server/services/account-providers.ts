@@ -1,4 +1,4 @@
-import { PROVIDER_ACCOUNT_KEYS, type ProviderAccountKey } from "~~/lib/provider-accounts";
+import { PROVIDER_ACCOUNT_KEYS, type ProviderAccountKey } from "#shared/provider-accounts";
 
 export { PROVIDER_ACCOUNT_KEYS, type ProviderAccountKey };
 

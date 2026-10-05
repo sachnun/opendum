@@ -15,14 +15,14 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@opendum/database/queries", () => mocks.db);
-vi.mock("../src/core/service-health.js", () => mocks.health);
+vi.mock("../src/core/health/service-health.ts", () => mocks.health);
 
 import {
   canAccountUseModel,
   getNextAvailableAccount,
   getNextSharedAccount,
-} from "../src/core/service-accounts.js";
-import type { ProxyDeps } from "../src/core/service-deps.js";
+} from "../src/core/service-accounts.ts";
+import type { ProxyDeps } from "../src/core/service-deps.ts";
 
 function account(overrides: Partial<ProviderAccount> = {}): ProviderAccount {
   return { id: "a1", userId: "u1", provider: "kiro", isActive: true, status: "active", ...overrides };

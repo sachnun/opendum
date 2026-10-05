@@ -5,8 +5,8 @@ import {
   anthropicStream,
   passthroughNonStream,
   passthroughStream,
-} from "../src/core/stream.js";
-import type { ResponseContext, StreamRecorder, UsageCounts } from "../src/core/types.js";
+} from "../src/core/streaming/stream.ts";
+import type { ResponseContext, StreamRecorder, UsageCounts } from "../src/core/types.ts";
 
 function streamOf(chunks: string[]): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();

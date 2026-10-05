@@ -1,6 +1,6 @@
 import { defineHandler, type H3, type H3Event } from "h3";
-import type { ProxyContext } from "../context.js";
-import { jsonResponse } from "./errors.js";
+import type { ProxyContext } from "../context.ts";
+import { jsonResponse } from "./errors.ts";
 
 async function handleModels(event: H3Event, context: ProxyContext): Promise<Response> {
   const authHeader = event.req.headers.get("authorization") ?? event.req.headers.get("x-api-key") ?? "";

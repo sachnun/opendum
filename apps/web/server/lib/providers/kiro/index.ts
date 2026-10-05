@@ -1,9 +1,9 @@
-import { BROWSER_REDIRECT_URI } from "./constants.js";
-import { buildKiroAuthUrl, generateCodeVerifier, kiroProvider } from "./client.js";
-import { generateOAuthState, type AccountConnector } from "../connector.js";
+import { BROWSER_REDIRECT_URI } from "./constants.ts";
+import { buildKiroAuthUrl, generateCodeVerifier, kiroProvider } from "./client.ts";
+import { generateOAuthState, type AccountConnector } from "../connector.ts";
 
-export { kiroProvider, generateCodeVerifier, buildKiroAuthUrl } from "./client.js";
-export * from "./constants.js";
+export { kiroProvider, generateCodeVerifier, buildKiroAuthUrl } from "./client.ts";
+export { AUTHORIZE_ENDPOINT, BROWSER_REDIRECT_URI, IDP, REFRESH_BUFFER_SECONDS, REFRESH_ENDPOINT, TOKEN_ENDPOINT } from "./constants.ts";
 
 export const connector: AccountConnector = {
   name: "kiro",

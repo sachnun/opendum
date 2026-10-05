@@ -14,7 +14,7 @@ import {
   CalendarPrev,
   CalendarRoot,
 } from "reka-ui";
-import { cn } from "~~/lib/utils";
+import { cn } from "#shared/utils";
 
 const props = withDefaults(
   defineProps<{

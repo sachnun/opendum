@@ -3,7 +3,7 @@ import { describe, it } from "vitest";
 import {
   transformAnthropicToOpenAI,
   transformOpenAIToAnthropic,
-} from "../src/core/anthropic-format.js";
+} from "../src/core/streaming/anthropic-format.ts";
 
 type Json = Record<string, unknown>;
 

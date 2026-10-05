@@ -1,6 +1,6 @@
 import { fetchInternalProvider } from "~~/server/lib/proxy/internal-relay";
-import { formatProviderHttpError } from "../provider-http-errors.js";
-import type { OAuthResult } from "../types.js";
+import { formatProviderHttpError } from "../provider-http-errors.ts";
+import type { OAuthResult } from "../types.ts";
 import {
   ACCOUNTS_PATH,
   AUTH_STATE_PATH,
@@ -13,7 +13,7 @@ import {
   WORKBUDDY_BASE_URL,
   WORKBUDDY_DOMAIN,
   WORKBUDDY_PLATFORM,
-} from "./constants.js";
+} from "./constants.ts";
 
 interface WorkbuddyStateResponse {
   code?: number;
@@ -194,7 +194,6 @@ async function fetchWorkbuddyIdentity(accessToken: string, state: string): Promi
       }
     }
   } catch {
-    // Fall through to the accounts snapshot.
   }
 
   const fallback = await fetchWorkbuddyAccounts(accessToken, "");

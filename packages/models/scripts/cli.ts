@@ -1,5 +1,5 @@
 import { pathToFileURL } from "node:url";
-import type { ModelSource } from "./source.js";
+import type { ModelSource } from "./source.ts";
 
 export function isDirectRun(metaUrl: string): boolean {
   const entry = process.argv[1];

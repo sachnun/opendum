@@ -6,7 +6,7 @@ import { stripParamInfoKey } from "@opendum/models/clean-key";
 import { buildModelIdMap } from "@opendum/models/registry";
 import { decrypt, encrypt, hashString } from "~~/server/lib/encryption";
 import { fetchInternalProvider, InternalRelayNotConfiguredError } from "~~/server/lib/proxy/internal-relay";
-import { PROVIDER_ACCOUNT_KEYS } from "./account-providers";
+import { PROVIDER_ACCOUNT_KEYS } from "./account-providers.ts";
 import type { ActionResult } from "~~/server/utils/api";
 
 const SLUG_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/;
@@ -295,12 +295,6 @@ export async function previewCustomModels(input: z.infer<typeof previewCustomMod
   return { success: true, data: { models: cleanCustomModels(fetched.data.ids) } };
 }
 
-/**
- * Derive a cleaned public id from an upstream model id: drop the provider
- * prefix, sanitize separators, then strip parameter info (size, quantization,
- * date, descriptors). Mirrors the generic `toModelKey` used by the provider
- * scripts in `@opendum/models`.
- */
 function toModelKey(upstream: string): string {
   const slashIndex = upstream.indexOf("/");
   const basename = slashIndex === -1 ? upstream : upstream.slice(slashIndex + 1);
@@ -313,11 +307,6 @@ function toModelKey(upstream: string): string {
   return cleaned.endsWith("-free") ? cleaned.slice(0, -"-free".length) : cleaned;
 }
 
-/**
- * Clean an upstream model list into public model ids and keep their kebab/raw
- * aliases. `buildModelIdMap` owns collision handling (newest date variant wins
- * the base key, older ones get a `-<date>` key), matching `@opendum/models`.
- */
 function cleanCustomModels(upstreamIds: string[]): Array<{ modelId: string; upstream: string }> {
   return [...buildModelIdMap(upstreamIds, toModelKey)].map(([modelId, upstream]) => ({ modelId, upstream }));
 }

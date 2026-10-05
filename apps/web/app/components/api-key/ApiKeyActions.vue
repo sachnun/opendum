@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { cn } from "~~/lib/utils";
-import type { ApiKeyListItem } from "~~/lib/api-types";
+import { cn } from "#shared/utils";
+import type { ApiKeyListItem } from "#shared/api";
 
 type ApiKey = ApiKeyListItem;
 

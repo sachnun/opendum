@@ -4,8 +4,8 @@ import { eq } from "drizzle-orm";
 import { ZodError } from "zod";
 import type { z } from "zod";
 
-import { requireSession } from "./session";
-import { roleForEmail, type UserRole } from "./maintainers";
+import { requireSession } from "./session.ts";
+import { roleForEmail, type UserRole } from "./maintainers.ts";
 import { db, user } from "@opendum/database";
 
 export const AUDIT_COOKIE_NAME = "__AuditUser";

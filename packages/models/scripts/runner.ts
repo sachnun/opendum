@@ -1,5 +1,5 @@
 import { discoverModules } from "@opendum/extension";
-import type { ModelSource } from "./source.js";
+import type { ModelSource } from "./source.ts";
 
 const NON_SOURCES = new Set(["models.ts", "runner.ts", "source.ts", "cli.ts"]);
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { PopoverArrow, PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from "reka-ui";
-import { cn } from "~~/lib/utils";
+import { cn } from "#shared/utils";
 
 type PopoverSide = "top" | "right" | "bottom" | "left";
 type PopoverAlign = "start" | "center" | "end";

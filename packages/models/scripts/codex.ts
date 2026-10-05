@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-import { isDirectRun, runSourceCli } from "./cli.js";
-import type { ModelSource } from "./source.js";
+import { isDirectRun, runSourceCli } from "./cli.ts";
+import type { ModelSource } from "./source.ts";
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,16 +11,8 @@ import { sleep, fetchText, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "#models/
 const CODEX_MODELS_URL =
   "https://raw.githubusercontent.com/openai/codex/main/codex-rs/models-manager/models.json";
 
-// Codex's public models feed includes CLI/API variants that are not accepted by
-// the ChatGPT-backed Codex account flow used by this project. Filter by
-// visibility and supported_in_api; models that are still rejected by the
-// ChatGPT Codex backend opt out with `"ignored": true` in their JSON file.
 const CHATGPT_SUPPORTED_VISIBILITY = "list";
 
-// Codex is included on the Free and Go plans with only a low-tier model, while
-// the frontier models require a paid ChatGPT plan. The public models.json feed
-// lists "free" for every model, so it cannot drive tier gating; the plan
-// breakdown comes from the Codex pricing docs instead.
 const CODEX_PRICING_DOCS_URL = "https://learn.chatgpt.com/docs/pricing.md";
 const FREE_PLAN_NAMES = new Set(["Free", "Go"]);
 const PAID_CODEX_TIERS = [
@@ -33,10 +25,6 @@ const PAID_CODEX_TIERS = [
   "student",
 ];
 
-/**
- * Fetch the public models.json from the openai/codex GitHub repo.
- * Returns the parsed array of model entries.
- */
 async function fetchCodexModels() {
   let lastError = null;
 
@@ -73,9 +61,6 @@ async function fetchCodexModels() {
     : new Error("Failed to fetch Codex CLI model list");
 }
 
-/**
- * Filter models that are visible and supported in API.
- */
 function filterModels(models) {
   return models.filter((m) => {
     if (!m.slug || typeof m.slug !== "string") return false;
@@ -85,10 +70,6 @@ function filterModels(models) {
   });
 }
 
-/**
- * Build the modelKey -> upstreamName map.
- * For Codex the slug is already a clean key so modelKey === slug.
- */
 function buildModelMap(models) {
   const map = new Map();
 
@@ -103,11 +84,6 @@ function normalizeModelName(value) {
   return String(value ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "");
 }
 
-/**
- * Fetch the Codex pricing docs and join the model mentions from the Free/Go
- * plan cards. Any Codex model whose name is not mentioned there requires a paid
- * ChatGPT plan.
- */
 async function fetchFreePlanModelNames() {
   const markdown = await fetchText(CODEX_PRICING_DOCS_URL, {
     label: "Codex pricing docs",
@@ -127,13 +103,6 @@ async function fetchFreePlanModelNames() {
   return mentions.join(" ");
 }
 
-/**
- * Build per-model provider config with tier restrictions.
- *
- * Models not advertised on the Free/Go plan get `allowedTiers` restricted to
- * paid plans, which makes the web dim them for free-tier accounts (same pattern
- * as Kiro). If the docs cannot be read, no gating is applied.
- */
 function buildProviderTierConfig(models, freePlanMentions) {
   const providerConfigByModel = new Map();
   if (!freePlanMentions) return providerConfigByModel;
@@ -147,9 +116,6 @@ function buildProviderTierConfig(models, freePlanMentions) {
   return providerConfigByModel;
 }
 
-/**
- * Build a lookup from slug -> models.json entry for enrichment.
- */
 function buildMetadataLookup(models) {
   const lookup = new Map();
   for (const m of models) {
@@ -158,10 +124,6 @@ function buildMetadataLookup(models) {
   return lookup;
 }
 
-/**
- * After syncProviderModels creates bare-bones JSON files for new models,
- * enrich them with metadata from models.json.
- */
 function enrichNewModels(modelsDir, addedKeys, metadataLookup) {
   const index = buildModelIndex(modelsDir);
 

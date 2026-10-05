@@ -21,6 +21,7 @@ minimumReleaseAgeExclude:
 catalog:
   "@types/node": ^26.1.1
   eslint: ^10.7.0
+  eslint-plugin-no-comments: ^1.2.1
   eventsource-parser: ^3.1.0
   p-retry: ^6.2.0
   tsx: ^4.23.13

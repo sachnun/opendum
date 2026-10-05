@@ -10,8 +10,8 @@ import { discoverProviderExtensions } from "@opendum/providers/extension";
 import { registerQuotaProviders } from "@opendum/quota";
 import { discoverQuotaProviders } from "@opendum/quota/extension";
 import { db } from "@opendum/database";
-import type { ProxyConfig } from "./config.js";
-import { ProxyService } from "./core/service.js";
+import type { ProxyConfig } from "./config.ts";
+import { ProxyService } from "./core/service.ts";
 
 export type ProxyContext = {
   config: ProxyConfig;

@@ -1,8 +1,8 @@
 import { and, eq, gte, inArray, sql } from "drizzle-orm";
 
-import { buildDayKeys, buildEmptyModelStats, buildHourKeys, MODEL_DURATION_LOOKBACK_HOURS, MODEL_STATS_DAYS, type ModelStats } from "~~/lib/model-stats";
+import { buildDayKeys, buildEmptyModelStats, buildHourKeys, MODEL_DURATION_LOOKBACK_HOURS, MODEL_STATS_DAYS, type ModelStats } from "#shared/model/stats";
 import { db, usageLog } from "@opendum/database";
-import { getModelLookupKeys, resolveModelAlias } from "./proxy/models";
+import { getModelLookupKeys, resolveModelAlias } from "./proxy/models.ts";
 
 interface RawModelStats {
   totalRequests: number;

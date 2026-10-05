@@ -24,7 +24,7 @@ import {
   reserveRoamingPoint,
   roamingPoints,
   settleRoamingPoint,
-} from "../src/core/points.js";
+} from "../src/core/metering/points.ts";
 import {
   anySlice,
   cloneMap,
@@ -35,15 +35,15 @@ import {
   numberAsInt,
   sleep,
   stringValue,
-} from "../src/core/helpers.js";
-import { stripImageContent } from "../src/core/content.js";
+} from "../src/core/transport/helpers.ts";
+import { stripImageContent } from "../src/core/streaming/content.ts";
 import {
   errorHistoryDedupeKey,
   errorHistoryEntryKey,
   errorHistoryKey,
   errorHistoryTtl,
   upsertErrorHistory,
-} from "../src/core/error-history.js";
+} from "../src/core/health/error-history.ts";
 
 function fakeDatabase(): Database {
   return {

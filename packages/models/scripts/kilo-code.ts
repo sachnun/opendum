@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-import { isDirectRun, runSourceCli } from "./cli.js";
-import type { ModelSource } from "./source.js";
+import { isDirectRun, runSourceCli } from "./cli.ts";
+import type { ModelSource } from "./source.ts";
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,12 +16,10 @@ function toModelKey(modelId) {
     return stripParamInfoKey(modelId.replace("/", "-"));
   }
 
-  // Strip provider prefix (e.g. "minimax/minimax-m2.5:free" → "minimax-m2.5:free")
   const withoutProvider = modelId.includes("/")
     ? modelId.slice(modelId.indexOf("/") + 1)
     : modelId;
 
-  // Drop any trailing parameter suffixes (e.g. ":free", ":optimized:free").
   const withoutParams = withoutProvider.replace(/(?::[a-zA-Z0-9_-]+)+$/, "");
 
   const modelKey = withoutParams

@@ -6,7 +6,7 @@ import { db, disabledModel } from "@opendum/database";
 import { getModelStatsByModel } from "~~/server/lib/model-stats";
 import { getAccountModelAvailability, invalidateDisabledModelsCache, isModelUsableByAccounts, type AccountModelAvailability } from "~~/server/lib/proxy/auth";
 import { MODEL_REGISTRY, getAllModels, getModelFamily, getModelLookupKeys, getProvidersForModel, isModelSupported, resolveModelAlias } from "~~/server/lib/proxy/models";
-import { compareModelEntries } from "~~/lib/model-sort";
+import { compareModelEntries } from "#shared/model/sort";
 
 export const setModelEnabledInputSchema = z.object({ modelId: z.string(), enabled: z.boolean() });
 const statsIdsQuerySchema = z.preprocess((value) => (Array.isArray(value) ? value : value == null ? [] : [value]), z.array(z.string().min(1)).max(50));

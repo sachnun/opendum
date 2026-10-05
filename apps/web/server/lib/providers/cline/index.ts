@@ -1,8 +1,8 @@
-import { initiateClineDeviceCodeFlow, pollClineDeviceCodeAuthorization } from "./client.js";
-import type { AccountConnector } from "../connector.js";
+import { initiateClineDeviceCodeFlow, pollClineDeviceCodeAuthorization } from "./client.ts";
+import type { AccountConnector } from "../connector.ts";
 
-export { initiateClineDeviceCodeFlow, pollClineDeviceCodeAuthorization } from "./client.js";
-export * from "./constants.js";
+export { initiateClineDeviceCodeFlow, pollClineDeviceCodeAuthorization } from "./client.ts";
+export { CLINE_BASE_URL, WORKOS_BASE_URL, CLIENT_ID, DEVICE_AUTHORIZE_PATH, DEVICE_AUTHENTICATE_PATH, CLINE_REGISTER_PATH, DEVICE_CODE_EXPIRY_SECONDS, POLLING_INTERVAL_SECONDS, ACCESS_TOKEN_TTL_SECONDS } from "./constants.ts";
 
 export const connector: AccountConnector = {
   name: "cline",

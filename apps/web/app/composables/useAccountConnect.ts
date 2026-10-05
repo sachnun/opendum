@@ -5,9 +5,9 @@ import {
   providerOptions,
   isDeviceProvider,
   isOAuthProvider,
-} from "~~/lib/provider-auth-config";
-import type { DeviceProviderKey } from "~~/lib/provider-accounts";
-import type { FlowType, MethodKey, Provider, ProviderConfig } from "~~/lib/provider-auth-config";
+} from "#shared/provider-auth-config";
+import type { DeviceProviderKey } from "#shared/provider-accounts";
+import type { FlowType, MethodKey, Provider, ProviderConfig } from "#shared/provider-auth-config";
 
 export function useAccountConnect(
   props: { initialProvider: Provider | null; triggerClass?: string; readonly?: boolean },

@@ -4,10 +4,10 @@ import { clearRefreshFailCount, invalidateDisabledModelsCache } from "~~/server/
 import { decrypt } from "~~/server/lib/encryption";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
-import { isKnownProvider, PROVIDER_ACCOUNT_KEYS } from "./account-providers";
-import { customProviderModels } from "./custom-providers";
-import { trackProviderEmail } from "./points";
-import { buildAccountStats, buildEmptyProviderStats, getProviderSummaryStats, type ProviderAccountIndicator } from "./account-stats";
+import { isKnownProvider, PROVIDER_ACCOUNT_KEYS } from "./account-providers.ts";
+import { customProviderModels } from "./custom-providers.ts";
+import { trackProviderEmail } from "./points.ts";
+import { buildAccountStats, buildEmptyProviderStats, getProviderSummaryStats, type ProviderAccountIndicator } from "./account-stats.ts";
 import {
   ACCOUNT_COOLDOWN_UNHEALTHY_THRESHOLD,
   type AccountHealthAggregate,
@@ -37,10 +37,10 @@ import {
   toTimeMs,
   withEffectiveActive,
   withEffectiveModelHealth,
-} from "./accounts-helpers.js";
+} from "./accounts-helpers.ts";
 export { getProviderModelsForAccountTier };
 
-export { createAccount, createAccountInputSchema } from "./account-connectors";
+export { createAccount, createAccountInputSchema } from "./account-connectors.ts";
 
 const ACCOUNT_COOLDOWN_MS = 10 * 60 * 1000;
 const DEFAULT_ERROR_HISTORY_ROWS = 100;

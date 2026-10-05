@@ -4,7 +4,7 @@ import type { Registry } from "@opendum/models/runtime";
 import type { ProviderRegistry } from "@opendum/providers";
 import type { OpendumRedis, SessionAffinity } from "@opendum/redis";
 
-import type { ProviderPerformance } from "./provider-performance.js";
+import type { ProviderPerformance } from "./health/provider-performance.ts";
 
 export type ProxyDeps = {
   database: Database;

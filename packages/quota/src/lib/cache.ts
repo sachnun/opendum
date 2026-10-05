@@ -79,7 +79,6 @@ export async function getQuotaJson(
         }
       }
     } catch {
-      // fall through to a live request
     }
   }
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ProviderAccountIndicator } from "~~/lib/navigation";
+import type { ProviderAccountIndicator } from "#shared/navigation";
 
 const props = defineProps<{
   accountCount?: number;

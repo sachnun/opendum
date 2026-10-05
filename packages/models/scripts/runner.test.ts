@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { discoverSources, orderSources } from "./runner.js";
+import { discoverSources, orderSources } from "./runner.ts";
 
 const EXPECTED = [
   "aa",

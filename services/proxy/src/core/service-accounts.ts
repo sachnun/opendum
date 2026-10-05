@@ -9,9 +9,9 @@ import {
 import type { ProviderAccount } from "@opendum/providers";
 import { preferSticky } from "@opendum/redis";
 
-import type { ProviderRoutingOptions } from "./provider-performance.js";
-import type { ProxyDeps } from "./service-deps.js";
-import { bumpAccountRequestCountDeferred, refreshAccountHealthFromModels } from "./service-health.js";
+import type { ProviderRoutingOptions } from "./health/provider-performance.ts";
+import type { ProxyDeps } from "./service-deps.ts";
+import { bumpAccountRequestCountDeferred, refreshAccountHealthFromModels } from "./health/service-health.ts";
 import {
   accountAccessDenial,
   isSyntheticProviderAccountId,
@@ -22,7 +22,7 @@ import {
   proxyTierSatisfiesRule,
   quotaFallbackTierLocal,
   sortAccountsByProviderPriority,
-} from "./service-helpers.js";
+} from "./transport/service-helpers.ts";
 
 export function canAccountUseModel(deps: ProxyDeps, account: ProviderAccount, model: string): boolean {
   const rule = deps.models.providerAccessRule(model, account.provider);

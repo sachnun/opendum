@@ -1,6 +1,8 @@
 import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 
+import noComments from "eslint-plugin-no-comments";
+
 export default tseslint.config(
   {
     ignores: [
@@ -27,17 +29,26 @@ export default tseslint.config(
       "prefer-const": "warn",
       "no-useless-assignment": "warn",
       "preserve-caught-error": "warn",
-      "max-lines": ["warn", { max: 500, skipBlankLines: true, skipComments: true }],
+      "max-lines": "warn",
     },
   },
   {
     files: ["**/*.{ts,mts,cts,js,mjs,cjs}"],
-    ignores: ["**/index.ts"],
     rules: {
       "no-restricted-syntax": [
-        "warn",
-        { selector: "ExportAllDeclaration", message: "Prefer explicit named re-exports outside package barrels." },
+        "error",
+        { selector: "ExportAllDeclaration:not([exported])" },
+        { selector: "ImportDeclaration[source.value=/\\.js$/]" },
+        { selector: "ImportExpression[source.value=/\\.js$/]" },
+        { selector: "ExportNamedDeclaration[source.value=/\\.js$/], ExportAllDeclaration[source.value=/\\.js$/]" },
       ],
+    },
+  },
+  {
+    files: ["**/*.{ts,mts,cts,js,mjs,cjs}"],
+    plugins: { "no-comments": noComments },
+    rules: {
+      "no-comments/disallowComments": ["error", { allow: ["eslint", "global", "/usr/bin/env"] }],
     },
   },
 );

@@ -1,8 +1,8 @@
 import { defineHandler, type H3, type H3Event } from "h3";
-import type { ProxyContext } from "../context.js";
-import { chatCompletionsConfig, messagesConfig, responsesConfig } from "../core/endpoints.js";
-import { extractSessionId } from "../core/service.js";
-import type { EndpointAdapter } from "../core/types.js";
+import type { ProxyContext } from "../context.ts";
+import { chatCompletionsConfig, messagesConfig, responsesConfig } from "../core/transport/endpoints.ts";
+import { extractSessionId } from "../core/service.ts";
+import type { EndpointAdapter } from "../core/types.ts";
 
 async function handleInference(
   event: H3Event,

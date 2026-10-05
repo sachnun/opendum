@@ -16,8 +16,8 @@ const mocks = vi.hoisted(() => {
 
 vi.mock("@opendum/config", () => ({ loadEnv: mocks.loadEnv, loadEnvFile: mocks.loadEnvFile }));
 vi.mock("h3", () => ({ serve: mocks.serve }));
-vi.mock("../src/context.js", () => ({ createContext: mocks.createContext, disposeContext: mocks.disposeContext }));
-vi.mock("../src/server.js", () => ({ createServer: mocks.createServer }));
+vi.mock("../src/context.ts", () => ({ createContext: mocks.createContext, disposeContext: mocks.disposeContext }));
+vi.mock("../src/server.ts", () => ({ createServer: mocks.createServer }));
 
 describe("main", () => {
   it("boots the server and shuts down on signals", async () => {
@@ -25,7 +25,7 @@ describe("main", () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
     const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
-    await import("../src/main.js");
+    await import("../src/main.ts");
     await new Promise((resolve) => setTimeout(resolve, 10));
 
     assert.equal(mocks.loadEnvFile.mock.calls.length, 2);

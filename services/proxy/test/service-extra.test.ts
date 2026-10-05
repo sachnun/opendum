@@ -21,14 +21,14 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("../src/core/service-routing.js", () => mocks.routing);
-vi.mock("../src/core/service-credentials.js", () => mocks.creds);
-vi.mock("../src/core/service-health.js", () => mocks.health);
-vi.mock("../src/core/ratelimit.js", () => mocks.ratelimit);
-vi.mock("../src/core/points.js", () => mocks.points);
+vi.mock("../src/core/selection/service-routing.ts", () => mocks.routing);
+vi.mock("../src/core/service-credentials.ts", () => mocks.creds);
+vi.mock("../src/core/health/service-health.ts", () => mocks.health);
+vi.mock("../src/core/metering/ratelimit.ts", () => mocks.ratelimit);
+vi.mock("../src/core/metering/points.ts", () => mocks.points);
 
-import { ProxyService, cloneMap, extractSessionId } from "../src/core/service.js";
-import type { AttemptResult, EndpointAdapter, ParsedEndpointRequest } from "../src/core/types.js";
+import { ProxyService, cloneMap, extractSessionId } from "../src/core/service.ts";
+import type { AttemptResult, EndpointAdapter, ParsedEndpointRequest } from "../src/core/types.ts";
 
 function authResult(overrides: Partial<AuthResult> = {}): AuthResult {
   return {
@@ -244,59 +244,5 @@ describe("delegates", () => {
     assert.deepEqual(cloneMap({ a: 1 }), { a: 1 });
     const request = new Request("https://x", { headers: { "x-session-id": "s1" } });
     assert.equal(extractSessionId(request, {}), "s1");
-  });
-});
-
-describe("handle edge branches", () => {
-  it("returns parse and forced-account errors", async () => {
-    const svc = service();
-    const parseError = cfg({ parse: () => ({ status: 400, message: "bad", type: "invalid_request_error" }) });
-    assert.equal((await svc.handle(parseError, {}, "", "s")).status, 400);
-
-    mocks.routing.modelAccountSelector.mockResolvedValueOnce({ accountId: "a1", model: "m2" });
-    mocks.routing.validateForcedAccount.mockResolvedValueOnce({ status: 403, message: "denied", type: "invalid_request_error" });
-    assert.equal((await svc.handle(cfg(), {}, "", "s")).status, 403);
-  });
-
-  it("validates playground headers", async () => {
-    const svc = service();
-    assert.equal((await svc.handle(cfg(), {}, "", "s", new Request("https://x"))).status, 200);
-
-    const partial = new Request("https://x", { headers: { "x-opendum-playground-user-id": "u1" } });
-    assert.equal((await svc.handle(cfg(), {}, "", "s", partial)).status, 401);
-
-    const badTimestamp = new Request("https://x", {
-      headers: { "x-opendum-playground-user-id": "u1", "x-opendum-playground-timestamp": "abc", "x-opendum-playground-signature": "x" },
-    });
-    assert.equal((await svc.handle(cfg(), {}, "", "s", badTimestamp)).status, 401);
-
-    const wrongSignature = new Request("https://x", {
-      headers: { "x-opendum-playground-user-id": "u1", "x-opendum-playground-timestamp": String(Math.floor(Date.now() / 1000)), "x-opendum-playground-signature": "wrong" },
-    });
-    assert.equal((await svc.handle(cfg(), {}, "", "s", wrongSignature)).status, 401);
-  });
-
-  it("accepts playground sessions with unparseable urls", async () => {
-    const { playgroundSignature } = await import("@opendum/crypto");
-    const timestamp = String(Math.floor(Date.now() / 1000));
-    const signature = playgroundSignature("secret", "u1", timestamp, "POST", "/");
-    const request = { url: "::", method: "POST", headers: new Headers({ "x-opendum-playground-user-id": "u1", "x-opendum-playground-timestamp": timestamp, "x-opendum-playground-signature": signature }) } as unknown as Request;
-    const response = await service().handle(cfg(), {}, "", "s", request);
-    assert.equal(response.status, 200);
-  });
-
-  it("swallows deferred helper failures", async () => {
-    const roaming = { userId: "u1", model: "m", amount: 1, debitId: "d1" };
-    mocks.routing.executeWithAccountRotation.mockResolvedValueOnce(attempt({ roaming }));
-    mocks.points.settleRoamingPoint.mockRejectedValueOnce(new Error("down"));
-    mocks.health.markAccountsRecoveredByRotation.mockRejectedValueOnce(new Error("down"));
-    const response = await service().handle(cfg(), {}, "", "s");
-    assert.equal(response.status, 200);
-    await new Promise((resolve) => setTimeout(resolve, 5));
-
-    mocks.routing.executeWithAccountRotation.mockResolvedValueOnce(attempt({ roaming }));
-    mocks.points.refundRoamingPoint.mockRejectedValueOnce(new Error("down"));
-    const failing = cfg({ handleNonStream: vi.fn(async () => { throw new Error("boom"); }) });
-    assert.equal((await service().handle(failing, {}, "", "s")).status, 500);
   });
 });

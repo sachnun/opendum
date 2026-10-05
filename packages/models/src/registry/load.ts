@@ -95,8 +95,6 @@ function mergeProviderConfig(
   if (authored.free) merged.free = true;
   if ((authored.aliases ?? []).length > 0) merged.aliases = authored.aliases;
 
-  // Provider flags outside the known fields (for example opencode's
-  // responses_api) are preserved under `custom`, matching the Go registry.
   const custom: Record<string, unknown> = { ...(merged.custom ?? {}) };
   for (const [key, value] of Object.entries(authored)) {
     if (KNOWN_PROVIDER_CONFIG_KEYS.has(key)) continue;

@@ -11,7 +11,7 @@ import {
   retryMetadata,
   sanitizedProxyError,
   shouldRotate,
-} from "../src/core/errors.js";
+} from "../src/core/transport/errors.ts";
 
 describe("providerErrorType", () => {
   it("maps statuses to error types", () => {

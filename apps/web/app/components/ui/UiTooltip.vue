@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { TooltipArrow, TooltipContent, TooltipPortal, TooltipRoot, TooltipTrigger } from "reka-ui";
-import { cn } from "~~/lib/utils";
+import { cn } from "#shared/utils";
 
 type TooltipSide = "top" | "right" | "bottom" | "left";
 type TooltipAlign = "start" | "center" | "end";

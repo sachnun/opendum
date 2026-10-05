@@ -17,7 +17,7 @@ describe("safeKiroUtf8PrefixLen", () => {
   });
 
   it("does not split inside a multibyte character", () => {
-    const value = "a\u00e9"; // "aé"
+    const value = "a\u00e9";
     assert.equal(safeKiroUtf8PrefixLen(value, 1), 1);
     assert.equal(safeKiroUtf8PrefixLen(value, 2), 2);
   });

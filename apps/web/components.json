@@ -12,9 +12,9 @@
   "aliases": {
     "components": "~/components",
     "composables": "~/composables",
-    "utils": "~~/lib/utils",
+    "utils": "~~/shared/utils",
     "ui": "~/components/ui",
-    "lib": "~~/lib"
+    "lib": "~~/shared"
   },
   "iconLibrary": "lucide"
 }

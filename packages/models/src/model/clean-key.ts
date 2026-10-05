@@ -1,47 +1,3 @@
-// Parameter-info stripping for model keys.
-//
-// Goal: derive a "clean" canonical-style key from a model basename by
-// stripping parameter info (MoE compound size, single size, quantization,
-// version, release date) and pure-behavior descriptor suffix tokens
-// (`instruct`, `thinking`, `preview`, ...) whose semantics move into the
-// `meta` block.
-//
-// Stripping tokens (left-to-right during a right-to-left trailing pass):
-//   1. Drop `-Xb-aYb` MoE compound (both size and active collapse). Also
-//      drops `-Xb-Ye` (`-128e` MoE expert-count) variants.
-//   2. Drop standalone size tokens (`-Xb`/`-Xm`/`-Xt`).
-//   3. Drop standalone quantization tokens anywhere (`-fp<N>`, `-int<N>`,
-//      `-awq`, `-gptq`, `-gguf`, `-q<N>[_<letter>]`).
-//   4. Drop trailing date tokens when no behavior descriptor follows them.
-//      Both YYMM/YYYYMM spellings (`2512`, `2603`, `0905`, `202601`) and
-//      MMDD/YYMMDD spellings (`0731`, `0813`, `250731`) are recognized.
-//      Release versions (`v0.1`, `v1.5`, `v2`, `v2.5`) are preserved as
-//      family identifiers.
-//   5. Drop trailing behavior-descriptor tokens whose meaning is recorded
-//      in `meta`: `instruct`, `it`, `chat`, `base`, `reasoning`,
-//      `thinking`, `completion`, `preview`, `beta`,
-//      `experimental`, `exp`, `deprecated`, `fast`, `nova`, `express`.
-//
-// Identifier/tier tokens preserved as family names:
-//   * Family names (`claude`, `gemini`, `qwen`, `nemotron`, `mistral`, ...).
-//   * Tier names (`ultra`, `super`, `pro`, `plus`, `nano`, `mini`,
-//     `flash`, `lite`, `premium`, `mega`, `medium`, `small`, `xl`).
-//   * Modality/discipline words (`coder`, `codex`, `code`, `vl`,
-//     `vision`, `omni`, `multimodal`).
-//
-// Examples:
-//   "nemotron-3-ultra-550b-a55b"             -> "nemotron-3-ultra"
-//   "qwen3-coder-30b-a3b-instruct"           -> "qwen3-coder"
-//   "qwen3-vl-30b-a3b-instruct"              -> "qwen3-vl"
-//   "qwen3-vl-thinking"                      -> "qwen3-vl"
-//   "mistral-large-3-675b-instruct-2512"     -> "mistral-large-3"
-//   "deepseek-v4-flash-0731"                 -> "deepseek-v4-flash"    (MMDD)
-//   "deepseek-v4-pro-0813"                   -> "deepseek-v4-pro"      (MMDD)
-//   "qwen3-250731"                           -> "qwen3"                (YYMMDD)
-//   "claude-opus-4-6-thinking"               -> "claude-opus-4-6"
-//   "nemotron-nano-vl"                       -> "nemotron-nano-vl"     (`vl` sub-family)
-//   "llama-4-maverick-17b-128e-instruct"     -> "llama-4-maverick"
-//   "mimo-v2.5"                              -> "mimo-v2.5"            (release version preserved)
 
 const ACTIVE_PARAMS_SUFFIX = /^a[0-9]+(?:\.[0-9]+)?[kmbt]$/i;
 const EXPERT_COUNT_SUFFIX = /^[0-9]+e$/i;
@@ -104,15 +60,6 @@ function isPairableMoESuffix(token: string): boolean {
   return ACTIVE_PARAMS_SUFFIX.test(token) || EXPERT_COUNT_SUFFIX.test(token);
 }
 
-/**
- * Strip every token that matches a parameter-info or pure-behavior
- * descriptor pattern. Identifier/tier tokens (`coder`, `vl`, `nano`,
- * `ultra`, release-version tokens like `v2.5`, ...) stay in the
- * basename as family names.
- *
- * Pass `{ keepDates: true }` to preserve trailing date tokens so callers
- * can build a dated variant key for a canonical base model.
- */
 export function stripParamInfoKey(
   modelKey: string | null | undefined,
   options: { keepDescriptors?: boolean; keepDates?: boolean } = {},
@@ -169,11 +116,6 @@ for (let i = 0; i < end; i += 1) {
   return cleaned.length > 0 ? cleaned : modelKey;
 }
 
-/**
- * Extract meta field updates from descriptors present in a basename.
- * The migration layer uses this so even after the basename is stripped,
- * the semantic info is preserved.
- */
 export interface ModelDescriptors {
   reasoning?: boolean;
 }
@@ -190,9 +132,6 @@ export function extractDescriptors(modelKey: string | null | undefined): ModelDe
   return out;
 }
 
-/**
- * Generate kebab-fallback aliases for `provider/name` style upstream ids.
- */
 export function aliasesFromUpstream(upstreamNames?: string[] | null): string[] {
   const aliases = new Set<string>();
   if (!upstreamNames) return [];
@@ -208,10 +147,6 @@ export function aliasesFromUpstream(upstreamNames?: string[] | null): string[] {
   return [...aliases];
 }
 
-/**
- * Extract the dominant size magnitude from a basename (e.g. `70b`->70,
- * `550b-a55b`->550). Used to pick a winner during collision-merge.
- */
 export function largestSizeValue(modelKey: string): number {
   if (typeof modelKey !== "string" || modelKey.length === 0) return 0;
   let largest = 0;

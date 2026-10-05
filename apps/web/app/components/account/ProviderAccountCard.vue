@@ -8,7 +8,7 @@ import {
   parseErrorParameters,
   parseStoredErrorMessage,
   stripStatusFromErrorMessage,
-} from "~~/lib/account-errors";
+} from "#shared/account/errors";
 import {
   collectStatValues,
   compactNumber,
@@ -35,11 +35,11 @@ import {
   type ErrorPreviewEntry,
   type StatDeltaTone,
   type StatMetric,
-} from "~~/lib/account-format";
-import { quotaPercentRemaining, quotaResetTitle } from "~~/lib/quota-display";
+} from "#shared/account/format";
+import { quotaPercentRemaining, quotaResetTitle } from "#shared/quota/display";
 
-import type { AccountQuotaInfo, ErrorHistoryResult, ProviderAccountUpdateData, ProviderDetailData, QuotaGroupDisplay } from "~~/lib/api-types";
-import { QUOTA_PROVIDER_KEYS } from "~~/lib/provider-accounts";
+import type { AccountQuotaInfo, ErrorHistoryResult, ProviderAccountUpdateData, ProviderDetailData, QuotaGroupDisplay } from "#shared/api";
+import { QUOTA_PROVIDER_KEYS } from "#shared/provider-accounts";
 
 
 type ErrorHistoryEntry = Extract<ErrorHistoryResult, { success: true }>["data"]["entries"][number];

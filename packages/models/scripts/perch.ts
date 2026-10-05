@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-import { isDirectRun, runSourceCli } from "./cli.js";
-import type { ModelSource } from "./source.js";
+import { isDirectRun, runSourceCli } from "./cli.ts";
+import type { ModelSource } from "./source.ts";
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,13 +11,6 @@ import { normalizeName } from "#models/model/similarity.ts";
 
 const PROVIDER_NAME = "perch";
 
-// Perch publishes the current Starter (free) pool on its models docs page
-// (https://www.perchai.app/docs/concepts/models). That page is the live source
-// of truth for which models a free account can pin; anything outside the
-// Starter pool is Pro-only and paid, so it is intentionally never registered.
-// The table only carries display names, so each name is resolved against the
-// registry to reuse the canonical model id and the Perch pool alias already
-// pinned for that model.
 const PERCH_DOCS_URL = "https://www.perchai.app/docs/concepts/models";
 
 function decodeHtmlEntities(text) {

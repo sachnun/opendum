@@ -1,11 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it, vi } from "vitest";
-import type { ProxyContext } from "../src/context.js";
-import { createServer } from "../src/server.js";
+import type { ProxyContext } from "../src/context.ts";
+import { createServer } from "../src/server.ts";
 
-// createServer pulls in the route graph, which reaches @opendum/database/queries.
-// That module eagerly opens a pg pool at import time, so stub it to keep the test
-// independent of DATABASE_URL (the handlers exercised here never query).
 const db = vi.hoisted(() => {
   const noop = () => vi.fn(async () => undefined);
   return {

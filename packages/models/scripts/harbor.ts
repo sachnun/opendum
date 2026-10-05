@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-import { isDirectRun, runSourceCli } from "./cli.js";
-import type { ModelSource } from "./source.js";
+import { isDirectRun, runSourceCli } from "./cli.ts";
+import type { ModelSource } from "./source.ts";
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";

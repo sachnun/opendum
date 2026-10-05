@@ -1,8 +1,8 @@
 import { AuthService } from "@opendum/auth";
 import type { AccountModelAvailability } from "@opendum/auth";
 import type { OpendumRedis } from "@opendum/redis";
-import { getRedisClient } from "../redis.js";
-import { registry } from "./models.js";
+import { getRedisClient } from "../redis.ts";
+import { registry } from "./models.ts";
 
 const VALIDATION_PREFIX = "opendum:api-key:validation";
 const LAST_USED_PREFIX = "opendum:api-key:last-used";

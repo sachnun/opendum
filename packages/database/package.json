@@ -2,8 +2,6 @@
   "name": "@opendum/database",
   "type": "module",
   "private": true,
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
     "./schema": "./src/schema/index.ts",
@@ -14,7 +12,6 @@
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "test": "node --experimental-test-module-mocks --import tsx --test ./src/*.test.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint ."
   },

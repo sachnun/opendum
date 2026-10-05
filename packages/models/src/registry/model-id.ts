@@ -14,17 +14,6 @@ function compareCandidatesNewestFirst(left: { dateToken: string | null }, right:
   return Number.parseInt(right.dateToken, 10) - Number.parseInt(left.dateToken, 10);
 }
 
-/**
- * Build a modelKey -> upstreamId map from a raw provider model id list.
- *
- * Provider feeds often carry both a rolling base id and date-pinned variants
- * of the same model (e.g. `deepseek/deepseek-v4-flash` next to
- * `deepseek/deepseek-v4-flash-0731` or `-0813`). All of them normalize to the
- * same base key via `toModelKey`; this helper makes the newest variant own
- * the base key (an undated rolling id counts as the newest) and re-keys
- * older date-pinned variants under `base-<date>` so the registry merge turns
- * them into aliases instead of separate models.
- */
 export function buildModelIdMap(modelIds: string[], toModelKey: (modelId: string) => string): Map<string, string> {
   const groups = new Map<string, Array<{ modelId: string; key: string; dateToken: string | null }>>();
 

@@ -6,14 +6,14 @@ import {
   isAccountOverviewDelta,
   normalizeModelFamilyCounts,
   type ShellAccountSummary,
-} from "~~/lib/account-overview";
+} from "#shared/account/overview";
 
-import type { NavItem, NavSubItem, ProviderAccountIndicator } from "../../lib/navigation";
-import type { AccountOverviewData, AccountOverviewResponse, MeData, PointStatusData } from "../../lib/api-types";
-import { isSwitchSubItem, primaryNavigation, subItemHref } from "../../lib/navigation";
-import { signOut, useSession } from "../../lib/auth-client";
-import { buildProviderHrefMap, getProviderAccountPath, PROVIDER_ACCOUNT_DEFINITIONS } from "../../lib/provider-accounts";
-import { avatarUrl } from "../../lib/utils";
+import type { NavItem, NavSubItem, ProviderAccountIndicator } from "#shared/navigation";
+import type { AccountOverviewData, AccountOverviewResponse, MeData, PointStatusData } from "#shared/api";
+import { isSwitchSubItem, primaryNavigation, subItemHref } from "#shared/navigation";
+import { signOut, useSession } from "~/utils/auth-client";
+import { buildProviderHrefMap, getProviderAccountPath, PROVIDER_ACCOUNT_DEFINITIONS } from "#shared/provider-accounts";
+import { avatarUrl } from "#shared/utils";
 
 const route = useRoute();
 const { data: session } = await useSession(useFetch);

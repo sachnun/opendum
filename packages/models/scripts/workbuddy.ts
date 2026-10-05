@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-import { isDirectRun, runSourceCli } from "./cli.js";
-import type { ModelSource } from "./source.js";
+import { isDirectRun, runSourceCli } from "./cli.ts";
+import type { ModelSource } from "./source.ts";
 
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -18,7 +18,6 @@ const WORKBUDDY_PRODUCT_MEMBER = "package/product.json";
 
 const MIN_EXPECTED_MODELS = 20;
 
-// House/preset routing ids (default-model, fast-model, ...) are not real models.
 const HOUSE_MODEL_PATTERN = /(?:^|-)model$/;
 
 function isExcludedId(id) {

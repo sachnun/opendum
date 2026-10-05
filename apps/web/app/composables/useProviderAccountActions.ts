@@ -1,5 +1,5 @@
-import type { Account } from "~~/lib/account-format";
-import type { ProviderAccountUpdateData } from "~~/lib/api-types";
+import type { Account } from "#shared/account/format";
+import type { ProviderAccountUpdateData } from "#shared/api";
 
 type TemporaryOffUnit = "minutes" | "hours" | "days";
 

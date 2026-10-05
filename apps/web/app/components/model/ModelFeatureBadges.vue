@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { getEffectiveModelCapabilities, type ModelCapabilitiesInput } from "~~/lib/model-capabilities";
+import { getEffectiveModelCapabilities, type ModelCapabilitiesInput } from "#shared/model/capabilities";
 
 const props = defineProps<{
   model?: ModelCapabilitiesInput;

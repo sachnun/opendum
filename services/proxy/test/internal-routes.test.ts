@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { beforeEach, describe, it, vi } from "vitest";
 import type { H3, H3Event } from "h3";
-import type { ProxyContext } from "../src/context.js";
+import type { ProxyContext } from "../src/context.ts";
 
 const mocks = vi.hoisted(() => ({
   db: { getQuotaAccount: vi.fn() },
@@ -13,9 +13,9 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@opendum/database/queries", () => mocks.db);
 vi.mock("@opendum/quota", () => mocks.quota);
 vi.mock("@opendum/crypto", () => mocks.crypto);
-vi.mock("../src/middleware/internal-signature.js", () => mocks.sig);
+vi.mock("../src/middleware/internal-signature.ts", () => mocks.sig);
 
-import { registerInternalRoutes } from "../src/routes/internal.js";
+import { registerInternalRoutes } from "../src/routes/internal.ts";
 
 type Handler = (event: H3Event) => Promise<Response> | Response;
 

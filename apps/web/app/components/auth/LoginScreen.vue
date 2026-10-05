@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { signIn } from "~~/lib/auth-client";
+import { signIn } from "~/utils/auth-client";
 
 type SocialProvider = "github" | "google";
 

@@ -1,7 +1,7 @@
 import { Registry } from "@opendum/models/runtime";
 import type { ModelInfo, ProviderAccessRule } from "@opendum/models/runtime";
 import { MODEL_ENTRIES } from "virtual:opendum-model-registry";
-import { compareModelEntries } from "~~/lib/model-sort";
+import { compareModelEntries } from "#shared/model/sort";
 
 export const registry = Registry.fromEntries(MODEL_ENTRIES, { familyFromFolder: true });
 

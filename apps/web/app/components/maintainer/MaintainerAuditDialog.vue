@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { MaintainerAuditSearchUser, MaintainerAuditUser } from "~~/lib/api-types";
-import { avatarUrl } from "~~/lib/utils";
+import type { MaintainerAuditSearchUser, MaintainerAuditUser } from "#shared/api";
+import { avatarUrl } from "#shared/utils";
 
 const open = defineModel<boolean>("open", { default: false });
 

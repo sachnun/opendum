@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
-import { anthropicStream, passthroughNonStream, passthroughStream } from "../src/core/stream.js";
-import type { ResponseContext, StreamRecorder, UsageCounts } from "../src/core/types.js";
+import { anthropicStream, passthroughNonStream, passthroughStream } from "../src/core/streaming/stream.ts";
+import type { ResponseContext, StreamRecorder, UsageCounts } from "../src/core/types.ts";
 
 function sseResponse(chunks: string[]): Response {
   const encoder = new TextEncoder();

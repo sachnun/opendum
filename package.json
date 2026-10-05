@@ -16,6 +16,7 @@
     "edgeone": "^1.6.34",
     "@eslint/js": "^10.0.0",
     "eslint": "catalog:",
+    "eslint-plugin-no-comments": "catalog:",
     "typescript-eslint": "^8.62.1"
   }
 }

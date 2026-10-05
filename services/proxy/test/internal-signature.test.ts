@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import { internalSignature } from "@opendum/crypto";
-import { validateInternalSignature } from "../src/middleware/internal-signature.js";
+import { validateInternalSignature } from "../src/middleware/internal-signature.ts";
 
 function request(headers: Record<string, string>): Request {
   return new Request("https://proxy/internal", { headers });

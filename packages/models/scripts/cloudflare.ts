@@ -1,17 +1,8 @@
 #!/usr/bin/env node
 
-import { isDirectRun, runSourceCli } from "./cli.js";
-import type { ModelSource } from "./source.js";
+import { isDirectRun, runSourceCli } from "./cli.ts";
+import type { ModelSource } from "./source.ts";
 
-/**
- * Sync Cloudflare Workers AI model availability into JSON registry.
- *
- * Data source: Cloudflare's public docs repository (no auth required)
- *   https://github.com/cloudflare/cloudflare-docs/tree/production/src/content/workers-ai-models
- *
- * The account API requires Cloudflare credentials, so the scheduled refresh uses
- * the docs model metadata that powers developers.cloudflare.com.
- */
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";

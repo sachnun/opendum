@@ -1,9 +1,3 @@
-/**
- * Shared fetch utilities for the model refresh scripts.
- *
- * Provides retrying helpers used by every provider scraper so retry and
- * timeout behaviour stays consistent.
- */
 
 import pRetry from "p-retry";
 

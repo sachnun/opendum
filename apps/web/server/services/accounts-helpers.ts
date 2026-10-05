@@ -3,10 +3,10 @@ import { createHash } from "node:crypto";
 import { db, pinnedProvider, providerAccountModelHealth } from "@opendum/database";
 import { getRedisClient } from "~~/server/lib/redis";
 import { getModelFamily, getProviderAccessRule, getProviderModelSet } from "~~/server/lib/proxy/models";
-import { compareModelEntries } from "~~/lib/model-sort";
+import { compareModelEntries } from "#shared/model/sort";
 import { asc, eq, inArray } from "drizzle-orm";
-import { PROVIDER_ACCOUNT_KEYS } from "./account-providers";
-import { INDICATOR_WEIGHT, type ProviderAccountIndicator, type ProviderStats } from "./account-stats";
+import { PROVIDER_ACCOUNT_KEYS } from "./account-providers.ts";
+import { INDICATOR_WEIGHT, type ProviderAccountIndicator, type ProviderStats } from "./account-stats.ts";
 
 const AUTO_PIN_SENTINEL = "_auto_pinned";
 const UNHEALTHY_IDLE_DECAY_MS = 10 * 60 * 1000;
@@ -68,7 +68,7 @@ export interface AccountReadOptions {
 }
 
 export type AccountOverviewSummary = { connected: number; active: number; indicator: ProviderAccountIndicator; stats: ProviderStats };
-export type AccountStatsResult = Awaited<ReturnType<typeof import("./account-stats").buildAccountStats>>;
+export type AccountStatsResult = Awaited<ReturnType<typeof import("./account-stats.ts").buildAccountStats>>;
 
 export type AccountOverviewCursor = {
   pinned: string;

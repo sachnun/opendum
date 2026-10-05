@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import { describe, it, vi } from "vitest";
 import type { H3, H3Event } from "h3";
-import type { ProxyContext } from "../src/context.js";
+import type { ProxyContext } from "../src/context.ts";
 
 vi.mock("@opendum/database/queries", () => ({}));
 
-import { jsonResponse, notFound, unknownEndpoint } from "../src/routes/errors.js";
-import { registerModelsRoute } from "../src/routes/models.js";
-import { registerInferenceRoutes } from "../src/routes/inference.js";
+import { jsonResponse, notFound, unknownEndpoint } from "../src/routes/errors.ts";
+import { registerModelsRoute } from "../src/routes/models.ts";
+import { registerInferenceRoutes } from "../src/routes/inference.ts";
 
 type Handler = (event: H3Event) => Promise<Response> | Response;
 

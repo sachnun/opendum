@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-import { isDirectRun, runSourceCli } from "./cli.js";
-import type { ModelSource } from "./source.js";
+import { isDirectRun, runSourceCli } from "./cli.ts";
+import type { ModelSource } from "./source.ts";
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,14 +10,9 @@ import { fetchJson } from "#models/lib/http.ts";
 import { stripParamInfoKey } from "#models/model/clean-key.ts";
 
 const PROVIDER_NAME = "cline";
-// Cline exposes its curated free model list on the recommended-models
-// endpoint (the same source the Cline CLI/VSCode use to zero-cost free
-// models). Only entries under `free` are usable without ClinePass credits.
 const CLINE_RECOMMENDED_MODELS_URL =
   "https://api.cline.bot/api/v1/ai/cline/recommended-models";
 
-// Minimum number of free models expected; guards against silent breakage of
-// the recommended-models payload format.
 const MIN_EXPECTED_MODELS = 1;
 
 function toModelKey(modelId) {

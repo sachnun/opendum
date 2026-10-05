@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import type { Env } from "@opendum/config";
-import { toProxyConfig } from "../src/config.js";
+import { toProxyConfig } from "../src/config.ts";
 
 function env(overrides: Record<string, unknown> = {}): Env {
   return {

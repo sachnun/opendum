@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it, vi } from "vitest";
-import { AnthropicStreamTracker } from "../src/core/anthropic-stream.js";
+import { AnthropicStreamTracker } from "../src/core/streaming/anthropic-stream.ts";
 
 type Json = Record<string, unknown>;
 

@@ -4,9 +4,9 @@ import { db, disabledModel, providerAccount, providerAccountDisabledModel } from
 import { getAccountModelAvailability, isModelUsableByAccounts } from "~~/server/lib/proxy/auth";
 import { getAuthlessProviderAccounts } from "~~/server/lib/proxy/authless-providers";
 import { MODEL_REGISTRY, getAllModels, getModelFamily, getProvidersForModel, resolveModelAlias } from "~~/server/lib/proxy/models";
-import { compareModelEntries } from "~~/lib/model-sort";
-import { getProviderModelsForAccountTier } from "./accounts";
-import { PROVIDER_ACCOUNT_KEYS } from "./account-providers";
+import { compareModelEntries } from "#shared/model/sort";
+import { getProviderModelsForAccountTier } from "./accounts.ts";
+import { PROVIDER_ACCOUNT_KEYS } from "./account-providers.ts";
 
 function normalizeProxyBaseUrl(value: unknown) {
   return typeof value === "string" ? value.trim().replace(/\/$/, "") || undefined : undefined;

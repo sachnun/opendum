@@ -3,8 +3,8 @@ import { eq } from "drizzle-orm";
 import { db, providerAccount, type ProviderAccount } from "@opendum/database";
 import { decrypt, encrypt } from "~~/server/lib/encryption";
 import { fetchInternalProvider } from "~~/server/lib/proxy/internal-relay";
-import type { OAuthResult } from "../types.js";
-import { formatProviderHttpError } from "../provider-http-errors.js";
+import type { OAuthResult } from "../types.ts";
+import { formatProviderHttpError } from "../provider-http-errors.ts";
 import {
   AUTH_HEADERS,
   CLIENT_ID,
@@ -13,7 +13,7 @@ import {
   LOAD_CODE_ASSIST_ENDPOINTS,
   ONBOARD_USER_ENDPOINTS,
   REFRESH_BUFFER_SECONDS,
-} from "./constants.js";
+} from "./constants.ts";
 
 function isTokenExpired(expiresAt: Date): boolean {
   const bufferMs = REFRESH_BUFFER_SECONDS * 1000;
@@ -245,7 +245,6 @@ async function fetchAccountInfo(
       email = userInfo.email ?? "";
     }
   } catch {
-    // Email is best-effort metadata for web display.
   }
 
   if (errors.length && !projectId) {

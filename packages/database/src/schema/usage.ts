@@ -53,7 +53,6 @@ export const usageLog = pgTable(
     cachedTokens: integer("cachedTokens").notNull().default(0),
     cacheWriteTokens: integer("cacheWriteTokens").notNull().default(0),
 
-    // Request metadata
     statusCode: integer("statusCode"),
     duration: integer("duration"),
 
