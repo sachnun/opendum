@@ -129,6 +129,18 @@ test("planCanonicalization does not rename a model onto an occupied id", () => {
   assert.equal(plan.actions[0].to, "nemotron-3-ultra-550b-a55b");
 });
 
+test("planCanonicalization reports authored provider conflicts", () => {
+  const conflicting = planCanonicalization(
+    [
+      model("nemotron-3-ultra-550b-a55b", { providers: ["nvidia_nim"], providerConfig: { nvidia_nim: { upstream: "nvidia/nemotron-3-ultra-550b-a55b", authless: true } } }),
+      model("nemotron-3-ultra", { providers: ["nvidia_nim"], providerConfig: { nvidia_nim: { upstream: "nvidia/nemotron-3-ultra", authless: false } } }),
+    ],
+    index(),
+  );
+  assert.equal(conflicting.actions.length, 0);
+  assert.match(conflicting.conflicts[0] ?? "", /nvidia_nim\.authless/);
+});
+
 test("applyCanonicalMerge folds providers, config and aliases", () => {
   const target: ModelData = {
     id: "deepseek-v4-flash",
@@ -232,4 +244,44 @@ test("applyCanonicalMerge does not let a merged duplicate outrank the target sco
     aliases: [],
   });
   assert.equal(target.scores?.artificialAnalysis?.index, 40);
+});
+
+test("applyCanonicalMerge unions nested provider config and arrays", () => {
+  const target: ModelData = {
+    id: "model",
+    providers: ["openrouter"],
+    providerConfig: { openrouter: { upstream: "u" } },
+    modalities: { input: ["text"], output: ["text"] },
+    reasoning_effort: ["low"],
+  };
+  applyCanonicalMerge(target, {
+    kind: "merge",
+    relativeId: "variant",
+    fileId: "variant",
+    path: "/models/variant.json",
+    from: "variant",
+    to: "model",
+    tier: "exact",
+    data: {
+      providers: ["openrouter", "kiro"],
+      providerConfig: { openrouter: { upstream: "other" } },
+      modalities: { input: ["image"], output: ["text"] },
+      reasoning_effort: ["low", "high"],
+    },
+    aliases: ["variant"],
+  });
+  assert.equal(target.providerConfig?.openrouter?.upstream, "u");
+  assert.deepEqual(target.modalities, { input: ["text", "image"], output: ["text"] });
+  assert.deepEqual(target.reasoning_effort, ["low", "high"]);
+});
+
+test("planCanonicalization reports conflicts against a claimed rename", () => {
+  const plan = planCanonicalization(
+    [
+      model("minimax-m2.7", { providers: ["zenmux"], providerConfig: { zenmux: { upstream: "minimax/MiniMax-M2.7", authless: true } } }),
+      model("minimax-m2.7-free", { providers: ["zenmux"], providerConfig: { zenmux: { upstream: "minimax/MiniMax-M2.7", authless: false } } }),
+    ],
+    buildCanonicalIndex({ models: { "minimax/MiniMax-M2.7": { name: "MiniMax M2.7" } } }),
+  );
+  assert.equal(plan.conflicts.length, 1);
 });

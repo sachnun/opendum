@@ -81,4 +81,14 @@ describe("cors middleware", () => {
     assert.equal(response.status, 204);
     assert.equal(response.headers.get("access-control-allow-origin"), "*");
   });
+
+  it("redirects the root and answers unknown paths", async () => {
+    const app = createServer(context);
+    const root = await app.request("/");
+    assert.equal(root.status, 308);
+    assert.equal(root.headers.get("location"), "/v1");
+
+    assert.equal((await app.request("/v1")).status, 404);
+    assert.equal((await app.request("/other")).status, 404);
+  });
 });

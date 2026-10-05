@@ -89,6 +89,18 @@ test("buildIndex deduplicates by normalized key keeping the first entry", () => 
   assert.equal(index.get("mock-model")?.source, "test");
 });
 
+test("buildIndex indexes name-only entries and skips blank keys", () => {
+  const index = buildIndex<number>(
+    [
+      { id: "", name: "Named Model", entry: 1 },
+      { id: "  ", name: "   ", entry: 2 },
+    ],
+    "test",
+  );
+  assert.equal(index.get("named-model")?.entry, 1);
+  assert.equal(index.size, 1);
+});
+
 test("resolveCandidates returns exact matches first", () => {
   const index = buildIndex<number>([{ id: "vendor/mock-model", entry: 7 }], "test");
   const result = resolveCandidates(["Mock-Model"], index);

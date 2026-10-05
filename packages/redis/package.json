@@ -9,7 +9,7 @@
     "./session-affinity": "./src/session-affinity.ts"
   },
   "scripts": {
-    "test": "tsx --test ./src/*.test.ts",
+    "test": "node --experimental-test-module-mocks --import tsx --test ./src/*.test.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint ."
   },

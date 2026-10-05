@@ -207,3 +207,91 @@ test("syncProviderModels still folds real revision suffixes into the parent", ()
     assert.deepEqual(result.added, [], "revision suffix should merge into the parent");
   });
 });
+
+test("syncProviderModels applies and clears managed provider config", () => {
+  withTempDir((dataDir) => {
+    const first = syncProviderModels(dataDir, "openrouter", new Map([["mock-model", "vendor/mock-model"]]), {
+      providerConfigByModel: new Map([["mock-model", { responses_api: true }]]),
+      managedProviderConfigKeys: ["responses_api"],
+    });
+    assert.deepEqual(first.added, ["mock-model"]);
+    assert.equal(mergedData(dataDir, "mock-model").providerConfig?.openrouter?.responses_api, true);
+
+    const second = syncProviderModels(dataDir, "openrouter", new Map([["mock-model", "vendor/mock-model"]]), {
+      providerConfigByModel: new Map([["mock-model", { responses_api: false }]]),
+      managedProviderConfigKeys: ["responses_api"],
+    });
+    assert.deepEqual(second.updated, ["mock-model"]);
+    assert.equal(mergedData(dataDir, "mock-model").providerConfig?.openrouter?.responses_api, false);
+
+    const cleared = syncProviderModels(dataDir, "openrouter", new Map([["mock-model", "vendor/mock-model"]]), {
+      providerConfigByModel: new Map([["mock-model", {}]]),
+      managedProviderConfigKeys: ["responses_api"],
+    });
+    assert.deepEqual(cleared.updated, ["mock-model"]);
+    assert.equal(mergedData(dataDir, "mock-model").providerConfig?.openrouter?.responses_api, undefined);
+  });
+});
+
+test("syncProviderModels merges into an existing unindexed file", () => {
+  withTempDir((dataDir) => {
+    writeModelJson(join(dataDir, "legacy.json"), { providers: ["other"], id: "legacy" });
+    const result = syncProviderModels(dataDir, "openrouter", new Map([["legacy", "vendor/legacy"]]));
+    assert.deepEqual(result.updated, ["legacy"]);
+    const data = mergedData(dataDir, "legacy");
+    assert.deepEqual(data.providers, ["other", "openrouter"]);
+    assert.equal(data.providerConfig?.openrouter?.upstream, "vendor/legacy");
+  });
+});
+
+test("syncProviderModels drops provider config when the provider leaves", () => {
+  withTempDir((dataDir) => {
+    syncProviderModels(dataDir, "openrouter", new Map([["mock-model", "vendor/mock-model"]]), {
+      providerConfigByModel: new Map([["mock-model", { responses_api: true }]]),
+      managedProviderConfigKeys: ["responses_api"],
+    });
+    syncProviderModels(dataDir, "kiro", new Map([["mock-model", "mock-model"]]));
+    const removed = syncProviderModels(dataDir, "openrouter", new Map());
+    assert.deepEqual(removed.removed, ["mock-model"]);
+    const data = mergedData(dataDir, "mock-model");
+    assert.deepEqual(data.providers, ["kiro"]);
+    assert.equal(data.providerConfig?.openrouter, undefined);
+  });
+});
+
+test("syncProviderModels resolves parents by id and alias", () => {
+  withTempDir((dataDir) => {
+    writeModelJson(join(dataDir, "parent.json"), { id: "parent-id", providers: ["openrouter"], aliases: ["alias-name"] });
+    const byId = syncProviderModels(dataDir, "kiro", new Map([["parent-id-2", "vendor/parent-id-2"]]));
+    assert.deepEqual(byId.added, []);
+
+    const byAlias = syncProviderModels(dataDir, "kiro", new Map([["alias-name-2", "vendor/alias-name-2"]]));
+    assert.deepEqual(byAlias.added, []);
+  });
+});
+
+test("syncProviderModels matches an existing entry by its public id", () => {
+  withTempDir((dataDir) => {
+    writeModelJson(join(dataDir, "foo.json"), { id: "bar", providers: ["kiro"] });
+    const result = syncProviderModels(dataDir, "openrouter", new Map([["bar", "vendor/bar"]]));
+    assert.deepEqual(result.updated, ["bar"]);
+    const data = mergedData(dataDir, "foo");
+    assert.deepEqual(data.providers, ["kiro", "openrouter"]);
+    assert.equal(data.providerConfig?.openrouter?.upstream, "vendor/bar");
+  });
+});
+
+test("syncProviderModels clears provider config on removal", () => {
+  withTempDir((dataDir) => {
+    syncProviderModels(dataDir, "openrouter", new Map([["mock-model", "vendor/mock-model"]]), {
+      providerConfigByModel: new Map([["mock-model", { responses_api: true }]]),
+      managedProviderConfigKeys: ["responses_api"],
+    });
+    syncProviderModels(dataDir, "kiro", new Map([["mock-model", "mock-model"]]));
+    const removed = syncProviderModels(dataDir, "openrouter", new Map());
+    assert.deepEqual(removed.removed, ["mock-model"]);
+    const data = mergedData(dataDir, "mock-model");
+    assert.equal(data.providerConfig?.openrouter, undefined);
+    assert.deepEqual(data.providers, ["kiro"]);
+  });
+});
