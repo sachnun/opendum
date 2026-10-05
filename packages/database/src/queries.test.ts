@@ -1,25 +1,30 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it, mock } from "node:test";
 import type { Database } from "#database/client.ts";
-import {
+
+mock.module("#database/client.ts", {
+  namedExports: { db: {} },
+});
+
+const {
   deactivateAPIKey,
   getAPIKeyByHash,
   getAPIKeyFreshnessByID,
   listAPIKeyRateLimits,
   touchAPIKeyLastUsed,
-} from "#database/queries/api-key.ts";
-import {
+} = await import("#database/queries/api-key.ts");
+const {
   listActiveAccountTiers,
   listDisabledModelsByAccounts,
   listDisabledModelsByUser,
   listSharedAccounts,
-} from "#database/queries/availability.ts";
-import {
+} = await import("#database/queries/availability.ts");
+const {
   getCustomProvider,
   listCustomProviderModels,
   listCustomProviders,
-} from "#database/queries/custom.ts";
-import {
+} = await import("#database/queries/custom.ts");
+const {
   bumpAccountRequestCount,
   clearModelQuotaLock,
   getAccountHealthState,
@@ -42,8 +47,8 @@ import {
   updateModelHealthStatus,
   updateModelHealthSuccess,
   updateModelHealthSuccessWithStatus,
-} from "#database/queries/model-health.ts";
-import {
+} = await import("#database/queries/model-health.ts");
+const {
   disableFailedAccount,
   getAccountCredentialsByID,
   getAccountOwnerUserID,
@@ -57,8 +62,8 @@ import {
   updateAntigravityAccountInfo,
   updateCodexAccountID,
   updateRefreshedCredentials,
-} from "#database/queries/provider-account.ts";
-import {
+} = await import("#database/queries/provider-account.ts");
+const {
   creditPointBalance,
   debitPointBalance,
   debitPointBalanceAllowNegative,
@@ -67,7 +72,7 @@ import {
   insertPointTransactionOnConflictDoNothing,
   insertUsageLog,
   updatePointTransactionBalance,
-} from "#database/queries/usage-points.ts";
+} = await import("#database/queries/usage-points.ts");
 
 type FakeDb = { db: Database; calls: string[] };
 

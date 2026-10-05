@@ -8,7 +8,11 @@ import type {
   CustomProviderReader,
   CustomProviderRecord,
 } from "#auth/custom-store.ts";
-import { AuthService } from "#auth/service.ts";
+import { mockDatabaseQueries } from "#auth/db-mock.ts";
+
+mockDatabaseQueries();
+
+const { AuthService } = await import("#auth/service.ts");
 
 type Store = Map<string, string>;
 

@@ -9,7 +9,11 @@ import {
   disabledModelsKey,
   type OpendumRedis,
 } from "@opendum/redis";
-import {
+import { mockDatabaseQueries } from "#auth/db-mock.ts";
+
+mockDatabaseQueries();
+
+const {
   bumpAnalyticsCacheVersionThrottled,
   getCachedAPIKeyValidation,
   getCachedDisabledModels,
@@ -17,7 +21,7 @@ import {
   setCachedAPIKeyValidation,
   setCachedDisabledModels,
   touchAPIKeyLastUsedThrottled,
-} from "#auth/cache.ts";
+} = await import("#auth/cache.ts");
 
 type RedisCall = { op: string; key: string; value?: string; options?: unknown };
 

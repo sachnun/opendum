@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { Registry } from "@opendum/models/runtime";
-import { isModelUsableByAccounts, isModelUsableBySharedAccounts } from "#auth/availability.ts";
 import { emptyAvailability, type AccountModelAvailability } from "#auth/types.ts";
+import { mockDatabaseQueries } from "#auth/db-mock.ts";
+
+mockDatabaseQueries();
+
+const { isModelUsableByAccounts, isModelUsableBySharedAccounts } = await import("#auth/availability.ts");
 
 function fakeRegistry(options: {
   canonical?: Record<string, string>;

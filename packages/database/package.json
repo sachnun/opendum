@@ -14,7 +14,7 @@
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "test": "tsx --test ./src/*.test.ts",
+    "test": "node --experimental-test-module-mocks --import tsx --test ./src/*.test.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint ."
   },

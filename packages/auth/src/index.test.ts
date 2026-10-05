@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import {
+import { mockDatabaseQueries } from "#auth/db-mock.ts";
+
+mockDatabaseQueries();
+
+const {
   AuthService,
   createCustomStore,
   emptyAuthResult,
@@ -8,7 +12,7 @@ import {
   isAuthlessProvider,
   isAuthlessProviderAccountId,
   parseModelParam,
-} from "#auth/index.ts";
+} = await import("#auth/index.ts");
 
 describe("auth index exports", () => {
   it("re-exports the public surface", () => {
