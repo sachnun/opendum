@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { compareModelIds } from "~~/lib/model-sort";
+import { compareModelIds } from "#shared/model/sort";
 
 type AccessMode = "all" | "whitelist" | "blacklist";
 

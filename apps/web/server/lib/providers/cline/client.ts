@@ -1,6 +1,6 @@
 import { fetchInternalProvider } from "~~/server/lib/proxy/internal-relay";
-import { formatProviderHttpError } from "../provider-http-errors.js";
-import type { OAuthResult } from "../types.js";
+import { formatProviderHttpError } from "../provider-http-errors.ts";
+import type { OAuthResult } from "../types.ts";
 import {
   ACCESS_TOKEN_TTL_SECONDS,
   CLIENT_ID,
@@ -11,7 +11,7 @@ import {
   DEVICE_CODE_EXPIRY_SECONDS,
   POLLING_INTERVAL_SECONDS,
   WORKOS_BASE_URL,
-} from "./constants.js";
+} from "./constants.ts";
 
 interface ClineDeviceCodeResponse {
   device_code?: string;

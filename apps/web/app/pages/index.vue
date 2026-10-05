@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { PROVIDER_ACCOUNT_DEFINITIONS } from "../../lib/provider-accounts";
+import { PROVIDER_ACCOUNT_DEFINITIONS } from "#shared/provider-accounts";
 
 definePageMeta({ layout: "web" });
 

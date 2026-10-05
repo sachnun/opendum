@@ -1,0 +1,21 @@
+{
+  "name": "@opendum/extension",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "tsx --test \"./src/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:"
+  },
+  "imports": {
+    "#extension/*": "./src/*"
+  }
+}

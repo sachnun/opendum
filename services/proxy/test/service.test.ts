@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it, vi } from "vitest";
-import { ProxyService } from "../src/core/service.js";
-import { chatCompletionsConfig } from "../src/core/endpoints.js";
+import { ProxyService } from "../src/core/service.ts";
+import { chatCompletionsConfig } from "../src/core/transport/endpoints.ts";
 import type { AuthResult, AuthService, ModelValidationResult } from "@opendum/auth";
-import type { Provider, ProviderAccount, ProviderRegistry } from "@opendum/providers";
+import type { ProviderRegistry } from "@opendum/providers";
 import type { Registry } from "@opendum/models/runtime";
 import type { OpendumRedis } from "@opendum/redis";
 

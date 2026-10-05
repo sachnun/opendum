@@ -1,10 +1,10 @@
 import { H3, defineHandler, onResponse } from "h3";
-import type { ProxyContext } from "./context.js";
-import { applyCors, defineCorsOptions } from "./middleware/cors.js";
-import { jsonResponse, notFound, unknownEndpoint } from "./routes/errors.js";
-import { registerModelsRoute } from "./routes/models.js";
-import { registerInferenceRoutes } from "./routes/inference.js";
-import { registerInternalRoutes } from "./routes/internal.js";
+import type { ProxyContext } from "./context.ts";
+import { applyCors, defineCorsOptions } from "./middleware/cors.ts";
+import { jsonResponse, notFound, unknownEndpoint } from "./routes/errors.ts";
+import { registerModelsRoute } from "./routes/models.ts";
+import { registerInferenceRoutes } from "./routes/inference.ts";
+import { registerInternalRoutes } from "./routes/internal.ts";
 
 export function createServer(context: ProxyContext): H3 {
   const app = new H3();

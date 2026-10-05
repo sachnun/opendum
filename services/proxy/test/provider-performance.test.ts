@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "vitest";
+import { describe, it, vi } from "vitest";
 import type { OpendumRedis } from "@opendum/redis";
 import type { ProviderAccount } from "@opendum/providers";
 import {
@@ -10,8 +10,8 @@ import {
   scoreProviderMetrics,
   type ProviderRoutingOptions,
   type ProviderScore,
-} from "../src/core/provider-performance.js";
-import { orderProvidersByPerformance, prioritizeAccounts } from "../src/core/service-helpers.js";
+} from "../src/core/health/provider-performance.ts";
+import { orderProvidersByPerformance, prioritizeAccounts } from "../src/core/transport/service-helpers.ts";
 
 const config = DEFAULT_PROVIDER_PERFORMANCE_CONFIG;
 
@@ -126,5 +126,82 @@ describe("ProviderPerformance store", () => {
   it("returns an empty map when there is nothing recorded", async () => {
     const store = new ProviderPerformance(fakeHashRedis(), config);
     assert.equal((await store.scoresForModel("missing")).size, 0);
+  });
+});
+
+function controlRedis(overrides: Record<string, unknown> = {}): OpendumRedis {
+  return {
+    hGet: vi.fn(async () => null),
+    hSet: vi.fn(async () => 1),
+    hGetAll: vi.fn(async () => ({})),
+    expire: vi.fn(async () => true),
+    ...overrides,
+  } as unknown as OpendumRedis;
+}
+
+describe("ProviderPerformance edge cases", () => {
+  it("skips samples that cannot be measured", async () => {
+    const redis = controlRedis();
+    const store = new ProviderPerformance(redis, config);
+    await store.record({ provider: "p", model: "m", ttftMs: 0, outputTokens: 0, durationMs: 100 });
+    assert.equal((redis.hSet as unknown as ReturnType<typeof vi.fn>).mock.calls.length, 0);
+  });
+
+  it("blends stored metrics", async () => {
+    const redis = controlRedis({ hGet: vi.fn(async () => JSON.stringify({ ttftMs: 100, tokensPerSecond: 10, samples: 2, updatedAt: 1 })) });
+    const store = new ProviderPerformance(redis, config);
+    await store.record({ provider: "p", model: "m", ttftMs: 200, outputTokens: 500, durationMs: 1200 });
+    const saved = JSON.parse((redis.hSet as unknown as ReturnType<typeof vi.fn>).mock.calls[0]![2] as string) as { samples: number };
+    assert.equal(saved.samples, 3);
+  });
+
+  it("keeps previous throughput when a sample has none", async () => {
+    const redis = controlRedis({ hGet: vi.fn(async () => JSON.stringify({ ttftMs: 100, tokensPerSecond: 10, samples: 1, updatedAt: 1 })) });
+    const store = new ProviderPerformance(redis, config);
+    await store.record({ provider: "p", model: "m", ttftMs: 50, outputTokens: 0, durationMs: 100 });
+    const saved = JSON.parse((redis.hSet as unknown as ReturnType<typeof vi.fn>).mock.calls[0]![2] as string) as { tokensPerSecond: number; ttftMs: number };
+    assert.equal(saved.tokensPerSecond, 10);
+    assert.equal(saved.ttftMs, 85);
+  });
+
+  it("treats invalid stored metrics as missing", async () => {
+    for (const raw of ["not json", JSON.stringify({ ttftMs: 0, tokensPerSecond: 0 })]) {
+      const redis = controlRedis({ hGet: vi.fn(async () => raw) });
+      const store = new ProviderPerformance(redis, config);
+      await store.record({ provider: "p", model: "m", ttftMs: 120, outputTokens: 100, durationMs: 500 });
+      const saved = JSON.parse((redis.hSet as unknown as ReturnType<typeof vi.fn>).mock.calls[0]![2] as string) as { ttftMs: number };
+      assert.equal(saved.ttftMs, 120);
+    }
+  });
+
+  it("caches scores and expires them", async () => {
+    const cacheable = new ProviderPerformance(controlRedis(), { ...config, cacheTtlSeconds: 10 });
+    const first = await cacheable.scoresForModel("m");
+    const second = await cacheable.scoresForModel("m");
+    assert.equal(first, second);
+
+    const expiring = new ProviderPerformance(controlRedis(), { ...config, cacheTtlSeconds: 0.001 });
+    const before = await expiring.scoresForModel("m");
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const after = await expiring.scoresForModel("m");
+    assert.notEqual(before, after);
+  });
+
+  it("skips invalid scored entries", async () => {
+    const redis = controlRedis({
+      hGetAll: vi.fn(async () => ({ bad: "nope", good: JSON.stringify({ ttftMs: 100, tokensPerSecond: 10, samples: 1, updatedAt: 1 }) })),
+    });
+    const store = new ProviderPerformance(redis, { ...config, cacheTtlSeconds: 0 });
+    const scores = await store.scoresForModel("m");
+    assert.equal(scores.size, 1);
+    assert.equal(scores.has("good"), true);
+  });
+
+  it("swallows redis errors", async () => {
+    const reading = new ProviderPerformance(controlRedis({ hGetAll: vi.fn(async () => { throw new Error("down"); }) }), { ...config, cacheTtlSeconds: 0 });
+    assert.equal((await reading.scoresForModel("m")).size, 0);
+
+    const recording = new ProviderPerformance(controlRedis({ hGet: vi.fn(async () => { throw new Error("down"); }) }), config);
+    await recording.record({ provider: "p", model: "m", ttftMs: 100, outputTokens: 10, durationMs: 200 });
   });
 });

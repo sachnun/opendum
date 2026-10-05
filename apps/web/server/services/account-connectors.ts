@@ -13,7 +13,7 @@ import { API_BASE_URL as harborApiBaseUrl } from "~~/server/lib/providers/harbor
 import { API_BASE_URL as hyperApiBaseUrl } from "~~/server/lib/providers/hyper/constants";
 import { formatProviderHttpError, isLikelyCloudflareChallenge } from "~~/server/lib/providers/provider-http-errors";
 import { getCloudflareValidationUrl } from "~~/server/lib/providers/cloudflare/constants";
-import { API_KEY_PROVIDER_KEYS, type ApiKeyProviderKey } from "~~/lib/provider-accounts";
+import { API_KEY_PROVIDER_KEYS, type ApiKeyProviderKey } from "#shared/provider-accounts";
 import type { ActionResult } from "~~/server/utils/api";
 
 const API_KEY_PROVIDER_ACCOUNT_EXPIRY = new Date("2100-01-01T00:00:00.000Z");

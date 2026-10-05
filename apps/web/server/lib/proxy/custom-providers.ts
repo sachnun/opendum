@@ -1,22 +1,16 @@
 import { and, eq, inArray, isNull, lte, or } from "drizzle-orm";
 
 import { db, customProvider, customProviderModel, providerAccount } from "@opendum/database";
-import { isModelSupported, resolveModelAlias } from "./models.js";
+import { isModelSupported, resolveModelAlias } from "./models.ts";
 
 export interface CustomProviderModels {
   slug: string;
   name: string;
-  /** Model ids that resolve to a built-in model, as canonical ids. */
   models: string[];
-  /** Model ids without a built-in counterpart, kept verbatim. */
   standaloneModels: string[];
   accountIds: string[];
 }
 
-/**
- * Enabled custom providers, keyed by provider slug. A provider is only
- * returned when it has at least one usable account and at least one model.
- */
 export async function listCustomProviderModels(userId: string, options: { includeInactiveAccounts?: boolean } = {}): Promise<CustomProviderModels[]> {
   const providers = await db
     .select({ id: customProvider.id, slug: customProvider.slug, name: customProvider.name })

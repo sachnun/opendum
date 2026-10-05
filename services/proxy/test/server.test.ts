@@ -1,11 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it, vi } from "vitest";
-import type { ProxyContext } from "../src/context.js";
-import { createServer } from "../src/server.js";
+import type { ProxyContext } from "../src/context.ts";
+import { createServer } from "../src/server.ts";
 
-// createServer pulls in the route graph, which reaches @opendum/database/queries.
-// That module eagerly opens a pg pool at import time, so stub it to keep the test
-// independent of DATABASE_URL (the handlers exercised here never query).
 const db = vi.hoisted(() => {
   const noop = () => vi.fn(async () => undefined);
   return {
@@ -80,5 +77,15 @@ describe("cors middleware", () => {
     const response = await app.request("/v1/chat/completions", { method: "OPTIONS" });
     assert.equal(response.status, 204);
     assert.equal(response.headers.get("access-control-allow-origin"), "*");
+  });
+
+  it("redirects the root and answers unknown paths", async () => {
+    const app = createServer(context);
+    const root = await app.request("/");
+    assert.equal(root.status, 308);
+    assert.equal(root.headers.get("location"), "/v1");
+
+    assert.equal((await app.request("/v1")).status, 404);
+    assert.equal((await app.request("/other")).status, 404);
   });
 });

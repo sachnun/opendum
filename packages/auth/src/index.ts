@@ -3,11 +3,11 @@ export {
   isAuthlessProvider,
   isAuthlessProviderAccountId,
   parseModelParam,
-} from "./service.js";
+} from "#auth/service.ts";
 export {
   emptyAuthResult,
   emptyAvailability,
-} from "./types.js";
+} from "#auth/types.ts";
 export type {
   AccountAccess,
   AccountModelAvailability,
@@ -15,10 +15,10 @@ export type {
   ModelAccess,
   ModelValidationResult,
   RateLimitRule,
-} from "./types.js";
-export { createCustomStore } from "./custom-store.js";
+} from "#auth/types.ts";
+export { createCustomStore } from "#auth/custom-store.ts";
 export type {
   CustomProviderModelRecord,
   CustomProviderReader,
   CustomProviderRecord,
-} from "./custom-store.js";
+} from "#auth/custom-store.ts";

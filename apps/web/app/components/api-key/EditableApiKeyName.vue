@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { MeData } from "~~/lib/api-types";
+import type { MeData } from "#shared/api";
 
 const props = withDefaults(
   defineProps<{

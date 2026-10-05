@@ -1,7 +1,7 @@
-import { MODEL_FAMILY_SORT_ORDER, categorizeModelFamily } from "../../lib/model-families";
-import { compareModelEntries } from "../../lib/model-sort";
-import { BY_KEY, getProviderAccountPath, getProviderLabel, type ProviderAccountKey } from "../../lib/provider-accounts";
-import type { PlaygroundOptions } from "../../lib/api-types";
+import { MODEL_FAMILY_SORT_ORDER, categorizeModelFamily } from "#shared/model/families";
+import { compareModelEntries } from "#shared/model/sort";
+import { BY_KEY, getProviderAccountPath, getProviderLabel, type ProviderAccountKey } from "#shared/provider-accounts";
+import type { PlaygroundOptions } from "#shared/api";
 import {
   generateId,
   normalizeQueryParam,
@@ -30,7 +30,7 @@ import {
   applyRouteSelectorToRequestBody,
   adaptRequestOverridesForEndpoint,
   formatToolArguments,
-} from "../../lib/playground-protocol";
+} from "#shared/playground-protocol";
 import type {
   ReasoningEffort,
   PlaygroundEndpoint,
@@ -40,7 +40,7 @@ import type {
   ParsedCompletionData,
   ResponseMetrics,
   PlaygroundSettings,
-} from "../../lib/playground-protocol";
+} from "#shared/playground-protocol";
 
 export function usePlayground() {
 

@@ -4,27 +4,30 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./clean-key": "./src/clean-key.ts",
-    "./families": "./src/families.ts",
-    "./merge": "./src/merge.ts",
-    "./probes": "./src/probes.ts",
-    "./registry": "./src/registry.ts",
-    "./runtime": "./src/runtime.ts"
+    "./clean-key": "./src/model/clean-key.ts",
+    "./families": "./src/model/families.ts",
+    "./merge": "./src/model/merge.ts",
+    "./probes": "./src/model/probes.ts",
+    "./registry": "./src/registry/registry.ts",
+    "./runtime": "./src/registry/runtime.ts"
   },
   "imports": {
     "#models/*": "./src/*"
   },
   "scripts": {
     "refresh": "tsx ./scripts/models.ts",
-    "test": "tsx --test ./src/*.test.ts",
-    "typecheck": "tsc --noEmit"
+    "test": "tsx --test \"./src/**/*.test.ts\" \"./scripts/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
   },
   "dependencies": {
-    "fuzzball": "^2.2.6"
+    "@opendum/extension": "workspace:*",
+    "fuzzball": "^2.2.6",
+    "p-retry": "catalog:"
   },
   "devDependencies": {
-    "@types/node": "^26.1.1",
-    "tsx": "^4.23.13",
-    "typescript": "^6.0.3"
+    "@types/node": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:"
   }
 }

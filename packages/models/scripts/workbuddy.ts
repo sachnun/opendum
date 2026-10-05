@@ -1,13 +1,16 @@
 #!/usr/bin/env node
 
+import { isDirectRun, runSourceCli } from "./cli.ts";
+import type { ModelSource } from "./source.ts";
+
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
-import { buildModelIndex, persistModel, syncProviderModels } from "#models/registry.ts";
-import { fetchJson } from "#models/http.ts";
+import { buildModelIndex, persistModel, syncProviderModels } from "#models/registry/registry.ts";
+import { fetchJson } from "#models/lib/http.ts";
 
 const PROVIDER_NAME = "workbuddy";
 const WORKBUDDY_NPM_PACKAGE = "@tencent-ai/codebuddy-code";
@@ -15,7 +18,6 @@ const WORKBUDDY_PRODUCT_MEMBER = "package/product.json";
 
 const MIN_EXPECTED_MODELS = 20;
 
-// House/preset routing ids (default-model, fast-model, ...) are not real models.
 const HOUSE_MODEL_PATTERN = /(?:^|-)model$/;
 
 function isExcludedId(id) {
@@ -50,14 +52,14 @@ async function fetchWorkbuddyCatalog() {
         maxBuffer: 32 * 1024 * 1024,
       });
     } catch (error) {
-      throw new Error(`Failed to extract ${WORKBUDDY_PRODUCT_MEMBER} from ${WORKBUDDY_NPM_PACKAGE}@${version}`);
+      throw new Error(`Failed to extract ${WORKBUDDY_PRODUCT_MEMBER} from ${WORKBUDDY_NPM_PACKAGE}@${version}`, { cause: error });
     }
 
     let product;
     try {
       product = JSON.parse(source);
     } catch (error) {
-      throw new Error(`Invalid ${WORKBUDDY_PRODUCT_MEMBER} JSON in ${WORKBUDDY_NPM_PACKAGE}@${version}`);
+      throw new Error(`Invalid ${WORKBUDDY_PRODUCT_MEMBER} JSON in ${WORKBUDDY_NPM_PACKAGE}@${version}`, { cause: error });
     }
     const models = product?.models;
     if (!Array.isArray(models) || models.length === 0) {
@@ -153,7 +155,7 @@ function enforceHouseIgnored(modelsDir) {
   return changed;
 }
 
-async function main() {
+async function run() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
   const modelsDir = resolve(scriptDir, "../data");
 
@@ -173,7 +175,7 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
-});
+
+export const source: ModelSource = { name: "workbuddy", run };
+
+if (isDirectRun(import.meta.url)) runSourceCli(source);

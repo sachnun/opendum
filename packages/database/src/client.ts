@@ -1,7 +1,7 @@
 import { drizzle as drizzleNodePg, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
-import * as relations from "./relations.js";
-import * as schema from "./schema/index.js";
+import * as relations from "#database/relations.ts";
+import * as schema from "#database/schema/index.ts";
 
 export const fullSchema = { ...schema, ...relations };
 

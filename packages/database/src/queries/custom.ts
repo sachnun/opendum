@@ -1,6 +1,6 @@
 import { and, asc, eq } from "drizzle-orm";
-import { db, type Database } from "../client.js";
-import { customProvider, customProviderModel } from "../schema/custom.js";
+import { db, type Database } from "#database/client.ts";
+import { customProvider, customProviderModel } from "#database/schema/custom.ts";
 
 export async function listCustomProviders(userId: string, database: Database = db) {
   return database

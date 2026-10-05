@@ -1,20 +1,18 @@
 #!/usr/bin/env node
 
+import { isDirectRun, runSourceCli } from "./cli.ts";
+import type { ModelSource } from "./source.ts";
+
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildModelIdMap, syncProviderModels } from "#models/registry.ts";
-import { fetchJson } from "#models/http.ts";
-import { stripParamInfoKey } from "#models/clean-key.ts";
+import { buildModelIdMap, syncProviderModels } from "#models/registry/registry.ts";
+import { fetchJson } from "#models/lib/http.ts";
+import { stripParamInfoKey } from "#models/model/clean-key.ts";
 
 const PROVIDER_NAME = "cline";
-// Cline exposes its curated free model list on the recommended-models
-// endpoint (the same source the Cline CLI/VSCode use to zero-cost free
-// models). Only entries under `free` are usable without ClinePass credits.
 const CLINE_RECOMMENDED_MODELS_URL =
   "https://api.cline.bot/api/v1/ai/cline/recommended-models";
 
-// Minimum number of free models expected; guards against silent breakage of
-// the recommended-models payload format.
 const MIN_EXPECTED_MODELS = 1;
 
 function toModelKey(modelId) {
@@ -54,7 +52,7 @@ async function fetchClineFreeModelIds() {
   return [...new Set(ids)].sort((a, b) => a.localeCompare(b));
 }
 
-async function main() {
+async function run() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
   const modelsDir = resolve(scriptDir, "../data");
 
@@ -70,7 +68,7 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
-});
+
+export const source: ModelSource = { name: "cline", run };
+
+if (isDirectRun(import.meta.url)) runSourceCli(source);

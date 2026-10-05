@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { MODEL_FAMILY_SORT_ORDER, getModelFamilyAnchorId } from "../../lib/model-families";
-import { compareModelEntries } from "../../lib/model-sort";
-import { buildDayKeys, buildEmptyModelStats, buildHourKeys, MODEL_DURATION_LOOKBACK_HOURS, MODEL_STATS_DAYS, type ModelStats } from "../../lib/model-stats";
-import { costEntries, formatCostPoints, type ModelCost } from "../../lib/model-cost";
-import { getProviderLabel } from "../../lib/provider-accounts";
+import { MODEL_FAMILY_SORT_ORDER, getModelFamilyAnchorId } from "#shared/model/families";
+import { compareModelEntries } from "#shared/model/sort";
+import { buildDayKeys, buildEmptyModelStats, buildHourKeys, MODEL_DURATION_LOOKBACK_HOURS, MODEL_STATS_DAYS, type ModelStats } from "#shared/model/stats";
+import { costEntries, formatCostPoints, type ModelCost } from "#shared/model/cost";
+import { getProviderLabel } from "#shared/provider-accounts";
 
 definePageMeta({ middleware: "auth", layout: "web" });
 

@@ -3,8 +3,8 @@ import { eq } from "drizzle-orm";
 import { db, providerAccount, type ProviderAccount } from "@opendum/database";
 import { decrypt, encrypt, hashString } from "~~/server/lib/encryption";
 import { fetchInternalProvider } from "~~/server/lib/proxy/internal-relay";
-import type { OAuthResult } from "../types.js";
-import { formatProviderHttpError } from "../provider-http-errors.js";
+import type { OAuthResult } from "../types.ts";
+import { formatProviderHttpError } from "../provider-http-errors.ts";
 import {
   AUTHORIZE_ENDPOINT,
   BROWSER_REDIRECT_URI,
@@ -12,7 +12,7 @@ import {
   REFRESH_BUFFER_SECONDS,
   REFRESH_ENDPOINT,
   TOKEN_ENDPOINT,
-} from "./constants.js";
+} from "./constants.ts";
 
 interface KiroTokenExchangeResponse {
   accessToken: string;

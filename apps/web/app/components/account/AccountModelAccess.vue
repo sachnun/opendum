@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { compareModelIds } from "~~/lib/model-sort";
-import type { ProviderAccountModelHealthItem } from "~~/lib/api-types";
+import { compareModelIds } from "#shared/model/sort";
+import type { ProviderAccountModelHealthItem } from "#shared/api";
 
 const props = defineProps<{
   accountId: string;

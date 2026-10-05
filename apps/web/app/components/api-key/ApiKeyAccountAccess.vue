@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { getProviderLabel } from "~~/lib/provider-accounts";
+import { getProviderLabel } from "#shared/provider-accounts";
 
 type AccessMode = "all" | "whitelist" | "blacklist";
 

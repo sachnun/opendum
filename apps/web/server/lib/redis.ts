@@ -24,7 +24,6 @@ export async function getRedisClient(): Promise<RedisClientType> {
     return ensureConnected(redisClient);
   }
 
-  // Reuse cached client across HMR in dev
   const cached = (globalThis as Record<string, unknown>)[globalKey] as RedisClientType | undefined;
   if (cached) {
     redisClient = cached;

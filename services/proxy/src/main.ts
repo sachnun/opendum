@@ -1,8 +1,8 @@
 import { loadEnv, loadEnvFile } from "@opendum/config";
 import { serve } from "h3";
-import { toProxyConfig } from "./config.js";
-import { createContext, disposeContext } from "./context.js";
-import { createServer } from "./server.js";
+import { toProxyConfig } from "./config.ts";
+import { createContext, disposeContext } from "./context.ts";
+import { createServer } from "./server.ts";
 
 async function main(): Promise<void> {
   loadEnvFile(".env");
@@ -34,7 +34,6 @@ async function main(): Promise<void> {
     try {
       await server.close();
     } catch {
-      // the server is already closing
     } finally {
       clearTimeout(forced);
     }

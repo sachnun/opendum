@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { cn } from "~~/lib/utils";
-import type { Provider } from "~~/lib/provider-auth-config";
+import { cn } from "#shared/utils";
+import type { Provider } from "#shared/provider-auth-config";
 
 const props = withDefaults(
   defineProps<{

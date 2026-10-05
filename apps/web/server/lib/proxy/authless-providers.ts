@@ -1,4 +1,4 @@
-import { getAuthlessProviderModels } from "./models.js";
+import { getAuthlessProviderModels } from "./models.ts";
 
 export const AUTHLESS_PROVIDER_KEYS = ["opencode"] as const;
 

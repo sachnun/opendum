@@ -1,0 +1,10 @@
+export const FAILED_COOLDOWN_MS = 10 * 60 * 1000;
+export const ACCOUNT_COOLDOWN_UNHEALTHY_THRESHOLD = 10;
+export const MAX_STORED_ERROR_LEN = 10000;
+export const TOKEN_REFRESH_LOCK_PREFIX = "opendum:provider-account:refresh-lock:";
+export const TOKEN_REFRESH_LOCK_TTL_SECONDS = 120;
+export const REFRESH_FAIL_COUNT_PREFIX = "opendum:provider-account:refresh-fail-count:";
+export const REFRESH_FAIL_COUNT_TTL_SECONDS = 30 * 24 * 60 * 60;
+export const REFRESH_MAX_CONSECUTIVE_FAILURES = 5;
+export const HYPERCREDITS_BALANCE_PREFIX = "opendum:hypercredits:balance:";
+export const HYPERCREDITS_BALANCE_TTL_SECONDS = 30 * 24 * 60 * 60;

@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import type { ActionResult, CustomProviderListItem, CustomProviderModelRow, ErrorHistoryResult, ProviderAccountUpdateData, ProviderDetailData, ProviderDetailDeltaData, ProviderDetailResponse, ProviderStats, QuotaGroupDisplay, QuotaProviderKey } from "../../lib/api-types";
-import { BY_KEY, getProviderFromSlug, QUOTA_PROVIDER_KEYS, type ProviderAccountKey } from "../../lib/provider-accounts";
-import { COMMON_HEADER_NAMES } from "../../lib/headers";
-import { requestErrorMessage } from "../../lib/utils";
-import { warmIdbStore } from "../utils/idb";
+import type { ActionResult, CustomProviderListItem, CustomProviderModelRow, ErrorHistoryResult, ProviderAccountUpdateData, ProviderDetailData, ProviderDetailDeltaData, ProviderDetailResponse, ProviderStats, QuotaGroupDisplay, QuotaProviderKey } from "#shared/api";
+import { BY_KEY, getProviderFromSlug, QUOTA_PROVIDER_KEYS, type ProviderAccountKey } from "#shared/provider-accounts";
+import { COMMON_HEADER_NAMES } from "#shared/headers";
+import { requestErrorMessage } from "#shared/utils";
+import { warmIdbStore } from "../utils/idb.ts";
 
 definePageMeta({
   middleware: ["provider", "auth"],

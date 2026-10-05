@@ -1,6 +1,6 @@
 import type { H3Event } from "h3";
 
-import { createAuth, type AuthSession } from "~~/lib/auth";
+import { createAuth, type AuthSession } from "~~/server/lib/auth";
 
 export async function getSessionFromEvent(event: H3Event): Promise<AuthSession> {
   return await createAuth().api.getSession({ headers: event.headers });

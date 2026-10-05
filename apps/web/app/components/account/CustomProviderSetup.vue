@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { cn, requestErrorMessage } from "~~/lib/utils";
-import { COMMON_HEADER_NAMES } from "~~/lib/headers";
-import type { ActionResult } from "~~/lib/api-types";
+import { cn, requestErrorMessage } from "#shared/utils";
+import { COMMON_HEADER_NAMES } from "#shared/headers";
+import type { ActionResult } from "#shared/api";
 
 interface HeaderRow {
   key: string;

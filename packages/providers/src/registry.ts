@@ -1,17 +1,9 @@
 import type { Registry } from "@opendum/models/runtime";
 import type { OpendumRedis } from "@opendum/redis";
-import { createTransport, type EgressFetch, type Logger, type MutableTransport } from "./http.js";
-import type { FallbackState } from "./fallback.js";
-import { OpenAICompatibleProvider, SUPPORTED_HARBOR, SUPPORTED_HYPER, SUPPORTED_KILO, SUPPORTED_NVIDIA, SUPPORTED_OPENROUTER, SUPPORTED_ZENMUX } from "./openai-compatible.js";
-import { OpencodeProvider } from "./opencode.js";
-import { ClineProvider } from "./cline.js";
-import { WorkbuddyProvider } from "./workbuddy.js";
-import { PerchProvider } from "./perch.js";
-import { CodexProvider } from "./codex.js";
-import { KiroProvider } from "./kiro.js";
-import { AntigravityProvider } from "./antigravity.js";
-import { WorkersAiProvider } from "./workers-ai.js";
-import type { AuthlessProvider, CredentialRefresher, Provider } from "./types.js";
+import { createTransport, type EgressFetch, type Logger, type MutableTransport } from "#providers/api/http.ts";
+import type { FallbackState } from "#providers/lib/fallback.ts";
+import type { AuthlessProvider, CredentialRefresher, Provider } from "#providers/model/types.ts";
+import type { ProviderDeps, ProviderExtension } from "#providers/extension/types.ts";
 
 export type ProviderRegistryOptions = {
   models: Registry;
@@ -19,6 +11,7 @@ export type ProviderRegistryOptions = {
   redis?: OpendumRedis | null;
   logger?: Logger;
   directFetch?: (url: string, init?: RequestInit) => Promise<Response>;
+  extensions?: ProviderExtension[];
 };
 
 export class ProviderRegistry {
@@ -26,90 +19,20 @@ export class ProviderRegistry {
   private readonly providers = new Map<string, Provider>();
 
   constructor(options: ProviderRegistryOptions) {
-    const direct = options.directFetch ?? ((url, init) => fetch(url, init));
+    const direct = options.directFetch ?? ((url: string, init?: RequestInit) => fetch(url, init));
     this.transport = createTransport(direct);
-    const common = {
+
+    const deps: ProviderDeps = {
       registry: options.models,
       transport: this.transport,
       fallback: options.fallback,
+      redis: options.redis ?? null,
       logger: options.logger,
     };
 
-    this.register(new OpencodeProvider(common));
-    this.register(new ClineProvider({ registry: options.models, transport: this.transport }));
-    this.register(new WorkbuddyProvider({ registry: options.models, transport: this.transport }));
-    this.register(new PerchProvider({ registry: options.models, transport: this.transport }));
-    this.register(new KiroProvider({ registry: options.models, transport: this.transport }));
-    this.register(
-      new AntigravityProvider({
-        registry: options.models,
-        transport: this.transport,
-        redis: options.redis ?? null,
-      })
-    );
-    this.register(
-      new CodexProvider({
-        registry: options.models,
-        transport: this.transport,
-        redis: options.redis ?? null,
-      })
-    );
-    this.register(new WorkersAiProvider({ registry: options.models, transport: this.transport }));
-    this.register(
-      new OpenAICompatibleProvider({
-        name: "openrouter",
-        baseUrl: "https://openrouter.ai/api/v1",
-        supportedParams: SUPPORTED_OPENROUTER,
-        trimPrefix: "openrouter/",
-        ...common,
-      })
-    );
-    this.register(
-      new OpenAICompatibleProvider({
-        name: "nvidia_nim",
-        baseUrl: "https://integrate.api.nvidia.com/v1",
-        supportedParams: SUPPORTED_NVIDIA,
-        trimPrefix: "nvidia_nim/",
-        ...common,
-      })
-    );
-    this.register(
-      new OpenAICompatibleProvider({
-        name: "kilo_code",
-        baseUrl: "https://api.kilo.ai/api/gateway",
-        fallbackBaseUrl: "https://unroxy.koyeb.app/api.kilo.ai/api/gateway",
-        supportedParams: SUPPORTED_KILO,
-        trimPrefix: "kilo_code/",
-        ...common,
-      })
-    );
-    this.register(
-      new OpenAICompatibleProvider({
-        name: "harbor",
-        baseUrl: "https://tokenharbor.ai/v1",
-        supportedParams: SUPPORTED_HARBOR,
-        trimPrefix: "harbor/",
-        ...common,
-      })
-    );
-    this.register(
-      new OpenAICompatibleProvider({
-        name: "zenmux",
-        baseUrl: "https://zenmux.ai/api/v1",
-        supportedParams: SUPPORTED_ZENMUX,
-        trimPrefix: "zenmux/",
-        ...common,
-      })
-    );
-    this.register(
-      new OpenAICompatibleProvider({
-        name: "hyper",
-        baseUrl: "https://hyper.charm.land/v1",
-        supportedParams: SUPPORTED_HYPER,
-        trimPrefix: "hyper/",
-        ...common,
-      })
-    );
+    for (const extension of options.extensions ?? []) {
+      this.register(extension.create(deps));
+    }
   }
 
   private register(provider: Provider): void {

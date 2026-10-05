@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 
+import { isDirectRun, runSourceCli } from "./cli.ts";
+import type { ModelSource } from "./source.ts";
+
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildModelIdMap, syncProviderModels } from "#models/registry.ts";
-import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "#models/http.ts";
-import { stripParamInfoKey } from "#models/clean-key.ts";
+import { buildModelIdMap, syncProviderModels } from "#models/registry/registry.ts";
+import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "#models/lib/http.ts";
+import { stripParamInfoKey } from "#models/model/clean-key.ts";
 
 const KILO_CODE_MODELS_URL = "https://api.kilo.ai/api/gateway/models";
 
@@ -13,12 +16,10 @@ function toModelKey(modelId) {
     return stripParamInfoKey(modelId.replace("/", "-"));
   }
 
-  // Strip provider prefix (e.g. "minimax/minimax-m2.5:free" → "minimax-m2.5:free")
   const withoutProvider = modelId.includes("/")
     ? modelId.slice(modelId.indexOf("/") + 1)
     : modelId;
 
-  // Drop any trailing parameter suffixes (e.g. ":free", ":optimized:free").
   const withoutParams = withoutProvider.replace(/(?::[a-zA-Z0-9_-]+)+$/, "");
 
   const modelKey = withoutParams
@@ -78,7 +79,7 @@ async function fetchKiloCodeModels() {
     : new Error("Failed to fetch Kilo Code model list");
 }
 
-async function main() {
+async function run() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
   const modelsDir = resolve(scriptDir, "../data");
 
@@ -100,7 +101,7 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? (error.stack ?? error.message) : String(error));
-  process.exitCode = 1;
-});
+
+export const source: ModelSource = { name: "kilo-code", run };
+
+if (isDirectRun(import.meta.url)) runSourceCli(source);

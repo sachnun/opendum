@@ -8,10 +8,10 @@ import { getAuthlessProviderAccounts, isSyntheticAuthlessAccount } from "~~/serv
 import { listCustomProviderModels } from "~~/server/lib/proxy/custom-providers";
 import { getAllFamilies, getAllModels, getModelFamily, getProvidersForModel, isModelSupported, resolveModelAlias } from "~~/server/lib/proxy/models";
 import { roamingUsagePointsByApiKey } from "~~/server/lib/roaming-points";
-import { compareModelEntries } from "~~/lib/model-sort";
+import { compareModelEntries } from "#shared/model/sort";
 import type { ActionResult } from "~~/server/utils/api";
-import { PROVIDER_ACCOUNT_KEYS } from "./account-providers";
-import { API_KEY_UPDATE_POINT_COST, debitUserPoints } from "./points";
+import { PROVIDER_ACCOUNT_KEYS } from "./account-providers.ts";
+import { API_KEY_UPDATE_POINT_COST, debitUserPoints } from "./points.ts";
 
 const MAX_API_KEY_ACCESS_ENTRIES = 500;
 const MAX_API_KEY_RATE_LIMIT_RULES = 500;

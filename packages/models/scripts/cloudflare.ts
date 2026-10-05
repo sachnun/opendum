@@ -1,14 +1,8 @@
 #!/usr/bin/env node
 
-/**
- * Sync Cloudflare Workers AI model availability into JSON registry.
- *
- * Data source: Cloudflare's public docs repository (no auth required)
- *   https://github.com/cloudflare/cloudflare-docs/tree/production/src/content/workers-ai-models
- *
- * The account API requires Cloudflare credentials, so the scheduled refresh uses
- * the docs model metadata that powers developers.cloudflare.com.
- */
+import { isDirectRun, runSourceCli } from "./cli.ts";
+import type { ModelSource } from "./source.ts";
+
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -17,9 +11,9 @@ import {
   getProviderUpstream,
   syncProviderModels,
   persistModel,
-} from "#models/registry.ts";
-import { fetchJson, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "#models/http.ts";
-import { stripParamInfoKey } from "#models/clean-key.ts";
+} from "#models/registry/registry.ts";
+import { fetchJson } from "#models/lib/http.ts";
+import { stripParamInfoKey } from "#models/model/clean-key.ts";
 
 const PROVIDER_NAME = "workers_ai";
 const WORKERS_AI_MODELS_API_URL = "https://api.github.com/repos/cloudflare/cloudflare-docs/contents/src/content/workers-ai-models?ref=production";
@@ -226,7 +220,7 @@ async function fetchWorkersAIModels() {
   }));
 }
 
-async function main() {
+async function run() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
   const modelsDir = resolve(scriptDir, "../data");
   const reverseMap = buildReverseMap(modelsDir);
@@ -252,7 +246,7 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
-});
+
+export const source: ModelSource = { name: "cloudflare", run };
+
+if (isDirectRun(import.meta.url)) runSourceCli(source);

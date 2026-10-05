@@ -4,9 +4,9 @@ import { fetchAccountQuota, isQuotaProvider } from "@opendum/quota";
 import type { QuotaContext, QuotaJournal } from "@opendum/quota";
 import { assertPublicHost, PrivateHostError } from "@opendum/egress";
 import { decrypt } from "@opendum/crypto";
-import type { ProxyContext } from "../context.js";
-import { validateInternalSignature } from "../middleware/internal-signature.js";
-import { jsonResponse } from "./errors.js";
+import type { ProxyContext } from "../context.ts";
+import { validateInternalSignature } from "../middleware/internal-signature.ts";
+import { jsonResponse } from "./errors.ts";
 
 const MAX_QUOTA_BODY_BYTES = 64 * 1024;
 const MAX_RELAY_BODY_BYTES = 2 << 20;
@@ -116,7 +116,7 @@ function resolveRelayTarget(url: string, method: string): { method: string; targ
   try {
     assertPublicHost(target.hostname);
   } catch (error) {
-    if (error instanceof PrivateHostError) throw new Error("url must not target a private network address");
+    if (error instanceof PrivateHostError) throw new Error("url must not target a private network address", { cause: error });
     throw error;
   }
   return { method: normalizedMethod, target: target.toString() };

@@ -6,11 +6,11 @@ export {
   hashString,
   pkcs7Pad,
   pkcs7Unpad,
-} from "./cryptojs.js";
+} from "#crypto/cryptojs.ts";
 export {
   hmacHex,
   internalSignature,
   playgroundSignature,
   signaturesMatch,
   timingSafeEqualHex,
-} from "./signature.js";
+} from "#crypto/signature.ts";

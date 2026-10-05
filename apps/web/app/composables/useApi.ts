@@ -32,8 +32,8 @@ import type {
   ProviderDetailData,
   ProviderDetailResponse,
   ProviderAccountUpdateData,
-} from "../../lib/api-types";
-import type { DeviceProviderKey, OAuthProviderKey } from "../../lib/provider-accounts";
+} from "#shared/api";
+import type { DeviceProviderKey, OAuthProviderKey } from "#shared/provider-accounts";
 
 type ApiKeyAccessMode = "all" | "whitelist" | "blacklist";
 type PlaygroundEndpoint = "chat_completions" | "messages" | "responses";

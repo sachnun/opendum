@@ -4,8 +4,8 @@ import { eq } from "drizzle-orm";
 import { db, providerAccount, type ProviderAccount } from "@opendum/database";
 import { decrypt, encrypt } from "~~/server/lib/encryption";
 import { fetchInternalProvider } from "~~/server/lib/proxy/internal-relay";
-import type { OAuthResult } from "../types.js";
-import { formatProviderHttpError } from "../provider-http-errors.js";
+import type { OAuthResult } from "../types.ts";
+import { formatProviderHttpError } from "../provider-http-errors.ts";
 import {
   BROWSER_REDIRECT_URI,
   CLIENT_ID,
@@ -16,7 +16,7 @@ import {
   DEVICE_VERIFICATION_URL,
   REFRESH_BUFFER_SECONDS,
   TOKEN_ENDPOINT,
-} from "./constants.js";
+} from "./constants.ts";
 
 interface CodexTokenResponse {
   access_token: string;
@@ -394,7 +394,6 @@ export const codexProvider = {
           .where(eq(providerAccount.id, account.id));
         account.accountId = resolvedAccountId;
       } catch {
-        // Ignore account ID sync failures.
       }
     }
 

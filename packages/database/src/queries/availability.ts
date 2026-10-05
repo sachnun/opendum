@@ -1,8 +1,8 @@
 import { and, eq, inArray, isNull, lte, ne, or } from "drizzle-orm";
-import { db, type Database } from "../client.js";
-import { providerAccount, providerAccountDisabledModel } from "../schema/accounts.js";
-import { disabledModel } from "../schema/keys.js";
-import { userSharingSetting } from "../schema/usage.js";
+import { db, type Database } from "#database/client.ts";
+import { providerAccount, providerAccountDisabledModel } from "#database/schema/accounts.ts";
+import { disabledModel } from "#database/schema/keys.ts";
+import { userSharingSetting } from "#database/schema/usage.ts";
 
 export async function listDisabledModelsByUser(userId: string, database: Database = db) {
   const rows = await database

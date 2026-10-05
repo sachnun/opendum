@@ -8,7 +8,7 @@ import {
   parseQuotaNumber,
   parseResetIso,
   quotaFallbackTier,
-} from "./index.js";
+} from "#quota/index.ts";
 
 describe("quota helpers", () => {
   it("clamps fractions", () => {

@@ -7,7 +7,7 @@ import type {
   PlaygroundOptions,
   ProviderAccountDetailItem,
   ProviderDetailData,
-} from "../../lib/api-types";
+} from "#shared/api";
 
 type ShellAccountSummary = {
   accountCounts: Record<string, number>;

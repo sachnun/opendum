@@ -1,8 +1,9 @@
 import { assert, describe, it } from "vitest";
-import { chatCompletionsConfig, messagesConfig, responsesConfig, transformAnthropicToOpenAI, transformOpenAIToAnthropic } from "../src/core/endpoints.js";
-import { SseScanner } from "../src/core/sse.js";
-import { isRouteError } from "../src/core/types.js";
-import { retryMetadata, sanitizedProxyError, shouldRotate } from "../src/core/errors.js";
+import { chatCompletionsConfig, messagesConfig, responsesConfig } from "../src/core/transport/endpoints.ts";
+import { transformAnthropicToOpenAI, transformOpenAIToAnthropic } from "../src/core/streaming/anthropic-format.ts";
+import { SseScanner } from "../src/core/streaming/sse.ts";
+import { isRouteError } from "../src/core/types.ts";
+import { retryMetadata, sanitizedProxyError, shouldRotate } from "../src/core/transport/errors.ts";
 
 describe("chat completions parse", () => {
   it("rejects a missing model", () => {

@@ -1,11 +1,14 @@
 #!/usr/bin/env node
 
+import { isDirectRun, runSourceCli } from "./cli.ts";
+import type { ModelSource } from "./source.ts";
+
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { syncProviderModels } from "#models/registry.ts";
-import { fetchText, fetchJson } from "#models/http.ts";
-import { stripParamInfoKey } from "#models/clean-key.ts";
+import { syncProviderModels } from "#models/registry/registry.ts";
+import { fetchText, fetchJson } from "#models/lib/http.ts";
+import { stripParamInfoKey } from "#models/model/clean-key.ts";
 
 const OPENCODE_MODELS_URL = "https://opencode.ai/zen/v1/models";
 const OPENCODE_ZEN_DOCS_URL = "https://raw.githubusercontent.com/anomalyco/opencode/dev/packages/web/src/content/docs/zen.mdx";
@@ -190,7 +193,7 @@ function buildProviderConfigByModel(modelMap, endpointByModelId) {
   return configByModel;
 }
 
-async function main() {
+async function run() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
   const modelsDir = resolve(scriptDir, "../data");
 
@@ -214,7 +217,7 @@ async function main() {
   });
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
-});
+
+export const source: ModelSource = { name: "opencode", run };
+
+if (isDirectRun(import.meta.url)) runSourceCli(source);

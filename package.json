@@ -8,9 +8,15 @@
     "db:push": "pnpm --filter @opendum/database db:push",
     "db:generate": "pnpm --filter @opendum/database db:generate",
     "db:migrate": "pnpm --filter @opendum/database db:migrate",
-    "models:refresh": "pnpm --filter @opendum/models refresh && pnpm --filter @opendum/web family-ranking"
+    "models:refresh": "pnpm --filter @opendum/models refresh && pnpm --filter @opendum/web family-ranking",
+    "lint": "eslint packages services",
+    "lint:fix": "eslint packages services --fix"
   },
   "devDependencies": {
-    "edgeone": "^1.6.34"
+    "edgeone": "^1.6.34",
+    "@eslint/js": "^10.0.0",
+    "eslint": "catalog:",
+    "eslint-plugin-no-comments": "catalog:",
+    "typescript-eslint": "^8.62.1"
   }
 }

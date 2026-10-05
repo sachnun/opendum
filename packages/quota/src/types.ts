@@ -45,3 +45,9 @@ export type QuotaContext = {
   decrypt: (value: string) => string;
   getCredentials: (account: QuotaAccount) => Promise<string>;
 };
+
+export interface QuotaProvider {
+  readonly name: string;
+  readonly needsToken?: boolean;
+  fetch(ctx: QuotaContext, account: QuotaAccount, token: string, forceRefresh: boolean): Promise<AccountQuotaInfo>;
+}

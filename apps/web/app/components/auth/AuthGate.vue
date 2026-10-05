@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useSession } from "~~/lib/auth-client";
+import { useSession } from "~/utils/auth-client";
 
 const { data: session } = await useSession(useFetch);
 const isAuthenticated = computed(() => Boolean(session.value?.user));

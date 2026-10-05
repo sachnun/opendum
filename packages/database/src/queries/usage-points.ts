@@ -1,7 +1,7 @@
 import { and, eq, gte, sql } from "drizzle-orm";
 import { createId } from "@paralleldrive/cuid2";
-import { db, type Database } from "../client.js";
-import { pointTransaction, usageLog, userPointBalance } from "../schema/usage.js";
+import { db, type Database } from "#database/client.ts";
+import { pointTransaction, usageLog, userPointBalance } from "#database/schema/usage.ts";
 
 export type InsertUsageLogParams = {
   id?: string;

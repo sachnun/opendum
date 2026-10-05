@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 
+import { isDirectRun, runSourceCli } from "./cli.ts";
+import type { ModelSource } from "./source.ts";
+
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildModelIdMap, syncProviderModels } from "#models/registry.ts";
-import { fetchText } from "#models/http.ts";
+import { buildModelIdMap, syncProviderModels } from "#models/registry/registry.ts";
+import { fetchText } from "#models/lib/http.ts";
 
 const PROVIDER_NAME = "harbor";
 const HARBOR_MODELS_URL = "https://tokenharbor.ai/models";
@@ -80,7 +83,7 @@ async function fetchHarborFreeModelIds() {
   return [...new Set(ids)].sort((a, b) => a.localeCompare(b));
 }
 
-async function main() {
+async function run() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
   const modelsDir = resolve(scriptDir, "../data");
 
@@ -96,7 +99,7 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
-});
+
+export const source: ModelSource = { name: "harbor", run };
+
+if (isDirectRun(import.meta.url)) runSourceCli(source);

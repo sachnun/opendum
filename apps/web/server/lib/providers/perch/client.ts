@@ -1,6 +1,6 @@
 import { fetchInternalProvider } from "~~/server/lib/proxy/internal-relay";
-import { formatProviderHttpError } from "../provider-http-errors.js";
-import type { OAuthResult } from "../types.js";
+import { formatProviderHttpError } from "../provider-http-errors.ts";
+import type { OAuthResult } from "../types.ts";
 import {
   PERCH_ACCOUNT_PATH,
   PERCH_APP_URL,
@@ -8,7 +8,7 @@ import {
   PERCH_AUTH_TOKEN_PATH,
   PERCH_REDIRECT_URI,
   PERCH_STARTER_PLAN_CODE,
-} from "./constants.js";
+} from "./constants.ts";
 
 interface PerchAuthConfig {
   supabaseUrl: string;

@@ -6,7 +6,7 @@ import {
   fetch as undiciFetch,
   type RequestInit as UndiciRequestInit,
 } from "undici";
-import { PrivateHostError, isPrivateIp } from "./ssrf.js";
+import { PrivateHostError, isPrivateIp } from "#egress/ssrf.ts";
 
 export type GuardedFetchOptions = {
   headersTimeout?: number;
@@ -30,10 +30,6 @@ type LookupCallback = (
 
 const DEFAULT_CONNECT_TIMEOUT_MS = 15000;
 
-// Resolves DNS ourselves and rejects private/loopback/link-local results before
-// the socket is created, so hostnames that resolve to internal addresses (DNS
-// rebinding) are covered. IP literals never reach this hook, so the connector
-// below validates them separately.
 function guardedLookup(hostname: string, options: unknown, callback: LookupCallback): void {
   dnsLookup(hostname, options as never, (error, address, family) => {
     if (error) {

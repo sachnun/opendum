@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 
+import { isDirectRun, runSourceCli } from "./cli.ts";
+import type { ModelSource } from "./source.ts";
+
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildModelIndex, persistModel, syncProviderModels } from "#models/registry.ts";
-import { fetchJson } from "#models/http.ts";
-import { stripParamInfoKey } from "#models/clean-key.ts";
+import { buildModelIndex, persistModel, syncProviderModels } from "#models/registry/registry.ts";
+import { fetchJson } from "#models/lib/http.ts";
+import { stripParamInfoKey } from "#models/model/clean-key.ts";
 
 const PROVIDER_NAME = "hyper";
 const HYPER_MODELS_URL = "https://hyper.charm.land/v1/models";
@@ -38,10 +41,6 @@ function buildModelMap(models) {
     let modelKey = baseModelKey;
     let suffix = 2;
 
-    // Distinct upstream models must never collapse onto the same key (e.g.
-    // "qwen3.8-27b" vs "qwen3.8-2.4t-a95b" both strip to "qwen3.8"). When a
-    // collision occurs, fall back to the full normalized id so the model stays
-    // addressable instead of being merged as a wrong alias.
     while (map.has(modelKey) && map.get(modelKey) !== modelId) {
       modelKey = suffix === 2 ? fullModelKey(modelId) : `${fullModelKey(modelId)}-${suffix}`;
       suffix += 1;
@@ -108,7 +107,7 @@ async function fetchHyperModels() {
   return models;
 }
 
-async function main() {
+async function run() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
   const modelsDir = resolve(scriptDir, "../data");
 
@@ -129,7 +128,7 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
-});
+
+export const source: ModelSource = { name: "hyper", run };
+
+if (isDirectRun(import.meta.url)) runSourceCli(source);

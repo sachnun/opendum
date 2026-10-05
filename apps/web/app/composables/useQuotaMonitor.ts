@@ -1,7 +1,7 @@
 import { getMany, set } from "idb-keyval";
 import type { ComputedRef } from "vue";
-import type { AccountQuotaInfo, ProviderDetailData, QuotaProviderKey } from "../../lib/api-types";
-import { createIdbStore } from "../utils/idb";
+import type { AccountQuotaInfo, ProviderDetailData, QuotaProviderKey } from "#shared/api";
+import { createIdbStore } from "../utils/idb.ts";
 
 type Account = ProviderDetailData["accounts"][number];
 

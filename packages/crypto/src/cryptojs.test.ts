@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { decrypt, encrypt, hashString } from "./cryptojs.js";
+import { decrypt, encrypt, hashString, pkcs7Pad, pkcs7Unpad } from "#crypto/cryptojs.ts";
 
 describe("cryptojs", () => {
   const secret = "test-secret";
@@ -29,5 +29,16 @@ describe("cryptojs", () => {
 
   it("hashes with sha256 hex", () => {
     assert.equal(hashString("abc"), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+  });
+
+  it("pads and unpads PKCS7 blocks", () => {
+    const padded = pkcs7Pad(Buffer.from("hello"), 16);
+    assert.equal(padded.length, 16);
+    assert.equal(pkcs7Unpad(padded, 16).toString("utf8"), "hello");
+
+    assert.throws(() => pkcs7Unpad(Buffer.alloc(0), 16), /invalid PKCS7 data/);
+    assert.throws(() => pkcs7Unpad(Buffer.alloc(5), 16), /invalid PKCS7 data/);
+    assert.throws(() => pkcs7Unpad(Buffer.from([1, 2, 3, 0]), 4), /invalid PKCS7 padding/);
+    assert.throws(() => pkcs7Unpad(Buffer.from([1, 2, 3, 9]), 4), /invalid PKCS7 padding/);
   });
 });

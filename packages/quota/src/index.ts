@@ -1,4 +1,4 @@
-export type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaFetcher, QuotaGroupDisplay, QuotaJournal } from "./types.js";
+export type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaFetcher, QuotaGroupDisplay, QuotaJournal, QuotaProvider } from "#quota/types.ts";
 export {
   baseQuotaInfo,
   clampFraction,
@@ -11,7 +11,7 @@ export {
   parseQuotaNumber,
   parseQuotaRecord,
   parseResetIso,
-} from "./helpers.js";
-export { encodeQuery, getQuotaJson, putQuotaCache } from "./cache.js";
-export { fetchAccountQuota, isQuotaProvider, quotaProvidersWithoutToken } from "./registry.js";
-export { quotaFallbackTier } from "./fetchers.js";
+} from "#quota/lib/helpers.ts";
+export { encodeQuery, getQuotaJson, putQuotaCache } from "#quota/lib/cache.ts";
+export { fetchAccountQuota, isQuotaProvider, quotaProvidersWithoutToken, registerQuotaProviders } from "#quota/registry.ts";
+export { quotaFallbackTier } from "#quota/providers/common.ts";

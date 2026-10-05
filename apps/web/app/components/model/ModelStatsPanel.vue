@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ModelStats } from "~~/lib/model-stats";
+import type { ModelStats } from "#shared/model/stats";
 
 type StatDeltaTone = "positive" | "negative" | "neutral";
 type StatHitEffect = { text: string; tone: StatDeltaTone; version: number };

@@ -1,20 +1,22 @@
 #!/usr/bin/env node
 
+import { isDirectRun, runSourceCli } from "./cli.ts";
+import type { ModelSource } from "./source.ts";
+
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { buildAaIndex, parseLeaderboard, resolveAaScore } from "#models/aa.ts";
-import { modelProbes } from "#models/probes.ts";
-import { fetchText } from "#models/http.ts";
-import { buildModelIndex, generatedModelPath, readModelJson, writeGeneratedModelJson } from "#models/registry.ts";
-import type { ModelData } from "#models/types.ts";
+import { buildAaIndex, parseLeaderboard, resolveAaScore } from "#models/registry/aa.ts";
+import { modelProbes } from "#models/model/probes.ts";
+import { fetchText } from "#models/lib/http.ts";
+import { buildModelIndex, generatedModelPath, readModelJson, writeGeneratedModelJson } from "#models/registry/registry.ts";
 
 const LEADERBOARD_URL = "https://artificialanalysis.ai/leaderboards/models";
 const USER_AGENT = "Mozilla/5.0 (compatible; opendum-model-sync)";
 const MIN_EXPECTED_MODELS = 100;
 
-async function main(): Promise<void> {
+async function run(): Promise<void> {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
   const modelsDir = resolve(scriptDir, "../data");
   const dryRun = process.argv.includes("--dry-run");
@@ -83,7 +85,7 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error: unknown) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
-});
+
+export const source: ModelSource = { name: "aa", order: 1, run };
+
+if (isDirectRun(import.meta.url)) runSourceCli(source);
