@@ -25,9 +25,9 @@
     "output": 524288
   },
   "cost": {
-    "input": 0,
-    "output": 0,
-    "cacheRead": 0,
+    "input": 0.75,
+    "output": 3,
+    "cacheRead": 0.15,
     "cacheWrite": 0
   },
   "providerConfig": {

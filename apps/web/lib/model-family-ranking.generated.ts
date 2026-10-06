@@ -19,5 +19,6 @@ export const MODEL_FAMILY_RANKING: readonly ModelFamilyRankingEntry[] = [
   { name: "MiniMax", anchorId: "minimax-models", score: 29.2 },
   { name: "Thinking Machines", anchorId: "thinking-machines-models", score: 25.7 },
   { name: "Hunyuan", anchorId: "hunyuan-models", score: 25.3 },
+  { name: "Upstage", anchorId: "upstage-models", score: 24.1 },
   { name: "NVIDIA", anchorId: "nvidia-models", score: 22.9 },
 ];

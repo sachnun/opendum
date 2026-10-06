@@ -26,7 +26,7 @@
   "cost": {
     "input": 3,
     "output": 12.5,
-    "cacheRead": 0.75
+    "cacheRead": 1.5
   },
   "scores": {
     "artificialAnalysis": {

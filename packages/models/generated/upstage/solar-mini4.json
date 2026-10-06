@@ -1,14 +1,11 @@
 {
-  "id": "hy3",
   "providers": [
-    "workbuddy"
-  ],
-  "aliases": [
-    "hy3-paid"
+    "cline"
   ],
   "reasoning": true,
   "reasoning_effort": [
     "low",
+    "medium",
     "high"
   ],
   "modalities": {
@@ -20,25 +17,26 @@
     ]
   },
   "limit": {
-    "context": 262144,
-    "output": 128000
+    "context": 524288,
+    "output": 131072
   },
   "cost": {
-    "input": 0.4125,
-    "output": 1.65,
-    "cacheRead": 0.103125
+    "input": 0.25,
+    "output": 1,
+    "cacheRead": 0.025
   },
   "scores": {
     "artificialAnalysis": {
-      "index": 25.3,
+      "index": 24.1,
       "estimated": false,
       "version": "4.3"
     }
   },
   "providerConfig": {
-    "workbuddy": {
-      "contextWindow": 262144,
-      "maxOutputTokens": 128000
+    "cline": {
+      "upstream": "cline-free/solar-mini4",
+      "contextWindow": 524288,
+      "maxOutputTokens": 131072
     }
   }
 }
