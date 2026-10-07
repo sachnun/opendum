@@ -1,47 +1,52 @@
 #!/usr/bin/env node
 
-import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { syncProviderModels } from "#models/registry.ts";
 import { fetchText, fetchJson } from "#models/http.ts";
 import { stripParamInfoKey } from "#models/clean-key.ts";
+import { syncCliVersion } from "./version-sync.ts";
 
 const OPENCODE_MODELS_URL = "https://opencode.ai/zen/v1/models";
 const OPENCODE_ZEN_DOCS_URL = "https://raw.githubusercontent.com/anomalyco/opencode/dev/packages/web/src/content/docs/zen.mdx";
 const OPENCODE_NPM_URL = "https://registry.npmjs.org/opencode-ai/latest";
 
-const OPENCODE_UA_REGEX = /(const USER_AGENT = "opencode\/)(\d+\.\d+\.\d+)(")/;
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 
-function compareSemver(a, b) {
-  const [aMajor, aMinor, aPatch] = a.split(".").map(Number);
-  const [bMajor, bMinor, bPatch] = b.split(".").map(Number);
-  return aMajor - bMajor || aMinor - bMinor || aPatch - bPatch;
-}
+// OpenCode's emulated version is reused by the OpenCode provider itself, the
+// Codex provider (which masquerades as the OpenCode CLI) and their quota
+// fetchers, so all of them are refreshed together from the npm release.
+const OPENCODE_VERSION_TARGETS = [
+  {
+    label: "opencode provider",
+    path: resolve(REPO_ROOT, "packages/providers/src/opencode.ts"),
+    pattern: /(const USER_AGENT = "opencode\/)(\d+\.\d+\.\d+)(")/,
+  },
+  {
+    label: "codex provider",
+    path: resolve(REPO_ROOT, "packages/providers/src/codex.ts"),
+    pattern: /(User-Agent": `opencode\/)(\d+\.\d+\.\d+)( \()/,
+  },
+  {
+    label: "codex quota fetcher",
+    path: resolve(REPO_ROOT, "packages/quota/src/fetchers.ts"),
+    pattern: /(User-Agent": `opencode\/)(\d+\.\d+\.\d+)( \()/,
+  },
+  {
+    label: "codex web constants",
+    path: resolve(REPO_ROOT, "apps/web/server/lib/providers/codex/constants.ts"),
+    pattern: /(const OPENCODE_VERSION = ")(\d+\.\d+\.\d+)(")/,
+  },
+];
 
 async function syncUserAgent() {
-  const providerPath = resolve(dirname(fileURLToPath(import.meta.url)), "../../../packages/providers/src/opencode.ts");
-  const source = readFileSync(providerPath, "utf-8");
-  const match = source.match(OPENCODE_UA_REGEX);
-  if (!match) {
-    console.warn("Opencode: could not find User-Agent version in the proxy provider, skipping.");
-    return;
-  }
-
-  const currentVersion = match[2];
   const metadata = await fetchJson(OPENCODE_NPM_URL, { label: "opencode-ai npm metadata" });
   const latestVersion = metadata?.version;
   if (typeof latestVersion !== "string" || !/^\d+\.\d+\.\d+$/.test(latestVersion)) {
     console.warn("Opencode: could not determine latest version from npm, skipping.");
     return;
   }
-
-  if (compareSemver(latestVersion, currentVersion) > 0) {
-    writeFileSync(providerPath, source.replace(OPENCODE_UA_REGEX, `$1${latestVersion}$3`));
-    console.log(`Opencode: updated User-Agent version ${currentVersion} -> ${latestVersion}`);
-  } else {
-    console.log(`Opencode: User-Agent version is up to date (${currentVersion}).`);
-  }
+  syncCliVersion("Opencode", OPENCODE_VERSION_TARGETS, latestVersion);
 }
 
 function toModelKey(modelId) {

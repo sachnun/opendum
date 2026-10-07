@@ -20,11 +20,11 @@
  *   node scripts/antigravity.ts --dry-run
  */
 
-import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildModelIndex, persistModel, syncProviderModels } from "#models/registry.ts";
 import { fetchText } from "#models/http.ts";
+import { syncCliVersion } from "./version-sync.ts";
 
 const ANTIGRAVITY_MODELS_URL = "https://antigravity.google/docs/models";
 const PROVIDER_NAME = "antigravity";
@@ -33,28 +33,29 @@ const ANTIGRAVITY_PAID_TIERS = ["g1-pro-tier", "g1-ultra-tier", "standard-tier",
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const packageDir = resolve(scriptDir, "..");
-const repoRoot = resolve(packageDir, "../..");
 const modelsDir = resolve(packageDir, "data");
 
 const ANTIGRAVITY_VERSION_SOURCES = [
   "https://releasebot.io/updates/google/antigravity",
-  "https://antigravity.google/changelog",
 ];
 const VERSION_FETCH_TIMEOUT_MS = 15_000;
 
-const PROXY_PROVIDER_PATH = resolve(
-  repoRoot,
-  "packages/providers/src/antigravity.ts"
-);
-const WEB_CONSTANTS_PATH = resolve(
-  repoRoot,
-  "apps/web/server/lib/providers/antigravity/constants.ts"
-);
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 
-const PROXY_USER_AGENT_REGEX =
-  /(antigravity\/)(\d+\.\d+\.\d+)(\s)/;
-const WEB_USER_AGENT_REGEX =
-  /((?:export\s+)?const USER_AGENT\s*=\s*`antigravity\/)(\d+\.\d+\.\d+)(\s+linux\/amd64`;)/;
+// Antigravity's emulated IDE version is reused by the provider and the quota
+// fetcher, so both are refreshed together from the published release feed.
+const ANTIGRAVITY_VERSION_TARGETS = [
+  {
+    label: "antigravity provider",
+    path: resolve(REPO_ROOT, "packages/providers/src/antigravity.ts"),
+    pattern: /(antigravity\/)(\d+\.\d+\.\d+)( \$\{process\.platform\})/,
+  },
+  {
+    label: "antigravity quota fetcher",
+    path: resolve(REPO_ROOT, "packages/quota/src/fetchers.ts"),
+    pattern: /(antigravity\/)(\d+\.\d+\.\d+)( \$\{process\.platform\})/,
+  },
+];
 
 const GEMINI_3X_FLASH_LEVELS = ["low", "medium", "high"];
 
@@ -425,28 +426,12 @@ function syncJson(modelMap, dryRun, tierConfig) {
 }
 
 function parseLatestVersion(html) {
-  const versionRegex = /\b(\d+\.\d+\.\d+)\b/g;
-  const versions = [];
-  let match;
+  const releases = [...html.matchAll(/"@type":"SoftwareRelease","name":"v?(\d+\.\d+\.\d+)/g)].map(
+    (match) => match[1]
+  );
+  if (releases.length === 0) return null;
 
-  while ((match = versionRegex.exec(html)) !== null) {
-    const version = match[1];
-    if (version.startsWith("1.") && !version.startsWith("1.0")) {
-      versions.push(version);
-    }
-  }
-
-  if (versions.length === 0) {
-    return null;
-  }
-
-  versions.sort((a, b) => {
-    const [aMajor, aMinor, aPatch] = a.split(".").map(Number);
-    const [bMajor, bMinor, bPatch] = b.split(".").map(Number);
-    return bMajor - aMajor || bMinor - aMinor || bPatch - aPatch;
-  });
-
-  return versions[0];
+  return releases.sort(compareSemver).at(-1) ?? null;
 }
 
 function compareSemver(a, b) {
@@ -458,32 +443,7 @@ function compareSemver(a, b) {
   return 0;
 }
 
-function getCurrentVersion() {
-  const source = readFileSync(PROXY_PROVIDER_PATH, "utf-8");
-  const match = source.match(PROXY_USER_AGENT_REGEX);
-  return match ? match[2] : null;
-}
-
-function updateVersion(newVersion) {
-  for (const [filePath, regex] of [
-    [PROXY_PROVIDER_PATH, PROXY_USER_AGENT_REGEX],
-    [WEB_CONSTANTS_PATH, WEB_USER_AGENT_REGEX],
-  ]) {
-    const source = readFileSync(filePath, "utf-8");
-    const updated = source.replace(regex, `$1${newVersion}$3`);
-    writeFileSync(filePath, updated);
-  }
-}
-
 async function syncUserAgent(dryRun) {
-  const currentVersion = getCurrentVersion();
-  if (!currentVersion) {
-    console.warn("[antigravity] Could not find User-Agent version in the proxy provider, skipping.");
-    return;
-  }
-
-  console.log(`[antigravity] Current proxy User-Agent version is ${currentVersion}`);
-
   let latestVersion;
   for (const source of ANTIGRAVITY_VERSION_SOURCES) {
     try {
@@ -504,16 +464,11 @@ async function syncUserAgent(dryRun) {
     return;
   }
 
-  if (compareSemver(latestVersion, currentVersion) > 0) {
-    if (dryRun) {
-      console.log(`[antigravity] Would update User-Agent version ${currentVersion} -> ${latestVersion}`);
-    } else {
-      updateVersion(latestVersion);
-      console.log(`[antigravity] Updated User-Agent version ${currentVersion} -> ${latestVersion}`);
-    }
-  } else {
-    console.log("[antigravity] User-Agent version is already up to date.");
+  if (dryRun) {
+    console.log(`[antigravity] Would sync CLI version to ${latestVersion}`);
+    return;
   }
+  syncCliVersion("antigravity", ANTIGRAVITY_VERSION_TARGETS, latestVersion);
 }
 
 async function main() {

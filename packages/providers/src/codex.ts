@@ -282,7 +282,7 @@ export class CodexProvider implements Provider, CredentialRefresher, RefreshBuff
       "Content-Type": "application/json",
       Accept: "text/event-stream",
       originator: CODEX_ORIGINATOR,
-      "User-Agent": `opencode/1.14.28 (${process.platform} ${process.platform}; ${process.arch})`,
+      "User-Agent": `opencode/1.18.35 (${process.platform} ${process.platform}; ${process.arch})`,
     };
     if (accountId) headers["ChatGPT-Account-Id"] = accountId;
     const sessionId = stringValue(request.body._sessionId);

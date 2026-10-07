@@ -22,23 +22,22 @@ import { PERCH_ACCOUNT_PATH, PERCH_APP_URL, PERCH_AUTH_CONFIG_PATH } from "./end
 
 const PERCH_TURN_TICKET_PATH = "/api/perch-terminal/turn-ticket";
 const PERCH_TURN_TICKET_HEADER = "x-perch-turn-ticket";
-const PERCH_CLI_VERSION = "2.4.98";
+const PERCH_CLI_VERSION = "2.4.105";
 const PERCH_MODEL_CALL_PATH = "/api/perch-terminal/model-call";
 const PERCH_ACCESS_TTL_MS = 60 * 60 * 1000;
 const PERCH_REFRESH_BUFFER_MS = 5 * 60 * 1000;
 const PERCH_CONFIG_CACHE_TTL_MS = 15 * 60 * 1000;
 const PERCH_SESSION_CACHE_TTL_MS = 10 * 60 * 1000;
-const PERCH_FALLBACK_ALIAS = "qwen-3.6";
+const PERCH_FALLBACK_ALIAS = "laguna-s";
 const PERCH_CALL_TIMEOUT_MS = 5000;
 
 const PERCH_MANUAL_OPTION_IDS: Record<string, string> = {
-  "qwen-3.6": "wandb-qwen3-6-35b-a3b",
-  "kimi-2.5": "bedrock-mantle-moonshotai-kimi-k2-5",
-  "glm-5": "bedrock-mantle-zai-glm-5",
-  "qwen3-coder": "bedrock-mantle-qwen-qwen3-coder-480b-a35b-instruct",
-  "nemotron-super": "bedrock-mantle-nvidia-nemotron-super-3-120b",
-  "gemma-4-e2b": "bedrock-mantle-google-gemma-4-e2b",
-  "gemma-4-31b": "bedrock-mantle-google-gemma-4-31b",
+  "laguna-s": "poolside-poolside-laguna-s-2-1",
+  "deepseek-flash-starter": "openrouter-deepseek-deepseek-v4-1-flash",
+  "glm-5.3-flash-starter": "openrouter-z-ai-glm-5-3-flash",
+  "qwen-3.8-27b": "openrouter-qwen-qwen3-8-27b",
+  "qwen-3.8-flash": "openrouter-qwen-qwen3-8-flash",
+  "qwen-3.8-max": "openrouter-qwen-qwen3-8-max-0902",
 };
 
 type Json = Record<string, unknown>;

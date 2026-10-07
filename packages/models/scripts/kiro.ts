@@ -19,11 +19,45 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { syncProviderModels } from "#models/registry.ts";
-import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "#models/http.ts";
+import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS, fetchText } from "#models/http.ts";
 import { stripParamInfoKey } from "#models/clean-key.ts";
+import { syncCliVersion } from "./version-sync.ts";
 
 const KIRO_DOCS_URL = "https://kiro.dev/docs/models/";
+const KIRO_DOWNLOADS_URL = "https://kiro.dev/downloads/";
 const PROVIDER_NAME = "kiro";
+
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
+
+// Kiro's emulated IDE version is reused by the provider and the quota fetcher,
+// so both are refreshed together from the published download build.
+const KIRO_IDE_VERSION_TARGETS = [
+  {
+    label: "kiro provider",
+    path: resolve(REPO_ROOT, "packages/providers/src/kiro.ts"),
+    pattern: /(KiroIDE-)(\d+\.\d+\.\d+)(")/,
+  },
+  {
+    label: "kiro quota fetcher",
+    path: resolve(REPO_ROOT, "packages/quota/src/fetchers.ts"),
+    pattern: /(KiroIDE-)(\d+\.\d+\.\d+)(")/,
+  },
+];
+
+function parseLatestIdeVersion(html) {
+  const labelMatch = html.match(/IDE\s+(\d+\.\d+\.\d+)\s*Latest/);
+  if (labelMatch) return labelMatch[1];
+  const downloadMatch = html.match(/kiro-ide-(\d+\.\d+\.\d+)-stable/);
+  return downloadMatch ? downloadMatch[1] : null;
+}
+
+async function syncIdeVersion() {
+  const html = await fetchText(KIRO_DOWNLOADS_URL, {
+    label: "Kiro downloads page",
+    headers: { Accept: "text/html" },
+  });
+  syncCliVersion("kiro", KIRO_IDE_VERSION_TARGETS, parseLatestIdeVersion(html));
+}
 
 // Display names to skip: real models carry a version/number, so names like
 // "Auto" (a routing pseudo-model) are filtered out automatically.
@@ -488,6 +522,11 @@ async function main() {
       console.log(`  Updated: ${result.updated.join(", ")}`);
     }
   }
+
+  await syncIdeVersion().catch((error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[kiro] IDE version sync failed (${message})`);
+  });
 }
 
 main().catch((error) => {

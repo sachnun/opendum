@@ -14,5 +14,5 @@ export {
   CODEX_TOKEN_ENDPOINT as TOKEN_ENDPOINT,
 } from "@opendum/providers/endpoints";
 
-const OPENCODE_VERSION = "1.14.28";
+const OPENCODE_VERSION = "1.18.35";
 export const CODEX_CHAT_USER_AGENT = `opencode/${OPENCODE_VERSION} (${os.platform()} ${os.release()}; ${os.arch()})`;
