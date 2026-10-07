@@ -201,7 +201,7 @@ test("applyCanonicalMerge carries generated fields the target is missing", () =>
       modalities: { input: ["text", "image"], output: ["text"] },
       limit: { context: 1000000, output: 65536 },
       cost: { input: 0.5, output: 1 },
-      scores: { artificialAnalysis: { index: 23.9, estimated: true, version: "4.3" } },
+      scores: { artificialAnalysis: { index: 23.9, estimated: true } },
     },
     aliases: ["mimo-omni"],
   });
@@ -218,7 +218,7 @@ test("applyCanonicalMerge carries generated fields the target is missing", () =>
 test("applyCanonicalMerge does not let a merged duplicate outrank the target score", () => {
   const target: ModelData = {
     id: "model",
-    scores: { artificialAnalysis: { index: 40, estimated: false, version: "4.3" } },
+    scores: { artificialAnalysis: { index: 40, estimated: false } },
   };
   applyCanonicalMerge(target, {
     kind: "merge",
@@ -228,7 +228,7 @@ test("applyCanonicalMerge does not let a merged duplicate outrank the target sco
     from: "variant",
     to: "model",
     tier: "exact",
-    data: { scores: { artificialAnalysis: { index: 12, estimated: true, version: "4.3" } } },
+    data: { scores: { artificialAnalysis: { index: 12, estimated: true } } },
     aliases: [],
   });
   assert.equal(target.scores?.artificialAnalysis?.index, 40);

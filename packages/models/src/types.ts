@@ -37,7 +37,6 @@ export interface ProviderModelConfig {
 export interface ArtificialAnalysisScores {
   index?: number;
   estimated?: boolean;
-  version?: string;
 }
 
 export interface ModelScores {

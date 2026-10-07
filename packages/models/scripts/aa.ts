@@ -23,13 +23,13 @@ async function main(): Promise<void> {
     label: "Artificial Analysis leaderboard",
     headers: { "User-Agent": USER_AGENT },
   });
-  const { version, models } = parseLeaderboard(html);
+  const models = parseLeaderboard(html);
   if (models.length < MIN_EXPECTED_MODELS) {
     throw new Error(`Artificial Analysis leaderboard returned ${models.length} scored models, expected at least ${MIN_EXPECTED_MODELS}`);
   }
 
-  const index = buildAaIndex(models, version);
-  console.log(`[aa] ${index.bySlug.size} slugs from ${models.length} entries, intelligence index v${version || "unknown"}`);
+  const index = buildAaIndex(models);
+  console.log(`[aa] ${index.bySlug.size} slugs from ${models.length} entries`);
 
   const registry = buildModelIndex(modelsDir);
   let scored = 0;
@@ -58,14 +58,9 @@ async function main(): Promise<void> {
     const next = {
       index: Math.round(hit.index * 10) / 10,
       estimated: hit.estimated,
-      version: version || undefined,
     };
     const current = entry.data.scores?.artificialAnalysis;
-    if (
-      current?.index === next.index
-      && current?.estimated === next.estimated
-      && (current?.version ?? "") === (next.version ?? "")
-    ) {
+    if (current?.index === next.index && current?.estimated === next.estimated) {
       continue;
     }
 

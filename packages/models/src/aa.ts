@@ -6,14 +6,12 @@ export interface AaEntry {
 }
 
 export interface AaIndex {
-  version: string;
   bySlug: Map<string, AaEntry>;
   byEffortlessSlug: Map<string, AaEntry>;
   byShape: Map<string, Map<string, AaEntry>>;
 }
 
 const EFFORT_SUFFIX = /-(?:xhigh|high|medium|low|minimal|adaptive|default|fallback)$/;
-const INDEX_VERSION = /Intelligence Index v([0-9]+(?:\.[0-9]+)*)/;
 const FLIGHT_CHUNK = /self\.__next_f\.push\(\[1,\s*"((?:[^"\\]|\\.)*)"\]\)/g;
 const PARAM_TOKEN = /^(?:\d+(?:\.\d+)?[bmtk]|a\d+(?:\.\d+)?[bmtk]|\d+e|fp\d+|int\d+|q\d+|v\d+(?:\.\d+)*|\d{4,8})$/i;
 const SIZE_TOKEN = /^(?:\d+(?:\.\d+)?[bmtk]|a\d+(?:\.\d+)?[bmtk]|\d+e)$/i;
@@ -121,7 +119,7 @@ function scoredModels(payload: string): Record<string, unknown>[] {
   return best;
 }
 
-export function parseLeaderboard(html: string): { version: string; models: AaEntry[] } {
+export function parseLeaderboard(html: string): AaEntry[] {
   const models: AaEntry[] = [];
   for (const record of scoredModels(flightPayload(html))) {
     const slug = typeof record.slug === "string" ? record.slug.trim() : "";
@@ -133,11 +131,10 @@ export function parseLeaderboard(html: string): { version: string; models: AaEnt
       estimated: record.intelligenceIndexIsEstimated === true,
     });
   }
-  const version = html.match(INDEX_VERSION)?.[1] ?? "";
-  return { version, models };
+  return models;
 }
 
-export function buildAaIndex(models: readonly AaEntry[], version: string): AaIndex {
+export function buildAaIndex(models: readonly AaEntry[]): AaIndex {
   const bySlug = new Map<string, AaEntry>();
   for (const model of models) {
     const key = normalizeAaSlug(model.slug);
@@ -165,7 +162,7 @@ export function buildAaIndex(models: readonly AaEntry[], version: string): AaInd
     byShape.set(key, sizes);
   }
 
-  return { version, bySlug, byEffortlessSlug, byShape };
+  return { bySlug, byEffortlessSlug, byShape };
 }
 
 export function resolveAaScore(probes: Iterable<string | null | undefined>, index: AaIndex): AaEntry | null {

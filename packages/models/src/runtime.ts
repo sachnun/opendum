@@ -42,7 +42,6 @@ export type ModelScores = {
   artificialAnalysis?: {
     index?: number;
     estimated?: boolean;
-    version?: string;
   };
 };
 
