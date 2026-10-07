@@ -31,8 +31,7 @@
   "scores": {
     "artificialAnalysis": {
       "index": 39,
-      "estimated": true,
-      "version": "4.3"
+      "estimated": true
     }
   },
   "providerConfig": {

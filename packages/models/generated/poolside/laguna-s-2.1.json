@@ -1,7 +1,8 @@
 {
   "providers": [
     "kilo_code",
-    "openrouter"
+    "openrouter",
+    "perch"
   ],
   "reasoning": true,
   "reasoning_effort": [
@@ -35,6 +36,11 @@
       "upstream": "poolside/laguna-s-2.1:free",
       "contextWindow": 1048576,
       "maxOutputTokens": 131072
+    },
+    "perch": {
+      "upstream": "laguna-s",
+      "contextWindow": 1048576,
+      "maxOutputTokens": 32768
     }
   }
 }

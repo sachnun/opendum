@@ -1,7 +1,6 @@
 {
   "providers": [
     "codex",
-    "perch",
     "zenmux"
   ],
   "reasoning": true,
@@ -35,16 +34,11 @@
   "scores": {
     "artificialAnalysis": {
       "index": 38.1,
-      "estimated": false,
-      "version": "4.3"
+      "estimated": false
     }
   },
   "providerConfig": {
     "codex": {
-      "contextWindow": 1050000,
-      "maxOutputTokens": 128000
-    },
-    "perch": {
       "contextWindow": 1050000,
       "maxOutputTokens": 128000
     },

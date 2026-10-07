@@ -27,8 +27,7 @@
   "scores": {
     "artificialAnalysis": {
       "index": 41.1,
-      "estimated": false,
-      "version": "4.3"
+      "estimated": false
     }
   },
   "providerConfig": {

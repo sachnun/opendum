@@ -1,7 +1,6 @@
 {
   "providers": [
-    "kiro",
-    "perch"
+    "kiro"
   ],
   "reasoning": true,
   "reasoning_effort": [
@@ -28,17 +27,11 @@
   "scores": {
     "artificialAnalysis": {
       "index": 27.9,
-      "estimated": true,
-      "version": "4.3"
+      "estimated": true
     }
   },
   "providerConfig": {
     "kiro": {
-      "contextWindow": 202752,
-      "maxOutputTokens": 16384
-    },
-    "perch": {
-      "upstream": "glm-5",
       "contextWindow": 202752,
       "maxOutputTokens": 16384
     }

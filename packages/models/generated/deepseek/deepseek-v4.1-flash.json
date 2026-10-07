@@ -4,7 +4,8 @@
     "harbor",
     "hyper",
     "workbuddy",
-    "zenmux"
+    "zenmux",
+    "perch"
   ],
   "aliases": [
     "deepseek-v4.1-flash-sg"
@@ -29,15 +30,14 @@
     "output": 384000
   },
   "cost": {
-    "input": 0.107105,
+    "input": 0.25,
     "output": 3,
     "cacheRead": 0.015
   },
   "scores": {
     "artificialAnalysis": {
       "index": 39.5,
-      "estimated": false,
-      "version": "4.3"
+      "estimated": false
     }
   },
   "providerConfig": {
@@ -49,6 +49,11 @@
     "hyper": {
       "contextWindow": 1048576,
       "maxOutputTokens": 262144
+    },
+    "perch": {
+      "upstream": "deepseek-flash-starter",
+      "contextWindow": 1048576,
+      "maxOutputTokens": 384000
     },
     "workbuddy": {
       "contextWindow": 1048576,

@@ -1,8 +1,7 @@
 {
   "id": "gpt-6-sol",
   "providers": [
-    "codex",
-    "perch"
+    "codex"
   ],
   "aliases": [
     "gpt-6-sol-pro",
@@ -39,16 +38,11 @@
   "scores": {
     "artificialAnalysis": {
       "index": 47.6,
-      "estimated": false,
-      "version": "4.3"
+      "estimated": false
     }
   },
   "providerConfig": {
     "codex": {
-      "contextWindow": 1050000,
-      "maxOutputTokens": 128000
-    },
-    "perch": {
       "contextWindow": 1050000,
       "maxOutputTokens": 128000
     }

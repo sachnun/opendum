@@ -1,10 +1,6 @@
 {
-  "id": "hy4-preview",
   "providers": [
-    "workbuddy"
-  ],
-  "aliases": [
-    "hy4"
+    "opencode"
   ],
   "reasoning": true,
   "reasoning_effort": [
@@ -12,6 +8,7 @@
   ],
   "modalities": {
     "input": [
+      "image",
       "text"
     ],
     "output": [
@@ -20,17 +17,17 @@
   },
   "limit": {
     "context": 1048576,
-    "output": 64000
+    "output": 131072
   },
   "cost": {
-    "input": 4.17,
-    "output": 12.505,
-    "cacheRead": 0.21
+    "input": 0,
+    "output": 0
   },
   "providerConfig": {
-    "workbuddy": {
+    "opencode": {
+      "upstream": "exo-free",
       "contextWindow": 1048576,
-      "maxOutputTokens": 64000
+      "maxOutputTokens": 131072
     }
   }
 }

@@ -1,8 +1,7 @@
 {
   "providers": [
     "zenmux",
-    "hyper",
-    "perch"
+    "hyper"
   ],
   "reasoning": true,
   "reasoning_effort": [
@@ -32,19 +31,13 @@
   "scores": {
     "artificialAnalysis": {
       "index": 25.8,
-      "estimated": false,
-      "version": "4.3"
+      "estimated": false
     }
   },
   "providerConfig": {
     "hyper": {
       "contextWindow": 256000,
       "maxOutputTokens": 16000
-    },
-    "perch": {
-      "upstream": "kimi-k2-7-code",
-      "contextWindow": 262144,
-      "maxOutputTokens": 262144
     },
     "zenmux": {
       "upstream": "moonshotai/kimi-k2.7-code",

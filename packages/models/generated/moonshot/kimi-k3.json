@@ -3,7 +3,6 @@
   "providers": [
     "hyper",
     "nvidia_nim",
-    "perch",
     "workbuddy"
   ],
   "aliases": [
@@ -29,15 +28,14 @@
     "output": 131072
   },
   "cost": {
-    "input": 4.15,
-    "output": 70,
-    "cacheRead": 1.35
+    "input": 3.1,
+    "output": 71.25,
+    "cacheRead": 1.425
   },
   "scores": {
     "artificialAnalysis": {
       "index": 43.6,
-      "estimated": false,
-      "version": "4.3"
+      "estimated": false
     }
   },
   "providerConfig": {
@@ -47,10 +45,6 @@
     },
     "nvidia_nim": {
       "upstream": "moonshotai/kimi-k3",
-      "contextWindow": 1048576,
-      "maxOutputTokens": 131072
-    },
-    "perch": {
       "contextWindow": 1048576,
       "maxOutputTokens": 131072
     },

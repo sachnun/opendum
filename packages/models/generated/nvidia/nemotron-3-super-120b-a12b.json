@@ -3,7 +3,6 @@
   "providers": [
     "kilo_code",
     "openrouter",
-    "perch",
     "workers_ai",
     "nvidia_nim"
   ],
@@ -40,8 +39,7 @@
   "scores": {
     "artificialAnalysis": {
       "index": 12.8,
-      "estimated": false,
-      "version": "4.3"
+      "estimated": false
     }
   },
   "providerConfig": {
@@ -59,11 +57,6 @@
       "upstream": "nvidia/nemotron-3-super-120b-a12b:free",
       "contextWindow": 262144,
       "maxOutputTokens": 235929
-    },
-    "perch": {
-      "upstream": "nemotron-super",
-      "contextWindow": 1000000,
-      "maxOutputTokens": 32000
     },
     "workers_ai": {
       "upstream": "@cf/nvidia/nemotron-3-120b-a12b",

@@ -2,8 +2,7 @@
   "providers": [
     "kiro",
     "codex",
-    "workbuddy",
-    "perch"
+    "workbuddy"
   ],
   "reasoning": true,
   "reasoning_effort": [
@@ -36,8 +35,7 @@
   "scores": {
     "artificialAnalysis": {
       "index": 42.1,
-      "estimated": false,
-      "version": "4.3"
+      "estimated": false
     }
   },
   "providerConfig": {
@@ -46,11 +44,6 @@
       "maxOutputTokens": 128000
     },
     "kiro": {
-      "contextWindow": 1050000,
-      "maxOutputTokens": 128000
-    },
-    "perch": {
-      "upstream": "gpt-5-6-terra",
       "contextWindow": 1050000,
       "maxOutputTokens": 128000
     },

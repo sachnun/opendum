@@ -10,7 +10,6 @@ export const MODEL_FAMILY_RANKING: readonly ModelFamilyRankingEntry[] = [
   { name: "Meta", anchorId: "meta-models", score: 48.1 },
   { name: "Qwen", anchorId: "qwen-models", score: 45.4 },
   { name: "Z.AI", anchorId: "z-ai-models", score: 44.8 },
-  { name: "xAI", anchorId: "xai-models", score: 44.3 },
   { name: "Moonshot", anchorId: "moonshot-models", score: 43.6 },
   { name: "InclusionAI", anchorId: "inclusion-ai-models", score: 41.1 },
   { name: "Google", anchorId: "google-models", score: 40.9 },

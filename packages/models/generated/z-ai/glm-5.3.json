@@ -2,7 +2,6 @@
   "providers": [
     "hyper",
     "workbuddy",
-    "perch",
     "nvidia_nim"
   ],
   "reasoning": true,
@@ -32,8 +31,7 @@
   "scores": {
     "artificialAnalysis": {
       "index": 44.8,
-      "estimated": false,
-      "version": "4.3"
+      "estimated": false
     }
   },
   "providerConfig": {
@@ -43,11 +41,6 @@
     },
     "nvidia_nim": {
       "upstream": "z-ai/glm-5.3",
-      "contextWindow": 1048576,
-      "maxOutputTokens": 131072
-    },
-    "perch": {
-      "upstream": "glm-5-3",
       "contextWindow": 1048576,
       "maxOutputTokens": 131072
     },

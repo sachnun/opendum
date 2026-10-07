@@ -36,8 +36,7 @@
   "scores": {
     "artificialAnalysis": {
       "index": 41.8,
-      "estimated": false,
-      "version": "4.3"
+      "estimated": false
     }
   },
   "providerConfig": {
@@ -51,7 +50,7 @@
       "maxOutputTokens": 131072
     },
     "perch": {
-      "upstream": "glm-5-3-flash",
+      "upstream": "glm-5.3-flash-starter",
       "contextWindow": 1048576,
       "maxOutputTokens": 131072
     },

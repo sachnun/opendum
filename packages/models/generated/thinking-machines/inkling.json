@@ -1,8 +1,7 @@
 {
   "providers": [
     "openrouter",
-    "hyper",
-    "perch"
+    "hyper"
   ],
   "reasoning": true,
   "reasoning_effort": [
@@ -23,7 +22,7 @@
   },
   "limit": {
     "context": 1048576,
-    "output": 1048576
+    "output": 471859
   },
   "cost": {
     "input": 4.75,
@@ -33,8 +32,7 @@
   "scores": {
     "artificialAnalysis": {
       "index": 25,
-      "estimated": false,
-      "version": "4.3"
+      "estimated": false
     }
   },
   "providerConfig": {
@@ -45,11 +43,7 @@
     "openrouter": {
       "upstream": "thinkingmachines/inkling:free",
       "contextWindow": 524288,
-      "maxOutputTokens": 262144
-    },
-    "perch": {
-      "contextWindow": 524288,
-      "maxOutputTokens": 1048576
+      "maxOutputTokens": 471859
     }
   }
 }

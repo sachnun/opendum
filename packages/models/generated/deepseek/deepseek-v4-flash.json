@@ -34,15 +34,14 @@
     "output": 384000
   },
   "cost": {
-    "input": 0.0265,
+    "input": 0.09,
     "output": 0.9,
     "cacheRead": 0.014
   },
   "scores": {
     "artificialAnalysis": {
       "index": 34.3,
-      "estimated": false,
-      "version": "4.3"
+      "estimated": false
     }
   },
   "providerConfig": {
