@@ -1,8 +1,8 @@
-import { defineHandler, type H3, type H3Event } from "h3";
+import { type H3Event } from "h3";
 import type { ProxyContext } from "../context.js";
 import { jsonResponse } from "./errors.js";
 
-async function handleModels(event: H3Event, context: ProxyContext): Promise<Response> {
+export async function handleModels(event: H3Event, context: ProxyContext): Promise<Response> {
   const authHeader = event.req.headers.get("authorization") ?? event.req.headers.get("x-api-key") ?? "";
 
   let userId = "";
@@ -75,11 +75,4 @@ async function handleModels(event: H3Event, context: ProxyContext): Promise<Resp
   }
 
   return jsonResponse({ object: "list", data: enabled });
-}
-
-export function registerModelsRoute(app: H3, context: ProxyContext): void {
-  app.get(
-    "/v1/models",
-    defineHandler((event) => handleModels(event, context))
-  );
 }

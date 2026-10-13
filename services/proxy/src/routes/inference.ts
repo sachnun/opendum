@@ -1,10 +1,9 @@
-import { defineHandler, type H3, type H3Event } from "h3";
+import { type H3Event } from "h3";
 import type { ProxyContext } from "../context.js";
-import { chatCompletionsConfig, messagesConfig, responsesConfig } from "../core/endpoints.js";
 import { extractSessionId } from "../core/service.js";
 import type { EndpointAdapter } from "../core/types.js";
 
-async function handleInference(
+export async function handleInference(
   event: H3Event,
   context: ProxyContext,
   endpoint: EndpointAdapter
@@ -34,19 +33,4 @@ async function handleInference(
     event.req.headers.get("authorization") ?? event.req.headers.get("x-api-key") ?? "";
   const sessionId = extractSessionId(event.req, body);
   return context.service.handle(endpoint, body, authHeader, sessionId, event.req);
-}
-
-export function registerInferenceRoutes(app: H3, context: ProxyContext): void {
-  app.post(
-    "/v1/chat/completions",
-    defineHandler((event) => handleInference(event, context, chatCompletionsConfig()))
-  );
-  app.post(
-    "/v1/messages",
-    defineHandler((event) => handleInference(event, context, messagesConfig()))
-  );
-  app.post(
-    "/v1/responses",
-    defineHandler((event) => handleInference(event, context, responsesConfig()))
-  );
 }

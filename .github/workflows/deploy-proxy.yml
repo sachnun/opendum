@@ -69,7 +69,7 @@ jobs:
           test -f services/proxy/Dockerfile
 
       - name: Bundle proxy
-        run: bun build services/proxy/src/main.ts --target=bun --outdir dist
+        run: bun run --filter @opendum/proxy build
 
       - name: Build and push image
         run: |
