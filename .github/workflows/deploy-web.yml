@@ -11,7 +11,6 @@ on:
       - packages/models/**
       - package.json
       - bun.lock
-      - bunfig.toml
   workflow_run:
     workflows:
       - Refresh Provider Models
