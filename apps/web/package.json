@@ -10,9 +10,9 @@
     "pretest": "bun run family-ranking",
     "pretest:unit": "bun run family-ranking",
     "family-ranking": "bun ./scripts/family-ranking.ts",
-    "test": "tsx --test ./lib/*.test.ts && vitest run",
+    "test": "tsx --test ./lib/*.test.ts && bun run test:nuxt",
     "test:unit": "tsx --test ./lib/*.test.ts",
-    "test:nuxt": "vitest run",
+    "test:nuxt": "nuxt prepare && vitest run",
     "lint": "oxlint .",
     "check": "nuxt prepare && vue-tsc --noEmit -p .nuxt/tsconfig.app.json && vue-tsc --noEmit -p .nuxt/tsconfig.server.json"
   },
