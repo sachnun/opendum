@@ -1,4 +1,205 @@
+import { Schema } from "effect";
 import { stringValue } from "./helpers.js";
+import type { ErrorFormat, RouteError } from "./types.js";
+
+const OptionalString = Schema.optional(Schema.NullOr(Schema.String));
+const OptionalNumber = Schema.optional(Schema.NullOr(Schema.Number));
+
+export class AuthenticationFailure extends Schema.TaggedError<AuthenticationFailure>()(
+  "AuthenticationFailure",
+  {
+    message: Schema.String,
+    accountId: Schema.optional(Schema.String),
+  }
+) {}
+
+export class ValidationFailure extends Schema.TaggedError<ValidationFailure>()("ValidationFailure", {
+  message: Schema.String,
+  param: OptionalString,
+  code: OptionalString,
+  status: Schema.optional(Schema.Number),
+}) {}
+
+export class RateLimitFailure extends Schema.TaggedError<RateLimitFailure>()("RateLimitFailure", {
+  message: Schema.String,
+  status: Schema.Number,
+  retryAfter: OptionalString,
+  retryAfterMs: OptionalNumber,
+  accountId: Schema.optional(Schema.String),
+}) {}
+
+export class NoAccountsFailure extends Schema.TaggedError<NoAccountsFailure>()("NoAccountsFailure", {
+  message: Schema.String,
+  status: Schema.Number,
+  type: Schema.optional(Schema.String),
+}) {}
+
+export class InsufficientPointsFailure extends Schema.TaggedError<InsufficientPointsFailure>()(
+  "InsufficientPointsFailure",
+  {
+    message: Schema.String,
+    code: OptionalString,
+  }
+) {}
+
+export class UpstreamFailure extends Schema.TaggedError<UpstreamFailure>()("UpstreamFailure", {
+  message: Schema.String,
+  status: Schema.Number,
+  type: Schema.optional(Schema.String),
+  accountId: Schema.optional(Schema.String),
+}) {}
+
+export class ConfigurationFailure extends Schema.TaggedError<ConfigurationFailure>()(
+  "ConfigurationFailure",
+  {
+    message: Schema.String,
+    status: Schema.optional(Schema.Number),
+  }
+) {}
+
+export class InternalFailure extends Schema.TaggedError<InternalFailure>()("InternalFailure", {
+  message: Schema.String,
+  status: Schema.optional(Schema.Number),
+  accountId: Schema.optional(Schema.String),
+}) {}
+
+export type ProxyFailure =
+  | AuthenticationFailure
+  | ValidationFailure
+  | RateLimitFailure
+  | NoAccountsFailure
+  | InsufficientPointsFailure
+  | UpstreamFailure
+  | ConfigurationFailure
+  | InternalFailure;
+
+export function toRouteError(error: ProxyFailure): RouteError {
+  switch (error._tag) {
+    case "AuthenticationFailure":
+      return {
+        status: 401,
+        message: error.message,
+        type: "authentication_error",
+        accountId: error.accountId,
+      };
+    case "ValidationFailure":
+      return {
+        status: error.status ?? 400,
+        message: error.message,
+        type: "invalid_request_error",
+        param: error.param ?? null,
+        code: error.code ?? null,
+      };
+    case "RateLimitFailure":
+      return {
+        status: error.status,
+        message: error.message,
+        type: "rate_limit_error",
+        retryAfter: error.retryAfter ?? null,
+        retryAfterMs: error.retryAfterMs ?? null,
+        accountId: error.accountId,
+      };
+    case "NoAccountsFailure":
+      return {
+        status: error.status,
+        message: error.message,
+        type: error.type ?? "api_error",
+      };
+    case "InsufficientPointsFailure":
+      return {
+        status: 402,
+        message: error.message,
+        type: "insufficient_quota",
+        code: error.code ?? "insufficient_points",
+      };
+    case "UpstreamFailure":
+      return {
+        status: error.status,
+        message: error.message,
+        type: error.type ?? "api_error",
+        accountId: error.accountId,
+      };
+    case "ConfigurationFailure":
+      return {
+        status: error.status ?? 503,
+        message: error.message,
+        type: "configuration_error",
+      };
+    case "InternalFailure":
+      return {
+        status: error.status ?? 500,
+        message: error.message,
+        type: "api_error",
+        accountId: error.accountId,
+      };
+  }
+}
+
+export function fromRouteError(error: RouteError): ProxyFailure {
+  if (error.status === 401) {
+    return new AuthenticationFailure({ message: error.message, accountId: error.accountId });
+  }
+  if (error.status === 402) {
+    return new InsufficientPointsFailure({ message: error.message, code: error.code ?? null });
+  }
+  if (error.status === 429 || error.status === 529) {
+    return new RateLimitFailure({
+      message: error.message,
+      status: error.status,
+      retryAfter: error.retryAfter ?? null,
+      retryAfterMs: error.retryAfterMs ?? null,
+      accountId: error.accountId,
+    });
+  }
+  if (error.type === "configuration_error") {
+    return new ConfigurationFailure({ message: error.message, status: error.status });
+  }
+  if (error.status === 503) {
+    return new NoAccountsFailure({ message: error.message, status: error.status, type: error.type });
+  }
+  if (error.status >= 500) {
+    return new UpstreamFailure({
+      message: error.message,
+      status: error.status,
+      type: error.type,
+      accountId: error.accountId,
+    });
+  }
+  return new ValidationFailure({
+    message: error.message,
+    param: error.param ?? null,
+    code: error.code ?? null,
+    status: error.status,
+  });
+}
+
+export function routeErrorResponse(error: RouteError, format: ErrorFormat): Response {
+  const headers = new Headers({ "Content-Type": "application/json" });
+  if (error.accountId) headers.set("X-Provider-Account-Id", error.accountId);
+  if (error.retryAfterMs != null && error.retryAfterMs > 0) {
+    headers.set("Retry-After", String(Math.max(1, Math.ceil(error.retryAfterMs / 1000))));
+  }
+  if (format === "anthropic") {
+    const body: Record<string, unknown> = {
+      type: error.type || "invalid_request_error",
+      message: error.message,
+    };
+    if (error.retryAfter != null) body.retry_after = error.retryAfter;
+    if (error.retryAfterMs != null) body.retry_after_ms = error.retryAfterMs;
+    return new Response(JSON.stringify({ type: "error", error: body }), { status: error.status, headers });
+  }
+  const body = {
+    error: {
+      message: error.message,
+      type: error.type || "invalid_request_error",
+      param: error.param ?? null,
+      code: error.code ?? null,
+      ...(error.retryAfter != null ? { retry_after: error.retryAfter } : {}),
+      ...(error.retryAfterMs != null ? { retry_after_ms: error.retryAfterMs } : {}),
+    },
+  };
+  return new Response(JSON.stringify(body), { status: error.status, headers });
+}
 
 export function sanitizedProxyError(status: number, body: string): { message: string; type: string } {
   const type = providerErrorType(status);
