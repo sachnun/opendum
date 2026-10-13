@@ -1,10 +1,10 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { AuthService } from "@opendum/auth";
-import { closeRedis, openRedis, type OpendumRedis } from "@opendum/redis";
+import { closeRedis, openRedis, type OpendumRedis } from "@opendum/core/redis";
 import { resolveModelsDir } from "@opendum/models";
 import { Registry as ModelRegistry } from "@opendum/models/runtime";
-import { UnroxyEgress, assertPublicHost, createGuardedFetch, type GuardedFetch } from "@opendum/egress";
+import { UnroxyEgress, assertPublicHost, createGuardedFetch, type GuardedFetch } from "@opendum/core/egress";
 import { ProviderRegistry, RedisFallbackRouter, type EgressFetch } from "@opendum/providers";
 import { db } from "@opendum/database";
 import type { ProxyConfig } from "./config.js";

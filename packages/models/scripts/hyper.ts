@@ -3,8 +3,8 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildModelIndex, persistModel, syncProviderModels } from "#models/registry.ts";
-import { fetchJson } from "#models/http.ts";
-import { stripParamInfoKey } from "#models/clean-key.ts";
+import { fetchJson } from "#models/sync/http.ts";
+import { stripParamInfoKey } from "#models/model/clean-key.ts";
 
 const PROVIDER_NAME = "hyper";
 const HYPER_MODELS_URL = "https://hyper.charm.land/v1/models";

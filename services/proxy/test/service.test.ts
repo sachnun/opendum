@@ -3,7 +3,7 @@ import { createDatabaseQueryMocks } from "./database-mock.js";
 import type { AuthResult, AuthService, ModelValidationResult } from "@opendum/auth";
 import type { ProviderRegistry } from "@opendum/providers";
 import type { Registry } from "@opendum/models/runtime";
-import type { OpendumRedis } from "@opendum/redis";
+import type { OpendumRedis } from "@opendum/core/redis";
 
 const db = createDatabaseQueryMocks();
 mock.module("@opendum/database/queries", () => db);

@@ -7,7 +7,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { buildModelIndex, persistModel, syncProviderModels } from "#models/registry.ts";
-import { fetchJson } from "#models/http.ts";
+import { fetchJson } from "#models/sync/http.ts";
 
 const PROVIDER_NAME = "workbuddy";
 const WORKBUDDY_NPM_PACKAGE = "@tencent-ai/codebuddy-code";

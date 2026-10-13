@@ -23,7 +23,7 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildModelIndex, persistModel, syncProviderModels } from "#models/registry.ts";
-import { fetchText } from "#models/http.ts";
+import { fetchText } from "#models/sync/http.ts";
 import { syncCliVersion } from "./version-sync.ts";
 
 const ANTIGRAVITY_MODELS_URL = "https://antigravity.google/docs/models";
@@ -47,12 +47,12 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const ANTIGRAVITY_VERSION_TARGETS = [
   {
     label: "antigravity provider",
-    path: resolve(REPO_ROOT, "packages/providers/src/antigravity.ts"),
+    path: resolve(REPO_ROOT, "packages/providers/upstreams/antigravity/index.ts"),
     pattern: /(antigravity\/)(\d+\.\d+\.\d+)( \$\{process\.platform\})/,
   },
   {
     label: "antigravity quota fetcher",
-    path: resolve(REPO_ROOT, "packages/quota/src/fetchers.ts"),
+    path: resolve(REPO_ROOT, "packages/providers/quota/fetchers/antigravity.ts"),
     pattern: /(antigravity\/)(\d+\.\d+\.\d+)( \$\{process\.platform\})/,
   },
 ];

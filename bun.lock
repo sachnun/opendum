@@ -16,10 +16,10 @@
         "@lucide/vue": "^1.43.0",
         "@nuxt/fonts": "^0.14.0",
         "@opendum/auth": "workspace:*",
+        "@opendum/core": "workspace:*",
         "@opendum/database": "workspace:*",
         "@opendum/models": "workspace:*",
         "@opendum/providers": "workspace:*",
-        "@opendum/redis": "workspace:*",
         "better-auth": "^1.6.23",
         "clsx": "^2.1.1",
         "date-fns": "^4.4.0",
@@ -56,10 +56,9 @@
       "name": "@opendum/auth",
       "version": "0.1.0",
       "dependencies": {
-        "@opendum/crypto": "workspace:*",
+        "@opendum/core": "workspace:*",
         "@opendum/database": "workspace:*",
         "@opendum/models": "workspace:*",
-        "@opendum/redis": "workspace:*",
       },
       "devDependencies": {
         "@types/bun": "^1.4.3",
@@ -68,22 +67,14 @@
         "typescript": "^6.0.3",
       },
     },
-    "packages/config": {
-      "name": "@opendum/config",
+    "packages/core": {
+      "name": "@opendum/core",
       "version": "0.1.0",
       "dependencies": {
+        "redis": "^6.1.0",
+        "undici": "^8.11.2",
         "zod": "^4.4.3",
       },
-      "devDependencies": {
-        "@types/bun": "^1.4.3",
-        "@types/node": "^26.1.1",
-        "tsx": "^4.23.13",
-        "typescript": "^6.0.3",
-      },
-    },
-    "packages/crypto": {
-      "name": "@opendum/crypto",
-      "version": "0.1.0",
       "devDependencies": {
         "@types/bun": "^1.4.3",
         "@types/node": "^26.1.1",
@@ -109,20 +100,6 @@
         "typescript": "^6.0.3",
       },
     },
-    "packages/egress": {
-      "name": "@opendum/egress",
-      "version": "0.1.0",
-      "dependencies": {
-        "@opendum/config": "workspace:*",
-        "undici": "^8.11.2",
-      },
-      "devDependencies": {
-        "@types/bun": "^1.4.3",
-        "@types/node": "^26.1.1",
-        "tsx": "^4.23.13",
-        "typescript": "^6.0.3",
-      },
-    },
     "packages/models": {
       "name": "@opendum/models",
       "dependencies": {
@@ -139,35 +116,8 @@
       "name": "@opendum/providers",
       "version": "0.1.0",
       "dependencies": {
-        "@opendum/config": "workspace:*",
-        "@opendum/database": "workspace:*",
-        "@opendum/egress": "workspace:*",
+        "@opendum/core": "workspace:*",
         "@opendum/models": "workspace:*",
-        "@opendum/redis": "workspace:*",
-      },
-      "devDependencies": {
-        "@types/bun": "^1.4.3",
-        "@types/node": "^26.1.1",
-        "tsx": "^4.23.13",
-        "typescript": "^6.0.3",
-      },
-    },
-    "packages/quota": {
-      "name": "@opendum/quota",
-      "version": "0.1.0",
-      "devDependencies": {
-        "@types/bun": "^1.4.3",
-        "@types/node": "^26.1.1",
-        "tsx": "^4.23.13",
-        "typescript": "^6.0.3",
-      },
-    },
-    "packages/redis": {
-      "name": "@opendum/redis",
-      "version": "0.1.0",
-      "dependencies": {
-        "@opendum/config": "workspace:*",
-        "redis": "^6.1.0",
       },
       "devDependencies": {
         "@types/bun": "^1.4.3",
@@ -181,14 +131,10 @@
       "version": "0.1.0",
       "dependencies": {
         "@opendum/auth": "workspace:*",
-        "@opendum/config": "workspace:*",
-        "@opendum/crypto": "workspace:*",
+        "@opendum/core": "workspace:*",
         "@opendum/database": "workspace:*",
-        "@opendum/egress": "workspace:*",
         "@opendum/models": "workspace:*",
         "@opendum/providers": "workspace:*",
-        "@opendum/quota": "workspace:*",
-        "@opendum/redis": "workspace:*",
         "h3": "^2.0.1",
         "zod": "^4.4.3",
       },
@@ -449,23 +395,15 @@
 
     "@opendum/auth": ["@opendum/auth@workspace:packages/auth"],
 
-    "@opendum/config": ["@opendum/config@workspace:packages/config"],
-
-    "@opendum/crypto": ["@opendum/crypto@workspace:packages/crypto"],
+    "@opendum/core": ["@opendum/core@workspace:packages/core"],
 
     "@opendum/database": ["@opendum/database@workspace:packages/database"],
-
-    "@opendum/egress": ["@opendum/egress@workspace:packages/egress"],
 
     "@opendum/models": ["@opendum/models@workspace:packages/models"],
 
     "@opendum/providers": ["@opendum/providers@workspace:packages/providers"],
 
     "@opendum/proxy": ["@opendum/proxy@workspace:services/proxy"],
-
-    "@opendum/quota": ["@opendum/quota@workspace:packages/quota"],
-
-    "@opendum/redis": ["@opendum/redis@workspace:packages/redis"],
 
     "@opendum/web": ["@opendum/web@workspace:apps/web"],
 

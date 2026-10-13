@@ -1,6 +1,6 @@
 import { AuthService } from "@opendum/auth";
 import type { AccountModelAvailability } from "@opendum/auth";
-import type { OpendumRedis } from "@opendum/redis";
+import type { OpendumRedis } from "@opendum/core/redis";
 import { getRedisClient } from "../redis.js";
 import { registry } from "./models.js";
 

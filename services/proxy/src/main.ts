@@ -1,4 +1,4 @@
-import { loadEnv, loadEnvFile } from "@opendum/config";
+import { loadEnv, loadEnvFile } from "@opendum/core/config";
 import { serve } from "h3";
 import { toProxyConfig } from "./config.js";
 import { createContext, disposeContext } from "./context.js";

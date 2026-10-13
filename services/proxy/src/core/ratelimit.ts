@@ -1,6 +1,6 @@
 import type { RateLimitRule } from "@opendum/auth";
 import type { Registry } from "@opendum/models/runtime";
-import type { OpendumRedis } from "@opendum/redis";
+import type { OpendumRedis } from "@opendum/core/redis";
 
 const API_KEY_RATE_LIMIT_PREFIX = "opendum:api-key-rl";
 

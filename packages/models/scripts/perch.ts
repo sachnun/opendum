@@ -3,8 +3,8 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildModelIndex, syncProviderModels } from "#models/registry.ts";
-import { fetchText, fetchJson } from "#models/http.ts";
-import { normalizeKey, normalizeName } from "#models/similarity.ts";
+import { fetchText, fetchJson } from "#models/sync/http.ts";
+import { normalizeKey, normalizeName } from "#models/model/similarity.ts";
 import { syncCliVersion } from "./version-sync.ts";
 
 const PROVIDER_NAME = "perch";
@@ -24,7 +24,7 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const PERCH_CLI_VERSION_TARGETS = [
   {
     label: "perch provider",
-    path: resolve(REPO_ROOT, "packages/providers/src/perch.ts"),
+    path: resolve(REPO_ROOT, "packages/providers/upstreams/perch.ts"),
     pattern: /(const PERCH_CLI_VERSION = ")(\d+\.\d+\.\d+)(")/,
   },
 ];

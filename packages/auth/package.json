@@ -4,20 +4,19 @@
   "version": "0.1.0",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts",
-    "./service": "./src/service.ts",
-    "./types": "./src/types.ts",
-    "./custom-store": "./src/custom-store.ts"
+    ".": "./index.ts",
+    "./service": "./service.ts",
+    "./types": "./types.ts",
+    "./custom-store": "./store/custom.ts"
   },
   "scripts": {
     "test": "bun test --pass-with-no-tests",
     "check": "bun check"
   },
   "dependencies": {
-    "@opendum/crypto": "workspace:*",
+    "@opendum/core": "workspace:*",
     "@opendum/database": "workspace:*",
-    "@opendum/models": "workspace:*",
-    "@opendum/redis": "workspace:*"
+    "@opendum/models": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
