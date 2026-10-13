@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import { describe, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { anthropicStream, passthroughNonStream, passthroughStream } from "../src/core/stream.js";
 import type { ResponseContext, StreamRecorder, UsageCounts } from "../src/core/types.js";
 
@@ -25,6 +24,19 @@ function sseResponseThenError(chunk: string, error: Error): Response {
     },
   });
   return new Response(body, { status: 200 });
+}
+
+async function readBodyText(response: Response): Promise<string> {
+  const reader = response.body?.getReader();
+  if (!reader) return "";
+  const decoder = new TextDecoder();
+  let text = "";
+  while (true) {
+    const result = await reader.read();
+    if (result.done) break;
+    text += decoder.decode(result.value, { stream: true });
+  }
+  return text + decoder.decode();
 }
 
 function context(response: Response, provider = "openai", usage?: UsageCounts): ResponseContext {
@@ -77,16 +89,16 @@ describe("passthroughStream", () => {
     };
     const { recorder: rec, recorded } = recorder();
     const response = await passthroughStream(ctx, rec);
-    assert.equal(ctx.streamHandled, true);
+    expect(ctx.streamHandled).toBe(true);
     const text = await response.text();
-    assert.match(text, /hel/);
-    assert.match(text, /lo/);
-    assert.equal(response.headers.get("x-provider-account-id"), "acc-1");
-    assert.equal(usage.inputTokens, 5);
-    assert.equal(usage.outputTokens, 2);
-    assert.equal(recorded.length, 1);
-    assert.equal(recorded[0].stream, true);
-    assert.equal(completion, "success");
+    expect(text).toMatch(/hel/);
+    expect(text).toMatch(/lo/);
+    expect(response.headers.get("x-provider-account-id")).toBe("acc-1");
+    expect(usage.inputTokens).toBe(5);
+    expect(usage.outputTokens).toBe(2);
+    expect(recorded.length).toBe(1);
+    expect(recorded[0].stream).toBe(true);
+    expect(completion).toBe("success");
   });
 
   it("reports an error completion instead of recording success", async () => {
@@ -97,11 +109,9 @@ describe("passthroughStream", () => {
     };
     const { recorder: rec, recorded } = recorder();
     const response = await passthroughStream(ctx, rec);
-    await assert.rejects(async () => {
-      await response.text();
-    });
-    assert.equal(completion, "error");
-    assert.equal(recorded.length, 0);
+    await expect(response.text()).rejects.toThrow();
+    expect(completion).toBe("error");
+    expect(recorded.length).toBe(0);
   });
 
   it("reports a cancel completion when the client disconnects", async () => {
@@ -118,11 +128,12 @@ describe("passthroughStream", () => {
     const { recorder: rec, recorded } = recorder();
     const response = await passthroughStream(ctx, rec);
     const reader = response.body?.getReader();
-    assert.ok(reader);
+    expect(reader).toBeTruthy();
+    if (!reader) return;
     await reader.read();
     await reader.cancel();
-    assert.equal(completion, "cancel");
-    assert.equal(recorded.length, 0);
+    expect(completion).toBe("cancel");
+    expect(recorded.length).toBe(0);
   });
 
   it("records hypercredits for hyper", async () => {
@@ -132,7 +143,7 @@ describe("passthroughStream", () => {
     );
     const { recorder: rec, hypercredits } = recorder();
     await (await passthroughStream(ctx, rec)).text();
-    assert.deepEqual(hypercredits, [{ accountId: "acc-1", remaining: 12.5, cost: 1.5 }]);
+    expect(hypercredits).toEqual([{ accountId: "acc-1", remaining: 12.5, cost: 1.5 }]);
   });
 });
 
@@ -152,10 +163,10 @@ describe("passthroughNonStream", () => {
     );
     const { recorder: rec, recorded } = recorder();
     const response = await passthroughNonStream(ctx, rec);
-    assert.equal(response.status, 200);
-    assert.equal(usage.inputTokens, 9);
-    assert.equal(usage.cachedTokens, 1);
-    assert.equal(recorded[0].stream, false);
+    expect(response.status).toBe(200);
+    expect(usage.inputTokens).toBe(9);
+    expect(usage.cachedTokens).toBe(1);
+    expect(recorded[0].stream).toBe(false);
   });
 });
 
@@ -172,13 +183,13 @@ describe("anthropicStream", () => {
     );
     const { recorder: rec } = recorder();
     const response = await anthropicStream(ctx, rec);
-    const text = await response.text();
-    assert.match(text, /event: message_start/);
-    assert.match(text, /event: content_block_start/);
-    assert.match(text, /"type":"thinking_delta"/);
-    assert.match(text, /"type":"text_delta"/);
-    assert.match(text, /"type":"tool_use"/);
-    assert.match(text, /"stop_reason":"tool_use"/);
-    assert.match(text, /event: message_stop/);
+    const text = await readBodyText(response);
+    expect(text).toMatch(/event: message_start/);
+    expect(text).toMatch(/event: content_block_start/);
+    expect(text).toMatch(/"type":"thinking_delta"/);
+    expect(text).toMatch(/"type":"text_delta"/);
+    expect(text).toMatch(/"type":"tool_use"/);
+    expect(text).toMatch(/"stop_reason":"tool_use"/);
+    expect(text).toMatch(/event: message_stop/);
   });
 });

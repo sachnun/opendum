@@ -10,7 +10,7 @@
     "./session-affinity": "./src/session-affinity.ts"
   },
   "scripts": {
-    "test": "tsx --test ./src/*.test.ts",
+    "test": "bun test --pass-with-no-tests",
     "check": "bun check"
   },
   "dependencies": {
@@ -20,6 +20,7 @@
   "devDependencies": {
     "@types/node": "^26.1.1",
     "tsx": "^4.23.13",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "@types/bun": "^1.4.3"
   }
 }

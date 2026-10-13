@@ -16,7 +16,7 @@
   },
   "scripts": {
     "refresh": "bun ./scripts/models.ts",
-    "test": "tsx --test ./src/*.test.ts",
+    "test": "bun test",
     "check": "bun check"
   },
   "dependencies": {
@@ -25,6 +25,7 @@
   "devDependencies": {
     "@types/node": "^26.1.1",
     "tsx": "^4.23.13",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "@types/bun": "^1.4.3"
   }
 }

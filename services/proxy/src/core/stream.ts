@@ -48,7 +48,7 @@ export async function passthroughStream(ctx: ResponseContext, recorder: StreamRe
 
   const stream = new ReadableStream<Uint8Array>({
     async pull(controller) {
-      let result: ReadableStreamReadResult<Uint8Array>;
+      let result: Awaited<ReturnType<typeof reader.read>>;
       try {
         result = await reader.read();
       } catch {
@@ -499,7 +499,7 @@ export async function anthropicStream(ctx: ResponseContext, recorder: StreamReco
       );
     },
     async pull(nextController) {
-      let result: ReadableStreamReadResult<Uint8Array>;
+      let result: Awaited<ReturnType<typeof reader.read>>;
       try {
         result = await reader.read();
       } catch {

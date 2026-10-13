@@ -4,7 +4,7 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "lib": ["ESNext", "DOM"],
-    "types": ["node"],
+    "types": ["node", "bun"],
     "strict": true,
     "verbatimModuleSyntax": true,
     "noEmit": true,

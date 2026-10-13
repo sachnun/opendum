@@ -1,5 +1,4 @@
-import { test } from "node:test";
-import assert from "node:assert/strict";
+import { expect, test } from "bun:test";
 
 import { modelProbeSets, modelProbes } from "./probes.ts";
 
@@ -15,7 +14,7 @@ test("modelProbes collects id, fileId, aliases and upstreams", () => {
       },
     },
   });
-  assert.deepEqual([...probes].sort(), [
+  expect([...probes].sort()).toEqual([
     "alias-a",
     "alias-b",
     "file-id",
@@ -32,7 +31,7 @@ test("modelProbes drops blank candidates", () => {
     fileId: "file-id",
     data: { aliases: ["", "  ", "real"], providerConfig: { p: { upstream: "  " } } },
   });
-  assert.deepEqual([...probes].sort(), ["file-id", "real"]);
+  expect([...probes].sort()).toEqual(["file-id", "real"]);
 });
 
 test("modelProbeSets keeps historical aliases out of core", () => {
@@ -44,12 +43,12 @@ test("modelProbeSets keeps historical aliases out of core", () => {
       providerConfig: { workers_ai: { upstream: "@cf/meta/llama-3.1-8b-instruct-fp8" } },
     },
   });
-  assert.deepEqual([...core].sort(), [
+  expect([...core].sort()).toEqual([
     "@cf/meta/llama-3.1-8b-instruct-fp8",
     "llama-3.1",
     "llama-3.1-8b-instruct-fp8",
   ]);
-  assert.deepEqual([...aliases].sort(), ["llama-3.1-70b-instruct", "llama-3.1-8b-instruct"]);
+  expect([...aliases].sort()).toEqual(["llama-3.1-70b-instruct", "llama-3.1-8b-instruct"]);
 });
 
 test("modelProbeSets does not repeat core values as aliases", () => {
@@ -58,6 +57,6 @@ test("modelProbeSets does not repeat core values as aliases", () => {
     fileId: "gemma-3",
     data: { aliases: ["gemma-3", "google/gemma-3-12b-it"] },
   });
-  assert.equal(core.has("gemma-3"), true);
-  assert.deepEqual([...aliases], ["google/gemma-3-12b-it"]);
+  expect(core.has("gemma-3")).toBe(true);
+  expect([...aliases]).toEqual(["google/gemma-3-12b-it"]);
 });

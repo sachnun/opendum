@@ -1,61 +1,16 @@
-import assert from "node:assert/strict";
-import { describe, it, vi } from "vitest";
-import { ProxyService } from "../src/core/service.js";
-import { chatCompletionsConfig } from "../src/core/endpoints.js";
+import { describe, expect, it, mock } from "bun:test";
+import { createDatabaseQueryMocks } from "./database-mock.js";
 import type { AuthResult, AuthService, ModelValidationResult } from "@opendum/auth";
 import type { ProviderRegistry } from "@opendum/providers";
 import type { Registry } from "@opendum/models/runtime";
 import type { OpendumRedis } from "@opendum/redis";
 
-const db = vi.hoisted(() => {
-  const asyncNoop = () => vi.fn(async () => undefined);
-  return {
-    bumpAccountRequestCount: asyncNoop(),
-    deactivateAPIKey: asyncNoop(),
-    disableFailedAccount: vi.fn(async () => 0),
-    getAccountCredentialsByID: vi.fn(async () => null),
-    getAccountHealthState: vi.fn(async () => null),
-    getAccountOwnerUserID: vi.fn(async () => null),
-    getForcedAccount: vi.fn(async () => null),
-    getModelHealth: vi.fn(async () => null),
-    getCustomProvider: vi.fn(async () => null),
-    listCustomProviderModels: vi.fn(async () => []),
-    listCustomProviders: vi.fn(async () => []),
-    insertModelHealth: asyncNoop(),
-    insertUsageLog: asyncNoop(),
-    listDisabledAccountIDs: vi.fn(async () => []),
-    listEligibleAccounts: vi.fn(async () => []),
-    listExpiringRefreshableAccounts: vi.fn(async () => []),
-    listModelHealthByAccount: vi.fn(async () => []),
-    listModelHealthByAccounts: vi.fn(async () => []),
-    listSharedEligibleAccounts: vi.fn(async () => []),
-    markAccountRecoveredByRotation: asyncNoop(),
-    markAccountSuccess: asyncNoop(),
-    markUsageLimitedHealth: asyncNoop(),
-    recordAccountError: asyncNoop(),
-    recordRequestError: asyncNoop(),
-    setAccountActive: asyncNoop(),
-    setAccountCooldown: asyncNoop(),
-    setAccountHealthFailed: asyncNoop(),
-    setAccountUsageLimited: asyncNoop(),
-    updateModelHealthCounters: asyncNoop(),
-    updateModelHealthFailure: asyncNoop(),
-    updateModelHealthFailureWithStatus: asyncNoop(),
-    updateModelHealthStatus: asyncNoop(),
-    updateModelHealthSuccess: asyncNoop(),
-    updateModelHealthSuccessWithStatus: asyncNoop(),
-    updateRefreshedCredentials: asyncNoop(),
-    creditPointBalance: asyncNoop(),
-    debitPointBalance: vi.fn(async () => 10),
-    debitPointBalanceAllowNegative: vi.fn(async () => 10),
-    insertPointBalanceOnConflictDoNothing: vi.fn(async () => 0),
-    insertPointTransaction: asyncNoop(),
-    insertPointTransactionOnConflictDoNothing: vi.fn(async () => 0),
-    updatePointTransactionBalance: asyncNoop(),
-  };
-});
+const db = createDatabaseQueryMocks();
+mock.module("@opendum/database/queries", () => db);
 
-vi.mock("@opendum/database/queries", () => db);
+const { ProxyService } = await import("../src/core/service.js");
+const { chatCompletionsConfig } = await import("../src/core/endpoints.js");
+type ProxyServiceInstance = InstanceType<typeof ProxyService>;
 
 function validAuth(overrides: Partial<AuthResult> = {}): AuthResult {
   return {
@@ -129,7 +84,7 @@ function buildService(options: {
   models?: Registry;
   redis?: OpendumRedis;
   providers?: ProviderRegistry;
-}): ProxyService {
+}): ProxyServiceInstance {
   return new ProxyService({
     database: {} as never,
     redis: options.redis ?? fakeRedis(),
@@ -153,10 +108,10 @@ describe("ProxyService.handle", () => {
     } as unknown as AuthService;
     const service = buildService({ auth });
     const response = await service.handle(cfg, chatBody, "Bearer bad", "");
-    assert.equal(response.status, 401);
+    expect(response.status).toBe(401);
     const body = (await response.json()) as { error: { type: string; message: string } };
-    assert.equal(body.error.type, "authentication_error");
-    assert.equal(body.error.message, "Invalid API key");
+    expect(body.error.type).toBe("authentication_error");
+    expect(body.error.message).toBe("Invalid API key");
   });
 
   it("rejects an invalid model with 400", async () => {
@@ -167,10 +122,10 @@ describe("ProxyService.handle", () => {
     } as unknown as AuthService;
     const service = buildService({ auth });
     const response = await service.handle(cfg, { ...chatBody, model: "nope" }, "Bearer ok", "");
-    assert.equal(response.status, 400);
+    expect(response.status).toBe(400);
     const body = (await response.json()) as { error: { code: string; param: string } };
-    assert.equal(body.error.code, "invalid_model");
-    assert.equal(body.error.param, "model");
+    expect(body.error.code).toBe("invalid_model");
+    expect(body.error.param).toBe("model");
   });
 
   it("rejects a rate-limited request with 429", async () => {
@@ -184,9 +139,9 @@ describe("ProxyService.handle", () => {
     } as unknown as AuthService;
     const service = buildService({ auth, redis: fakeRedis({ get: async () => "1" }) });
     const response = await service.handle(cfg, chatBody, "Bearer ok", "");
-    assert.equal(response.status, 429);
+    expect(response.status).toBe(429);
     const body = (await response.json()) as { error: { type: string } };
-    assert.equal(body.error.type, "rate_limit_error");
+    expect(body.error.type).toBe("rate_limit_error");
   });
 
   it("returns 503 configuration_error when no accounts exist", async () => {
@@ -197,10 +152,10 @@ describe("ProxyService.handle", () => {
     } as unknown as AuthService;
     const service = buildService({ auth });
     const response = await service.handle(cfg, chatBody, "Bearer ok", "");
-    assert.equal(response.status, 503);
+    expect(response.status).toBe(503);
     const body = (await response.json()) as { error: { type: string; message: string } };
-    assert.equal(body.error.type, "configuration_error");
-    assert.match(body.error.message, /No active accounts/);
+    expect(body.error.type).toBe("configuration_error");
+    expect(body.error.message).toMatch(/No active accounts/);
   });
 
   it("rejects an invalid playground session with 401", async () => {
@@ -219,8 +174,8 @@ describe("ProxyService.handle", () => {
       },
     });
     const response = await service.handle(cfg, chatBody, "", "", request);
-    assert.equal(response.status, 401);
+    expect(response.status).toBe(401);
     const body = (await response.json()) as { error: { message: string } };
-    assert.equal(body.error.message, "Invalid playground session");
+    expect(body.error.message).toBe("Invalid playground session");
   });
 });

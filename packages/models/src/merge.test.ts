@@ -1,5 +1,4 @@
-import { test } from "node:test";
-import assert from "node:assert/strict";
+import { expect, test } from "bun:test";
 
 import { mergeModelData, splitModelData } from "./merge.ts";
 import type { ModelData } from "./types.ts";
@@ -9,10 +8,10 @@ test("mergeModelData lets authored fields win over generated", () => {
     { id: "model", reasoning: true, ignored: true, providers: ["a"] },
     { ignored: false, aliases: ["alias"] },
   );
-  assert.equal(merged.reasoning, true);
-  assert.equal(merged.ignored, false);
-  assert.deepEqual(merged.aliases, ["alias"]);
-  assert.deepEqual(merged.providers, ["a"]);
+  expect(merged.reasoning).toBe(true);
+  expect(merged.ignored).toBe(false);
+  expect(merged.aliases).toEqual(["alias"]);
+  expect(merged.providers).toEqual(["a"]);
 });
 
 test("mergeModelData deep merges provider config with authored winning", () => {
@@ -20,7 +19,7 @@ test("mergeModelData deep merges provider config with authored winning", () => {
     { providerConfig: { kiro: { upstream: "claude", contextWindow: 200000 } } },
     { providerConfig: { kiro: { authless: true }, openrouter: { free: true } } },
   );
-  assert.deepEqual(merged.providerConfig, {
+  expect(merged.providerConfig).toEqual({
     kiro: { upstream: "claude", contextWindow: 200000, authless: true },
     openrouter: { free: true },
   });
@@ -28,20 +27,20 @@ test("mergeModelData deep merges provider config with authored winning", () => {
 
 test("mergeModelData unions aliases across halves", () => {
   const merged = mergeModelData({ aliases: ["auto"] }, { aliases: ["curated"] });
-  assert.deepEqual(merged.aliases, ["auto", "curated"]);
+  expect(merged.aliases).toEqual(["auto", "curated"]);
 });
 
 test("mergeModelData handles one-sided and empty input", () => {
-  assert.deepEqual(mergeModelData({ id: "a" }, undefined), { id: "a" });
-  assert.deepEqual(mergeModelData(undefined, { ignored: true }), { ignored: true });
-  assert.deepEqual(mergeModelData(undefined, undefined), {});
-  assert.deepEqual(mergeModelData({ providerConfig: {} }, { providerConfig: {} }), {});
+  expect(mergeModelData({ id: "a" }, undefined)).toEqual({ id: "a" });
+  expect(mergeModelData(undefined, { ignored: true })).toEqual({ ignored: true });
+  expect(mergeModelData(undefined, undefined)).toEqual({});
+  expect(mergeModelData({ providerConfig: {} }, { providerConfig: {} })).toEqual({});
 });
 
 test("mergeModelData drops empty arrays", () => {
-  assert.deepEqual(mergeModelData({ providers: [] }, undefined), {});
-  assert.deepEqual(mergeModelData({ aliases: [] }, undefined), {});
-  assert.deepEqual(mergeModelData({ providers: ["kiro"] }, undefined).providers, ["kiro"]);
+  expect(mergeModelData({ providers: [] }, undefined)).toEqual({});
+  expect(mergeModelData({ aliases: [] }, undefined)).toEqual({});
+  expect(mergeModelData({ providers: ["kiro"] }, undefined).providers).toEqual(["kiro"]);
 });
 
 test("splitModelData routes fields by ownership", () => {
@@ -54,7 +53,7 @@ test("splitModelData routes fields by ownership", () => {
     aliases: ["a"],
     providerConfig: { kiro: { upstream: "u", authless: true } },
   });
-  assert.deepEqual(generated, {
+  expect(generated).toEqual({
     id: "model",
     providers: ["kiro"],
     reasoning: true,
@@ -62,7 +61,7 @@ test("splitModelData routes fields by ownership", () => {
     aliases: ["a"],
     providerConfig: { kiro: { upstream: "u" } },
   });
-  assert.deepEqual(authored, {
+  expect(authored).toEqual({
     ignored: true,
     providerConfig: { kiro: { authless: true } },
   });
@@ -70,19 +69,19 @@ test("splitModelData routes fields by ownership", () => {
 
 test("splitModelData drops default ignored flags", () => {
   const { authored } = splitModelData({ providers: ["kiro"], ignored: false });
-  assert.deepEqual(authored, {});
+  expect(authored).toEqual({});
   const kept = splitModelData({ ignored: true });
-  assert.deepEqual(kept.authored, { ignored: true });
+  expect(kept.authored).toEqual({ ignored: true });
 });
 
 test("splitModelData drops empty halves", () => {
   const { generated, authored } = splitModelData({ providers: ["kiro"] });
-  assert.deepEqual(generated, { providers: ["kiro"] });
-  assert.deepEqual(authored, {});
+  expect(generated).toEqual({ providers: ["kiro"] });
+  expect(authored).toEqual({});
 
   const other = splitModelData({ ignored: true });
-  assert.deepEqual(other.generated, {});
-  assert.deepEqual(other.authored, { ignored: true });
+  expect(other.generated).toEqual({});
+  expect(other.authored).toEqual({ ignored: true });
 });
 
 test("splitModelData round-trips through mergeModelData", () => {
@@ -98,5 +97,5 @@ test("splitModelData round-trips through mergeModelData", () => {
     },
   };
   const { generated, authored } = splitModelData(original);
-  assert.deepEqual(mergeModelData(generated, authored), original);
+  expect(mergeModelData(generated, authored)).toEqual(original);
 });

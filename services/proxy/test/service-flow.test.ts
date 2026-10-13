@@ -1,61 +1,15 @@
-import assert from "node:assert/strict";
-import { describe, it, vi } from "vitest";
-import { ProxyService } from "../src/core/service.js";
-import { chatCompletionsConfig } from "../src/core/endpoints.js";
+import { describe, expect, it, mock } from "bun:test";
+import { createDatabaseQueryMocks } from "./database-mock.js";
 import type { AuthResult, AuthService, ModelValidationResult } from "@opendum/auth";
 import type { Provider, ProviderRegistry } from "@opendum/providers";
 import type { Registry } from "@opendum/models/runtime";
 import type { OpendumRedis } from "@opendum/redis";
 
-const db = vi.hoisted(() => {
-  const asyncNoop = () => vi.fn(async () => undefined);
-  return {
-    bumpAccountRequestCount: asyncNoop(),
-    deactivateAPIKey: asyncNoop(),
-    disableFailedAccount: vi.fn(async () => 0),
-    getAccountCredentialsByID: vi.fn(async () => null),
-    getAccountHealthState: vi.fn(async () => null),
-    getAccountOwnerUserID: vi.fn(async () => null),
-    getForcedAccount: vi.fn(async () => null),
-    getModelHealth: vi.fn(async () => null),
-    insertModelHealth: asyncNoop(),
-    insertUsageLog: asyncNoop(),
-    listDisabledAccountIDs: vi.fn(async () => []),
-    listEligibleAccounts: vi.fn(async () => []),
-    listExpiringRefreshableAccounts: vi.fn(async () => []),
-    listModelHealthByAccount: vi.fn(async () => []),
-    listModelHealthByAccounts: vi.fn(async () => []),
-    listSharedEligibleAccounts: vi.fn(async () => []),
-    markAccountRecoveredByRotation: asyncNoop(),
-    markAccountSuccess: asyncNoop(),
-    markUsageLimitedHealth: asyncNoop(),
-    recordAccountError: asyncNoop(),
-    recordRequestError: asyncNoop(),
-    setAccountActive: asyncNoop(),
-    setAccountCooldown: asyncNoop(),
-    setAccountHealthFailed: asyncNoop(),
-    setAccountUsageLimited: asyncNoop(),
-    updateModelHealthCounters: asyncNoop(),
-    updateModelHealthFailure: asyncNoop(),
-    updateModelHealthFailureWithStatus: asyncNoop(),
-    updateModelHealthStatus: asyncNoop(),
-    updateModelHealthSuccess: asyncNoop(),
-    updateModelHealthSuccessWithStatus: asyncNoop(),
-    updateRefreshedCredentials: asyncNoop(),
-    creditPointBalance: asyncNoop(),
-    debitPointBalance: vi.fn(async () => 10),
-    debitPointBalanceAllowNegative: vi.fn(async () => 10),
-    insertPointBalanceOnConflictDoNothing: vi.fn(async () => 0),
-    insertPointTransaction: asyncNoop(),
-    insertPointTransactionOnConflictDoNothing: vi.fn(async () => 0),
-    updatePointTransactionBalance: asyncNoop(),
-    getCustomProvider: vi.fn(async () => null),
-    listCustomProviderModels: vi.fn(async () => []),
-    listCustomProviders: vi.fn(async () => []),
-  };
-});
+const db = createDatabaseQueryMocks();
+mock.module("@opendum/database/queries", () => db);
 
-vi.mock("@opendum/database/queries", () => db);
+const { ProxyService } = await import("../src/core/service.js");
+const { chatCompletionsConfig } = await import("../src/core/endpoints.js");
 
 function sseResponse(chunks: string[]): Response {
   const encoder = new TextEncoder();
@@ -127,11 +81,10 @@ describe("ProxyService full flow", () => {
       "Bearer ok",
       ""
     );
-    assert.equal(response.status, 200);
-    assert.equal(response.headers.get("content-type"), "text/event-stream");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("text/event-stream");
     const text = await response.text();
-    assert.match(text, /hello/);
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    assert.ok(db.insertUsageLog.mock.calls.length >= 1);
+    expect(text).toMatch(/hello/);
+    expect(db.insertUsageLog.mock.calls.length >= 1).toBe(true);
   });
 });

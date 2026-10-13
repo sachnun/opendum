@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { defineComponent, h } from "vue";
-import { mountSuspended } from "@nuxt/test-utils/runtime";
+import { mount } from "@vue/test-utils";
 
 import { useDesktopViewport } from "~/composables/useDesktopViewport";
 
@@ -16,7 +16,7 @@ const Probe = defineComponent({
 
 describe("useDesktopViewport", () => {
   it("exposes a boolean viewport flag", async () => {
-    const wrapper = await mountSuspended(Probe);
+    const wrapper = mount(Probe);
     expect(["true", "false"]).toContain(wrapper.text());
   });
 });

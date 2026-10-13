@@ -1,14 +1,18 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { defineComponent, h, ref } from "vue";
-import { mockNuxtImport, mountSuspended } from "@nuxt/test-utils/runtime";
+import { mount } from "@vue/test-utils";
 
 import { usePlayground } from "~/composables/usePlayground";
 
-const mocks = vi.hoisted(() => ({ options: vi.fn(), auth: vi.fn() }));
+const options = mock(async () => null);
+const auth = mock(async () => null);
 
-mockNuxtImport("useApi", () => () => ({ playground: { options: mocks.options, auth: mocks.auth } }));
-mockNuxtImport("useInvalidate", () => () => ({ invalidateAccountCollection: vi.fn(), refreshData: vi.fn() }));
-mockNuxtImport("useCachedData", () => () => ({ data: ref(null), error: ref(null), refresh: vi.fn() }));
+(globalThis as Record<string, unknown>).useApi = () => ({ playground: { options, auth } });
+(globalThis as Record<string, unknown>).useInvalidate = () => ({ invalidateAccountCollection: mock(() => {}), invalidateAccountOverview: mock(() => {}) });
+(globalThis as Record<string, unknown>).useCachedData = () => ({ data: ref(null), error: ref(null), refresh: mock(() => {}) });
+(globalThis as Record<string, unknown>).dataKeys = { playgroundOptions: "playground-options" };
+(globalThis as Record<string, unknown>).useRoute = () => ({ path: "/playground", query: {} });
+(globalThis as Record<string, unknown>).navigateTo = mock(() => {});
 
 type Playground = ReturnType<typeof usePlayground>;
 
@@ -22,18 +26,18 @@ const Probe = defineComponent({
   },
 });
 
-async function mountProbe() {
-  const wrapper = await mountSuspended(Probe);
+function mountProbe() {
+  const wrapper = mount(Probe);
   return (wrapper.vm as unknown as { playground: Playground }).playground;
 }
 
 describe("usePlayground", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    mock.clearAllMocks();
   });
 
   it("starts with the first scenario and a single panel", async () => {
-    const playground = await mountProbe();
+    const playground = mountProbe();
     expect(playground.selectedScenario.value.id).toBe("text");
     expect(playground.panels.value.length).toBe(1);
     expect(playground.settings.temperature).toBe(1);
@@ -41,7 +45,7 @@ describe("usePlayground", () => {
   });
 
   it("switches the selected scenario", async () => {
-    const playground = await mountProbe();
+    const playground = mountProbe();
     const next = playground.SCENARIOS[1]!;
     playground.selectScenario(next);
     expect(playground.selectedScenario.value.id).toBe(next.id);
