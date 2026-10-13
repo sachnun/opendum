@@ -11,7 +11,7 @@
   },
   "scripts": {
     "test": "tsx --test ./src/*.test.ts",
-    "typecheck": "tsc --noEmit"
+    "check": "bun check"
   },
   "dependencies": {
     "@opendum/config": "workspace:*",

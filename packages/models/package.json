@@ -17,7 +17,7 @@
   "scripts": {
     "refresh": "tsx ./scripts/models.ts",
     "test": "tsx --test ./src/*.test.ts",
-    "typecheck": "tsc --noEmit"
+    "check": "bun check"
   },
   "dependencies": {
     "fuzzball": "^2.2.6"

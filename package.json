@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "dev": "(bun run --filter @opendum/web dev & bun run --filter @opendum/proxy dev)",
-    "build": "bun run --filter @opendum/web build && bun run --filter @opendum/proxy typecheck",
+    "build": "bun run --filter @opendum/web build && bun run --filter @opendum/proxy check",
     "db:push": "bun run --filter @opendum/database db:push",
     "db:generate": "bun run --filter @opendum/database db:generate",
     "db:migrate": "bun run --filter @opendum/database db:migrate",
