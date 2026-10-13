@@ -55,7 +55,9 @@ jobs:
 
       - name: Build web
         working-directory: apps/web
-        run: bun run build:edgeone
+        run: bun run build
+        env:
+          NITRO_PRESET: edgeone_pages
 
       - name: Deploy web to EdgeOne Pages
         working-directory: apps/web
