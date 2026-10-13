@@ -1,4 +1,5 @@
 import { createHmac } from "node:crypto";
+import { Duration, Effect, Schedule, Schema } from "effect";
 
 type InternalRelayInit = Omit<RequestInit, "headers" | "body"> & {
   headers?: HeadersInit;
@@ -19,6 +20,12 @@ export class InternalRelayNotConfiguredError extends Error {
   }
 }
 
+export class InternalRelayError extends Schema.TaggedError<InternalRelayError>()("InternalRelayError", {
+  message: Schema.String,
+  status: Schema.optional(Schema.Number),
+  path: Schema.String,
+}) {}
+
 function getProxyBaseUrl() {
   const value = process.env.NUXT_PUBLIC_PROXY_URL?.trim().replace(/\/+$/, "");
   return value || null;
@@ -28,26 +35,6 @@ function internalSignature(path: string, timestamp: string, body: string): strin
   const secret = process.env.BETTER_AUTH_SECRET;
   if (!secret) throw new Error("BETTER_AUTH_SECRET is required for internal proxy calls.");
   return createHmac("sha256", secret).update(`${timestamp}\n${path}\n${body}`).digest("hex");
-}
-
-async function fetchInternal(path: "/internal/refresh" | "/internal/quota", payload: Record<string, unknown>, signal?: AbortSignal): Promise<Response> {
-  const proxyBaseUrl = getProxyBaseUrl();
-  if (!proxyBaseUrl) throw new InternalRelayNotConfiguredError();
-  const body = JSON.stringify(payload);
-  const timestamp = Math.floor(Date.now() / 1000).toString();
-
-  return fetch(`${proxyBaseUrl}${path}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      "X-Opendum-Internal-Timestamp": timestamp,
-      "X-Opendum-Internal-Signature": internalSignature(path, timestamp, body),
-    },
-    body,
-    signal,
-    cache: "no-store",
-  });
 }
 
 function normalizeHeaders(headers: HeadersInit | undefined): Record<string, string> | undefined {
@@ -66,6 +53,56 @@ function normalizeBody(body: InternalRelayInit["body"]): unknown {
   return body;
 }
 
+const relayRetrySchedule = Schedule.exponential(Duration.millis(50)).pipe(
+  Schedule.jittered,
+  Schedule.upTo({ times: 3 })
+);
+
+export function fetchInternalEffect(
+  path: "/internal/refresh" | "/internal/quota",
+  payload: Record<string, unknown>,
+  signal?: AbortSignal
+): Effect.Effect<Response, InternalRelayNotConfiguredError | InternalRelayError> {
+  return Effect.gen(function* () {
+    const proxyBaseUrl = getProxyBaseUrl();
+    if (!proxyBaseUrl) return yield* Effect.fail(new InternalRelayNotConfiguredError());
+
+    const body = JSON.stringify(payload);
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const signature = yield* Effect.try({
+      try: () => internalSignature(path, timestamp, body),
+      catch: (cause) =>
+        new InternalRelayError({
+          message: cause instanceof Error ? cause.message : String(cause),
+          path,
+        }),
+    });
+
+    const attempt = Effect.tryPromise({
+      try: () =>
+        fetch(`${proxyBaseUrl}${path}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            "X-Opendum-Internal-Timestamp": timestamp,
+            "X-Opendum-Internal-Signature": signature,
+          },
+          body,
+          signal,
+          cache: "no-store",
+        }),
+      catch: (cause) =>
+        new InternalRelayError({
+          message: cause instanceof Error ? cause.message : String(cause),
+          path,
+        }),
+    });
+
+    return yield* Effect.retry(attempt, relayRetrySchedule);
+  }).pipe(Effect.withSpan("internalRelay.fetch", { attributes: { path } }));
+}
+
 export async function fetchInternalProvider(url: string, init: InternalRelayInit = {}): Promise<Response> {
   const payload = {
     url,
@@ -74,9 +111,9 @@ export async function fetchInternalProvider(url: string, init: InternalRelayInit
     body: normalizeBody(init.body),
   };
 
-  return fetchInternal("/internal/refresh", payload, init.signal ?? undefined);
+  return Effect.runPromise(fetchInternalEffect("/internal/refresh", payload, init.signal ?? undefined));
 }
 
 export async function fetchInternalQuota(payload: InternalQuotaPayload, signal?: AbortSignal): Promise<Response> {
-  return fetchInternal("/internal/quota", payload, signal);
+  return Effect.runPromise(fetchInternalEffect("/internal/quota", payload, signal));
 }
