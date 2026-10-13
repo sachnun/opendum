@@ -6,8 +6,13 @@
     "opencode"
   ],
   "aliases": [
+    "cline-free-step-5-preview",
+    "cline-free/step-5-preview",
     "step-5",
-    "step-5-free"
+    "step-5-free",
+    "step-5-preview-free",
+    "stepfun-step-5-preview-free",
+    "stepfun/step-5-preview-free"
   ],
   "reasoning": true,
   "reasoning_effort": [
