@@ -1,3 +1,4 @@
+import { Cause, Effect, Exit, Stream } from "effect";
 import { numberAsInt, stringValue } from "./helpers.js";
 import { SseScanner } from "./sse.js";
 import { transformOpenAIToAnthropic } from "./endpoints.js";
@@ -7,23 +8,42 @@ import type { ResponseContext, StreamCompletion, StreamRecorder } from "./types.
 type Json = Record<string, unknown>;
 
 const decoder = new TextDecoder();
+const encoder = new TextEncoder();
+
+function sseHeaders(accountId: string): Record<string, string> {
+  return {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+    "X-Accel-Buffering": "no",
+    "X-Provider-Account-Id": accountId,
+  };
+}
+
+function readableChunks(body: ReadableStream<Uint8Array>): Stream.Stream<Uint8Array, Error> {
+  return Stream.fromReadableStream<Uint8Array, Error>({
+    evaluate: () => body,
+    onError: (error) => (error instanceof Error ? error : new Error(String(error))),
+    releaseLockOnEnd: true,
+  });
+}
 
 export async function passthroughStream(ctx: ResponseContext, recorder: StreamRecorder): Promise<Response> {
   const body = ctx.response.body;
   if (!body) return ctx.response;
   const tracker = new OpenAIStreamUsageTracker();
-  const reader = body.getReader();
   ctx.streamHandled = true;
-  let settled = false;
-  const finish = (reason: StreamCompletion): void => {
-    if (settled) return;
-    settled = true;
-    tracker.flush();
+
+  let completion: StreamCompletion = "success";
+  let finalized = false;
+  const finalize = (): void => {
+    if (finalized) return;
+    finalized = true;
     ctx.usage.inputTokens = tracker.inputTokens;
     ctx.usage.outputTokens = tracker.outputTokens;
     ctx.usage.cachedTokens = tracker.cachedTokens;
     ctx.usage.cacheWriteTokens = tracker.cacheWriteTokens;
-    if (reason === "success") {
+    if (completion === "success") {
       if (ctx.provider === "hyper" && (tracker.hypercreditsRemaining !== null || tracker.hypercreditsCost > 0)) {
         recorder.storeHypercreditsUsage(ctx.accountId, tracker.hypercreditsRemaining, tracker.hypercreditsCost);
       }
@@ -43,47 +63,29 @@ export async function passthroughStream(ctx: ResponseContext, recorder: StreamRe
         upstreamFirstResponseMs: ctx.upstreamFirstResponseMs,
       });
     }
-    ctx.onStreamComplete?.(reason);
+    ctx.onStreamComplete?.(completion);
   };
 
-  const stream = new ReadableStream<Uint8Array>({
-    async pull(controller) {
-      let result: Awaited<ReturnType<typeof reader.read>>;
-      try {
-        result = await reader.read();
-      } catch {
-        finish("error");
-        controller.error(new Error("upstream stream failed"));
-        return;
-      }
-      if (result.done) {
-        finish("success");
-        controller.close();
-        return;
-      }
-      tracker.process(decoder.decode(result.value, { stream: true }));
-      controller.enqueue(result.value);
-    },
-    async cancel() {
-      finish("cancel");
-      try {
-        await reader.cancel();
-      } catch {
-        return;
-      }
-    },
-  });
+  const stream = readableChunks(body).pipe(
+    Stream.map((chunk) => {
+      tracker.process(decoder.decode(chunk, { stream: true }));
+      return chunk;
+    }),
+    Stream.onExit((exit) =>
+      Effect.sync(() => {
+        completion = Exit.isSuccess(exit) ? "success" : Cause.hasInterruptsOnly(exit.cause) ? "cancel" : "error";
+      })
+    ),
+    Stream.ensuring(
+      Effect.sync(() => {
+        tracker.flush();
+        finalize();
+      })
+    ),
+    Stream.toReadableStream()
+  );
 
-  return new Response(stream, {
-    status: 200,
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-      "X-Accel-Buffering": "no",
-      "X-Provider-Account-Id": ctx.accountId,
-    },
-  });
+  return new Response(stream, { status: 200, headers: sseHeaders(ctx.accountId) });
 }
 
 export async function passthroughNonStream(ctx: ResponseContext, recorder: StreamRecorder): Promise<Response> {
@@ -397,7 +399,7 @@ class AnthropicStreamTracker {
   }
 
   finish(): void {
-    this.scanner.flush((event) => this.processEvent(event.data));
+    this.scannerFlush();
     this.closeThinkingBlock();
     this.flushPendingText();
     this.closeOpenBlock();
@@ -412,6 +414,10 @@ class AnthropicStreamTracker {
       usage: deltaUsage,
     });
     this.write("message_stop", { type: "message_stop" });
+  }
+
+  scannerFlush(): void {
+    this.scanner.flush((event) => this.processEvent(event.data));
   }
 }
 
@@ -431,33 +437,49 @@ export async function anthropicStream(ctx: ResponseContext, recorder: StreamReco
   const body = ctx.response.body;
   if (!body) return ctx.response;
   const messageId = `msg_${new Date().toISOString().replace(/\D/g, "").slice(0, 14)}`;
-  const encoder = new TextEncoder();
-  const reader = body.getReader();
   ctx.streamHandled = true;
+
+  const encoderChunk = (event: string, data: Json): Uint8Array =>
+    encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+
+  const start = encoder.encode(
+    `event: message_start\ndata: ${JSON.stringify({
+      type: "message_start",
+      message: {
+        id: messageId,
+        type: "message",
+        role: "assistant",
+        content: [],
+        model: ctx.model,
+        stop_reason: null,
+        stop_sequence: null,
+        usage: { input_tokens: 0, output_tokens: 0 },
+      },
+    })}\n\n`
+  );
+
+  let completion: StreamCompletion = "success";
+  let finalized = false;
+  let started = false;
+  let closing = false;
+  const pending: Uint8Array[] = [];
   const tracker = new AnthropicStreamTracker(
     (event, data) => {
-      if (!controller) return;
-      try {
-        controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
-      } catch {
-        return;
-      }
+      pending.push(encoderChunk(event, data));
     },
     ctx.model,
     ctx.provider === "kiro"
   );
-  let controller: ReadableStreamDefaultController<Uint8Array> | null = null;
-  let settled = false;
 
-  const finish = (reason: StreamCompletion): void => {
-    if (settled) return;
-    settled = true;
-    if (reason === "success") tracker.finish();
+  const finalize = (): void => {
+    if (finalized) return;
+    finalized = true;
     ctx.usage.inputTokens = tracker.inputTokens;
     ctx.usage.outputTokens = tracker.outputTokens;
     ctx.usage.cachedTokens = tracker.cachedTokens;
     ctx.usage.cacheWriteTokens = tracker.cacheWriteTokens;
-    if (reason === "success") {
+    if (completion === "success") {
+      tracker.finish();
       recorder.recordSuccessfulRequest({
         accountId: ctx.accountId,
         provider: ctx.provider,
@@ -474,65 +496,61 @@ export async function anthropicStream(ctx: ResponseContext, recorder: StreamReco
         upstreamFirstResponseMs: ctx.upstreamFirstResponseMs,
       });
     }
-    ctx.onStreamComplete?.(reason);
+    ctx.onStreamComplete?.(completion);
   };
 
-  const stream = new ReadableStream<Uint8Array>({
-    start(nextController) {
-      controller = nextController;
-      controller.enqueue(
-        encoder.encode(
-          `event: message_start\ndata: ${JSON.stringify({
-            type: "message_start",
-            message: {
-              id: messageId,
-              type: "message",
-              role: "assistant",
-              content: [],
-              model: ctx.model,
-              stop_reason: null,
-              stop_sequence: null,
-              usage: { input_tokens: 0, output_tokens: 0 },
-            },
-          })}\n\n`
-        )
-      );
-    },
-    async pull(nextController) {
-      let result: Awaited<ReturnType<typeof reader.read>>;
-      try {
-        result = await reader.read();
-      } catch {
-        finish("error");
-        nextController.error(new Error("upstream stream failed"));
-        return;
-      }
-      if (result.done) {
-        finish("success");
-        nextController.close();
-        return;
-      }
-      controller = nextController;
-      tracker.process(decoder.decode(result.value, { stream: true }));
-    },
-    async cancel() {
-      finish("cancel");
-      try {
-        await reader.cancel();
-      } catch {
-        return;
-      }
-    },
-  });
+  const takePending = (): Uint8Array => {
+    const parts: Uint8Array[] = [];
+    if (!started) {
+      started = true;
+      parts.push(start);
+    }
+    parts.push(...pending);
+    pending.length = 0;
+    return joinBytes(parts);
+  };
 
-  return new Response(stream, {
-    status: 200,
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-      "X-Accel-Buffering": "no",
-      "X-Provider-Account-Id": ctx.accountId,
-    },
-  });
+  const stream = readableChunks(body).pipe(
+    Stream.map((chunk) => {
+      tracker.process(decoder.decode(chunk, { stream: true }));
+      return takePending();
+    }),
+    Stream.onExit((exit) =>
+      Effect.sync(() => {
+        completion = Exit.isSuccess(exit) ? "success" : Cause.hasInterruptsOnly(exit.cause) ? "cancel" : "error";
+      })
+    ),
+    Stream.concat(
+      Stream.fromEffect(
+        Effect.sync(() => {
+          if (!closing) {
+            closing = true;
+            finalize();
+          }
+          return takePending();
+        })
+      )
+    ),
+    Stream.ensuring(
+      Effect.sync(() => {
+        finalize();
+      })
+    ),
+    Stream.toReadableStream()
+  );
+
+  return new Response(stream, { status: 200, headers: sseHeaders(ctx.accountId) });
+}
+
+function joinBytes(parts: Uint8Array[]): Uint8Array {
+  if (parts.length === 1) return parts[0] as Uint8Array;
+  let total = 0;
+  for (const part of parts) total += part.length;
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const part of parts) {
+    out.set(part, offset);
+    offset += part.length;
+  }
+  return out;
 }
