@@ -23,7 +23,7 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildModelIndex, persistModel, syncProviderModels } from "#models/registry.ts";
-import { fetchText } from "#models/sync/http.ts";
+import { runFetchText } from "#models/sync/http.ts";
 import { syncCliVersion } from "./version-sync.ts";
 
 const ANTIGRAVITY_MODELS_URL = "https://antigravity.google/docs/models";
@@ -466,7 +466,7 @@ function compareSemver(a, b) {
 async function syncUserAgent(dryRun) {
   let latestVersion = null;
   try {
-    const text = await fetchText(ANTIGRAVITY_CHANGELOG_URL, {
+    const text = await runFetchText(ANTIGRAVITY_CHANGELOG_URL, {
       label: "Antigravity changelog",
       timeout: VERSION_FETCH_TIMEOUT_MS,
       headers: { Accept: "text/markdown" },
@@ -504,7 +504,7 @@ async function main() {
   console.log("[antigravity] Fetching official Antigravity model docs ...");
   let html;
   try {
-    html = await fetchText(ANTIGRAVITY_MODELS_URL, { label: "Antigravity model docs" });
+    html = await runFetchText(ANTIGRAVITY_MODELS_URL, { label: "Antigravity model docs" });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (message.includes("404")) {

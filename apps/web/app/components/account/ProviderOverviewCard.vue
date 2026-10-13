@@ -3,7 +3,7 @@ import type { AccountOverviewData } from "~~/lib/api-types";
 
 type ProviderOverview = AccountOverviewData["summaries"][string];
 type StatDeltaTone = "positive" | "negative" | "neutral";
-type StatHitEffect = { text: string; tone: StatDeltaTone; version: number };
+type StatHit = { text: string; tone: StatDeltaTone; version: number };
 type StatMetric = { key: string; label: string; value: string; numericValue: number; formatDelta: (delta: number) => string; getTone?: (delta: number) => StatDeltaTone };
 
 const props = defineProps<{
@@ -18,7 +18,7 @@ const emit = defineEmits<{
 }>();
 
 const { auditRefreshVersion, auditUser, isAuditMode } = useAudit();
-const statHitEffects = ref<Record<string, StatHitEffect>>({});
+const statHitEffects = ref<Record<string, StatHit>>({});
 const previousStatValues = ref<Record<string, number> | null>(null);
 const previousStatAnimationContextKey = ref<string | null>(null);
 const pendingStatBaselineContextKey = ref<string | null>(null);

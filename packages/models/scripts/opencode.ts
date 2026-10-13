@@ -3,7 +3,7 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { syncProviderModels } from "#models/registry.ts";
-import { fetchText, fetchJson } from "#models/sync/http.ts";
+import { runFetchText, runFetchJson } from "#models/sync/http.ts";
 import { stripParamInfoKey } from "#models/model/clean-key.ts";
 import { syncCliVersion } from "./version-sync.ts";
 
@@ -40,7 +40,7 @@ const OPENCODE_VERSION_TARGETS = [
 ];
 
 async function syncUserAgent() {
-  const metadata = await fetchJson(OPENCODE_NPM_URL, { label: "opencode-ai npm metadata" });
+  const metadata = await runFetchJson(OPENCODE_NPM_URL, { label: "opencode-ai npm metadata" });
   const latestVersion = metadata?.version;
   if (typeof latestVersion !== "string" || !/^\d+\.\d+\.\d+$/.test(latestVersion)) {
     console.warn("Opencode: could not determine latest version from npm, skipping.");
@@ -144,8 +144,8 @@ function extractFreeModelIdsFromDocs(markdown) {
 
 async function fetchOpencodeFreeModelIds() {
   const [docsMarkdown, modelsPayload] = await Promise.all([
-    fetchText(OPENCODE_ZEN_DOCS_URL, { label: "OpenCode Console docs" }),
-    fetchJson(OPENCODE_MODELS_URL, { label: "OpenCode model list" }),
+    runFetchText(OPENCODE_ZEN_DOCS_URL, { label: "OpenCode Console docs" }),
+    runFetchJson(OPENCODE_MODELS_URL, { label: "OpenCode model list" }),
   ]);
 
   if (!modelsPayload || !Array.isArray(modelsPayload.data)) {

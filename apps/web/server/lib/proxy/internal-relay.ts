@@ -58,7 +58,7 @@ const relayRetrySchedule = Schedule.exponential(Duration.millis(50)).pipe(
   Schedule.upTo({ times: 3 })
 );
 
-export function fetchInternalEffect(
+export function relayRequest(
   path: "/internal/refresh" | "/internal/quota",
   payload: Record<string, unknown>,
   signal?: AbortSignal
@@ -111,9 +111,9 @@ export async function fetchInternalProvider(url: string, init: InternalRelayInit
     body: normalizeBody(init.body),
   };
 
-  return Effect.runPromise(fetchInternalEffect("/internal/refresh", payload, init.signal ?? undefined));
+  return Effect.runPromise(relayRequest("/internal/refresh", payload, init.signal ?? undefined));
 }
 
 export async function fetchInternalQuota(payload: InternalQuotaPayload, signal?: AbortSignal): Promise<Response> {
-  return Effect.runPromise(fetchInternalEffect("/internal/quota", payload, signal));
+  return Effect.runPromise(relayRequest("/internal/quota", payload, signal));
 }

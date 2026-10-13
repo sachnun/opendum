@@ -7,7 +7,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { buildModelIndex, persistModel, syncProviderModels } from "#models/registry.ts";
-import { fetchJson } from "#models/sync/http.ts";
+import { runFetchJson } from "#models/sync/http.ts";
 
 const PROVIDER_NAME = "workbuddy";
 const WORKBUDDY_NPM_PACKAGE = "@tencent-ai/codebuddy-code";
@@ -25,7 +25,7 @@ function isExcludedId(id) {
 }
 
 async function fetchWorkbuddyCatalog() {
-  const metadata = await fetchJson(`https://registry.npmjs.org/${WORKBUDDY_NPM_PACKAGE}`, {
+  const metadata = await runFetchJson(`https://registry.npmjs.org/${WORKBUDDY_NPM_PACKAGE}`, {
     label: `${WORKBUDDY_NPM_PACKAGE} npm metadata`,
   });
   const version = metadata?.["dist-tags"]?.latest;

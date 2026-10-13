@@ -1,6 +1,13 @@
-import { Duration, Effect } from "effect";
+import { Duration, Effect, Schedule } from "effect";
 import type { FallbackState } from "./fallback.js";
 import { NoFallbackState, shouldUseFallbackEndpoint } from "./fallback.js";
+import {
+  ProviderFallbackFailure,
+  ProviderRequestFailure,
+  ProviderTransportFailure,
+  asError,
+  providerFailureMessage,
+} from "./errors.js";
 
 export type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
 export type EgressFetch = (url: string, init?: RequestInit) => Promise<Response>;
@@ -39,7 +46,65 @@ export function createTransport(direct: FetchLike): MutableTransport {
   };
 }
 
-export async function postJSONWithHeadersAuth(
+/**
+ * Normalizes any provider failure into the tagged `ProviderFailure` channel so
+ * Promise rejections and ad hoc errors cannot leak past the Effect boundary.
+ */
+export function normalizeProviderFailure<A>(
+  provider: string,
+  effect: Effect.Effect<A, unknown>
+): Effect.Effect<A, ProviderRequestFailure> {
+  return Effect.catch(effect, (cause) =>
+    Effect.fail(
+      new ProviderRequestFailure({
+        message: asError(cause).message,
+        provider,
+        cause,
+      })
+    )
+  );
+}
+
+/**
+ * Retries a transient Effect according to an exponential, jittered schedule.
+ * The source is always evaluated once, so `attempts` counts total evaluations.
+ */
+export function retryTransient<A, E, R>(
+  self: Effect.Effect<A, E, R>,
+  options: { attempts: number; baseDelayMs: number; factor?: number }
+): Effect.Effect<A, E, R> {
+  const retries = Math.max(0, Math.trunc(options.attempts) - 1);
+  if (retries === 0) return self;
+  const policy = Schedule.exponential(
+    Duration.millis(Math.max(1, options.baseDelayMs)),
+    options.factor ?? 2
+  ).pipe(Schedule.jittered, Schedule.upTo({ times: retries }));
+  return Effect.retry(self, policy);
+}
+
+export function transportFailure(
+  provider: string,
+  cause: unknown,
+  url?: string
+): ProviderTransportFailure {
+  return new ProviderTransportFailure({
+    message: providerFailureMessage(cause),
+    provider,
+    url,
+    cause,
+  });
+}
+
+export function fallbackFailure(provider: string, cause: unknown): ProviderFallbackFailure {
+  return new ProviderFallbackFailure({
+    message: providerFailureMessage(cause),
+    provider,
+    cause,
+  });
+}
+
+export function postJSONWithHeadersAuth(
+  provider: string,
   fetchFn: FetchLike,
   url: string,
   bearer: string,
@@ -48,30 +113,37 @@ export async function postJSONWithHeadersAuth(
   extraHeaders?: Record<string, string>,
   useAuth = true,
   onStart?: () => void
-): Promise<Response> {
+): Effect.Effect<Response, ProviderTransportFailure> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (useAuth) headers.Authorization = `Bearer ${bearer.trim()}`;
   headers.Accept = stream ? "text/event-stream" : "application/json";
   if (extraHeaders) {
     for (const [key, value] of Object.entries(extraHeaders)) headers[key] = value;
   }
-  const resp = await fetchFn(url, { method: "POST", headers, body: JSON.stringify(payload) });
-  onStart?.();
-  return resp;
+  return Effect.tryPromise({
+    try: async () => {
+      const resp = await fetchFn(url, { method: "POST", headers, body: JSON.stringify(payload) });
+      onStart?.();
+      return resp;
+    },
+    catch: (cause) => transportFailure(provider, cause, url),
+  });
 }
 
 export function postJSON(
+  provider: string,
   fetchFn: FetchLike,
   url: string,
   bearer: string,
   payload: unknown,
   stream: boolean,
   onStart?: () => void
-): Promise<Response> {
-  return postJSONWithHeadersAuth(fetchFn, url, bearer, payload, stream, undefined, true, onStart);
+): Effect.Effect<Response, ProviderTransportFailure> {
+  return postJSONWithHeadersAuth(provider, fetchFn, url, bearer, payload, stream, undefined, true, onStart);
 }
 
 export function postJSONWithHeaders(
+  provider: string,
   fetchFn: FetchLike,
   url: string,
   bearer: string,
@@ -79,50 +151,56 @@ export function postJSONWithHeaders(
   stream: boolean,
   extraHeaders?: Record<string, string>,
   onStart?: () => void
-): Promise<Response> {
-  return postJSONWithHeadersAuth(fetchFn, url, bearer, payload, stream, extraHeaders, true, onStart);
+): Effect.Effect<Response, ProviderTransportFailure> {
+  return postJSONWithHeadersAuth(provider, fetchFn, url, bearer, payload, stream, extraHeaders, true, onStart);
 }
 
 export function postJSONWithoutAuth(
+  provider: string,
   fetchFn: FetchLike,
   url: string,
   payload: unknown,
   stream: boolean,
   onStart?: () => void
-): Promise<Response> {
-  return postJSONWithHeadersAuth(fetchFn, url, "", payload, stream, undefined, false, onStart);
+): Effect.Effect<Response, ProviderTransportFailure> {
+  return postJSONWithHeadersAuth(provider, fetchFn, url, "", payload, stream, undefined, false, onStart);
 }
 
-export async function postExecuteWithFallback(
+export function postExecuteWithFallback(
   fetchFn: FetchLike,
   state: FallbackState | null,
   provider: string,
   primary: string,
   fallbackUrl: string,
-  execute: (fetchFn: FetchLike, url: string) => Promise<Response>
-): Promise<Response> {
+  execute: (fetchFn: FetchLike, url: string) => Effect.Effect<Response, ProviderTransportFailure>
+): Effect.Effect<Response, ProviderFallbackFailure> {
   const router = state ?? new NoFallbackState();
-  const run = (target: string): Promise<Response> => execute(fetchFn, target);
-  if (!fallbackUrl) return run(primary);
+  const run = (target: string): Effect.Effect<Response, ProviderTransportFailure> => execute(fetchFn, target);
 
-  if (await router.sticky(provider)) {
-    const resp = await run(fallbackUrl);
-    if (!shouldUseFallbackEndpoint(resp.status)) return resp;
-    await resp.body?.cancel();
-    return postPrimary(router, provider, primary, run);
+  if (!fallbackUrl) {
+    return run(primary).pipe(Effect.mapError((cause) => fallbackFailure(provider, cause)));
   }
 
-  const resp = await postPrimary(router, provider, primary, run);
-  if (!shouldUseFallbackEndpoint(resp.status)) return resp;
-  await resp.body?.cancel();
-  await router.recordStrike(provider);
-  return run(fallbackUrl);
+  return Effect.gen(function* () {
+    if (yield* router.sticky(provider)) {
+      const resp = yield* run(fallbackUrl);
+      if (!shouldUseFallbackEndpoint(resp.status)) return resp;
+      yield* Effect.promise(() => resp.body?.cancel() ?? Promise.resolve());
+      return yield* postPrimary(router, provider, primary, run);
+    }
+
+    const resp = yield* postPrimary(router, provider, primary, run);
+    if (!shouldUseFallbackEndpoint(resp.status)) return resp;
+    yield* Effect.promise(() => resp.body?.cancel() ?? Promise.resolve());
+    yield* router.recordStrike(provider);
+    return yield* run(fallbackUrl);
+  }).pipe(Effect.mapError((cause) => fallbackFailure(provider, cause)));
 }
 
 export function postJSONWithFallback(
+  provider: string,
   fetchFn: FetchLike,
   state: FallbackState | null,
-  provider: string,
   url: string,
   fallbackUrl: string,
   bearer: string,
@@ -130,73 +208,78 @@ export function postJSONWithFallback(
   stream: boolean,
   headers?: Record<string, string>,
   onStart?: () => void
-): Promise<Response> {
+): Effect.Effect<Response, ProviderFallbackFailure> {
   return postExecuteWithFallback(fetchFn, state, provider, url, fallbackUrl, (fn, target) =>
-    postJSONWithHeaders(fn, target, bearer, payload, stream, headers, onStart)
+    postJSONWithHeaders(provider, fn, target, bearer, payload, stream, headers, onStart)
   );
 }
 
-async function postPrimary(
+function postPrimary(
   router: FallbackState,
   provider: string,
   primary: string,
-  poster: (target: string) => Promise<Response>
-): Promise<Response> {
-  const resp = await poster(primary);
-  if (resp.status >= 200 && resp.status < 300) await router.clear(provider);
-  return resp;
+  poster: (target: string) => Effect.Effect<Response, ProviderTransportFailure>
+): Effect.Effect<Response, ProviderTransportFailure> {
+  return poster(primary).pipe(
+    Effect.tap((resp) =>
+      resp.status >= 200 && resp.status < 300 ? router.clear(provider) : Effect.void
+    )
+  );
 }
 
-export async function postWithEgressFallback(options: {
+export function postWithEgressFallback(options: {
   transport: UpstreamTransport;
   state: FallbackState | null;
   provider: string;
   primary: string;
-  execute: (fetchFn: FetchLike, url: string) => Promise<Response>;
+  execute: (fetchFn: FetchLike, url: string) => Effect.Effect<Response, ProviderTransportFailure>;
   logger?: Logger;
-}): Promise<Response> {
+}): Effect.Effect<Response, ProviderFallbackFailure> {
   const { transport, provider, primary, execute } = options;
   const router = options.state ?? new NoFallbackState();
   const egressFetch = transport.egress;
   const egressAvailable = transport.egressReady() && egressFetch !== null;
 
   if (!egressAvailable) {
-    return postPrimary(router, provider, primary, (target) => execute(transport.direct, target));
+    return postPrimary(router, provider, primary, (target) => execute(transport.direct, target)).pipe(
+      Effect.mapError((cause) => fallbackFailure(provider, cause))
+    );
   }
 
-  if (await router.sticky(provider)) {
-    options.logger?.("egress preferred", { provider });
-    const resp = await postEgressWithRotation(options, primary, transport);
+  return Effect.gen(function* () {
+    if (yield* router.sticky(provider)) {
+      options.logger?.("egress preferred", { provider });
+      const resp = yield* postEgressWithRotation(options, primary, transport);
+      if (!shouldUseFallbackEndpoint(resp.status)) return resp;
+      yield* Effect.promise(() => resp.body?.cancel() ?? Promise.resolve());
+      return yield* postPrimary(router, provider, primary, (target) => execute(transport.direct, target));
+    }
+
+    const resp = yield* postPrimary(router, provider, primary, (target) =>
+      execute(transport.direct, target)
+    );
     if (!shouldUseFallbackEndpoint(resp.status)) return resp;
-    await resp.body?.cancel();
-    return postPrimary(router, provider, primary, (target) => execute(transport.direct, target));
-  }
-
-  const resp = await postPrimary(router, provider, primary, (target) => execute(transport.direct, target));
-  if (!shouldUseFallbackEndpoint(resp.status)) return resp;
-  options.logger?.("egress fallback", { provider, status: resp.status });
-  await resp.body?.cancel();
-  await router.recordStrike(provider);
-  return postEgressWithRotation(options, primary, transport);
+    options.logger?.("egress fallback", { provider, status: resp.status });
+    yield* Effect.promise(() => resp.body?.cancel() ?? Promise.resolve());
+    yield* router.recordStrike(provider);
+    return yield* postEgressWithRotation(options, primary, transport);
+  }).pipe(Effect.mapError((cause) => fallbackFailure(provider, cause)));
 }
 
-async function postEgressWithRotation(
+function postEgressWithRotation(
   options: {
     provider: string;
-    execute: (fetchFn: FetchLike, url: string) => Promise<Response>;
+    execute: (fetchFn: FetchLike, url: string) => Effect.Effect<Response, ProviderTransportFailure>;
     logger?: Logger;
   },
   primary: string,
   transport: UpstreamTransport
-): Promise<Response> {
+): Effect.Effect<Response, ProviderTransportFailure> {
   const egressFetch = transport.egress as EgressFetch;
 
-  const attemptOnce = Effect.tryPromise({
-    try: () => options.execute(egressFetch, primary),
-    catch: (error) => error,
-  });
+  const attemptOnce = options.execute(egressFetch, primary);
 
-  const loop = (attempt: number): Effect.Effect<Response, unknown> =>
+  const loop = (attempt: number): Effect.Effect<Response, ProviderTransportFailure> =>
     attemptOnce.pipe(
       Effect.flatMap((response) => {
         if (!shouldUseFallbackEndpoint(response.status)) return Effect.succeed(response);
@@ -214,10 +297,12 @@ async function postEgressWithRotation(
           Effect.flatMap(() => loop(attempt + 1))
         );
       }),
-      Effect.catch((error) => (attempt + 1 >= EGRESS_MAX_TRIES ? Effect.fail(error) : loop(attempt + 1)))
+      Effect.catchTag("ProviderTransportFailure", (error) =>
+        attempt + 1 >= EGRESS_MAX_TRIES ? Effect.fail(error) : loop(attempt + 1)
+      )
     );
 
-  return Effect.runPromise(loop(0));
+  return loop(0);
 }
 
 export function postJSONWithEgressFallback(
@@ -231,7 +316,7 @@ export function postJSONWithEgressFallback(
   headers?: Record<string, string>,
   onStart?: () => void,
   logger?: Logger
-): Promise<Response> {
+): Effect.Effect<Response, ProviderFallbackFailure> {
   return postWithEgressFallback({
     transport,
     state,
@@ -239,10 +324,21 @@ export function postJSONWithEgressFallback(
     primary: url,
     logger,
     execute: (fetchFn, target) =>
-      postJSONWithHeaders(fetchFn, target, bearer, payload, stream, headers, onStart),
+      postJSONWithHeaders(provider, fetchFn, target, bearer, payload, stream, headers, onStart),
   });
 }
 
 export function statusOf(resp: Response | null | undefined): number {
   return resp ? resp.status : 0;
 }
+
+export type {
+  ProviderCredentialFailure,
+  ProviderFallbackFailure,
+  ProviderFailure,
+  ProviderRequestFailure,
+  ProviderTransportFailure,
+  QuotaFailure,
+  QuotaFetchFailure,
+  QuotaJournalFailure,
+} from "./errors.js";

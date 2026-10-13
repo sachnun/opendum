@@ -1,10 +1,13 @@
+import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
 import { jsonResponse, numberFromAny, parseSseDataLines, stringValue } from "../core/helpers.js";
-import type { UpstreamTransport } from "../core/http.js";
+import { normalizeProviderFailure, transportFailure, type UpstreamTransport } from "../core/http.js";
+import { ProviderCredentialFailure, asError } from "../core/errors.js";
 import type {
   CredentialRefresher,
   Provider,
   ProviderAccount,
+  ProviderFailure,
   ProviderRequest,
   RefreshedCredentials,
 } from "../types.js";
@@ -55,43 +58,58 @@ export class WorkbuddyProvider implements Provider, CredentialRefresher {
     this.transport = options.transport;
   }
 
-  async refreshCredentials(refreshToken: string, _account: ProviderAccount): Promise<RefreshedCredentials> {
-    const resp = await this.transport.direct(`${WORKBUDDY_API_BASE}${WORKBUDDY_REFRESH_PATH}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        "X-Domain": WORKBUDDY_DOMAIN,
-        "X-Refresh-Token": refreshToken.trim(),
-        "X-Auth-Refresh-Source": WORKBUDDY_REFRESH_SOURCE,
+  refreshCredentials(
+    refreshToken: string,
+    _account: ProviderAccount
+  ): Effect.Effect<RefreshedCredentials, ProviderCredentialFailure> {
+    return Effect.tryPromise({
+      try: async () => {
+        const resp = await this.transport.direct(`${WORKBUDDY_API_BASE}${WORKBUDDY_REFRESH_PATH}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            "X-Domain": WORKBUDDY_DOMAIN,
+            "X-Refresh-Token": refreshToken.trim(),
+            "X-Auth-Refresh-Source": WORKBUDDY_REFRESH_SOURCE,
+          },
+          body: "{}",
+        });
+        const text = await resp.text();
+        if (resp.status < 200 || resp.status >= 300) {
+          throw new Error(`workbuddy token refresh failed: ${resp.status} ${text.slice(0, 1024)}`);
+        }
+        const parsed = JSON.parse(text) as {
+          code?: number;
+          data?: { accessToken?: string; refreshToken?: string; expiresIn?: number; expiresAt?: number };
+        };
+        const accessToken = (parsed.data?.accessToken ?? "").trim();
+        if (parsed.code !== 0 || !accessToken) {
+          throw new Error("workbuddy token refresh returned empty token");
+        }
+        const nextRefresh = (parsed.data?.refreshToken ?? "").trim() || refreshToken.trim();
+        return {
+          accessToken,
+          refreshToken: nextRefresh,
+          expiresAt: workbuddyExpiry(parsed.data?.expiresAt ?? 0, parsed.data?.expiresIn ?? 0),
+        };
       },
-      body: "{}",
+      catch: (cause) =>
+        new ProviderCredentialFailure({
+          message: asError(cause).message,
+          provider: "workbuddy",
+          cause,
+        }),
     });
-    const text = await resp.text();
-    if (resp.status < 200 || resp.status >= 300) {
-      throw new Error(`workbuddy token refresh failed: ${resp.status} ${text.slice(0, 1024)}`);
-    }
-    const parsed = JSON.parse(text) as {
-      code?: number;
-      data?: { accessToken?: string; refreshToken?: string; expiresIn?: number; expiresAt?: number };
-    };
-    const accessToken = (parsed.data?.accessToken ?? "").trim();
-    if (parsed.code !== 0 || !accessToken) {
-      throw new Error("workbuddy token refresh returned empty token");
-    }
-    const nextRefresh = (parsed.data?.refreshToken ?? "").trim() || refreshToken.trim();
-    return {
-      accessToken,
-      refreshToken: nextRefresh,
-      expiresAt: workbuddyExpiry(parsed.data?.expiresAt ?? 0, parsed.data?.expiresIn ?? 0),
-    };
   }
 
-  async makeRequest(request: ProviderRequest): Promise<Response> {
+  makeRequest(request: ProviderRequest): Effect.Effect<Response, ProviderFailure> {
     const accountId = request.account.accountId;
     const uid = accountId ? accountId.trim() : "";
     if (!uid) {
-      throw new Error("workbuddy account is missing user id, re-authenticate this account");
+      return Effect.fail(
+        transportFailure("workbuddy", new Error("workbuddy account is missing user id, re-authenticate this account"))
+      );
     }
     const payload: Json = {};
     for (const [key, value] of Object.entries(request.body)) {
@@ -111,22 +129,33 @@ export class WorkbuddyProvider implements Provider, CredentialRefresher {
     payload.model = modelName;
     payload.stream = true;
 
-    const resp = await this.transport.direct(`${WORKBUDDY_API_BASE}${WORKBUDDY_CHAT_PATH}`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${request.credentials.trim()}`,
-        "X-User-Id": uid,
-        "X-Domain": WORKBUDDY_DOMAIN,
-        "Content-Type": "application/json",
-        Accept: "text/event-stream",
-      },
-      body: JSON.stringify(payload),
-    });
-    if (resp.status < 200 || resp.status >= 300) return resp;
-    request.onUpstreamResponseStart?.();
-    if (request.stream) return resp;
-    const body = await resp.text();
-    return jsonResponse(200, workbuddyStreamToCompletion(body, modelName));
+    const url = `${WORKBUDDY_API_BASE}${WORKBUDDY_CHAT_PATH}`;
+    const direct = this.transport.direct;
+    return normalizeProviderFailure(
+      "workbuddy",
+      Effect.gen(function* () {
+        const resp = yield* Effect.tryPromise({
+          try: () =>
+            direct(url, {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${request.credentials.trim()}`,
+                "X-User-Id": uid,
+                "X-Domain": WORKBUDDY_DOMAIN,
+                "Content-Type": "application/json",
+                Accept: "text/event-stream",
+              },
+              body: JSON.stringify(payload),
+            }),
+          catch: (cause) => transportFailure("workbuddy", cause, url),
+        });
+        if (resp.status < 200 || resp.status >= 300) return resp;
+        request.onUpstreamResponseStart?.();
+        if (request.stream) return resp;
+        const body = yield* Effect.promise(() => resp.text());
+        return jsonResponse(200, workbuddyStreamToCompletion(body, modelName));
+      })
+    );
   }
 }
 

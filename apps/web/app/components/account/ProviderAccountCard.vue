@@ -49,7 +49,7 @@ type ErrorHistoryEntry = Extract<ErrorHistoryResult, { success: true }>["data"][
 
 
 
-type StatHitEffect = { text: string; tone: StatDeltaTone; version: number };
+type StatHit = { text: string; tone: StatDeltaTone; version: number };
 
 
 
@@ -129,7 +129,7 @@ const copiedErrorPreview = ref(false);
 const isMaintainer = computed(() => import.meta.dev || (me.value?.isMaintainer ?? false));
 const copiedSession = ref(false);
 const sessionLoading = ref(false);
-const statHitEffects = ref<Record<string, StatHitEffect>>({});
+const statHitEffects = ref<Record<string, StatHit>>({});
 const previousStatValues = ref<Record<string, number> | null>(null);
 const previousStatAnimationContextKey = ref<string | null>(null);
 const pendingStatBaselineContextKey = ref<string | null>(null);

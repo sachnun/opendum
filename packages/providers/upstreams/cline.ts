@@ -1,10 +1,13 @@
+import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
 import { stringValue } from "../core/helpers.js";
 import { postJSONWithHeaders, type UpstreamTransport } from "../core/http.js";
+import { ProviderCredentialFailure, asError } from "../core/errors.js";
 import type {
   CredentialRefresher,
   Provider,
   ProviderAccount,
+  ProviderFailure,
   ProviderRequest,
   RefreshedCredentials,
   RefreshBufferProvider,
@@ -49,32 +52,45 @@ export class ClineProvider implements Provider, CredentialRefresher, RefreshBuff
     return CLINE_REFRESH_BUFFER_MS;
   }
 
-  async refreshCredentials(refreshToken: string, _account: ProviderAccount): Promise<RefreshedCredentials> {
-    const resp = await this.transport.direct(`${CLINE_API_BASE}${CLINE_REFRESH_PATH}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ refreshToken: refreshToken.trim(), grantType: "refresh_token" }),
+  refreshCredentials(
+    refreshToken: string,
+    _account: ProviderAccount
+  ): Effect.Effect<RefreshedCredentials, ProviderCredentialFailure> {
+    return Effect.tryPromise({
+      try: async () => {
+        const resp = await this.transport.direct(`${CLINE_API_BASE}${CLINE_REFRESH_PATH}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({ refreshToken: refreshToken.trim(), grantType: "refresh_token" }),
+        });
+        const text = await resp.text();
+        if (resp.status < 200 || resp.status >= 300) {
+          throw new Error(`cline token refresh failed: ${resp.status} ${text.slice(0, 1024)}`);
+        }
+        const parsed = JSON.parse(text) as {
+          data?: { accessToken?: string; refreshToken?: string };
+        };
+        const accessToken = parsed.data?.accessToken ?? "";
+        if (!accessToken.trim()) {
+          throw new Error("cline token refresh returned empty access token");
+        }
+        const nextRefresh = parsed.data?.refreshToken || refreshToken;
+        return {
+          accessToken: `workos:${accessToken}`,
+          refreshToken: nextRefresh,
+          expiresAt: new Date(Date.now() + CLINE_ACCESS_TTL_MS),
+        };
+      },
+      catch: (cause) =>
+        new ProviderCredentialFailure({
+          message: asError(cause).message,
+          provider: "cline",
+          cause,
+        }),
     });
-    const text = await resp.text();
-    if (resp.status < 200 || resp.status >= 300) {
-      throw new Error(`cline token refresh failed: ${resp.status} ${text.slice(0, 1024)}`);
-    }
-    const parsed = JSON.parse(text) as {
-      data?: { accessToken?: string; refreshToken?: string };
-    };
-    const accessToken = parsed.data?.accessToken ?? "";
-    if (!accessToken.trim()) {
-      throw new Error("cline token refresh returned empty access token");
-    }
-    const nextRefresh = parsed.data?.refreshToken || refreshToken;
-    return {
-      accessToken: `workos:${accessToken}`,
-      refreshToken: nextRefresh,
-      expiresAt: new Date(Date.now() + CLINE_ACCESS_TTL_MS),
-    };
   }
 
-  async makeRequest(request: ProviderRequest): Promise<Response> {
+  makeRequest(request: ProviderRequest): Effect.Effect<Response, ProviderFailure> {
     const payload: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(request.body)) {
       if (SUPPORTED_CLINE.has(key) && value !== undefined && value !== null) payload[key] = value;
@@ -84,6 +100,7 @@ export class ClineProvider implements Provider, CredentialRefresher, RefreshBuff
     payload.model = this.registry.upstreamModelName(model, "cline");
     payload.stream = request.stream;
     return postJSONWithHeaders(
+      "cline",
       this.transport.direct,
       `${CLINE_API_BASE}${CLINE_CHAT_PATH}`,
       request.credentials,

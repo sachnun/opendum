@@ -1,8 +1,9 @@
+import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
 import { stringValue } from "../core/helpers.js";
 import { convertImageURLsToBase64 } from "../core/images.js";
-import { postJSON, type UpstreamTransport } from "../core/http.js";
-import type { Provider, ProviderRequest } from "../types.js";
+import { postJSON, transportFailure, type UpstreamTransport } from "../core/http.js";
+import type { Provider, ProviderFailure, ProviderRequest } from "../types.js";
 
 export const SUPPORTED_WORKERS_AI = new Set([
   "model", "messages", "audio", "temperature", "top_p", "max_tokens", "max_completion_tokens",
@@ -27,10 +28,12 @@ export class WorkersAiProvider implements Provider {
     this.transport = options.transport;
   }
 
-  async makeRequest(request: ProviderRequest): Promise<Response> {
+  makeRequest(request: ProviderRequest): Effect.Effect<Response, ProviderFailure> {
     const accountId = request.account.accountId;
     if (!accountId || !accountId.trim()) {
-      throw new Error("missing Cloudflare Account ID on Cloudflare account");
+      return Effect.fail(
+        transportFailure("workers_ai", new Error("missing Cloudflare Account ID on Cloudflare account"))
+      );
     }
     const payload: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(request.body)) {
@@ -39,17 +42,24 @@ export class WorkersAiProvider implements Provider {
     const model = stringValue(request.body.model);
     payload.model = this.registry.upstreamModelName(model, "workers_ai");
     payload.stream = request.stream;
-    if (Array.isArray(payload.messages)) {
-      payload.messages = await convertImageURLsToBase64(this.transport.direct, payload.messages);
-    }
     const url = `https://api.cloudflare.com/client/v4/accounts/${accountId.trim()}/ai/v1/chat/completions`;
-    return postJSON(
-      this.transport.direct,
-      url,
-      request.credentials,
-      payload,
-      request.stream,
-      request.onUpstreamResponseStart
-    );
+    const direct = this.transport.direct;
+    return Effect.gen(function* () {
+      if (Array.isArray(payload.messages)) {
+        payload.messages = yield* Effect.tryPromise({
+          try: () => convertImageURLsToBase64(direct, payload.messages as unknown[]),
+          catch: (cause) => transportFailure("workers_ai", cause, url),
+        });
+      }
+      return yield* postJSON(
+        "workers_ai",
+        direct,
+        url,
+        request.credentials,
+        payload,
+        request.stream,
+        request.onUpstreamResponseStart
+      );
+    });
   }
 }

@@ -1,4 +1,5 @@
-import { getQuotaJson, putQuotaCache } from "../cache.js";
+import { Effect } from "effect";
+import { putQuotaCache } from "../cache.js";
 import {
   baseQuotaInfo,
   clampFraction,
@@ -13,7 +14,7 @@ import {
   parseQuotaString,
 } from "../helpers.js";
 import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay } from "../types.js";
-import type { Json } from "./shared.js";
+import { quotaAttempt, type Json } from "./shared.js";
 
 const WORKBUDDY_SUMMARY_URL = "https://www.workbuddy.ai/billing/meter/get-user-resource-summary";
 const WORKBUDDY_FREE_URL = "https://www.workbuddy.ai/billing/meter/get-user-resource-free-packages";
@@ -21,14 +22,16 @@ const WORKBUDDY_PAID_URL = "https://www.workbuddy.ai/billing/meter/get-user-reso
 const WORKBUDDY_DOMAIN = "www.workbuddy.ai";
 const WORKBUDDY_PAGE_SIZE = 50;
 
-export async function fetchWorkbuddyQuota(
+export function fetchWorkbuddyQuota(
   ctx: QuotaContext,
   account: QuotaAccount,
   accessToken: string,
   forceRefresh: boolean
-): Promise<AccountQuotaInfo> {
+): Effect.Effect<AccountQuotaInfo> {
   const token = accessToken.trim();
-  if (!token) return expiredQuotaInfo("WorkBuddy access token is missing. Re-authenticate this account.");
+  if (!token) {
+    return Effect.succeed(expiredQuotaInfo("WorkBuddy access token is missing. Re-authenticate this account."));
+  }
   const headers: Record<string, string> = {
     Authorization: `Bearer ${token}`,
     "Content-Type": "application/json",
@@ -38,34 +41,55 @@ export async function fetchWorkbuddyQuota(
   const userId = account.accountId?.trim() ?? "";
   if (userId) headers["X-User-Id"] = userId;
 
-  let result;
-  try {
-    result = await getQuotaJson(ctx, account, forceRefresh, "workbuddy:resource-summary", "POST", WORKBUDDY_SUMMARY_URL, headers, {});
-  } catch (error) {
-    return errorQuotaInfo(error instanceof Error ? error.message : String(error));
-  }
-  if (result.statusCode === 401 || result.statusCode === 403) {
-    return expiredQuotaInfo("WorkBuddy session is invalid or expired. Re-authenticate this account.");
-  }
-  if (result.statusCode < 200 || result.statusCode >= 300) {
-    return errorQuotaInfo(`WorkBuddy quota endpoint failed: HTTP ${result.statusCode} ${result.raw}`);
-  }
-  let payload: { code?: number; msg?: string; data?: Json };
-  try {
-    payload = JSON.parse(result.raw) as { code?: number; msg?: string; data?: Json };
-  } catch {
-    return errorQuotaInfo("WorkBuddy quota response was not valid JSON");
-  }
-  if (payload.code !== 0) {
-    return errorQuotaInfo(`WorkBuddy quota request failed: ${payload.code} ${payload.msg ?? ""}`);
-  }
-  const summary = payload.data ?? {};
-  const packages = parseQuotaArray(summary.Packages).map((raw) => (parseQuotaRecord(raw) ?? {}) as Json);
-  const details = await fetchWorkbuddyPackageDetails(ctx, account, headers, forceRefresh, packages);
-  const groups = workbuddyQuotaGroups(packages, details);
-  if (groups.length === 0) return errorQuotaInfo("WorkBuddy quota response did not include usable quota data");
-  await putQuotaCache(ctx, result);
-  return baseQuotaInfo("success", groups);
+  return quotaAttempt(
+    ctx,
+    account,
+    forceRefresh,
+    "workbuddy:resource-summary",
+    "POST",
+    WORKBUDDY_SUMMARY_URL,
+    headers,
+    {}
+  ).pipe(
+    Effect.flatMap((attempt) => {
+      if (!attempt.ok) return Effect.succeed(errorQuotaInfo(attempt.message));
+      const { result } = attempt;
+      if (result.statusCode === 401 || result.statusCode === 403) {
+        return Effect.succeed(
+          expiredQuotaInfo("WorkBuddy session is invalid or expired. Re-authenticate this account.")
+        );
+      }
+      if (result.statusCode < 200 || result.statusCode >= 300) {
+        return Effect.succeed(
+          errorQuotaInfo(`WorkBuddy quota endpoint failed: HTTP ${result.statusCode} ${result.raw}`)
+        );
+      }
+      const payload = (() => {
+        try {
+          return JSON.parse(result.raw) as { code?: number; msg?: string; data?: Json };
+        } catch {
+          return null;
+        }
+      })();
+      if (!payload) return Effect.succeed(errorQuotaInfo("WorkBuddy quota response was not valid JSON"));
+      if (payload.code !== 0) {
+        return Effect.succeed(
+          errorQuotaInfo(`WorkBuddy quota request failed: ${payload.code} ${payload.msg ?? ""}`)
+        );
+      }
+      const summary = payload.data ?? {};
+      const packages = parseQuotaArray(summary.Packages).map((raw) => (parseQuotaRecord(raw) ?? {}) as Json);
+      return fetchWorkbuddyPackageDetails(ctx, account, headers, forceRefresh, packages).pipe(
+        Effect.flatMap((details) => {
+          const groups = workbuddyQuotaGroups(packages, details);
+          if (groups.length === 0) {
+            return Effect.succeed(errorQuotaInfo("WorkBuddy quota response did not include usable quota data"));
+          }
+          return putQuotaCache(ctx, result).pipe(Effect.as(baseQuotaInfo("success", groups)));
+        })
+      );
+    })
+  );
 }
 
 function workbuddyQuotaGroups(
@@ -100,13 +124,13 @@ function workbuddyQuotaGroups(
   return groups;
 }
 
-async function fetchWorkbuddyPackageDetails(
+function fetchWorkbuddyPackageDetails(
   ctx: QuotaContext,
   account: QuotaAccount,
   headers: Record<string, string>,
   forceRefresh: boolean,
   packages: Json[]
-): Promise<Map<string, { packageName: string; cycleEndTime: string }>> {
+): Effect.Effect<Map<string, { packageName: string; cycleEndTime: string }>> {
   const out = new Map<string, { packageName: string; cycleEndTime: string }>();
   const codes: string[] = [];
   const seen = new Set<string>();
@@ -116,43 +140,49 @@ async function fetchWorkbuddyPackageDetails(
     seen.add(code);
     codes.push(code);
   }
-  if (codes.length === 0) return out;
+  if (codes.length === 0) return Effect.succeed(out);
   const targets = [
     { cache: "workbuddy:resource-free-packages", url: WORKBUDDY_FREE_URL },
     { cache: "workbuddy:resource-paid-packages", url: WORKBUDDY_PAID_URL },
   ];
-  for (const target of targets) {
-    let result;
-    try {
-      result = await getQuotaJson(ctx, account, forceRefresh, target.cache, "POST", target.url, headers, {
-        PackageCodes: codes,
-        PageNumber: 1,
-        PageSize: WORKBUDDY_PAGE_SIZE,
-      });
-    } catch {
-      continue;
-    }
-    if (result.statusCode < 200 || result.statusCode >= 300) continue;
-    let payload: { code?: number; data?: { Accounts?: unknown[] } };
-    try {
-      payload = JSON.parse(result.raw) as { code?: number; data?: { Accounts?: unknown[] } };
-    } catch {
-      continue;
-    }
-    if (payload.code !== 0) continue;
-    await putQuotaCache(ctx, result);
-    for (const raw of parseQuotaArray(payload.data?.Accounts)) {
-      const entry = parseQuotaRecord(raw);
-      if (!entry) continue;
-      const code = parseQuotaString(entry.PackageCode);
-      if (!code || out.has(code)) continue;
-      out.set(code, {
-        packageName: parseQuotaString(entry.PackageName),
-        cycleEndTime: parseQuotaString(entry.CycleEndTime),
-      });
-    }
-  }
-  return out;
+
+  const loadTarget = (target: { cache: string; url: string }) =>
+    quotaAttempt(ctx, account, forceRefresh, target.cache, "POST", target.url, headers, {
+      PackageCodes: codes,
+      PageNumber: 1,
+      PageSize: WORKBUDDY_PAGE_SIZE,
+    }).pipe(
+      Effect.flatMap((attempt) => {
+        if (!attempt.ok) return Effect.void;
+        const { result } = attempt;
+        if (result.statusCode < 200 || result.statusCode >= 300) return Effect.void;
+        const payload = (() => {
+          try {
+            return JSON.parse(result.raw) as { code?: number; data?: { Accounts?: unknown[] } };
+          } catch {
+            return null;
+          }
+        })();
+        if (!payload || payload.code !== 0) return Effect.void;
+        return putQuotaCache(ctx, result).pipe(
+          Effect.flatMap(() => {
+            for (const raw of parseQuotaArray(payload.data?.Accounts)) {
+              const entry = parseQuotaRecord(raw);
+              if (!entry) continue;
+              const code = parseQuotaString(entry.PackageCode);
+              if (!code || out.has(code)) continue;
+              out.set(code, {
+                packageName: parseQuotaString(entry.PackageName),
+                cycleEndTime: parseQuotaString(entry.CycleEndTime),
+              });
+            }
+            return Effect.void;
+          })
+        );
+      })
+    );
+
+  return Effect.forEach(targets, loadTarget, { concurrency: 1, discard: true }).pipe(Effect.as(out));
 }
 
 function workbuddyDisplayName(packageCode: string, packageName: string): string {

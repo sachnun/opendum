@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
 import {
   boolFromAny,
@@ -8,11 +9,13 @@ import {
   randomId,
   stringValue,
 } from "../core/helpers.js";
-import type { UpstreamTransport } from "../core/http.js";
+import { normalizeProviderFailure, transportFailure, type UpstreamTransport } from "../core/http.js";
+import { ProviderCredentialFailure, asError } from "../core/errors.js";
 import type {
   CredentialRefresher,
   Provider,
   ProviderAccount,
+  ProviderFailure,
   ProviderRequest,
   RefreshedCredentials,
   RefreshBufferProvider,
@@ -336,132 +339,168 @@ export class PerchProvider implements Provider, CredentialRefresher, RefreshBuff
     return PERCH_REFRESH_BUFFER_MS;
   }
 
-  async refreshCredentials(refreshToken: string, _account: ProviderAccount): Promise<RefreshedCredentials> {
-    const config = await fetchPerchAuthConfig(this.transport);
-    const resp = await this.transport.direct(
-      `${config.supabaseUrl}/auth/v1/token?grant_type=refresh_token`,
-      {
-        method: "POST",
-        headers: { ...perchTokenHeaders(config), Accept: "application/json" },
-        body: JSON.stringify({ refresh_token: refreshToken.trim() }),
-      }
-    );
-    const text = await resp.text();
-    if (resp.status < 200 || resp.status >= 300) {
-      throw new Error(`perch token refresh failed: ${resp.status} ${text.slice(0, 1024)}`);
-    }
-    const token = JSON.parse(text) as {
-      access_token?: string;
-      refresh_token?: string;
-      expires_at?: number;
-      expires_in?: number;
-    };
-    const accessToken = (token.access_token ?? "").trim();
-    if (!accessToken) throw new Error("perch token refresh returned empty access token");
-    let expiresAt = new Date(Date.now() + PERCH_ACCESS_TTL_MS);
-    if ((token.expires_at ?? 0) > 0) expiresAt = new Date(Math.trunc((token.expires_at as number) * 1000));
-    else if ((token.expires_in ?? 0) > 0) expiresAt = new Date(Date.now() + (token.expires_in as number) * 1000);
-    const nextRefresh = (token.refresh_token ?? "").trim() || refreshToken.trim();
-    return { accessToken, refreshToken: nextRefresh, expiresAt };
+  refreshCredentials(
+    refreshToken: string,
+    _account: ProviderAccount
+  ): Effect.Effect<RefreshedCredentials, ProviderCredentialFailure> {
+    const transport = this.transport;
+    return Effect.tryPromise({
+      try: async () => {
+        const config = await fetchPerchAuthConfig(transport);
+        const resp = await transport.direct(
+          `${config.supabaseUrl}/auth/v1/token?grant_type=refresh_token`,
+          {
+            method: "POST",
+            headers: { ...perchTokenHeaders(config), Accept: "application/json" },
+            body: JSON.stringify({ refresh_token: refreshToken.trim() }),
+          }
+        );
+        const text = await resp.text();
+        if (resp.status < 200 || resp.status >= 300) {
+          throw new Error(`perch token refresh failed: ${resp.status} ${text.slice(0, 1024)}`);
+        }
+        const token = JSON.parse(text) as {
+          access_token?: string;
+          refresh_token?: string;
+          expires_at?: number;
+          expires_in?: number;
+        };
+        const accessToken = (token.access_token ?? "").trim();
+        if (!accessToken) throw new Error("perch token refresh returned empty access token");
+        let expiresAt = new Date(Date.now() + PERCH_ACCESS_TTL_MS);
+        if ((token.expires_at ?? 0) > 0) expiresAt = new Date(Math.trunc((token.expires_at as number) * 1000));
+        else if ((token.expires_in ?? 0) > 0) expiresAt = new Date(Date.now() + (token.expires_in as number) * 1000);
+        const nextRefresh = (token.refresh_token ?? "").trim() || refreshToken.trim();
+        return { accessToken, refreshToken: nextRefresh, expiresAt };
+      },
+      catch: (cause) =>
+        new ProviderCredentialFailure({
+          message: asError(cause).message,
+          provider: "perch",
+          cause,
+        }),
+    });
   }
 
-  async makeRequest(request: ProviderRequest): Promise<Response> {
+  makeRequest(request: ProviderRequest): Effect.Effect<Response, ProviderFailure> {
     const requestedModel = stringValue(request.body.model);
     const upstream = perchModelAlias(this.registry, requestedModel);
     const optionId = PERCH_MANUAL_OPTION_IDS[upstream];
     if (!optionId) {
-      return jsonResponse(400, {
-        error: {
-          message: `Model "${requestedModel}" is not supported for Perch. Supported models: ${perchSupportedModels(
-            this.registry
-          )}.`,
-          type: "invalid_request_error",
-          param: "model",
-          code: "unsupported_perch_model",
-        },
-      });
+      return Effect.succeed(
+        jsonResponse(400, {
+          error: {
+            message: `Model "${requestedModel}" is not supported for Perch. Supported models: ${perchSupportedModels(
+              this.registry
+            )}.`,
+            type: "invalid_request_error",
+            param: "model",
+            code: "unsupported_perch_model",
+          },
+        })
+      );
     }
     const includeReasoning = boolFromAny(request.body._includeReasoning);
+    const transport = this.transport;
+    const url = `${PERCH_APP_URL}${PERCH_MODEL_CALL_PATH}`;
 
-    const { ticket, runId: ticketRunId } = await perchTurnTicket(this.transport, request.credentials);
-    const runId = ticketRunId.trim() || perchRunId();
-    let attribution: Json | null = null;
-    const ids = await sessionIdsForAccount(this.transport, request.account, request.credentials);
-    if (ids && ids.userId && ids.workspaceId) {
-      attribution = {
-        userId: ids.userId,
-        workspaceId: ids.workspaceId,
-        runId,
-        lane: "chat",
-        source: "cli",
-        billingMultiplier: null,
-      };
-    }
+    return normalizeProviderFailure(
+      "perch",
+      Effect.gen(function* () {
+        const { ticket, runId: ticketRunId } = yield* Effect.tryPromise({
+          try: () => perchTurnTicket(transport, request.credentials),
+          catch: (cause) => transportFailure("perch", cause),
+        });
+        const runId = ticketRunId.trim() || perchRunId();
+        let attribution: Json | null = null;
+        const ids = yield* Effect.tryPromise({
+          try: () => sessionIdsForAccount(transport, request.account, request.credentials),
+          catch: (cause) => transportFailure("perch", cause),
+        });
+        if (ids && ids.userId && ids.workspaceId) {
+          attribution = {
+            userId: ids.userId,
+            workspaceId: ids.workspaceId,
+            runId,
+            lane: "chat",
+            source: "cli",
+            billingMultiplier: null,
+          };
+        }
 
-    const perchRequest: Json = { lane: "chat", messages: perchMessages(request.body) };
-    const tools = perchTools(request.body);
-    if (tools) {
-      perchRequest.tools = tools;
-      perchRequest.toolChoice = "auto";
-    }
-    if (request.body.temperature !== undefined && request.body.temperature !== null) {
-      perchRequest.temperature = request.body.temperature;
-    }
-    const maxTokens = firstNonNil(request.body.max_tokens, request.body.max_completion_tokens);
-    if (maxTokens !== null) perchRequest.maxOutputTokens = maxTokens;
+        const perchRequest: Json = { lane: "chat", messages: perchMessages(request.body) };
+        const tools = perchTools(request.body);
+        if (tools) {
+          perchRequest.tools = tools;
+          perchRequest.toolChoice = "auto";
+        }
+        if (request.body.temperature !== undefined && request.body.temperature !== null) {
+          perchRequest.temperature = request.body.temperature;
+        }
+        const maxTokens = firstNonNil(request.body.max_tokens, request.body.max_completion_tokens);
+        if (maxTokens !== null) perchRequest.maxOutputTokens = maxTokens;
 
-    const { level, reasoningEnabled } = perchEffortFromBody(request.body);
-    const payload: Json = {
-      request: perchRequest,
-      runId,
-      lane: "chat",
-      strictManual: false,
-      preferredModelId: null,
-      avoidModelIds: [],
-      attribution,
-      clientSurface: "cli",
-      manualModelOptionId: optionId,
-      roostModelChoice: "standard",
-      roostReasoning: reasoningEnabled,
-      effort: { level, orchestration: false },
-    };
+        const { level, reasoningEnabled } = perchEffortFromBody(request.body);
+        const payload: Json = {
+          request: perchRequest,
+          runId,
+          lane: "chat",
+          strictManual: false,
+          preferredModelId: null,
+          avoidModelIds: [],
+          attribution,
+          clientSurface: "cli",
+          manualModelOptionId: optionId,
+          roostModelChoice: "standard",
+          roostReasoning: reasoningEnabled,
+          effort: { level, orchestration: false },
+        };
 
-    const resp = await this.transport.direct(`${PERCH_APP_URL}${PERCH_MODEL_CALL_PATH}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${request.credentials.trim()}`,
-        [PERCH_TURN_TICKET_HEADER]: ticket,
-        "User-Agent": perchUserAgent(),
-        Accept: "text/event-stream",
-      },
-      body: JSON.stringify(payload),
-    });
-    request.onUpstreamResponseStart?.();
-    if (resp.status < 200 || resp.status >= 300) return resp;
+        const resp = yield* Effect.tryPromise({
+          try: () =>
+            transport.direct(url, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${request.credentials.trim()}`,
+                [PERCH_TURN_TICKET_HEADER]: ticket,
+                "User-Agent": perchUserAgent(),
+                Accept: "text/event-stream",
+              },
+              body: JSON.stringify(payload),
+            }),
+          catch: (cause) => transportFailure("perch", cause, url),
+        });
+        request.onUpstreamResponseStart?.();
+        if (resp.status < 200 || resp.status >= 300) return resp;
 
-    if (request.stream && resp.body) {
-      return new Response(perchSseToChatStream(resp.body, requestedModel, includeReasoning), {
-        status: 200,
-        headers: {
-          "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache",
-          Connection: "keep-alive",
-        },
-      });
-    }
-    try {
-      const completion = await perchSseToChatCompletion(resp, requestedModel, includeReasoning);
-      return jsonResponse(200, completion);
-    } catch (error) {
-      if (error instanceof PerchUpstreamError) {
-        return jsonResponse(
-          error.quota ? 429 : 502,
-          { error: { message: error.message, type: error.quota ? "rate_limit_error" : "api_error" } }
+        if (request.stream && resp.body) {
+          return new Response(perchSseToChatStream(resp.body, requestedModel, includeReasoning), {
+            status: 200,
+            headers: {
+              "Content-Type": "text/event-stream",
+              "Cache-Control": "no-cache",
+              Connection: "keep-alive",
+            },
+          });
+        }
+        const completion = yield* Effect.tryPromise({
+          try: () => perchSseToChatCompletion(resp, requestedModel, includeReasoning),
+          catch: (cause) => cause,
+        }).pipe(
+          Effect.catchIf(
+            (cause): cause is PerchUpstreamError => cause instanceof PerchUpstreamError,
+            (error) =>
+              Effect.succeed(
+                jsonResponse(error.quota ? 429 : 502, {
+                  error: { message: error.message, type: error.quota ? "rate_limit_error" : "api_error" },
+                })
+              )
+          )
         );
-      }
-      throw error;
-    }
+        return jsonResponse(200, completion);
+      })
+    );
   }
 }
 

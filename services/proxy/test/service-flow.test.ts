@@ -1,6 +1,7 @@
 import { describe, expect, it, mock } from "bun:test";
 import { createDatabaseQueryMocks } from "./database-mock.js";
 import type { AuthResult, AuthService, ModelValidationResult } from "@opendum/auth";
+import { Effect } from "effect";
 import type { Provider, ProviderRegistry } from "@opendum/providers";
 import type { Registry } from "@opendum/models/runtime";
 import type { OpendumRedis } from "@opendum/core/redis";
@@ -37,7 +38,8 @@ describe("ProxyService full flow", () => {
   it("streams the provider response and logs usage", async () => {
     const provider: Provider = {
       name: "opencode",
-      makeRequest: async () => sseResponse(['data: {"choices":[{"delta":{"content":"hello"}}]}\n\n', "data: [DONE]\n\n"]),
+      makeRequest: () =>
+        Effect.succeed(sseResponse(['data: {"choices":[{"delta":{"content":"hello"}}]}\n\n', "data: [DONE]\n\n"])),
     };
     const providers = {
       names: () => ["opencode"],

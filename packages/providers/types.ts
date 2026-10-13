@@ -1,3 +1,8 @@
+import type { Effect } from "effect";
+import type { ProviderCredentialFailure, ProviderFailure } from "./core/errors.js";
+
+export type { ProviderFailure, ProviderCredentialFailure } from "./core/errors.js";
+
 export type ProviderAccount = {
   id: string;
   userId: string;
@@ -43,7 +48,7 @@ export type ProviderRequest = {
 
 export interface Provider {
   readonly name: string;
-  makeRequest(request: ProviderRequest): Promise<Response>;
+  makeRequest(request: ProviderRequest): Effect.Effect<Response, ProviderFailure>;
 }
 
 export interface AuthlessProvider {
@@ -51,7 +56,10 @@ export interface AuthlessProvider {
 }
 
 export interface CredentialRefresher {
-  refreshCredentials(refreshToken: string, account: ProviderAccount): Promise<RefreshedCredentials>;
+  refreshCredentials(
+    refreshToken: string,
+    account: ProviderAccount
+  ): Effect.Effect<RefreshedCredentials, ProviderCredentialFailure>;
 }
 
 export interface RefreshBufferProvider {

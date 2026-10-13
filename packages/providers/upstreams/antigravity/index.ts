@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { Duration, Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
 import type { OpendumRedis } from "@opendum/core/redis";
 
@@ -34,11 +35,13 @@ import {
 } from "./transform.js";
 export type { ToolSchemaMap } from "./transform.js";
 import { convertImageURLsToBase64 } from "../../core/images.js";
-import type { UpstreamTransport } from "../../core/http.js";
+import { normalizeProviderFailure, transportFailure, type UpstreamTransport } from "../../core/http.js";
+import { ProviderCredentialFailure, asError } from "../../core/errors.js";
 import type {
   CredentialRefresher,
   Provider,
   ProviderAccount,
+  ProviderFailure,
   ProviderRequest,
   RefreshedCredentials,
   RefreshBufferProvider,
@@ -289,36 +292,50 @@ export class AntigravityProvider implements Provider, CredentialRefresher, Refre
     return 60 * 60 * 1000;
   }
 
-  async refreshCredentials(refreshToken: string, _account: ProviderAccount): Promise<RefreshedCredentials> {
-    const form = new URLSearchParams({
-      client_id: this.clientId,
-      client_secret: this.clientSecret,
-      refresh_token: refreshToken.trim(),
-      grant_type: "refresh_token",
+  refreshCredentials(
+    refreshToken: string,
+    _account: ProviderAccount
+  ): Effect.Effect<RefreshedCredentials, ProviderCredentialFailure> {
+    const transport = this.transport;
+    return Effect.tryPromise({
+      try: async () => {
+        const form = new URLSearchParams({
+          client_id: this.clientId,
+          client_secret: this.clientSecret,
+          refresh_token: refreshToken.trim(),
+          grant_type: "refresh_token",
+        });
+        const resp = await transport.direct(GOOGLE_OAUTH_TOKEN_ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: form.toString(),
+        });
+        const text = await resp.text();
+        if (resp.status < 200 || resp.status >= 300) {
+          throw new Error(`antigravity token refresh failed: ${resp.status} ${text.slice(0, 1024)}`);
+        }
+        const token = JSON.parse(text) as { access_token?: string; refresh_token?: string; expires_in?: number };
+        if (!token.access_token) throw new Error("antigravity token refresh returned empty access token");
+        const nextRefresh = token.refresh_token || refreshToken;
+        const expiresIn = token.expires_in && token.expires_in > 0 ? token.expires_in : 3600;
+        const info = await this.fetchAccountInfo(token.access_token);
+        return {
+          accessToken: token.access_token,
+          refreshToken: nextRefresh,
+          expiresAt: new Date(Date.now() + expiresIn * 1000),
+          projectId: info.projectId,
+          tier: info.tier,
+          paidTier: info.paidTier,
+          email: info.email,
+        };
+      },
+      catch: (cause) =>
+        new ProviderCredentialFailure({
+          message: asError(cause).message,
+          provider: "antigravity",
+          cause,
+        }),
     });
-    const resp = await this.transport.direct(GOOGLE_OAUTH_TOKEN_ENDPOINT, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: form.toString(),
-    });
-    const text = await resp.text();
-    if (resp.status < 200 || resp.status >= 300) {
-      throw new Error(`antigravity token refresh failed: ${resp.status} ${text.slice(0, 1024)}`);
-    }
-    const token = JSON.parse(text) as { access_token?: string; refresh_token?: string; expires_in?: number };
-    if (!token.access_token) throw new Error("antigravity token refresh returned empty access token");
-    const nextRefresh = token.refresh_token || refreshToken;
-    const expiresIn = token.expires_in && token.expires_in > 0 ? token.expires_in : 3600;
-    const info = await this.fetchAccountInfo(token.access_token);
-    return {
-      accessToken: token.access_token,
-      refreshToken: nextRefresh,
-      expiresAt: new Date(Date.now() + expiresIn * 1000),
-      projectId: info.projectId,
-      tier: info.tier,
-      paidTier: info.paidTier,
-      email: info.email,
-    };
   }
 
   private setGoogleHeaders(headers: Record<string, string>, accessToken: string, stream: boolean): void {
@@ -400,7 +417,7 @@ export class AntigravityProvider implements Provider, CredentialRefresher, Refre
       let data = await this.postOnboardUser(accessToken, endpoint, payload);
       if (!data) continue;
       for (let i = 0; i < 30 && data.done === false; i += 1) {
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+        await Effect.runPromise(Effect.sleep(Duration.millis(2000)));
         const polled = await this.postOnboardUser(accessToken, endpoint, payload);
         if (polled) data = polled;
       }
@@ -442,111 +459,139 @@ export class AntigravityProvider implements Provider, CredentialRefresher, Refre
     }
   }
 
-  async makeRequest(request: ProviderRequest): Promise<Response> {
-    const body = request.body;
-    let projectId = request.account.projectId?.trim() ?? "";
-    if (!projectId) projectId = this.defaultProject;
-    if (!projectId) {
-      const info = await this.fetchAccountInfo(request.credentials);
-      projectId = info.projectId || this.defaultProject;
-      if (projectId && request.account.id) {
-        const tier = info.paidTier || info.tier;
-        this.persistAccountInfo?.(request.account.id, { projectId, tier, email: info.email });
-      }
-    }
-    if (!projectId) throw new Error("antigravity account missing projectId");
+  makeRequest(request: ProviderRequest): Effect.Effect<Response, ProviderFailure> {
+    return normalizeProviderFailure(
+      "antigravity",
+      Effect.gen({ self: this }, function* () {
+        const body = request.body;
+        let projectId = request.account.projectId?.trim() ?? "";
+        if (!projectId) projectId = this.defaultProject;
+        if (!projectId) {
+          const info = yield* Effect.tryPromise({
+            try: () => this.fetchAccountInfo(request.credentials),
+            catch: (cause) => transportFailure("antigravity", cause),
+          });
+          projectId = info.projectId || this.defaultProject;
+          if (projectId && request.account.id) {
+            const tier = info.paidTier || info.tier;
+            this.persistAccountInfo?.(request.account.id, { projectId, tier, email: info.email });
+          }
+        }
+        if (!projectId) {
+          return yield* Effect.fail(
+            transportFailure("antigravity", new Error("antigravity account missing projectId"))
+          );
+        }
 
-    let modelName = this.resolveModel(stringValue(body.model));
-    modelName = this.resolveAntigravityGemini3ModelVariant(modelName, body);
-    let normalizedBody = this.normalizeBodyForModel(body, modelName);
-    const messages = normalizedBody.messages;
-    if (Array.isArray(messages) && modelName.includes("claude")) {
-      normalizedBody = cloneAnyMap(normalizedBody);
-      normalizedBody.messages = await convertImageURLsToBase64(this.transport.direct, messages);
-    }
+        let modelName = this.resolveModel(stringValue(body.model));
+        modelName = this.resolveAntigravityGemini3ModelVariant(modelName, body);
+        let normalizedBody = this.normalizeBodyForModel(body, modelName);
+        const messages = normalizedBody.messages;
+        if (Array.isArray(messages) && modelName.includes("claude")) {
+          normalizedBody = cloneAnyMap(normalizedBody);
+          normalizedBody.messages = yield* Effect.tryPromise({
+            try: () => convertImageURLsToBase64(this.transport.direct, messages),
+            catch: (cause) => transportFailure("antigravity", cause),
+          });
+        }
 
-    const clientSession = stringValue(normalizedBody._sessionId);
-    let sessionId = clientSession ? toNumericSessionId(clientSession) : toNumericSessionId(stableSessionId(normalizedBody));
-    if (!sessionId) sessionId = toNumericSessionId(randomUuid());
+        const clientSession = stringValue(normalizedBody._sessionId);
+        let sessionId = clientSession ? toNumericSessionId(clientSession) : toNumericSessionId(stableSessionId(normalizedBody));
+        if (!sessionId) sessionId = toNumericSessionId(randomUuid());
 
-    const geminiPayload = openAiToGemini(normalizedBody);
-    await this.transformAntigravityPayload(geminiPayload, modelName, sessionId);
-    const toolSchemas = buildToolSchemaMap(geminiPayload.tools);
-    if (!this.configBool(modelName, "strict_tool_schema")) sanitizeToolSchemaKeys(toolSchemas);
-
-    const requestPayload = wrapCodeAssistPayload(projectId, modelName, geminiPayload);
-    let actualStream = request.stream;
-    if (!modelName.includes("gemini") && !request.stream) actualStream = true;
-    else if (this.configBool(modelName, "force_stream_non_stream") && !request.stream) actualStream = true;
-    const action = actualStream ? "streamGenerateContent?alt=sse" : "generateContent";
-    const encoded = JSON.stringify(requestPayload);
-
-    let lastResp: Response | null = null;
-    let lastErr: unknown = null;
-    for (const endpoint of this.endpoints) {
-      const headers: Record<string, string> = {};
-      this.setGoogleHeaders(headers, request.credentials, actualStream);
-      if (this.shouldSetAnthropicBeta(modelName)) headers["anthropic-beta"] = CLAUDE_BETA_HEADER;
-      let resp: Response;
-      try {
-        resp = await this.transport.direct(`${endpoint}/v1internal:${action}`, {
-          method: "POST",
-          headers,
-          body: encoded,
+        const geminiPayload = openAiToGemini(normalizedBody);
+        yield* Effect.tryPromise({
+          try: () => this.transformAntigravityPayload(geminiPayload, modelName, sessionId),
+          catch: (cause) => transportFailure("antigravity", cause),
         });
-      } catch (error) {
-        lastErr = error;
-        continue;
-      }
-      if (resp.status === 429) {
-        request.onUpstreamResponseStart?.();
-        return resp;
-      }
-      if ([401, 403, 404].includes(resp.status) || resp.status >= 500) {
-        lastResp = resp;
-        continue;
-      }
-      if (resp.status < 200 || resp.status >= 300) {
-        request.onUpstreamResponseStart?.();
-        return resp;
-      }
-      request.onUpstreamResponseStart?.();
-      lastResp = resp;
-      lastErr = null;
-      break;
-    }
-    const resp = lastResp;
-    if (lastErr || !resp || resp.status < 200 || resp.status >= 300) {
-      if (lastErr) throw lastErr;
-      return resp as Response;
-    }
+        const toolSchemas = buildToolSchemaMap(geminiPayload.tools);
+        if (!this.configBool(modelName, "strict_tool_schema")) sanitizeToolSchemaKeys(toolSchemas);
 
-    let streamBody: ReadableStream<Uint8Array> | null = resp.body;
-    if (request.stream || actualStream) {
-      const { retired, notice, body } = await peekRetiredNotice(resp);
-      if (retired) return retiredResponse(notice);
-      streamBody = body ?? resp.body;
-    }
-    if (!streamBody) throw new Error("antigravity response stream is empty");
+        const requestPayload = wrapCodeAssistPayload(projectId, modelName, geminiPayload);
+        let actualStream = request.stream;
+        if (!modelName.includes("gemini") && !request.stream) actualStream = true;
+        else if (this.configBool(modelName, "force_stream_non_stream") && !request.stream) actualStream = true;
+        const action = actualStream ? "streamGenerateContent?alt=sse" : "generateContent";
+        const encoded = JSON.stringify(requestPayload);
 
-    if (request.stream) {
-      return new Response(geminiSseToOpenAiStream(this, streamBody, modelName, sessionId, toolSchemas), {
-        status: 200,
-        headers: {
-          "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache",
-          Connection: "keep-alive",
-        },
-      });
-    }
-    if (actualStream) {
-      const completion = await geminiStreamToOpenAiCompletionImpl(this, streamBody, modelName, sessionId, toolSchemas);
-      return jsonResponse(200, completion);
-    }
-    const data = (await resp.json()) as unknown;
-    const response = unwrapGeminiResponse(data);
-    this.cacheSignaturesFromResponse(response, modelName, sessionId);
-    return jsonResponse(200, geminiToOpenAiCompletion(response, modelName, toolSchemas));
+        let lastResp: Response | null = null;
+        let lastErr: unknown = null;
+        for (const endpoint of this.endpoints) {
+          const headers: Record<string, string> = {};
+          this.setGoogleHeaders(headers, request.credentials, actualStream);
+          if (this.shouldSetAnthropicBeta(modelName)) headers["anthropic-beta"] = CLAUDE_BETA_HEADER;
+          const url = `${endpoint}/v1internal:${action}`;
+          let resp: Response;
+          try {
+            resp = yield* Effect.tryPromise({
+              try: () => this.transport.direct(url, { method: "POST", headers, body: encoded }),
+              catch: (cause) => transportFailure("antigravity", cause, url),
+            });
+          } catch (error) {
+            lastErr = error;
+            continue;
+          }
+          if (resp.status === 429) {
+            request.onUpstreamResponseStart?.();
+            return resp;
+          }
+          if ([401, 403, 404].includes(resp.status) || resp.status >= 500) {
+            lastResp = resp;
+            continue;
+          }
+          if (resp.status < 200 || resp.status >= 300) {
+            request.onUpstreamResponseStart?.();
+            return resp;
+          }
+          request.onUpstreamResponseStart?.();
+          lastResp = resp;
+          lastErr = null;
+          break;
+        }
+        const resp = lastResp;
+        if (lastErr || !resp || resp.status < 200 || resp.status >= 300) {
+          if (lastErr) throw lastErr;
+          return resp as Response;
+        }
+
+        let streamBody: ReadableStream<Uint8Array> | null = resp.body;
+        if (request.stream || actualStream) {
+          const { retired, notice, body: peeked } = yield* Effect.tryPromise({
+            try: () => peekRetiredNotice(resp as Response),
+            catch: (cause) => transportFailure("antigravity", cause),
+          });
+          if (retired) return retiredResponse(notice);
+          streamBody = peeked ?? resp.body;
+        }
+        if (!streamBody) {
+          return yield* Effect.fail(
+            transportFailure("antigravity", new Error("antigravity response stream is empty"))
+          );
+        }
+
+        if (request.stream) {
+          return new Response(geminiSseToOpenAiStream(this, streamBody, modelName, sessionId, toolSchemas), {
+            status: 200,
+            headers: {
+              "Content-Type": "text/event-stream",
+              "Cache-Control": "no-cache",
+              Connection: "keep-alive",
+            },
+          });
+        }
+        if (actualStream) {
+          const completion = yield* Effect.tryPromise({
+            try: () => geminiStreamToOpenAiCompletionImpl(this, streamBody as ReadableStream<Uint8Array>, modelName, sessionId, toolSchemas),
+            catch: (cause) => transportFailure("antigravity", cause),
+          });
+          return jsonResponse(200, completion);
+        }
+        const data = (yield* Effect.promise(() => resp.json())) as unknown;
+        const response = unwrapGeminiResponse(data);
+        this.cacheSignaturesFromResponse(response, modelName, sessionId);
+        return jsonResponse(200, geminiToOpenAiCompletion(response, modelName, toolSchemas));
+      })
+    );
   }
 
   private configValue(model: string, key: string): unknown {

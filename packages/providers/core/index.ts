@@ -1,3 +1,4 @@
+export * from "./errors.js";
 export * from "./http.js";
 export * from "./helpers.js";
 export * from "./fallback.js";

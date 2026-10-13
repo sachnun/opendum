@@ -18,7 +18,7 @@ import {
   syncProviderModels,
   persistModel,
 } from "#models/registry.ts";
-import { fetchJson } from "#models/sync/http.ts";
+import { runFetchJson } from "#models/sync/http.ts";
 import { stripParamInfoKey } from "#models/model/clean-key.ts";
 
 const PROVIDER_NAME = "workers_ai";
@@ -207,7 +207,7 @@ function applyMetadata(modelsDir, metadata) {
 }
 
 async function fetchWorkersAIModelFiles() {
-  const files = await fetchJson(WORKERS_AI_MODELS_API_URL);
+  const files = await runFetchJson(WORKERS_AI_MODELS_API_URL);
   if (!Array.isArray(files)) {
     throw new Error("Unexpected Cloudflare Workers AI model file list payload");
   }
@@ -222,7 +222,7 @@ async function fetchWorkersAIModels() {
 
   return mapWithConcurrency(files, FETCH_CONCURRENCY, async (file) => ({
     slug: file.name.replace(/\.json$/, ""),
-    model: await fetchJson(file.download_url),
+    model: await runFetchJson(file.download_url),
   }));
 }
 

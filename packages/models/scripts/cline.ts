@@ -3,7 +3,7 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildModelIdMap, syncProviderModels } from "#models/registry.ts";
-import { fetchJson } from "#models/sync/http.ts";
+import { runFetchJson } from "#models/sync/http.ts";
 import { stripParamInfoKey } from "#models/model/clean-key.ts";
 
 const PROVIDER_NAME = "cline";
@@ -35,7 +35,7 @@ function buildModelMap(modelIds) {
 }
 
 async function fetchClineFreeModelIds() {
-  const data = await fetchJson(CLINE_RECOMMENDED_MODELS_URL, {
+  const data = await runFetchJson(CLINE_RECOMMENDED_MODELS_URL, {
     label: "Cline recommended models",
   });
   if (!data || !Array.isArray(data.free)) {

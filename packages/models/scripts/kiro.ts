@@ -19,7 +19,7 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { syncProviderModels } from "#models/registry.ts";
-import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS, fetchText } from "#models/sync/http.ts";
+import { fetchDecoded, runFetchText, FETCH_TIMEOUT_MS, runOrThrow } from "#models/sync/http.ts";
 import { stripParamInfoKey } from "#models/model/clean-key.ts";
 import { syncCliVersion } from "./version-sync.ts";
 
@@ -52,7 +52,7 @@ function parseLatestIdeVersion(html) {
 }
 
 async function syncIdeVersion() {
-  const html = await fetchText(KIRO_DOWNLOADS_URL, {
+  const html = await runFetchText(KIRO_DOWNLOADS_URL, {
     label: "Kiro downloads page",
     headers: { Accept: "text/html" },
   });
@@ -103,39 +103,13 @@ function stripHtml(html) {
  * @returns {Promise<Array<{name: string, contextWindow: string, region: string}>>}
  */
 async function fetchOfficialModels() {
-  let lastError = null;
-
-  for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt++) {
-    try {
-      const response = await fetch(KIRO_DOCS_URL, {
-        headers: {
-          Accept: "text/html",
-        },
-        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          `Failed to fetch Kiro docs: ${response.status} ${response.statusText}`
-        );
-      }
-
-      const html = await response.text();
-      return parseModelsFromHtml(html);
-    } catch (error) {
-      lastError = error;
-      if (attempt < MAX_FETCH_ATTEMPTS) {
-        console.warn(
-          `[kiro] Attempt ${attempt} failed: ${error.message}. Retrying...`
-        );
-        await sleep(attempt * 1_000);
-      }
-    }
-  }
-
-  throw lastError instanceof Error
-    ? lastError
-    : new Error("Failed to fetch Kiro models page");
+  return runOrThrow(
+    fetchDecoded(
+      KIRO_DOCS_URL,
+      { label: "Kiro docs", headers: { Accept: "text/html" } },
+      async (response) => parseModelsFromHtml(await response.text())
+    )
+  );
 }
 
 /**

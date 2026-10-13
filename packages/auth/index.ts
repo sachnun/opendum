@@ -22,7 +22,7 @@ export {
   AuthServiceTag,
   validateAPIKey,
   validateModelForUser,
-} from "./effect.js";
+} from "./layer.js";
 export type {
   CustomProviderModelRecord,
   CustomProviderReader,

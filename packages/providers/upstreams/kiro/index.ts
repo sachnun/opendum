@@ -1,6 +1,8 @@
+import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
 import { jsonResponse, randomId, stringValue } from "../../core/helpers.js";
-import type { UpstreamTransport } from "../../core/http.js";
+import { normalizeProviderFailure, transportFailure, type UpstreamTransport } from "../../core/http.js";
+import { ProviderCredentialFailure, asError } from "../../core/errors.js";
 import { KIRO_REFRESH_ENDPOINT } from "../../endpoints.js";
 import {
   KiroParserState,
@@ -24,6 +26,7 @@ import type {
   CredentialRefresher,
   Provider,
   ProviderAccount,
+  ProviderFailure,
   ProviderRequest,
   RefreshedCredentials,
   RefreshBufferProvider,
@@ -48,23 +51,37 @@ export class KiroProvider implements Provider, CredentialRefresher, RefreshBuffe
     return 5 * 60 * 1000;
   }
 
-  async refreshCredentials(refreshToken: string, _account: ProviderAccount): Promise<RefreshedCredentials> {
-    const resp = await this.transport.direct(KIRO_REFRESH_ENDPOINT, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json", "User-Agent": "KiroIDE" },
-      body: JSON.stringify({ refreshToken: refreshToken.trim() }),
+  refreshCredentials(
+    refreshToken: string,
+    _account: ProviderAccount
+  ): Effect.Effect<RefreshedCredentials, ProviderCredentialFailure> {
+    const transport = this.transport;
+    return Effect.tryPromise({
+      try: async () => {
+        const resp = await transport.direct(KIRO_REFRESH_ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json", "User-Agent": "KiroIDE" },
+          body: JSON.stringify({ refreshToken: refreshToken.trim() }),
+        });
+        const text = await resp.text();
+        if (resp.status < 200 || resp.status >= 300) {
+          throw new Error(`kiro token refresh failed: ${resp.status} ${text.slice(0, 1024)}`);
+        }
+        const token = JSON.parse(text) as { accessToken?: string; refreshToken?: string; expiresIn?: number };
+        const accessToken = (token.accessToken ?? "").trim();
+        if (!accessToken) throw new Error("kiro token refresh returned empty access token");
+        const nextRefresh = token.refreshToken || refreshToken;
+        const expiresIn = token.expiresIn && token.expiresIn > 0 ? token.expiresIn : 3600;
+        const tier = await this.fetchSubscriptionTier(accessToken);
+        return { accessToken, refreshToken: nextRefresh, expiresAt: new Date(Date.now() + expiresIn * 1000), tier };
+      },
+      catch: (cause) =>
+        new ProviderCredentialFailure({
+          message: asError(cause).message,
+          provider: "kiro",
+          cause,
+        }),
     });
-    const text = await resp.text();
-    if (resp.status < 200 || resp.status >= 300) {
-      throw new Error(`kiro token refresh failed: ${resp.status} ${text.slice(0, 1024)}`);
-    }
-    const token = JSON.parse(text) as { accessToken?: string; refreshToken?: string; expiresIn?: number };
-    const accessToken = (token.accessToken ?? "").trim();
-    if (!accessToken) throw new Error("kiro token refresh returned empty access token");
-    const nextRefresh = token.refreshToken || refreshToken;
-    const expiresIn = token.expiresIn && token.expiresIn > 0 ? token.expiresIn : 3600;
-    const tier = await this.fetchSubscriptionTier(accessToken);
-    return { accessToken, refreshToken: nextRefresh, expiresAt: new Date(Date.now() + expiresIn * 1000), tier };
   }
 
   private async fetchSubscriptionTier(accessToken: string): Promise<string> {
@@ -91,50 +108,61 @@ export class KiroProvider implements Provider, CredentialRefresher, RefreshBuffe
     }
   }
 
-  async makeRequest(request: ProviderRequest): Promise<Response> {
+  makeRequest(request: ProviderRequest): Effect.Effect<Response, ProviderFailure> {
     const body = request.body;
     const modelName = lastModelSegment(stringValue(body.model));
     const thinkingEnabled = kiroThinkingRequested(this.registry, body);
     const payload = buildKiroRequest(this.registry, body);
     const accountId = request.account.accountId?.trim();
     if (accountId) payload.profileArn = accountId;
+    const transport = this.transport;
+    const url = kiroApiUrlForAccount(request.account);
 
-    const resp = await this.transport.direct(kiroApiUrlForAccount(request.account), {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${request.credentials.trim()}`,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        "User-Agent":
-          "aws-sdk-js/3.738.0 ua/2.1 lang/go api/codewhisperer#3.738.0 m/E KiroIDE",
-        "x-amz-user-agent": "aws-sdk-js/3.738.0 KiroIDE",
-        "x-amzn-codewhisperer-optout": "true",
-        "x-amzn-kiro-agent-mode": "vibe",
-        "amz-sdk-invocation-id": randomId("kiro"),
-        "amz-sdk-request": "attempt=1; max=1",
-        Connection: "close",
-      },
-      body: JSON.stringify(payload),
-    });
-    if (resp.status < 200 || resp.status >= 300) return resp;
-    request.onUpstreamResponseStart?.();
-    if (!resp.body) {
-      return jsonResponse(502, { error: { message: "Kiro response stream is empty", type: "api_error" } });
-    }
+    return normalizeProviderFailure(
+      "kiro",
+      Effect.gen(function* () {
+        const resp = yield* Effect.tryPromise({
+          try: () =>
+            transport.direct(url, {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${request.credentials.trim()}`,
+                "Content-Type": "application/json",
+                Accept: "application/json",
+                "User-Agent":
+                  "aws-sdk-js/3.738.0 ua/2.1 lang/go api/codewhisperer#3.738.0 m/E KiroIDE",
+                "x-amz-user-agent": "aws-sdk-js/3.738.0 KiroIDE",
+                "x-amzn-codewhisperer-optout": "true",
+                "x-amzn-kiro-agent-mode": "vibe",
+                "amz-sdk-invocation-id": randomId("kiro"),
+                "amz-sdk-request": "attempt=1; max=1",
+                Connection: "close",
+              },
+              body: JSON.stringify(payload),
+            }),
+          catch: (cause) => transportFailure("kiro", cause, url),
+        });
+        if (resp.status < 200 || resp.status >= 300) return resp;
+        request.onUpstreamResponseStart?.();
+        if (!resp.body) {
+          return jsonResponse(502, { error: { message: "Kiro response stream is empty", type: "api_error" } });
+        }
 
-    if (request.stream) {
-      return new Response(kiroSseStream(resp.body, modelName, thinkingEnabled), {
-        status: 200,
-        headers: {
-          "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache",
-          Connection: "keep-alive",
-        },
-      });
-    }
-    const rawText = await resp.text();
-    const events = parseKiroJsonEvents(rawText, new KiroParserState());
-    return jsonResponse(200, convertKiroEventsToCompletion(events, modelName, thinkingEnabled));
+        if (request.stream) {
+          return new Response(kiroSseStream(resp.body, modelName, thinkingEnabled), {
+            status: 200,
+            headers: {
+              "Content-Type": "text/event-stream",
+              "Cache-Control": "no-cache",
+              Connection: "keep-alive",
+            },
+          });
+        }
+        const rawText = yield* Effect.promise(() => resp.text());
+        const events = parseKiroJsonEvents(rawText, new KiroParserState());
+        return jsonResponse(200, convertKiroEventsToCompletion(events, modelName, thinkingEnabled));
+      })
+    );
   }
 }
 

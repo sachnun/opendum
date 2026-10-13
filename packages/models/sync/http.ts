@@ -1,15 +1,20 @@
 /**
  * Shared fetch utilities for the model refresh scripts.
  *
- * Provides retrying helpers used by every provider scraper so retry and
- * timeout behaviour stays consistent.
+ * The exported functions are Effect based, so retry, timeout, and typed
+ * failure behaviour stays consistent across every provider scraper. The
+ * `run*` prefixed helpers bridge into Promise based callers.
  */
+
+import { Duration, Effect, Schedule } from "effect";
+import { ModelFetchFailure, asError, modelFailureMessage } from "../errors.ts";
 
 export const MAX_FETCH_ATTEMPTS = 3;
 export const FETCH_TIMEOUT_MS = 20_000;
+export const FETCH_RETRY_BASE_DELAY_MS = 1_000;
 
 export function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  return Effect.runPromise(Effect.sleep(Duration.millis(ms)));
 }
 
 export interface FetchOptions {
@@ -21,49 +26,111 @@ export interface FetchOptions {
 
 export type FetchResponseType = "json" | "text";
 
-export async function fetchWithRetry(
+/**
+ * Retries a transient Effect with an exponential, jittered schedule. The source
+ * is evaluated once before the schedule applies, so `attempts` counts total
+ * evaluations.
+ */
+export function retryTransient<A, E, R>(
+  self: Effect.Effect<A, E, R>,
+  attempts: number
+): Effect.Effect<A, E, R> {
+  const retries = Math.max(0, Math.trunc(attempts) - 1);
+  if (retries === 0) return self;
+  const policy = Schedule.exponential(Duration.millis(FETCH_RETRY_BASE_DELAY_MS)).pipe(
+    Schedule.jittered,
+    Schedule.upTo({ times: retries })
+  );
+  return Effect.retry(self, policy);
+}
+
+export function runOrThrow<A>(effect: Effect.Effect<A, unknown>): Promise<A> {
+  return Effect.runPromise(effect).catch((cause: unknown) => {
+    throw asError(cause);
+  });
+}
+
+export function request<T>(
   url: string,
-  options: FetchOptions & { responseType?: FetchResponseType } = {},
-): Promise<unknown> {
+  options: FetchOptions,
+  decode: (response: Response) => T | Promise<T>
+): Effect.Effect<T, ModelFetchFailure> {
   const {
     attempts = MAX_FETCH_ATTEMPTS,
     timeout = FETCH_TIMEOUT_MS,
-    responseType = "json",
     label = url,
     headers = {},
   } = options;
 
-  let lastError: unknown = null;
-
-  for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    try {
+  const attempt = Effect.tryPromise({
+    try: async () => {
       const response = await fetch(url, {
-        headers: { Accept: "application/json", ...headers },
+        headers,
         signal: AbortSignal.timeout(timeout),
       });
-
       if (!response.ok) {
         throw new Error(`Failed to fetch ${label} (${response.status} ${response.statusText})`);
       }
+      return decode(response);
+    },
+    catch: (cause) =>
+      new ModelFetchFailure({
+        message: modelFailureMessage(cause),
+        label,
+        cause,
+      }),
+  });
 
-      return responseType === "text" ? await response.text() : await response.json();
-    } catch (error) {
-      lastError = error;
-      if (attempt < attempts) await sleep(attempt * 1_000);
-    }
-  }
-
-  throw lastError instanceof Error ? lastError : new Error(`Failed to fetch ${label}`);
+  return retryTransient(attempt, attempts);
 }
 
-export function fetchJson(url: string, options: FetchOptions = {}): Promise<unknown> {
+export function fetchWithRetry(
+  url: string,
+  options: FetchOptions & { responseType?: FetchResponseType } = {}
+): Effect.Effect<unknown, ModelFetchFailure> {
+  const { responseType = "json", ...rest } = options;
+  const accept = responseType === "text" ? "text/plain" : "application/json";
+  return request(
+    url,
+    { ...rest, headers: { Accept: accept, ...rest.headers } },
+    (response) => (responseType === "text" ? response.text() : response.json())
+  );
+}
+
+export function fetchJson(
+  url: string,
+  options: FetchOptions = {}
+): Effect.Effect<unknown, ModelFetchFailure> {
   return fetchWithRetry(url, { ...options, responseType: "json" });
 }
 
-export function fetchText(url: string, options: FetchOptions = {}): Promise<string> {
-  return fetchWithRetry(url, {
-    ...options,
-    responseType: "text",
-    headers: { Accept: "text/plain", ...options.headers },
-  }) as Promise<string>;
+export function fetchText(
+  url: string,
+  options: FetchOptions = {}
+): Effect.Effect<string, ModelFetchFailure> {
+  return fetchWithRetry(url, { ...options, responseType: "text" }) as Effect.Effect<
+    string,
+    ModelFetchFailure
+  >;
+}
+
+/**
+ * Fetches a URL and decodes the response with a scraper specific function.
+ * Decode failures are retried like transport failures, matching the previous
+ * hand written loops.
+ */
+export function fetchDecoded<T>(
+  url: string,
+  options: FetchOptions,
+  decode: (response: Response) => T | Promise<T>
+): Effect.Effect<T, ModelFetchFailure> {
+  return request(url, options, decode);
+}
+
+export function runFetchJson(url: string, options: FetchOptions = {}): Promise<unknown> {
+  return runOrThrow(fetchJson(url, options));
+}
+
+export function runFetchText(url: string, options: FetchOptions = {}): Promise<string> {
+  return runOrThrow(fetchText(url, options));
 }
