@@ -1,3 +1,4 @@
+import { Duration, Effect } from "effect";
 import type { FallbackState } from "./fallback.js";
 import { NoFallbackState, shouldUseFallbackEndpoint } from "./fallback.js";
 
@@ -189,31 +190,34 @@ async function postEgressWithRotation(
   transport: UpstreamTransport
 ): Promise<Response> {
   const egressFetch = transport.egress as EgressFetch;
-  let lastError: unknown = null;
-  let lastResponse: Response | null = null;
 
-  for (let attempt = 0; ; attempt += 1) {
-    try {
-      const resp = await options.execute(egressFetch, primary);
-      if (!shouldUseFallbackEndpoint(resp.status)) return resp;
-      lastResponse = resp;
-    } catch (error) {
-      lastError = error;
-      lastResponse = null;
-    }
+  const attemptOnce = Effect.tryPromise({
+    try: () => options.execute(egressFetch, primary),
+    catch: (error) => error,
+  });
 
-    const maxTries = lastResponse?.status === 403 ? EGRESS_FORBIDDEN_TRIES : EGRESS_MAX_TRIES;
-    if (attempt + 1 >= maxTries) {
-      if (lastResponse) return lastResponse;
-      throw lastError;
-    }
-    if (lastResponse) await lastResponse.body?.cancel();
-    options.logger?.("egress retry", {
-      provider: options.provider,
-      attempt: attempt + 1,
-      status: lastResponse?.status ?? 0,
-    });
-  }
+  const loop = (attempt: number): Effect.Effect<Response, unknown> =>
+    attemptOnce.pipe(
+      Effect.flatMap((response) => {
+        if (!shouldUseFallbackEndpoint(response.status)) return Effect.succeed(response);
+        const maxTries = response.status === 403 ? EGRESS_FORBIDDEN_TRIES : EGRESS_MAX_TRIES;
+        if (attempt + 1 >= maxTries) return Effect.succeed(response);
+        return Effect.promise(() => response.body?.cancel() ?? Promise.resolve()).pipe(
+          Effect.flatMap(() =>
+            Effect.logDebug("egress retry", {
+              provider: options.provider,
+              attempt: attempt + 1,
+              status: response.status,
+            })
+          ),
+          Effect.flatMap(() => Effect.sleep(Duration.millis(Math.min(50 * 2 ** attempt, 2000)))),
+          Effect.flatMap(() => loop(attempt + 1))
+        );
+      }),
+      Effect.catch((error) => (attempt + 1 >= EGRESS_MAX_TRIES ? Effect.fail(error) : loop(attempt + 1)))
+    );
+
+  return Effect.runPromise(loop(0));
 }
 
 export function postJSONWithEgressFallback(
