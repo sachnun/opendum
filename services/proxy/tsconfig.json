@@ -6,5 +6,5 @@
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true
   },
-  "include": ["src/**/*", "test/**/*", "nitro/**/*", "nitro.config.ts"]
+  "include": ["src/**/*", "test/**/*", "server/**/*", "nitro.config.ts"]
 }

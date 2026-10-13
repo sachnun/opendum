@@ -1,4 +1,4 @@
-import { defineHandler, type H3, type H3Event } from "h3";
+import { type H3Event } from "h3";
 import { getQuotaAccount } from "@opendum/database/queries";
 import { fetchAccountQuota, isQuotaProvider } from "@opendum/providers/quota";
 import type { QuotaContext, QuotaJournal } from "@opendum/providers/quota";
@@ -41,7 +41,7 @@ function quotaContext(context: ProxyContext): QuotaContext {
   };
 }
 
-async function handleQuota(event: H3Event, context: ProxyContext): Promise<Response> {
+export async function handleQuota(event: H3Event, context: ProxyContext): Promise<Response> {
   const rawBody = await event.req.text();
   if (Buffer.byteLength(rawBody, "utf8") > MAX_QUOTA_BODY_BYTES) {
     return jsonResponse({ success: false, error: "Invalid quota payload" }, 400);
@@ -122,7 +122,7 @@ function resolveRelayTarget(url: string, method: string): { method: string; targ
   return { method: normalizedMethod, target: target.toString() };
 }
 
-async function handleRefresh(event: H3Event, context: ProxyContext): Promise<Response> {
+export async function handleRefresh(event: H3Event, context: ProxyContext): Promise<Response> {
   const rawBody = await event.req.text();
   if (Buffer.byteLength(rawBody, "utf8") > MAX_RELAY_BODY_BYTES) {
     return relayError(400, "Invalid internal refresh payload");
@@ -188,15 +188,4 @@ function relayError(status: number, message: string): Response {
     status,
     headers: { "Content-Type": "application/json", "X-Opendum-Internal-Relay-Error": "1" },
   });
-}
-
-export function registerInternalRoutes(app: H3, context: ProxyContext): void {
-  app.post(
-    "/internal/quota",
-    defineHandler((event) => handleQuota(event, context))
-  );
-  app.post(
-    "/internal/refresh",
-    defineHandler((event) => handleRefresh(event, context))
-  );
 }
