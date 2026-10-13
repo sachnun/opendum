@@ -70,20 +70,26 @@ const DOCUMENTED_EFFORT_SUFFIX = new Map([
   ["gpt-oss-120b", "medium"],
 ]);
 
-function leveledFlashModelKey(modelKey) {
-  const match = /^gemini-3\.(\d+)-flash$/.exec(modelKey);
-  if (!match) return "";
-  return Number(match[1]) >= 5 ? modelKey : "";
+const GEMINI_3X_FLASH_PATTERN = /^gemini-3\.(\d+)-flash$/;
+
+// Documented Gemini models whose wire name carries an effort suffix. The docs
+// picker exposes one level per model (e.g. Gemini 3.5 Flash, Gemini 4 Argon),
+// so the registry stores the default wire and the provider appends the level.
+function leveledGeminiModelKey(modelKey) {
+  const flash = GEMINI_3X_FLASH_PATTERN.exec(modelKey);
+  if (flash) return Number(flash[1]) >= 5 ? modelKey : "";
+  return /^gemini-\d+-[a-z]+$/.test(modelKey) ? modelKey : "";
 }
 
-function leveledFlashUpstream(modelKey) {
-  if (!leveledFlashModelKey(modelKey)) return "";
-  const minor = Number(/^gemini-3\.(\d+)-flash$/.exec(modelKey)[1]);
-  return minor >= 7 ? `${modelKey}-tiered` : `${modelKey}-medium`;
+function leveledGeminiUpstream(modelKey) {
+  if (!leveledGeminiModelKey(modelKey)) return "";
+  const flash = GEMINI_3X_FLASH_PATTERN.exec(modelKey);
+  if (flash) return Number(flash[1]) >= 7 ? `${modelKey}-tiered` : `${modelKey}-medium`;
+  return `${modelKey}-medium`;
 }
 
-function leveledFlashAliases(modelKey) {
-  if (!leveledFlashModelKey(modelKey)) return [];
+function leveledGeminiAliases(modelKey) {
+  if (!leveledGeminiModelKey(modelKey)) return [];
   return GEMINI_3X_FLASH_LEVELS.map((level) => `${modelKey}-${level}`);
 }
 
@@ -164,8 +170,8 @@ function canonicalizeWidgetModel(entry) {
   const key = keyFromDocsId(entry.id);
   let upstream;
 
-  if (leveledFlashModelKey(key)) {
-    upstream = leveledFlashUpstream(key);
+  if (leveledGeminiModelKey(key)) {
+    upstream = leveledGeminiUpstream(key);
   } else if (/^gemini-\d+(?:\.\d+)*-pro$/.test(entry.id)) {
     upstream = entry.id;
   } else {
@@ -308,7 +314,7 @@ function enrichModelMetadata(result, documentedModelKeys, aliasesByKey) {
       changed = true;
     }
 
-    const desiredAliases = aliasesByKey.get(modelKey) ?? leveledFlashAliases(modelKey);
+    const desiredAliases = aliasesByKey.get(modelKey) ?? leveledGeminiAliases(modelKey);
     if (desiredAliases.length > 0) {
       const aliases = new Set(data.aliases || []);
       for (const alias of desiredAliases) {

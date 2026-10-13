@@ -43,6 +43,7 @@
   },
   "providerConfig": {
     "antigravity": {
+      "upstream": "gemini-4-argon-medium",
       "contextWindow": 1048576,
       "maxOutputTokens": 65536
     }

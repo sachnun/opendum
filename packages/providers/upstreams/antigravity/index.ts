@@ -92,13 +92,16 @@ function stableSessionId(body: Json): string {
   return randomId("session");
 }
 
+// Level based thinking starts at Gemini 3. Newer majors (Gemini 4 Argon) keep
+// the same wire convention, so the check is version based instead of literal.
 function isGemini3ModelName(model: string): boolean {
-  return lastModelSegment(model).toLowerCase().startsWith("gemini-3");
+  const match = /^gemini-(\d+)/.exec(lastModelSegment(model).toLowerCase());
+  return match !== null && Number(match[1]) >= 3;
 }
 
 function isTieredGemini3Model(model: string): boolean {
   const value = lastModelSegment(model).toLowerCase();
-  return value.startsWith("gemini-3") && value.endsWith("-tiered");
+  return isGemini3ModelName(value) && value.endsWith("-tiered");
 }
 
 function geminiThinkingLevelFromModel(model: string): string {
@@ -183,7 +186,7 @@ function antigravityConfigValue(model: string, key: string): { found: boolean; v
   if (name.startsWith("gemini-")) {
     const image = name.includes("image");
     const pro = name.includes("pro");
-    const levelThinking = name.startsWith("gemini-3") && !pro && !image;
+    const levelThinking = isGemini3ModelName(name) && !pro && !image;
     switch (key) {
       case "inject_thought_signature":
       case "scrub_model_artifacts":
@@ -191,7 +194,7 @@ function antigravityConfigValue(model: string, key: string): { found: boolean; v
       case "signature_family":
         return { found: true, value: "gemini-flash" };
       case "system_instruction":
-        return { found: true, value: name.startsWith("gemini-3") && !image };
+        return { found: true, value: isGemini3ModelName(name) && !image };
       case "thinking_format":
         if (image) return { found: false, value: undefined };
         return { found: true, value: levelThinking ? "level" : "budget" };
@@ -593,23 +596,17 @@ export class AntigravityProvider implements Provider, CredentialRefresher, Refre
     return this.registry.upstreamModelName(value, this.name);
   }
 
+  // Every leveled Gemini wire is addressed as <base>-<level>. Tiered wires and
+  // lite/image variants pick their own effort, so they are left untouched.
   private resolveAntigravityGemini3ModelVariant(model: string, body: Json): string {
     if (!isGemini3ModelName(model)) return model;
     const lower = model.toLowerCase();
-    if (lower.startsWith("gemini-3.5-flash") && !lower.includes("lite")) {
-      const base = trimGeminiThinkingLevelSuffix(model);
-      let level = geminiThinkingLevelFromModel(model);
-      const bodyLevel = this.requestedGemini3ThinkingLevel(model, body);
-      if (bodyLevel) level = bodyLevel;
-      if (!level) level = "medium";
-      return `${base}-${level}`;
-    }
-    if (!model.toLowerCase().includes("pro")) return model;
+    if (lower.endsWith("-tiered") || lower.includes("lite") || lower.includes("image")) return model;
     const base = trimGeminiThinkingLevelSuffix(model);
     let level = geminiThinkingLevelFromModel(model);
     const bodyLevel = this.requestedGemini3ThinkingLevel(model, body);
     if (bodyLevel) level = bodyLevel;
-    if (!level) level = "high";
+    if (!level) level = lower.includes("pro") ? "high" : "medium";
     return `${base}-${level}`;
   }
 
