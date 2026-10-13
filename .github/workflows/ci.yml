@@ -19,29 +19,23 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: pnpm
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: bun install --frozen-lockfile
 
       - name: Lint web
-        run: pnpm --filter @opendum/web lint
+        run: bun run --filter @opendum/web lint
 
       - name: Test web
-        run: pnpm --filter @opendum/web test
+        run: bun run --filter @opendum/web test
 
       - name: Typecheck web
-        run: pnpm --filter @opendum/web typecheck
+        run: bun run --filter @opendum/web typecheck
 
       - name: Build web
-        run: pnpm --filter @opendum/web build
+        run: bun run --filter @opendum/web build
 
   checks:
     name: Checks
@@ -51,26 +45,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: pnpm
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: bun install --frozen-lockfile
 
       - name: Typecheck packages
-        run: pnpm --filter "./packages/*" -r --if-present typecheck
+        run: bun run --filter "./packages/*" --if-present typecheck
 
       - name: Test packages
-        run: pnpm --filter "./packages/*" -r --if-present test
+        run: bun run --filter "./packages/*" --if-present test
 
       - name: Typecheck proxy
-        run: pnpm --filter @opendum/proxy typecheck
+        run: bun run --filter @opendum/proxy typecheck
 
       - name: Test proxy
-        run: pnpm --filter @opendum/proxy test
+        run: bun run --filter @opendum/proxy test

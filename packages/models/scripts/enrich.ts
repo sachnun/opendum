@@ -10,7 +10,7 @@
  * files into their inferred family folder.
  *
  * Runs as the final step of the provider refresh:
- *   pnpm run models:refresh
+ *   bun run models:refresh
  */
 
 import { basename, dirname, join, resolve } from "node:path";
