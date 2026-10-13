@@ -1,7 +1,7 @@
 {
   "name": "opendum",
   "installCommand": "true",
-  "buildCommand": "pnpm run build",
+  "buildCommand": "bun run build",
   "outputDirectory": ".edgeone/assets",
   "nodeVersion": "24.18.0",
   "cloudFunctions": {

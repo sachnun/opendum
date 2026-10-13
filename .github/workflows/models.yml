@@ -18,20 +18,17 @@ jobs:
         with:
           ref: main
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: pnpm
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: bun install --frozen-lockfile
 
       - name: Refresh provider models
-        run: pnpm run models:refresh --summary "$RUNNER_TEMP/summary.md"
+        run: bun run --filter @opendum/models refresh --summary "$RUNNER_TEMP/summary.md"
+
+      - name: Regenerate family ranking
+        run: bun run --filter @opendum/web family-ranking
 
       - name: Build commit message
         id: commit_msg

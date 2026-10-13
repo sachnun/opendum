@@ -10,8 +10,8 @@ on:
       - packages/database/**
       - packages/models/**
       - package.json
-      - pnpm-lock.yaml
-      - pnpm-workspace.yaml
+      - bun.lock
+      - bunfig.toml
   workflow_run:
     workflows:
       - Refresh Provider Models
@@ -42,20 +42,14 @@ jobs:
         with:
           ref: main
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: pnpm
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: bun install --frozen-lockfile
 
       - name: Deploy web to EdgeOne Pages
         working-directory: apps/web
-        run: pnpm exec edgeone makers deploy -n opendum -a overseas -t "$EDGEONE_API_TOKEN" -e production
+        run: bunx edgeone makers deploy -n opendum -a overseas -t "$EDGEONE_API_TOKEN" -e production
         env:
           EDGEONE_API_TOKEN: ${{ secrets.EDGEONE_API_TOKEN }}
