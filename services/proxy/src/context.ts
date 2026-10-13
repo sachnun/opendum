@@ -6,7 +6,7 @@ import { resolveModelsDir } from "@opendum/models";
 import { Registry as ModelRegistry } from "@opendum/models/runtime";
 import { UnroxyEgress, assertPublicHost, createGuardedFetch, type GuardedFetch } from "@opendum/core/egress";
 import { ProviderRegistry, RedisFallbackRouter, type EgressFetch } from "@opendum/providers";
-import { db } from "@opendum/database";
+import { db, closeDatabase } from "@opendum/database";
 import type { ProxyConfig } from "./config.js";
 import { ProxyService } from "./core/service.js";
 
@@ -103,4 +103,5 @@ export async function disposeContext(context: ProxyContext): Promise<void> {
   await context.egress.close();
   await context.closeDirect();
   await closeRedis(context.redis);
+  await closeDatabase();
 }

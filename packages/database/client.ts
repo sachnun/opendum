@@ -53,6 +53,13 @@ export const db = new Proxy({} as Database, {
   },
 }) as Database;
 
+export async function closeDatabase(): Promise<void> {
+  const current = globalForDb.db;
+  if (!current) return;
+  globalForDb.db = undefined;
+  await current.$client.end();
+}
+
 if (process.env.NODE_ENV !== "production") {
   globalForDb.db ??= getDb();
 }
