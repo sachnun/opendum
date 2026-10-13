@@ -2,5 +2,21 @@
   "providers": [
     "workbuddy"
   ],
-  "reasoning": true
+  "reasoning": true,
+  "limit": {
+    "context": 1000000,
+    "output": 1000000
+  },
+  "cost": {
+    "input": 5,
+    "output": 20,
+    "cacheRead": 1.25,
+    "cacheWrite": 0
+  },
+  "providerConfig": {
+    "workbuddy": {
+      "contextWindow": 1000000,
+      "maxOutputTokens": 1000000
+    }
+  }
 }

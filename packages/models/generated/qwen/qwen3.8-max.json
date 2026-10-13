@@ -1,7 +1,6 @@
 {
   "providers": [
-    "hyper",
-    "perch"
+    "hyper"
   ],
   "aliases": [
     "Qwen-Qwen3.8-Max",
@@ -24,7 +23,7 @@
   },
   "limit": {
     "context": 1000000,
-    "output": 131072
+    "output": 65536
   },
   "cost": {
     "input": 8.25,
@@ -41,11 +40,6 @@
     "hyper": {
       "contextWindow": 1000000,
       "maxOutputTokens": 65536
-    },
-    "perch": {
-      "upstream": "qwen-3.8-max",
-      "contextWindow": 256000,
-      "maxOutputTokens": 131072
     }
   }
 }
