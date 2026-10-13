@@ -1,24 +1,18 @@
+import { Effect, Layer } from "effect";
 import { AuthService } from "@opendum/auth";
-import { closeRedis, openRedis, type OpendumRedis } from "@opendum/core/redis";
+import { closeRedis, openRedis } from "@opendum/core/redis";
 import { resolveModelsDir } from "@opendum/models";
 import { Registry as ModelRegistry } from "@opendum/models/runtime";
 import { UnroxyEgress, assertPublicHost, createGuardedFetch, type GuardedFetch } from "@opendum/core/egress";
 import { ProviderRegistry, RedisFallbackRouter, type EgressFetch } from "@opendum/providers";
 import { db, closeDatabase } from "@opendum/database";
-import type { ProxyConfig } from "../config.js";
 import { ProxyService } from "./service.js";
+import { proxyConfig } from "../config.js";
+import { ProxyContextTag, type ProxyContext } from "./services.js";
 
-export type ProxyContext = {
-  config: ProxyConfig;
-  models: ModelRegistry;
-  redis: OpendumRedis;
-  auth: AuthService;
-  providers: ProviderRegistry;
-  service: ProxyService;
-  egress: UnroxyEgress;
-  guardedFetch: GuardedFetch;
-  closeDirect: () => Promise<void>;
-};
+export type { ProxyContext } from "./services.js";
+
+const MAX_REDIRECTS = 10;
 
 async function resolveModelsDirForService(): Promise<string> {
   const cwd = process.cwd();
@@ -38,8 +32,6 @@ async function resolveModelsDirForService(): Promise<string> {
   }
   return resolveModelsDir();
 }
-
-const MAX_REDIRECTS = 10;
 
 async function fetchThroughRedirects(
   baseFetch: GuardedFetch,
@@ -68,45 +60,61 @@ async function fetchThroughRedirects(
   throw new Error("stopped after 10 redirects");
 }
 
-export async function createContext(config: ProxyConfig): Promise<ProxyContext> {
-  const models = ModelRegistry.load(await resolveModelsDirForService());
-  const redis = await openRedis(config.redisUrl);
-  const auth = new AuthService(models, redis);
-
-  const egress = new UnroxyEgress();
-  const guard = createGuardedFetch({
-    headersTimeout: config.requestTimeoutMs > 0 ? config.requestTimeoutMs : undefined,
-  });
-  const guardedFetch: GuardedFetch = (url, init) => fetchThroughRedirects(guard.fetch, url, init);
-  const directFetch = (url: string, init?: RequestInit): Promise<Response> =>
-    guardedFetch(url, init).catch((error: unknown) =>
-      Promise.reject(error instanceof Error ? error : new Error(String(error)))
+export const ProxyContextLayer = Layer.effect(
+  ProxyContextTag,
+  Effect.gen(function* () {
+    const config = yield* proxyConfig;
+    const dir = yield* Effect.promise(() => resolveModelsDirForService());
+    const models = yield* Effect.sync(() => ModelRegistry.load(dir));
+    const redis = yield* Effect.acquireRelease(
+      Effect.promise(() => openRedis(config.redisUrl)),
+      (client) => Effect.promise(() => closeRedis(client))
     );
-  const providers = new ProviderRegistry({
-    models,
-    fallback: new RedisFallbackRouter(redis),
-    redis,
-    directFetch,
-  });
-  const egressFetch: EgressFetch = (url, init) => egress.fetch(url, init);
-  providers.setEgress(egressFetch, true);
+    const auth = new AuthService(models, redis);
+    const egress = yield* Effect.acquireRelease(
+      Effect.sync(() => new UnroxyEgress()),
+      (value) => Effect.promise(() => value.close())
+    );
+    const guard = yield* Effect.acquireRelease(
+      Effect.sync(() =>
+        createGuardedFetch({ headersTimeout: config.requestTimeoutMs > 0 ? config.requestTimeoutMs : undefined })
+      ),
+      (fetcher) => Effect.promise(() => fetcher.close())
+    );
+    const guardedFetch: GuardedFetch = (url, init) => fetchThroughRedirects(guard.fetch, url, init);
+    const directFetch = (url: string, init?: RequestInit): Promise<Response> =>
+      guardedFetch(url, init).catch((error: unknown) =>
+        Promise.reject(error instanceof Error ? error : new Error(String(error)))
+      );
+    const providers = new ProviderRegistry({
+      models,
+      fallback: new RedisFallbackRouter(redis),
+      redis,
+      directFetch,
+    });
+    const egressFetch: EgressFetch = (url, init) => egress.fetch(url, init);
+    providers.setEgress(egressFetch, true);
+    const service = new ProxyService({
+      database: db,
+      redis,
+      models,
+      auth,
+      providers,
+      betterAuthSecret: config.betterAuthSecret,
+      requestTimeoutMs: config.requestTimeoutMs,
+    });
 
-  const service = new ProxyService({
-    database: db,
-    redis,
-    models,
-    auth,
-    providers,
-    betterAuthSecret: config.betterAuthSecret,
-    requestTimeoutMs: config.requestTimeoutMs,
-  });
+    if (config.tokenRefreshIntervalMs > 0) {
+      yield* Effect.forkScoped(
+        service.refreshTokenLoop(config.tokenRefreshIntervalMs).pipe(Effect.catchCause(() => Effect.void))
+      );
+    }
 
-  return { config, models, redis, auth, providers, service, egress, guardedFetch, closeDirect: () => guard.close() };
-}
+    yield* Effect.addFinalizer(() => Effect.promise(() => closeDatabase()));
 
-export async function disposeContext(context: ProxyContext): Promise<void> {
-  await context.egress.close();
-  await context.closeDirect();
-  await closeRedis(context.redis);
-  await closeDatabase();
-}
+    const context: ProxyContext = { config, models, redis, auth, providers, service, egress, guardedFetch };
+    return context;
+  })
+);
+
+export { fetchThroughRedirects };
