@@ -1,9 +1,10 @@
 {
+  "id": "mistral-large",
   "providers": [
     "nvidia_nim"
   ],
   "aliases": [
-    "mistral-large",
+    "mistral-large-3",
     "mistral-large-3-675b-instruct-2512",
     "mistral-large-3-instruct",
     "mistralai/mistral-large",
@@ -12,8 +13,6 @@
   "reasoning": false,
   "modalities": {
     "input": [
-      "image",
-      "pdf",
       "text"
     ],
     "output": [
@@ -21,8 +20,8 @@
     ]
   },
   "limit": {
-    "context": 262144,
-    "output": 209715
+    "context": 128000,
+    "output": 102400
   },
   "cost": {
     "input": 2.5,
@@ -38,8 +37,8 @@
   "providerConfig": {
     "nvidia_nim": {
       "upstream": "mistralai/mistral-large",
-      "contextWindow": 262144,
-      "maxOutputTokens": 209715
+      "contextWindow": 128000,
+      "maxOutputTokens": 102400
     }
   }
 }

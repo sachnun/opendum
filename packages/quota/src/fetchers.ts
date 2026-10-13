@@ -152,7 +152,7 @@ export async function fetchAntigravityQuota(
       result = await getQuotaJson(ctx, account, forceRefresh, "antigravity:fetchAvailableModels", "POST", `${endpoint}/v1internal:fetchAvailableModels`, {
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
-        "User-Agent": `antigravity/2.19.1 ${process.platform}/${process.arch}`,
+        "User-Agent": `antigravity/2.22.0 ${process.platform}/${process.arch}`,
       }, { project: projectId });
     } catch (error) {
       lastErr = error instanceof Error ? error.message : String(error);
@@ -221,7 +221,7 @@ export async function fetchCodexQuota(
   const headers: Record<string, string> = {
     Authorization: `Bearer ${accessToken}`,
     Accept: "application/json",
-    "User-Agent": `opencode/1.18.35 (${process.platform} ${process.platform}; ${process.arch})`,
+    "User-Agent": `opencode/1.19.0 (${process.platform} ${process.platform}; ${process.arch})`,
     Origin: "https://chatgpt.com",
     Referer: "https://chatgpt.com/",
     originator: "opencode",
@@ -373,8 +373,8 @@ export async function fetchKiroQuota(
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/x-amz-json-1.0",
       Accept: "application/json",
-      "User-Agent": "KiroIDE-1.2.37",
-      "x-amz-user-agent": "KiroIDE-1.2.37",
+      "User-Agent": "KiroIDE-1.2.56",
+      "x-amz-user-agent": "KiroIDE-1.2.56",
       "x-amz-target": "AmazonCodeWhispererService.GetUsageLimits",
       "x-amzn-codewhisperer-optout": "true",
       "x-amzn-kiro-agent-mode": "vibe",

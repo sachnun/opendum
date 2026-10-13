@@ -22,8 +22,8 @@
     "output": 262144
   },
   "cost": {
-    "input": 0.195,
-    "output": 0.8,
+    "input": 0.125,
+    "output": 0.6,
     "cacheRead": 0.05
   },
   "scores": {
@@ -36,7 +36,7 @@
     "kilo_code": {
       "upstream": "nvidia/nemotron-3.5-lightning:free",
       "contextWindow": 262144,
-      "maxOutputTokens": 32768
+      "maxOutputTokens": 235929
     },
     "nvidia_nim": {
       "upstream": "nvidia/nemotron-3.5-lightning-30b-a3b",
@@ -51,7 +51,7 @@
     "openrouter": {
       "upstream": "nvidia/nemotron-3.5-lightning:free",
       "contextWindow": 262144,
-      "maxOutputTokens": 32768
+      "maxOutputTokens": 235929
     }
   }
 }

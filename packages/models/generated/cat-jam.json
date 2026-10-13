@@ -4,11 +4,14 @@
   ],
   "reasoning": true,
   "reasoning_effort": [
-    "high"
+    "low",
+    "medium",
+    "high",
+    "xhigh",
+    "max"
   ],
   "modalities": {
     "input": [
-      "image",
       "text"
     ],
     "output": [
@@ -16,17 +19,18 @@
     ]
   },
   "limit": {
-    "context": 1048576,
+    "context": 262144,
     "output": 131072
   },
   "cost": {
     "input": 0,
-    "output": 0
+    "output": 0,
+    "cacheRead": 0
   },
   "providerConfig": {
     "opencode": {
-      "upstream": "exo-free",
-      "contextWindow": 1048576,
+      "upstream": "cat-jam-free",
+      "contextWindow": 262144,
       "maxOutputTokens": 131072
     }
   }
