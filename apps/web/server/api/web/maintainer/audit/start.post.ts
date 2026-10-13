@@ -1,5 +1,4 @@
 import { eq } from "drizzle-orm";
-import { createError } from "h3";
 import { z } from "zod";
 
 import { parseBody, requireMaintainerContext, setAuditUserCookie } from "~~/server/utils/api";
@@ -12,7 +11,7 @@ export default defineEventHandler(async (event) => {
   const input = await parseBody(event, startAuditInputSchema);
 
   if (input.userId === context.actor.id) {
-    throw createError({ statusCode: 400, statusMessage: "Cannot audit your own account" });
+    throw createError({ status: 400, statusText: "Cannot audit your own account" });
   }
 
   const [targetUser] = await db
@@ -21,7 +20,7 @@ export default defineEventHandler(async (event) => {
     .where(eq(user.id, input.userId))
     .limit(1);
 
-  if (!targetUser) throw createError({ statusCode: 404, statusMessage: "User not found" });
+  if (!targetUser) throw createError({ status: 404, statusText: "User not found" });
 
   setAuditUserCookie(event, targetUser.id);
 

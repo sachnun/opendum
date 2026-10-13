@@ -1,5 +1,4 @@
-import type { H3Event } from "h3";
-import { createError, deleteCookie, getCookie, getQuery, readBody, setCookie } from "h3";
+import { createError, deleteCookie, getCookie, getQuery, readBody, setCookie, type RequestEvent } from "nuxt/server";
 import { eq } from "drizzle-orm";
 import { ZodError } from "zod";
 import type { z } from "zod";
@@ -48,18 +47,18 @@ function auditCookieOptions() {
   };
 }
 
-export function setAuditUserCookie(event: H3Event, userId: string) {
+export function setAuditUserCookie(event: RequestEvent, userId: string) {
   setCookie(event, AUDIT_COOKIE_NAME, userId, {
     ...auditCookieOptions(),
     maxAge: 60 * 60 * 24 * 30,
   });
 }
 
-export function clearAuditUserCookie(event: H3Event) {
+export function clearAuditUserCookie(event: RequestEvent) {
   deleteCookie(event, AUDIT_COOKIE_NAME, auditCookieOptions());
 }
 
-async function getAuditTargetUser(event: H3Event, actorId: string, isMaintainer: boolean): Promise<ActorUser | null> {
+async function getAuditTargetUser(event: RequestEvent, actorId: string, isMaintainer: boolean): Promise<ActorUser | null> {
   const auditUserId = getCookie(event, AUDIT_COOKIE_NAME)?.trim();
   if (!auditUserId || !isMaintainer) return null;
 
@@ -82,7 +81,7 @@ async function getAuditTargetUser(event: H3Event, actorId: string, isMaintainer:
   return targetUser;
 }
 
-export async function requireContext(event: H3Event): Promise<RequestContext> {
+export async function requireContext(event: RequestEvent): Promise<RequestContext> {
   const session = await requireSession(event);
   const role = roleForEmail(session.user.email);
   const actor = toActorUser(session.user);
@@ -99,47 +98,47 @@ export async function requireContext(event: H3Event): Promise<RequestContext> {
   };
 }
 
-export async function requireMaintainerContext(event: H3Event): Promise<RequestContext> {
+export async function requireMaintainerContext(event: RequestEvent): Promise<RequestContext> {
   const context = await requireContext(event);
   if (!context.isMaintainer) {
-    throw createError({ statusCode: 403, statusMessage: "Maintainer access required" });
+    throw createError({ status: 403, statusText: "Maintainer access required" });
   }
 
   return context;
 }
 
-export async function requireReadContext(event: H3Event): Promise<RequestContext> {
+export async function requireReadContext(event: RequestEvent): Promise<RequestContext> {
   return requireContext(event);
 }
 
-export async function requireReadableUserId(event: H3Event): Promise<string> {
+export async function requireReadableUserId(event: RequestEvent): Promise<string> {
   return (await requireReadContext(event)).userId;
 }
 
-async function requireWriteContext(event: H3Event, allowAudit = false): Promise<RequestContext> {
+async function requireWriteContext(event: RequestEvent, allowAudit = false): Promise<RequestContext> {
   const context = await requireContext(event);
   if (context.isAuditMode && !allowAudit) {
-    throw createError({ statusCode: 403, statusMessage: "Audit mode is read-only" });
+    throw createError({ status: 403, statusText: "Audit mode is read-only" });
   }
 
   return context;
 }
 
-export async function requireWritableUserId(event: H3Event): Promise<string> {
+export async function requireWritableUserId(event: RequestEvent): Promise<string> {
   return (await requireWriteContext(event)).userId;
 }
 
-export async function requireAuditWritableUserId(event: H3Event): Promise<string> {
+export async function requireAuditWritableUserId(event: RequestEvent): Promise<string> {
   return (await requireWriteContext(event, true)).userId;
 }
 
 function badRequestFromZod(error: ZodError): never {
   const message = error.issues[0]?.message ?? "Invalid request";
-  throw createError({ statusCode: 400, statusMessage: message });
+  throw createError({ status: 400, statusText: message });
 }
 
 export async function parseBody<TSchema extends z.ZodType>(
-  event: H3Event,
+  event: RequestEvent,
   schema: TSchema
 ): Promise<z.output<TSchema>> {
   try {
@@ -151,7 +150,7 @@ export async function parseBody<TSchema extends z.ZodType>(
 }
 
 export function parseQuery<TSchema extends z.ZodType>(
-  event: H3Event,
+  event: RequestEvent,
   schema: TSchema
 ): z.output<TSchema> {
   try {
