@@ -238,22 +238,6 @@ export function nullableTimeBefore(a: Date | null | undefined, b: Date | null | 
   return a.getTime() < b.getTime();
 }
 
-export function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("upstream request timed out")), ms);
-    promise.then(
-      (value) => {
-        clearTimeout(timer);
-        resolve(value);
-      },
-      (error) => {
-        clearTimeout(timer);
-        reject(error);
-      }
-    );
-  });
-}
-
 export function normalizeAccountTierAlias(tier: string): string {
   const normalized = tier.trim().toLowerCase().replace(/_/g, "-");
   if (normalized === "pro-plus" || normalized === "proplus") return "pro+";

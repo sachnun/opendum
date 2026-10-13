@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 import {
   creditPointBalance,
   debitPointBalance,
@@ -79,26 +80,31 @@ export async function reserveRoamingPoint(
   const now = new Date();
   return database.transaction(async (tx) => {
     const txDb = tx as unknown as Tx;
-    await ensurePointBalance(txDb, userId, now);
-    const balanceAfter = await debitPointBalance(
-      { userId, amount: reservation.amount, at: now },
-      txDb
+    return Effect.runPromise(
+      Effect.gen(function* () {
+        yield* Effect.promise(() => ensurePointBalance(txDb, userId, now));
+        const balanceAfter = yield* Effect.promise(() =>
+          debitPointBalance({ userId, amount: reservation.amount, at: now }, txDb)
+        );
+        if (balanceAfter === null) return null;
+        yield* Effect.promise(() =>
+          insertPointTransaction(
+            {
+              id: reservation.debitId,
+              userId,
+              amount: -reservation.amount,
+              type: "roaming_debit",
+              balanceAfter,
+              idempotencyKey: null,
+              usageLogId: null,
+              createdAt: now,
+            },
+            txDb
+          )
+        );
+        return reservation;
+      })
     );
-    if (balanceAfter === null) return null;
-    await insertPointTransaction(
-      {
-        id: reservation.debitId,
-        userId,
-        amount: -reservation.amount,
-        type: "roaming_debit",
-        balanceAfter,
-        idempotencyKey: null,
-        usageLogId: null,
-        createdAt: now,
-      },
-      txDb
-    );
-    return reservation;
   });
 }
 
@@ -108,27 +114,34 @@ export async function refundRoamingPoint(database: Database, reservation: PointR
   const idempotencyKey = `roaming_refund:${reservation.debitId}`;
   await database.transaction(async (tx) => {
     const txDb = tx as unknown as Tx;
-    await ensurePointBalance(txDb, reservation.userId, now);
-    const transactionId = crypto.randomUUID();
-    const affected = await insertPointTransactionOnConflictDoNothing(
-      {
-        id: transactionId,
-        userId: reservation.userId,
-        amount: reservation.amount,
-        type: "roaming_refund",
-        balanceAfter: 0,
-        idempotencyKey,
-        usageLogId: null,
-        createdAt: now,
-      },
-      txDb
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        yield* Effect.promise(() => ensurePointBalance(txDb, reservation.userId, now));
+        const transactionId = crypto.randomUUID();
+        const affected = yield* Effect.promise(() =>
+          insertPointTransactionOnConflictDoNothing(
+            {
+              id: transactionId,
+              userId: reservation.userId,
+              amount: reservation.amount,
+              type: "roaming_refund",
+              balanceAfter: 0,
+              idempotencyKey,
+              usageLogId: null,
+              createdAt: now,
+            },
+            txDb
+          )
+        );
+        if (affected === 0) return;
+        const balanceAfter = yield* Effect.promise(() =>
+          creditPointBalance({ userId: reservation.userId, amount: reservation.amount, at: now }, txDb)
+        );
+        yield* Effect.promise(() =>
+          updatePointTransactionBalance({ id: transactionId, balanceAfter: balanceAfter ?? 0 }, txDb)
+        );
+      })
     );
-    if (affected === 0) return;
-    const balanceAfter = await creditPointBalance(
-      { userId: reservation.userId, amount: reservation.amount, at: now },
-      txDb
-    );
-    await updatePointTransactionBalance({ id: transactionId, balanceAfter: balanceAfter ?? 0 }, txDb);
   });
 }
 
@@ -144,27 +157,36 @@ export async function adjustRoamingPoints(
   const idempotencyKey = `roaming_settle:${reservation.debitId}`;
   await database.transaction(async (tx) => {
     const txDb = tx as unknown as Tx;
-    await ensurePointBalance(txDb, reservation.userId, now);
-    const transactionId = crypto.randomUUID();
-    const affected = await insertPointTransactionOnConflictDoNothing(
-      {
-        id: transactionId,
-        userId: reservation.userId,
-        amount: -delta,
-        type: "roaming_settle",
-        balanceAfter: 0,
-        idempotencyKey,
-        usageLogId: null,
-        createdAt: now,
-      },
-      txDb
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        yield* Effect.promise(() => ensurePointBalance(txDb, reservation.userId, now));
+        const transactionId = crypto.randomUUID();
+        const affected = yield* Effect.promise(() =>
+          insertPointTransactionOnConflictDoNothing(
+            {
+              id: transactionId,
+              userId: reservation.userId,
+              amount: -delta,
+              type: "roaming_settle",
+              balanceAfter: 0,
+              idempotencyKey,
+              usageLogId: null,
+              createdAt: now,
+            },
+            txDb
+          )
+        );
+        if (affected === 0) return;
+        const balanceAfter = yield* Effect.promise(() =>
+          delta > 0
+            ? debitPointBalanceAllowNegative({ userId: reservation.userId, amount: delta, at: now }, txDb)
+            : creditPointBalance({ userId: reservation.userId, amount: -delta, at: now }, txDb)
+        );
+        yield* Effect.promise(() =>
+          updatePointTransactionBalance({ id: transactionId, balanceAfter: balanceAfter ?? 0 }, txDb)
+        );
+      })
     );
-    if (affected === 0) return;
-    const balanceAfter =
-      delta > 0
-        ? await debitPointBalanceAllowNegative({ userId: reservation.userId, amount: delta, at: now }, txDb)
-        : await creditPointBalance({ userId: reservation.userId, amount: -delta, at: now }, txDb);
-    await updatePointTransactionBalance({ id: transactionId, balanceAfter: balanceAfter ?? 0 }, txDb);
   });
 }
 
@@ -193,24 +215,34 @@ export async function creditSharingPoint(
   const idempotencyKey = `sharing_credit:${debitId}`;
   await database.transaction(async (tx) => {
     const txDb = tx as unknown as Tx;
-    await ensurePointBalance(txDb, ownerUserId, now);
-    const transactionId = crypto.randomUUID();
-    const affected = await insertPointTransactionOnConflictDoNothing(
-      {
-        id: transactionId,
-        userId: ownerUserId,
-        amount,
-        type: "sharing_credit",
-        balanceAfter: 0,
-        idempotencyKey,
-        usageLogId: null,
-        createdAt: now,
-      },
-      txDb
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        yield* Effect.promise(() => ensurePointBalance(txDb, ownerUserId, now));
+        const transactionId = crypto.randomUUID();
+        const affected = yield* Effect.promise(() =>
+          insertPointTransactionOnConflictDoNothing(
+            {
+              id: transactionId,
+              userId: ownerUserId,
+              amount,
+              type: "sharing_credit",
+              balanceAfter: 0,
+              idempotencyKey,
+              usageLogId: null,
+              createdAt: now,
+            },
+            txDb
+          )
+        );
+        if (affected === 0) return;
+        const balanceAfter = yield* Effect.promise(() =>
+          creditPointBalance({ userId: ownerUserId, amount, at: now }, txDb)
+        );
+        yield* Effect.promise(() =>
+          updatePointTransactionBalance({ id: transactionId, balanceAfter: balanceAfter ?? 0 }, txDb)
+        );
+      })
     );
-    if (affected === 0) return;
-    const balanceAfter = await creditPointBalance({ userId: ownerUserId, amount, at: now }, txDb);
-    await updatePointTransactionBalance({ id: transactionId, balanceAfter: balanceAfter ?? 0 }, txDb);
   });
 }
 
