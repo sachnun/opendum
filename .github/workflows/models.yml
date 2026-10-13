@@ -31,7 +31,9 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Refresh provider models
-        run: pnpm run models:refresh --summary "$RUNNER_TEMP/summary.md"
+        run: |
+          pnpm --filter @opendum/models refresh --summary "$RUNNER_TEMP/summary.md"
+          pnpm --filter @opendum/web family-ranking
 
       - name: Build commit message
         id: commit_msg
