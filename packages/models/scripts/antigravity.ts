@@ -35,9 +35,14 @@ const scriptDir = dirname(fileURLToPath(import.meta.url));
 const packageDir = resolve(scriptDir, "..");
 const modelsDir = resolve(packageDir, "data");
 
-const ANTIGRAVITY_VERSION_SOURCES = [
-  "https://releasebot.io/updates/google/antigravity",
-];
+// Antigravity publishes the same release notes as Markdown. This page is a
+// stable, first party URL, unlike the auto updater bucket whose host embeds a
+// numeric project id, so the emulated client version is read from here.
+const ANTIGRAVITY_CHANGELOG_URL = "https://antigravity.google/docs/changelog.md";
+// The desktop app section owns the version the providers emulate. Its release
+// headings link to the `hub` release tab, which is a stabler anchor than the
+// section title.
+const ANTIGRAVITY_CHANGELOG_RELEASE_TAB = "hub";
 const VERSION_FETCH_TIMEOUT_MS = 15_000;
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -431,13 +436,22 @@ function syncJson(modelMap, dryRun, tierConfig) {
   });
 }
 
-function parseLatestVersion(html) {
-  const releases = [...html.matchAll(/"@type":"SoftwareRelease","name":"v?(\d+\.\d+\.\d+)/g)].map(
-    (match) => match[1]
-  );
-  if (releases.length === 0) return null;
+/**
+ * Read the newest desktop app version from the published changelog.
+ *
+ * Release headings look like `### [v2.23.0](/releases?tab=hub&version=2.23.0)`.
+ * Matching the release tab keeps the CLI and IDE lines from being mistaken for
+ * the desktop app version even if a section title is renamed.
+ */
+function parseLatestVersion(text, releaseTab) {
+  const versions = [];
+  for (const match of text.matchAll(/^###\s+\[v?(\d+\.\d+\.\d+)\]\(([^)]*)\)/gm)) {
+    if (releaseTab && !match[2].includes(`tab=${releaseTab}`)) continue;
+    versions.push(match[1]);
+  }
+  if (versions.length === 0) return null;
 
-  return releases.sort(compareSemver).at(-1) ?? null;
+  return versions.sort(compareSemver).at(-1) ?? null;
 }
 
 function compareSemver(a, b) {
@@ -450,23 +464,24 @@ function compareSemver(a, b) {
 }
 
 async function syncUserAgent(dryRun) {
-  let latestVersion;
-  for (const source of ANTIGRAVITY_VERSION_SOURCES) {
-    try {
-      const html = await fetchText(source, { label: source, timeout: VERSION_FETCH_TIMEOUT_MS, headers: { Accept: "text/html" } });
-      latestVersion = parseLatestVersion(html);
-      if (latestVersion) {
-        console.log(`[antigravity] Latest version from ${source} is ${latestVersion}`);
-        break;
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      console.warn(`[antigravity] Fetch failed for ${source} (${message})`);
+  let latestVersion = null;
+  try {
+    const text = await fetchText(ANTIGRAVITY_CHANGELOG_URL, {
+      label: "Antigravity changelog",
+      timeout: VERSION_FETCH_TIMEOUT_MS,
+      headers: { Accept: "text/markdown" },
+    });
+    latestVersion = parseLatestVersion(text, ANTIGRAVITY_CHANGELOG_RELEASE_TAB);
+    if (latestVersion) {
+      console.log(`[antigravity] Latest version from the changelog is ${latestVersion}`);
     }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[antigravity] Fetch failed for the changelog (${message})`);
   }
 
   if (!latestVersion) {
-    console.warn("[antigravity] Could not parse version from any source, skipping.");
+    console.warn("[antigravity] Could not parse a version from the changelog, skipping.");
     return;
   }
 

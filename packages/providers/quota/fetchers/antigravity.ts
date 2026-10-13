@@ -28,7 +28,7 @@ export async function fetchAntigravityQuota(
       result = await getQuotaJson(ctx, account, forceRefresh, "antigravity:fetchAvailableModels", "POST", `${endpoint}/v1internal:fetchAvailableModels`, {
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
-        "User-Agent": `antigravity/2.22.0 ${process.platform}/${process.arch}`,
+        "User-Agent": `antigravity/2.23.0 ${process.platform}/${process.arch}`,
       }, { project: projectId });
     } catch (error) {
       lastErr = error instanceof Error ? error.message : String(error);
