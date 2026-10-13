@@ -93,23 +93,17 @@ function generateSummary(before: Map<string, Set<string>>, after: Map<string, Se
     }
   }
 
-  const sections: string[] = [];
+  const lines: string[] = [];
 
-  if (added.length) {
-    const lines = added
-      .sort((a, b) => a.model.localeCompare(b.model))
-      .map((e) => `+ ${e.model} (${e.provider})`);
-    sections.push(`Added ${added.length} model${added.length === 1 ? "" : "s"}\n${lines.join("\n")}`);
+  for (const entry of added.sort((a, b) => a.model.localeCompare(b.model))) {
+    lines.push(`+ ${entry.model} (${entry.provider})`);
   }
 
-  if (removed.length) {
-    const lines = removed
-      .sort((a, b) => a.model.localeCompare(b.model))
-      .map((e) => `- ${e.model} (${e.provider})`);
-    sections.push(`Removed ${removed.length} model${removed.length === 1 ? "" : "s"}\n${lines.join("\n")}`);
+  for (const entry of removed.sort((a, b) => a.model.localeCompare(b.model))) {
+    lines.push(`- ${entry.model} (${entry.provider})`);
   }
 
-  return sections.length > 0 ? sections.join("\n\n") + "\n" : "";
+  return lines.length > 0 ? `Models:\n${lines.join("\n")}\n` : "";
 }
 
 async function main(): Promise<void> {

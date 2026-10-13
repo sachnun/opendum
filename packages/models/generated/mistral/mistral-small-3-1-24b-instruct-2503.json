@@ -16,6 +16,7 @@
   "reasoning": false,
   "modalities": {
     "input": [
+      "image",
       "text"
     ],
     "output": [
@@ -27,8 +28,8 @@
     "output": 128000
   },
   "cost": {
-    "input": 1.755,
-    "output": 2.775
+    "input": 0.53,
+    "output": 1.59
   },
   "scores": {
     "artificialAnalysis": {

@@ -22,7 +22,7 @@ import { PERCH_ACCOUNT_PATH, PERCH_APP_URL, PERCH_AUTH_CONFIG_PATH } from "./end
 
 const PERCH_TURN_TICKET_PATH = "/api/perch-terminal/turn-ticket";
 const PERCH_TURN_TICKET_HEADER = "x-perch-turn-ticket";
-const PERCH_CLI_VERSION = "2.4.105";
+const PERCH_CLI_VERSION = "2.4.107";
 const PERCH_MODEL_CALL_PATH = "/api/perch-terminal/model-call";
 const PERCH_ACCESS_TTL_MS = 60 * 60 * 1000;
 const PERCH_REFRESH_BUFFER_MS = 5 * 60 * 1000;

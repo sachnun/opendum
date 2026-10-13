@@ -1,7 +1,8 @@
 {
   "providers": [
     "opencode",
-    "kilo_code"
+    "kilo_code",
+    "zenmux"
   ],
   "reasoning": true,
   "reasoning_effort": [
@@ -17,7 +18,7 @@
   },
   "limit": {
     "context": 262144,
-    "output": 32768
+    "output": 235929
   },
   "cost": {
     "input": 0.375,
@@ -34,10 +35,15 @@
     "kilo_code": {
       "upstream": "inclusionai/ling-3.1-flash",
       "contextWindow": 262144,
-      "maxOutputTokens": 32768
+      "maxOutputTokens": 235929
     },
     "opencode": {
       "upstream": "ling-3.1-flash-free",
+      "contextWindow": 262144,
+      "maxOutputTokens": 32768
+    },
+    "zenmux": {
+      "upstream": "inclusionai/ling-3.1-flash",
       "contextWindow": 262144,
       "maxOutputTokens": 32768
     }

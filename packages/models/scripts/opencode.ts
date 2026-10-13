@@ -8,7 +8,7 @@ import { stripParamInfoKey } from "#models/clean-key.ts";
 import { syncCliVersion } from "./version-sync.ts";
 
 const OPENCODE_MODELS_URL = "https://opencode.ai/zen/v1/models";
-const OPENCODE_ZEN_DOCS_URL = "https://raw.githubusercontent.com/anomalyco/opencode/dev/packages/web/src/content/docs/zen.mdx";
+const OPENCODE_ZEN_DOCS_URL = "https://raw.githubusercontent.com/anomalyco/opencode/dev/services/www/src/docs/content/console/models.mdx";
 const OPENCODE_NPM_URL = "https://registry.npmjs.org/opencode-ai/latest";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -99,7 +99,7 @@ function extractFreeModelIdsFromDocs(markdown) {
   const pricingTable = tables.find((table) => headerIndex(table.headers, "Input") !== -1 && headerIndex(table.headers, "Output") !== -1 && headerIndex(table.headers, "Cached Read") !== -1);
 
   if (!endpointsTable || !pricingTable) {
-    throw new Error("Unexpected OpenCode Zen docs format: model endpoint or pricing table not found");
+    throw new Error("Unexpected OpenCode Console docs format: model endpoint or pricing table not found");
   }
 
   const endpointModelIndex = headerIndex(endpointsTable.headers, "Model");
@@ -128,12 +128,12 @@ function extractFreeModelIdsFromDocs(markdown) {
 
     const modelName = row[pricingModelIndex];
     const modelId = modelIdsByName.get(modelNameKey(modelName));
-    if (!modelId) throw new Error(`OpenCode Zen docs pricing model is missing from endpoint table: ${modelName}`);
+    if (!modelId) throw new Error(`OpenCode Console docs pricing model is missing from endpoint table: ${modelName}`);
     modelIds.push(modelId);
   }
 
   if (modelIds.length === 0) {
-    throw new Error("OpenCode Zen docs did not list any free models");
+    throw new Error("OpenCode Console docs did not list any free models");
   }
 
   return {
@@ -144,7 +144,7 @@ function extractFreeModelIdsFromDocs(markdown) {
 
 async function fetchOpencodeFreeModelIds() {
   const [docsMarkdown, modelsPayload] = await Promise.all([
-    fetchText(OPENCODE_ZEN_DOCS_URL, { label: "OpenCode Zen docs" }),
+    fetchText(OPENCODE_ZEN_DOCS_URL, { label: "OpenCode Console docs" }),
     fetchJson(OPENCODE_MODELS_URL, { label: "OpenCode model list" }),
   ]);
 
@@ -160,11 +160,16 @@ async function fetchOpencodeFreeModelIds() {
   const { freeModelIds, endpointByModelId } = extractFreeModelIdsFromDocs(docsMarkdown);
   const missingModelIds = freeModelIds.filter((id) => !availableModelIds.has(id));
 
+  // The docs page is updated ahead of the model API, so free models that are not
+  // served yet are skipped instead of failing the whole refresh.
   if (missingModelIds.length > 0) {
-    throw new Error(`OpenCode Zen docs list free models missing from /zen/v1/models: ${missingModelIds.join(", ")}`);
+    console.warn(`Opencode: docs list free models missing from /zen/v1/models, skipping: ${missingModelIds.join(", ")}`);
   }
 
-  return { freeModelIds, endpointByModelId };
+  return {
+    freeModelIds: freeModelIds.filter((id) => availableModelIds.has(id)),
+    endpointByModelId,
+  };
 }
 
 function buildModelMap(modelIds) {
