@@ -1,0 +1,50 @@
+{
+  "providers": [
+    "antigravity"
+  ],
+  "aliases": [
+    "gemini-4-argon-high",
+    "gemini-4-argon-low",
+    "gemini-4-argon-medium"
+  ],
+  "reasoning": true,
+  "reasoning_effort": [
+    "low",
+    "medium",
+    "high"
+  ],
+  "modalities": {
+    "input": [
+      "audio",
+      "image",
+      "pdf",
+      "text",
+      "video"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 1048576,
+    "output": 65536
+  },
+  "cost": {
+    "input": 10,
+    "output": 50,
+    "cacheRead": 0.5,
+    "cacheWrite": 0.9375
+  },
+  "scores": {
+    "artificialAnalysis": {
+      "index": 52.6,
+      "estimated": false
+    }
+  },
+  "providerConfig": {
+    "antigravity": {
+      "contextWindow": 1048576,
+      "maxOutputTokens": 65536
+    }
+  }
+}
