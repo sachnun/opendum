@@ -1,3 +1,4 @@
+import { Config } from "effect";
 import { z } from "zod";
 
 export const envSchema = z.object({
@@ -34,3 +35,12 @@ export function loadEnvFile(path = ".env"): void {
     return;
   }
 }
+
+export const effectEnv = Config.all({
+  databaseUrl: Config.NonEmptyString("DATABASE_URL"),
+  redisUrl: Config.NonEmptyString("REDIS_URL"),
+  betterAuthSecret: Config.NonEmptyString("BETTER_AUTH_SECRET"),
+  nodeEnv: Config.Literals(["development", "test", "production"], "NODE_ENV").pipe(
+    Config.withDefault("development")
+  ),
+});

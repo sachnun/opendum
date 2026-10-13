@@ -1,3 +1,4 @@
+import { Cache, Duration, Effect } from "effect";
 import type { OpendumRedis } from "@opendum/core/redis";
 
 export type ProviderPerformanceConfig = {
@@ -113,10 +114,25 @@ export class ProviderPerformance {
   private readonly redis: OpendumRedis;
   private readonly config: ProviderPerformanceConfig;
   private readonly cache = new Map<string, CacheEntry>();
+  private effectCache: Cache.Cache<string, Map<string, ProviderScore>> | null = null;
 
   constructor(redis: OpendumRedis, config: ProviderPerformanceConfig = DEFAULT_PROVIDER_PERFORMANCE_CONFIG) {
     this.redis = redis;
     this.config = config;
+  }
+
+  private getScoresCache(): Cache.Cache<string, Map<string, ProviderScore>> {
+    if (this.effectCache) return this.effectCache;
+    const ttl = this.config.cacheTtlSeconds > 0 ? Duration.seconds(this.config.cacheTtlSeconds) : Duration.zero;
+    const built = Effect.runSync(
+      Cache.make({
+        capacity: 1024,
+        timeToLive: ttl,
+        lookup: (key: string) => Effect.promise(() => this.loadScores(key)),
+      })
+    );
+    this.effectCache = built;
+    return built;
   }
 
   routingOptions(scores: Map<string, ProviderScore>): ProviderRoutingOptions {
@@ -137,7 +153,7 @@ export class ProviderPerformance {
       const next = blendMetrics(previous, { ttftMs, tokensPerSecond }, this.config.ewmaAlpha);
       await this.redis.hSet(key, sample.provider, JSON.stringify(next));
       await this.redis.expire(key, this.config.sampleTtlSeconds);
-      this.cache.delete(key);
+      await Effect.runPromise(Cache.invalidate(this.getScoresCache(), key));
     } catch {
       return;
     }
@@ -145,8 +161,10 @@ export class ProviderPerformance {
 
   async scoresForModel(model: string): Promise<Map<string, ProviderScore>> {
     const key = providerPerformanceKey(model);
-    const cached = this.cachedScores(key);
-    if (cached) return cached;
+    return Effect.runPromise(Cache.get(this.getScoresCache(), key));
+  }
+
+  private async loadScores(key: string): Promise<Map<string, ProviderScore>> {
     const scores = new Map<string, ProviderScore>();
     try {
       const entries = await this.redis.hGetAll(key);
@@ -164,20 +182,6 @@ export class ProviderPerformance {
     } catch {
       return scores;
     }
-    if (this.config.cacheTtlSeconds > 0) {
-      this.cache.set(key, { at: Date.now(), scores });
-    }
     return scores;
-  }
-
-  private cachedScores(key: string): Map<string, ProviderScore> | null {
-    if (this.config.cacheTtlSeconds <= 0) return null;
-    const entry = this.cache.get(key);
-    if (!entry) return null;
-    if (Date.now() - entry.at >= this.config.cacheTtlSeconds * 1000) {
-      this.cache.delete(key);
-      return null;
-    }
-    return entry.scores;
   }
 }

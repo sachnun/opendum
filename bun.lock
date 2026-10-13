@@ -24,6 +24,7 @@
         "clsx": "^2.1.1",
         "date-fns": "^4.4.0",
         "drizzle-orm": "^0.45.2",
+        "effect": "4.0.4",
         "eventsource-parser": "^3.1.0",
         "idb-keyval": "^6.3.0",
         "nuxt": "npm:nuxt-nightly@5.0.0-2610121449-e69fd4e",
@@ -56,6 +57,7 @@
         "@opendum/core": "workspace:*",
         "@opendum/database": "workspace:*",
         "@opendum/models": "workspace:*",
+        "effect": "4.0.4",
       },
       "devDependencies": {
         "@types/bun": "^1.4.3",
@@ -68,6 +70,7 @@
       "name": "@opendum/core",
       "version": "0.1.0",
       "dependencies": {
+        "effect": "4.0.4",
         "redis": "^6.1.0",
         "undici": "^8.11.2",
         "zod": "^4.4.3",
@@ -115,6 +118,7 @@
       "dependencies": {
         "@opendum/core": "workspace:*",
         "@opendum/models": "workspace:*",
+        "effect": "4.0.4",
       },
       "devDependencies": {
         "@types/bun": "^1.4.3",
@@ -132,6 +136,7 @@
         "@opendum/database": "workspace:*",
         "@opendum/models": "workspace:*",
         "@opendum/providers": "workspace:*",
+        "effect": "4.0.4",
         "h3": "^2.0.1",
         "zod": "^4.4.3",
       },
@@ -666,6 +671,8 @@
     "edgeone": ["edgeone@1.6.41", "", { "dependencies": { "@babel/generator": "^7.28.0", "@babel/parser": "^7.28.0", "@babel/traverse": "^7.28.0", "@babel/types": "^7.28.0", "@edgeone/nuxt-pages": "1.1.2-beta.1", "@edgeone/opennextjs-pages": "0.2.10-beta.9", "@edgeone/pages-agent-toolkit": "0.1.38", "@edgeone/pages-blob": "^0.0.16", "chokidar": "^4.0.1", "esbuild": "^0.19.2", "esbuild-plugin-polyfill-node": "^0.3.0", "extract-zip": "^2.0.1", "fast-glob": "^3.3.0", "giget": "^2.0.0", "minimatch": "^9.0.5", "open": "^8.4.2" }, "bin": { "edgeone": "edgeone-bin/edgeone.js" } }, "sha512-xRPTfOp8styRcIuWjlD6HNWEb2+vsMY1hJmNKDomdwxBFDAqzTSSgL2jd3zMF3HAsrvYCzSo75yfLlQZYmBm+g=="],
 
     "editorconfig": ["editorconfig@3.0.2", "", { "dependencies": { "@one-ini/wasm": "0.2.1", "commander": "14.0.3", "minimatch": "10.2.6", "semver": "7.8.5" }, "bin": { "editorconfig": "bin/editorconfig" } }, "sha512-T0ix8GhtxyKVfUFEcvdNDt3YGqlwkFHbD4/5bgFUDgFmxhI/cSRAeJ87/Sz//Cq8Eam6JX/e23RkoFO71P7aAA=="],
+
+    "effect": ["effect@4.0.4", "", {}, "sha512-Sr50OeVSC3M5UkoUYUhFf3EULryhGaZZUf6OzDHTvaznOw7HRlxOKdF3/4nvQXHL22StOyMG3Cvo8Bt7xUp+Ng=="],
 
     "end-of-stream": ["end-of-stream@1.4.5", "", { "dependencies": { "once": "^1.4.0" } }, "sha512-ooEGc6HP26xXq/N+GCGOT0JKCLDGrq2bQUZrQ7gyrJiZANJ/8YDTxTpQBXGMn+WbIQXNVpyWymm7KYVICQnyOg=="],
 

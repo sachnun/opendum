@@ -17,6 +17,12 @@ export type {
   RateLimitRule,
 } from "./types.js";
 export { createCustomStore } from "./store/custom.js";
+export {
+  AuthServiceLayer,
+  AuthServiceTag,
+  validateAPIKey,
+  validateModelForUser,
+} from "./effect.js";
 export type {
   CustomProviderModelRecord,
   CustomProviderReader,

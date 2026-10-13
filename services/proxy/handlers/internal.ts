@@ -1,3 +1,4 @@
+import { Effect, Option, Schema } from "effect";
 import { type H3Event } from "h3";
 import { getQuotaAccount } from "@opendum/database/queries";
 import { fetchAccountQuota, isQuotaProvider } from "@opendum/providers/quota";
@@ -12,6 +13,23 @@ import { jsonResponse } from "./errors.js";
 const MAX_QUOTA_BODY_BYTES = 64 * 1024;
 const MAX_RELAY_BODY_BYTES = 2 << 20;
 const RELAY_TIMEOUT_MS = 20 * 1000;
+
+const QuotaInputSchema = Schema.Struct({
+  userId: Schema.optional(Schema.String),
+  provider: Schema.optional(Schema.String),
+  accountId: Schema.optional(Schema.String),
+  forceRefresh: Schema.optional(Schema.Boolean),
+});
+
+const RelayInputSchema = Schema.Struct({
+  url: Schema.optional(Schema.String),
+  method: Schema.optional(Schema.String),
+  headers: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+  body: Schema.optional(Schema.Unknown),
+});
+
+const decodeQuotaInput = Schema.decodeUnknownOption(QuotaInputSchema, { onExcessProperty: "error" });
+const decodeRelayInput = Schema.decodeUnknownOption(RelayInputSchema, { onExcessProperty: "error" });
 
 const BLOCKED_RELAY_HEADERS = new Set([
   "host", "connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailer",
@@ -43,61 +61,61 @@ function quotaContext(context: ProxyContext): QuotaContext {
 }
 
 export async function handleQuota(event: H3Event, context: ProxyContext): Promise<Response> {
-  const rawBody = await event.req.text();
-  if (utf8ByteLength(rawBody) > MAX_QUOTA_BODY_BYTES) {
-    return jsonResponse({ success: false, error: "Invalid quota payload" }, 400);
-  }
-  const valid = await validateInternalSignature(context.config.betterAuthSecret, event.req, "/internal/quota", rawBody);
-  if (!valid) {
-    return jsonResponse({ success: false, error: "Invalid internal quota signature" }, 401);
-  }
-  let input: { userId?: string; provider?: string; accountId?: string; forceRefresh?: boolean };
-  try {
-    input = JSON.parse(rawBody) as typeof input;
-  } catch {
-    return jsonResponse({ success: false, error: "Invalid quota payload" }, 400);
-  }
-  if (input === null || typeof input !== "object" || Array.isArray(input)) {
-    return jsonResponse({ success: false, error: "Invalid quota payload" }, 400);
-  }
-  const allowed = new Set(["userId", "provider", "accountId", "forceRefresh"]);
-  if (Object.keys(input).some((key) => !allowed.has(key))) {
-    return jsonResponse({ success: false, error: "Invalid quota payload" }, 400);
-  }
-  if (input.forceRefresh !== undefined && typeof input.forceRefresh !== "boolean") {
-    return jsonResponse({ success: false, error: "Invalid quota payload" }, 400);
-  }
-  const userId = (input.userId ?? "").trim();
-  const provider = (input.provider ?? "").trim();
-  const accountId = (input.accountId ?? "").trim();
-  if (!userId || !provider || !accountId) {
-    return jsonResponse({ success: false, error: "userId, provider, and accountId are required" }, 400);
-  }
-  if (!isQuotaProvider(provider)) {
-    return jsonResponse({ success: false, error: `provider ${provider} is not supported for quota` }, 200);
-  }
+  return Effect.runPromise(
+    Effect.gen(function* () {
+      const rawBody = yield* Effect.promise(() => event.req.text());
+      if (utf8ByteLength(rawBody) > MAX_QUOTA_BODY_BYTES) {
+        return jsonResponse({ success: false, error: "Invalid quota payload" }, 400);
+      }
+      const valid = yield* Effect.promise(() =>
+        validateInternalSignature(context.config.betterAuthSecret, event.req, "/internal/quota", rawBody)
+      );
+      if (!valid) {
+        return jsonResponse({ success: false, error: "Invalid internal quota signature" }, 401);
+      }
+      const parsed = yield* Effect.sync(() => {
+        try {
+          return JSON.parse(rawBody) as unknown;
+        } catch {
+          return null;
+        }
+      });
+      const decoded = Option.getOrNull(decodeQuotaInput(parsed));
+      if (decoded === null) {
+        return jsonResponse({ success: false, error: "Invalid quota payload" }, 400);
+      }
+      const userId = (decoded.userId ?? "").trim();
+      const provider = (decoded.provider ?? "").trim();
+      const accountId = (decoded.accountId ?? "").trim();
+      if (!userId || !provider || !accountId) {
+        return jsonResponse({ success: false, error: "userId, provider, and accountId are required" }, 400);
+      }
+      if (!isQuotaProvider(provider)) {
+        return jsonResponse({ success: false, error: `provider ${provider} is not supported for quota` }, 200);
+      }
 
-  const row = await getQuotaAccount(accountId, userId, provider);
-  if (!row) return jsonResponse({ success: false, error: "Account not found" }, 404);
+      const row = yield* Effect.promise(() => getQuotaAccount(accountId, userId, provider));
+      if (!row) return jsonResponse({ success: false, error: "Account not found" }, 404);
 
-  const account = {
-    id: row.id,
-    userId: row.userId,
-    provider: row.provider,
-    projectId: row.projectId,
-    accountId: row.accountId,
-    tier: row.tier,
-    accessToken: row.accessToken,
-  };
-  try {
-    const result = await fetchAccountQuota(quotaContext(context), account, Boolean(input.forceRefresh));
-    return jsonResponse({ success: true, data: result }, 200);
-  } catch (error) {
-    return jsonResponse(
-      { success: false, error: error instanceof Error ? error.message : "Failed to fetch quota" },
-      200
-    );
-  }
+      const account = {
+        id: row.id,
+        userId: row.userId,
+        provider: row.provider,
+        projectId: row.projectId,
+        accountId: row.accountId,
+        tier: row.tier,
+        accessToken: row.accessToken,
+      };
+      const result = yield* Effect.tryPromise({
+        try: () => fetchAccountQuota(quotaContext(context), account, Boolean(decoded.forceRefresh)),
+        catch: (error) => (error instanceof Error ? error : new Error("Failed to fetch quota")),
+      }).pipe(Effect.result);
+      if (result._tag === "Failure") {
+        return jsonResponse({ success: false, error: result.failure.message }, 200);
+      }
+      return jsonResponse({ success: true, data: result.success }, 200);
+    }).pipe(Effect.withSpan("handleQuota"))
+  );
 }
 
 function resolveRelayTarget(url: string, method: string): { method: string; target: string } {
@@ -124,64 +142,76 @@ function resolveRelayTarget(url: string, method: string): { method: string; targ
 }
 
 export async function handleRefresh(event: H3Event, context: ProxyContext): Promise<Response> {
-  const rawBody = await event.req.text();
-  if (utf8ByteLength(rawBody) > MAX_RELAY_BODY_BYTES) {
-    return relayError(400, "Invalid internal refresh payload");
-  }
-  const valid = await validateInternalSignature(context.config.betterAuthSecret, event.req, "/internal/refresh", rawBody);
-  if (!valid) return relayError(401, "Invalid internal refresh signature");
+  return Effect.runPromise(
+    Effect.gen(function* () {
+      const rawBody = yield* Effect.promise(() => event.req.text());
+      if (utf8ByteLength(rawBody) > MAX_RELAY_BODY_BYTES) {
+        return relayError(400, "Invalid internal refresh payload");
+      }
+      const valid = yield* Effect.promise(() =>
+        validateInternalSignature(context.config.betterAuthSecret, event.req, "/internal/refresh", rawBody)
+      );
+      if (!valid) return relayError(401, "Invalid internal refresh signature");
 
-  let input: { url?: string; method?: string; headers?: Record<string, string>; body?: unknown };
-  try {
-    input = JSON.parse(rawBody) as typeof input;
-  } catch {
-    return relayError(400, "Invalid internal refresh payload");
-  }
-  const url = (input.url ?? "").trim();
-  if (!url) return relayError(400, "url is required");
+      const parsed = yield* Effect.sync(() => {
+        try {
+          return JSON.parse(rawBody) as unknown;
+        } catch {
+          return null;
+        }
+      });
+      const decoded = Option.getOrNull(decodeRelayInput(parsed));
+      if (decoded === null) {
+        return relayError(400, "Invalid internal refresh payload");
+      }
+      const url = (decoded.url ?? "").trim();
+      if (!url) return relayError(400, "url is required");
 
-  let resolved: { method: string; target: string };
-  try {
-    resolved = resolveRelayTarget(url, input.method ?? "");
-  } catch (error) {
-    return relayError(400, error instanceof Error ? error.message : "Invalid target");
-  }
+      const resolved = yield* Effect.try({
+        try: () => resolveRelayTarget(url, decoded.method ?? ""),
+        catch: (error) => (error instanceof Error ? error : new Error("Invalid target")),
+      }).pipe(Effect.result);
+      if (resolved._tag === "Failure") return relayError(400, resolved.failure.message);
 
-  const headers = new Headers();
-  for (const [key, value] of Object.entries(input.headers ?? {})) {
-    const normalized = key.trim().toLowerCase();
-    if (!normalized || normalized.startsWith(":") || normalized.startsWith("proxy-")) continue;
-    if (BLOCKED_RELAY_HEADERS.has(normalized)) continue;
-    if (!value.trim()) continue;
-    headers.set(normalized, value);
-  }
+      const headers = new Headers();
+      for (const [key, value] of Object.entries(decoded.headers ?? {})) {
+        const normalized = key.trim().toLowerCase();
+        if (!normalized || normalized.startsWith(":") || normalized.startsWith("proxy-")) continue;
+        if (BLOCKED_RELAY_HEADERS.has(normalized)) continue;
+        if (!value.trim()) continue;
+        headers.set(normalized, value);
+      }
 
-  let body: string | undefined;
-  if (input.body !== undefined && input.body !== null) {
-    body = typeof input.body === "string" ? input.body : JSON.stringify(input.body);
-  }
+      let body: string | undefined;
+      if (decoded.body !== undefined && decoded.body !== null) {
+        body = typeof decoded.body === "string" ? decoded.body : JSON.stringify(decoded.body);
+      }
 
-  let upstream: Response;
-  try {
-    upstream = await context.guardedFetch(resolved.target, {
-      method: resolved.method,
-      headers,
-      body,
-      signal: AbortSignal.timeout(RELAY_TIMEOUT_MS),
-    });
-  } catch (error) {
-    return relayError(502, `Internal relay upstream request failed: ${error instanceof Error ? error.message : String(error)}`);
-  }
+      const upstream = yield* Effect.tryPromise({
+        try: () =>
+          context.guardedFetch(resolved.success.target, {
+            method: resolved.success.method,
+            headers,
+            body,
+            signal: AbortSignal.timeout(RELAY_TIMEOUT_MS),
+          }),
+        catch: (error) => (error instanceof Error ? error : new Error(String(error))),
+      }).pipe(Effect.result);
+      if (upstream._tag === "Failure") {
+        return relayError(502, `Internal relay upstream request failed: ${upstream.failure.message}`);
+      }
 
-  const responseHeaders = new Headers();
-  upstream.headers.forEach((value, key) => {
-    const normalized = key.toLowerCase();
-    if (normalized.startsWith("proxy-")) return;
-    if (BLOCKED_RELAY_RESPONSE_HEADERS.has(normalized)) return;
-    responseHeaders.append(key, value);
-  });
-  const text = await upstream.text();
-  return new Response(text, { status: upstream.status, headers: responseHeaders });
+      const responseHeaders = new Headers();
+      upstream.success.headers.forEach((value, key) => {
+        const normalized = key.toLowerCase();
+        if (normalized.startsWith("proxy-")) return;
+        if (BLOCKED_RELAY_RESPONSE_HEADERS.has(normalized)) return;
+        responseHeaders.append(key, value);
+      });
+      const text = yield* Effect.promise(() => upstream.success.text());
+      return new Response(text, { status: upstream.success.status, headers: responseHeaders });
+    }).pipe(Effect.withSpan("handleRefresh"))
+  );
 }
 
 function relayError(status: number, message: string): Response {

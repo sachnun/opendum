@@ -71,8 +71,15 @@ export type AccountRotationFailure = {
   failedAt: Date;
 };
 
-export function isRouteError(value: ParsedEndpointRequest | RouteError): value is RouteError {
-  return "status" in value && typeof (value as RouteError).status === "number";
+export function isRouteError(value: unknown): value is RouteError {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    "status" in value &&
+    typeof (value as RouteError).status === "number" &&
+    "message" in value &&
+    typeof (value as RouteError).message === "string"
+  );
 }
 
 export type AttemptResult = {

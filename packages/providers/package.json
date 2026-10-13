@@ -20,7 +20,8 @@
   },
   "dependencies": {
     "@opendum/core": "workspace:*",
-    "@opendum/models": "workspace:*"
+    "@opendum/models": "workspace:*",
+    "effect": "4.0.4"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
