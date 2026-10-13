@@ -25,14 +25,11 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Lint web
-        run: bun run --filter @opendum/web lint
-
       - name: Test web
         run: bun run --filter @opendum/web test
 
       - name: Typecheck web
-        run: bun run --filter @opendum/web typecheck
+        run: bun run --filter @opendum/web check
 
       - name: Build web
         run: bun run --filter @opendum/web build
@@ -51,14 +48,17 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Lint
+        run: bun run lint
+
       - name: Typecheck packages
-        run: bun run --filter "./packages/*" --if-present typecheck
+        run: bun run --filter "./packages/*" --if-present check
 
       - name: Test packages
         run: bun run --filter "./packages/*" --if-present test
 
       - name: Typecheck proxy
-        run: bun run --filter @opendum/proxy typecheck
+        run: bun run --filter @opendum/proxy check
 
       - name: Test proxy
         run: bun run --filter @opendum/proxy test

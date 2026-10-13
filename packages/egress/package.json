@@ -11,16 +11,16 @@
   },
   "scripts": {
     "test": "bun test",
-    "typecheck": "tsc --noEmit"
+    "check": "bun check"
   },
   "dependencies": {
     "@opendum/config": "workspace:*",
     "undici": "^8.11.2"
   },
   "devDependencies": {
-    "@types/bun": "^1.4.3",
     "@types/node": "^26.1.1",
     "tsx": "^4.23.13",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "@types/bun": "^1.4.3"
   }
 }

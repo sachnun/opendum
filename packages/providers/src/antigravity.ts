@@ -5,7 +5,6 @@ import type { OpendumRedis } from "@opendum/redis";
 import {
   cloneAnyMap,
   contentToText,
-  defaultEmpty,
   defaultStringValue,
   jsonResponse,
   numberFromAny,
@@ -13,14 +12,10 @@ import {
   stringValue,
 } from "./helpers.js";
 import {
-  RETIRED_MODEL_PATTERN,
   anySlice,
   defaultAny,
-  inferEnumType,
   type Json,
   mapSlice,
-  normalizeSchemaType,
-  randomHyphenId,
   randomUuid,
   sanitizedToolName,
 } from "./antigravity-common.js";
@@ -95,10 +90,6 @@ function stableSessionId(body: Json): string {
     return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
   }
   return randomId("session");
-}
-
-function joinNonEmpty(sep: string, ...values: string[]): string {
-  return values.filter((value) => value.trim() !== "").join(sep);
 }
 
 function isGemini3ModelName(model: string): boolean {

@@ -36,7 +36,7 @@ function mergeProviderConfig(
   if (!generated && !authored) return undefined;
   const merged: Record<string, ProviderModelConfig> = {};
   for (const provider of new Set([...Object.keys(generated ?? {}), ...Object.keys(authored ?? {})])) {
-    merged[provider] = { ...(generated?.[provider] ?? {}), ...(authored?.[provider] ?? {}) };
+    merged[provider] = { ...generated?.[provider], ...authored?.[provider] };
   }
   return Object.keys(merged).length > 0 ? merged : undefined;
 }

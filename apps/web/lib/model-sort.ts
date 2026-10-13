@@ -126,14 +126,14 @@ function contextRank(modelId: string): number {
 
 function openAIModelLineRank(modelId: string): number {
   const normalized = normalizeModelId(modelId);
-  if (/^gpt-oss-/.test(normalized)) return 2;
-  if (/^gpt-/.test(normalized)) return 0;
+  if (normalized.startsWith("gpt-oss-")) return 2;
+  if (normalized.startsWith("gpt-")) return 0;
   if (/^o\d/.test(normalized)) return 1;
   return 3;
 }
 
 function isGptOssModel(modelId: string): boolean {
-  return /^gpt-oss-/.test(normalizeModelId(modelId));
+  return normalizeModelId(modelId).startsWith("gpt-oss-");
 }
 
 function openAIVariantRank(modelId: string): number {

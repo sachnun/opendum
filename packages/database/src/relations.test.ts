@@ -95,7 +95,10 @@ test("relations are declared for exactly the tables connected by foreign keys", 
 test("relation targets exist in the schema", () => {
   for (const [sourceTable, definition] of relationsBySourceTable) {
     for (const [fieldName, relation] of definition) {
-      expect(tablesByName.has(relation.referencedTable)).toBeTruthy();
+      expect(
+        tablesByName.has(relation.referencedTable),
+        `${sourceTable}.${fieldName} references unknown table ${relation.referencedTable}`,
+      ).toBeTruthy();
     }
   }
 });
@@ -132,7 +135,10 @@ test("every foreign key is reachable back from its target table", () => {
 
     for (const [fieldName, relation] of matches) {
       if (relation.kind === "one") {
-        expect({ fields: relation.references, references: relation.fields }).toEqual({ fields: foreignKey.columns, references: foreignKey.targetColumns });
+        expect(
+          { fields: relation.references, references: relation.fields },
+          `${foreignKey.targetTable}.${fieldName} does not match the foreign key columns`,
+        ).toEqual({ fields: foreignKey.columns, references: foreignKey.targetColumns });
       }
     }
   }
@@ -143,11 +149,14 @@ test("to-many relations are backed by a foreign key", () => {
     for (const [fieldName, relation] of definition) {
       if (relation.kind !== "many") continue;
 
-      expect(foreignKeys.some(
+      expect(
+        foreignKeys.some(
           (foreignKey) =>
             foreignKey.sourceTable === relation.referencedTable &&
             foreignKey.targetTable === sourceTable,
-        )).toBeTruthy();
+        ),
+        `${sourceTable}.${fieldName} has no foreign key from ${relation.referencedTable}`,
+      ).toBeTruthy();
     }
   }
 });
@@ -169,13 +178,19 @@ test("to-one relations follow a foreign key in one of its two directions", () =>
             foreignKey.targetColumns.join() === relation.fields.join()),
       );
 
-      expect(matches).toBeTruthy();
+      expect(
+        matches,
+        `${sourceTable}.${fieldName} does not match any foreign key between ${sourceTable} and ${relation.referencedTable}`,
+      ).toBeTruthy();
     }
   }
 });
 
 test("relation field names are unique per table", () => {
   for (const [sourceTable, definition] of relationsBySourceTable) {
-    expect(new Set(definition.keys()).size).toBe(definition.size);
+    expect(
+      new Set(definition.keys()).size,
+      `duplicate relation field names on ${sourceTable}`,
+    ).toBe(definition.size);
   }
 });

@@ -5,7 +5,10 @@
     "zenmux"
   ],
   "aliases": [
-    "claude-haiku-5.5"
+    "anthropic-claude-haiku-5.5",
+    "anthropic/claude-haiku-5.5",
+    "claude-haiku-5.5",
+    "claude-haiku-5.5:free"
   ],
   "reasoning": true,
   "reasoning_effort": [

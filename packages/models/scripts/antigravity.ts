@@ -200,9 +200,9 @@ function buildDiscoveredModelMap(widgetEntries) {
 }
 
 function upstreamRank(upstream) {
-  if (/-high$/.test(upstream)) return 3;
-  if (/-medium$/.test(upstream)) return 2;
-  if (/-low$/.test(upstream)) return 1;
+  if (upstream.endsWith("-high")) return 3;
+  if (upstream.endsWith("-medium")) return 2;
+  if (upstream.endsWith("-low")) return 1;
   return 0;
 }
 

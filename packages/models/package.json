@@ -15,17 +15,17 @@
     "#models/*": "./src/*"
   },
   "scripts": {
-    "refresh": "tsx ./scripts/models.ts",
+    "refresh": "bun ./scripts/models.ts",
     "test": "bun test",
-    "typecheck": "tsc --noEmit"
+    "check": "bun check"
   },
   "dependencies": {
     "fuzzball": "^2.2.6"
   },
   "devDependencies": {
-    "@types/bun": "^1.4.3",
     "@types/node": "^26.1.1",
     "tsx": "^4.23.13",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "@types/bun": "^1.4.3"
   }
 }

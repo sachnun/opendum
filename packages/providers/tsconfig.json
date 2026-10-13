@@ -3,14 +3,8 @@
     "target": "ESNext",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "lib": [
-      "ESNext",
-      "DOM"
-    ],
-    "types": [
-      "node",
-      "bun"
-    ],
+    "lib": ["ESNext", "DOM"],
+    "types": ["node", "bun"],
     "strict": true,
     "verbatimModuleSyntax": true,
     "noEmit": true,
@@ -18,7 +12,5 @@
     "esModuleInterop": true,
     "skipLibCheck": true
   },
-  "include": [
-    "src/**/*"
-  ]
+  "include": ["src/**/*"]
 }

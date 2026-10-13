@@ -38,7 +38,7 @@ function refreshedProviders(): string[] {
 function runScript(scriptName: string): Promise<void> {
   const scriptPath = resolve(scriptDir, scriptName);
   return new Promise((resolvePromise, rejectPromise) => {
-    const child = spawn(process.execPath, ["--import", "tsx", scriptPath], {
+    const child = spawn(process.execPath, [scriptPath], {
       stdio: "inherit",
     });
 

@@ -1,7 +1,6 @@
 import type { Registry } from "@opendum/models/runtime";
 import { stringValue } from "./helpers.js";
 import {
-  chatSseToChatCompletion,
   buildResponsesApiPayload,
   responsesJsonToChatCompletion,
   responsesSseToChatStream,

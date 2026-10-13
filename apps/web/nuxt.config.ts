@@ -17,7 +17,7 @@ export default defineNuxtConfig({
   compatibilityDate: "2025-07-15",
   ssr: false,
   sourcemap: false,
-  modules: ["@nuxt/a11y", "@nuxt/eslint", "@nuxt/fonts"],
+  modules: ["@nuxt/a11y", "@nuxt/fonts"],
   css: ["~/assets/css/main.css"],
   components: [{ path: "~/components", pathPrefix: false }],
   devtools: { enabled: process.env.NODE_ENV !== "production" },

@@ -3,7 +3,6 @@ import { db, type Database } from "../client.js";
 import {
   providerAccount,
   providerAccountDisabledModel,
-  providerAccountModelHealth,
 } from "../schema/accounts.js";
 import { userSharingSetting } from "../schema/usage.js";
 
