@@ -15,7 +15,7 @@
     "#models/*": "./src/*"
   },
   "scripts": {
-    "refresh": "tsx ./scripts/models.ts",
+    "refresh": "bun ./scripts/models.ts",
     "test": "tsx --test ./src/*.test.ts",
     "check": "bun check"
   },

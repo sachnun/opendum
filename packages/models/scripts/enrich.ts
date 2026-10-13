@@ -1,4 +1,4 @@
-#!/usr/bin/env -S npx tsx
+#!/usr/bin/env bun
 
 /**
  * Enrich the local model registry with external metadata and normalize file

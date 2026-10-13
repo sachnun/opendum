@@ -9,7 +9,7 @@
     "prebuild": "bun run family-ranking",
     "pretest": "bun run family-ranking",
     "pretest:unit": "bun run family-ranking",
-    "family-ranking": "tsx ./scripts/family-ranking.ts",
+    "family-ranking": "bun ./scripts/family-ranking.ts",
     "test": "tsx --test ./lib/*.test.ts && vitest run",
     "test:unit": "tsx --test ./lib/*.test.ts",
     "test:nuxt": "vitest run",
