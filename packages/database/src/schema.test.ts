@@ -1,8 +1,7 @@
-import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { test } from "node:test";
+import { expect, test } from "bun:test";
 
 import { isTable, getTableName } from "drizzle-orm";
 import { getTableConfig, IndexedColumn, type PgTable } from "drizzle-orm/pg-core";
@@ -197,7 +196,7 @@ function loadSql(): ParsedSchema {
   const files = readdirSync(drizzleDir)
     .filter((name) => name.endsWith(".sql"))
     .sort();
-  assert.ok(files.length > 0, `expected committed migrations in ${drizzleDir}`);
+  expect(files.length > 0, `expected committed migrations in ${drizzleDir}`).toBeTruthy();
 
   const statements = files.flatMap((file) =>
     readFileSync(join(drizzleDir, file), "utf8")
@@ -238,10 +237,7 @@ const sql = loadSql();
 const tablesByName = new Map(drizzleTables().map((table) => [getTableName(table), table]));
 
 test("committed migrations define exactly the drizzle tables", () => {
-  assert.deepEqual(
-    sorted([...sql.tables.keys()], (name) => name),
-    sorted([...tablesByName.keys()], (name) => name),
-  );
+  expect(sorted([...sql.tables.keys()], (name) => name)).toEqual(sorted([...tablesByName.keys()], (name) => name));
 });
 
 test("table columns match the drizzle schema", () => {
@@ -260,7 +256,7 @@ test("table columns match the drizzle schema", () => {
       .map(([columnName, column]) => ({ name: columnName, ...column }))
       .sort((left, right) => left.name.localeCompare(right.name));
 
-    assert.deepEqual(actual, expected, `column mismatch for table ${name}`);
+    expect(actual, `column mismatch for table ${name}`).toEqual(expected);
   }
 });
 
@@ -273,9 +269,9 @@ test("unique constraints match the drizzle schema", () => {
       .sort((left, right) => String(left.name).localeCompare(String(right.name)));
     const actual = [...(sql.tables.get(name)?.uniques ?? new Map())]
       .map(([constraintName, columns]) => ({ name: constraintName, columns }))
-      .sort((left, right) => left.name.localeCompare(right.name));
+      .sort((left, right) => String(left.name).localeCompare(String(right.name)));
 
-    assert.deepEqual(actual, expected, `unique constraint mismatch for table ${name}`);
+    expect(actual, `unique constraint mismatch for table ${name}`).toEqual(expected);
   }
 });
 
@@ -283,7 +279,7 @@ test("indexes match the drizzle schema", () => {
   const expected = drizzleTables()
     .flatMap((table) =>
       getTableConfig(table).indexes.map((index) => ({
-        name: index.config.name,
+        name: String(index.config.name),
         table: getTableName(table),
         unique: index.config.unique,
         columns: index.config.columns.map(indexColumnName),
@@ -292,9 +288,9 @@ test("indexes match the drizzle schema", () => {
     .sort((left, right) => String(left.name).localeCompare(String(right.name)));
   const actual = [...sql.indexes]
     .map(([indexName, index]) => ({ name: indexName, ...index }))
-    .sort((left, right) => left.name.localeCompare(right.name));
+    .sort((left, right) => String(left.name).localeCompare(String(right.name)));
 
-  assert.deepEqual(actual, expected);
+  expect(actual).toEqual(expected);
 });
 
 test("foreign keys match the drizzle schema", () => {
@@ -319,5 +315,5 @@ test("foreign keys match the drizzle schema", () => {
     .map(([constraintName, foreignKey]) => ({ name: constraintName, ...foreignKey }))
     .sort((left, right) => left.name.localeCompare(right.name));
 
-  assert.deepEqual(actual, expected);
+  expect(actual).toEqual(expected);
 });

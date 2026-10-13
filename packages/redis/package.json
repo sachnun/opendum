@@ -10,7 +10,7 @@
     "./session-affinity": "./src/session-affinity.ts"
   },
   "scripts": {
-    "test": "tsx --test ./src/*.test.ts",
+    "test": "bun test --pass-with-no-tests",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

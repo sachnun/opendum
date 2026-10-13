@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import { describe, it, mock } from "node:test";
+import { describe, expect, it, setSystemTime } from "bun:test";
 import {
   clampFraction,
   displayNumber,
@@ -12,41 +11,41 @@ import {
 
 describe("quota helpers", () => {
   it("clamps fractions", () => {
-    assert.equal(clampFraction(0.5), 0.5);
-    assert.equal(clampFraction(-1), 0);
-    assert.equal(clampFraction(2), 1);
+    expect(clampFraction(0.5)).toBe(0.5);
+    expect(clampFraction(-1)).toBe(0);
+    expect(clampFraction(2)).toBe(1);
   });
 
   it("formats numbers", () => {
-    assert.equal(displayNumber(42), 42);
-    assert.equal(displayNumber(42.129), 42.13);
-    assert.equal(formatFloat(42), "42");
-    assert.equal(formatFloat(42.5), "42.50");
+    expect(displayNumber(42)).toBe(42);
+    expect(displayNumber(42.129)).toBe(42.13);
+    expect(formatFloat(42)).toBe("42");
+    expect(formatFloat(42.5)).toBe("42.50");
   });
 
   it("parses quota numbers", () => {
-    assert.equal(parseQuotaNumber("12.5"), 12.5);
-    assert.equal(parseQuotaNumber(7), 7);
-    assert.equal(parseQuotaNumber("nope"), null);
+    expect(parseQuotaNumber("12.5")).toBe(12.5);
+    expect(parseQuotaNumber(7)).toBe(7);
+    expect(parseQuotaNumber("nope")).toBe(null);
   });
 
   it("normalizes reset ISO values", () => {
-    assert.equal(parseResetIso("2026-01-01T00:00:00Z"), "2026-01-01T00:00:00.000Z");
-    assert.equal(parseResetIso(1_700_000_000), "2023-11-14T22:13:20.000Z");
-    assert.equal(parseResetIso("not-a-date"), null);
+    expect(parseResetIso("2026-01-01T00:00:00Z")).toBe("2026-01-01T00:00:00.000Z");
+    expect(parseResetIso(1_700_000_000)).toBe("2023-11-14T22:13:20.000Z");
+    expect(parseResetIso("not-a-date")).toBe(null);
   });
 
   it("formats time until reset", () => {
-    mock.timers.enable({ apis: ["Date"], now: 1_000_000 });
-    assert.equal(formatTimeUntilReset(1_000_000 + 90 * 60 * 1000), "1h 30m");
-    assert.equal(formatTimeUntilReset(1_000_000 + 25 * 60 * 1000), "25m");
-    mock.timers.reset();
-    assert.equal(formatTimeUntilReset(1), "resetting...");
-    assert.equal(formatTimeUntilReset(0), null);
+    setSystemTime(new Date(1_000_000));
+    expect(formatTimeUntilReset(1_000_000 + 90 * 60 * 1000)).toBe("1h 30m");
+    expect(formatTimeUntilReset(1_000_000 + 25 * 60 * 1000)).toBe("25m");
+    setSystemTime();
+    expect(formatTimeUntilReset(1)).toBe("resetting...");
+    expect(formatTimeUntilReset(0)).toBe(null);
   });
 
   it("falls back to free tier", () => {
-    assert.equal(quotaFallbackTier({ id: "1", userId: "u", provider: "kiro", tier: "pro" }), "pro");
-    assert.equal(quotaFallbackTier({ id: "1", userId: "u", provider: "kiro", tier: null }), "free");
+    expect(quotaFallbackTier({ id: "1", userId: "u", provider: "kiro", tier: "pro" })).toBe("pro");
+    expect(quotaFallbackTier({ id: "1", userId: "u", provider: "kiro", tier: null })).toBe("free");
   });
 });

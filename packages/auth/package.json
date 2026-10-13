@@ -10,7 +10,7 @@
     "./custom-store": "./src/custom-store.ts"
   },
   "scripts": {
-    "test": "tsx --test ./src/*.test.ts",
+    "test": "bun test --pass-with-no-tests",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

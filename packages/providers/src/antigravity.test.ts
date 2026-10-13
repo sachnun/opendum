@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, expect, it } from "bun:test";
 import type { Registry } from "@opendum/models/runtime";
 
 import { AntigravityProvider } from "./antigravity.js";
@@ -55,16 +54,17 @@ function antigravityProvider(transport: unknown): AntigravityProvider {
 describe("antigravity retired notice", () => {
   it("preserves the response stream when no notice is found", async () => {
     const peeked = await peekRetiredNotice(new Response(STREAM, { status: 200 }));
-    assert.equal(peeked.retired, false);
-    assert.ok(peeked.body);
-    assert.equal(await readAll(peeked.body), STREAM);
+    expect(peeked.retired).toBe(false);
+    expect(peeked.body).toBeTruthy();
+    if (!peeked.body) return;
+    expect(await readAll(peeked.body)).toBe(STREAM);
   });
 
   it("detects a retired notice without passing the stream through", async () => {
     const peeked = await peekRetiredNotice(new Response(RETIRED_STREAM, { status: 200 }));
-    assert.equal(peeked.retired, true);
-    assert.equal(peeked.body, null);
-    assert.match(peeked.notice ?? "", /no longer available/);
+    expect(peeked.retired).toBe(true);
+    expect(peeked.body).toBe(null);
+    expect(peeked.notice ?? "").toMatch(/no longer available/);
   });
 });
 
@@ -78,8 +78,8 @@ describe("antigravity makeRequest", () => {
       stream: true,
     });
     const text = await resp.text();
-    assert.match(text, /hello/);
-    assert.match(text, /data: \[DONE\]/);
+    expect(text).toMatch(/hello/);
+    expect(text).toMatch(/data: \[DONE\]/);
   });
 
   it("injects the antigravity system instruction from the model family", async () => {
@@ -97,6 +97,6 @@ describe("antigravity makeRequest", () => {
     const injected = payload.request?.systemInstruction?.parts?.some((part) =>
       (part.text ?? "").startsWith("You are Antigravity")
     );
-    assert.equal(injected, true);
+    expect(injected).toBe(true);
   });
 });

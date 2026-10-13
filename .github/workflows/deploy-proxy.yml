@@ -56,7 +56,7 @@ jobs:
 
       - name: Test proxy
         working-directory: services/proxy
-        run: bunx vitest run
+        run: bun test
 
       - name: Validate Koyeb configuration
         run: |

@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, expect, it } from "bun:test";
 import {
   chatCompletionToResponsesJson,
   chatSseToChatCompletion,
@@ -35,11 +34,11 @@ describe("responses transform", () => {
       },
       { role: "tool", tool_call_id: "call_1", content: "ok" },
     ]) as Array<Record<string, unknown>>;
-    assert.equal(input[0].role, "developer");
-    assert.equal(input[1].role, "user");
-    assert.equal(input[2].type, "function_call");
-    assert.equal(input[2].call_id, "fc_1");
-    assert.equal(input[3].type, "function_call_output");
+    expect(input[0].role).toBe("developer");
+    expect(input[1].role).toBe("user");
+    expect(input[2].type).toBe("function_call");
+    expect(input[2].call_id).toBe("fc_1");
+    expect(input[3].type).toBe("function_call_output");
   });
 
   it("normalizes shorthand responses input", () => {
@@ -47,21 +46,21 @@ describe("responses transform", () => {
       { role: "user", content: [{ type: "input_text", text: "hey" }] },
       { call_id: "fc_1", name: "do", arguments: "{}" },
     ]) as Array<Record<string, unknown>>;
-    assert.equal(input[0].type, "message");
-    assert.equal(input[1].type, "function_call");
+    expect(input[0].type).toBe("message");
+    expect(input[1].type).toBe("function_call");
   });
 
   it("converts chat tools to responses tools", () => {
     const tools = convertToolsForResponses([
       { type: "function", function: { name: "x", description: "d", parameters: { type: "object" } } },
     ]) as Array<Record<string, unknown>>;
-    assert.equal(tools[0].type, "function");
-    assert.equal(tools[0].name, "x");
+    expect(tools[0].type).toBe("function");
+    expect(tools[0].name).toBe("x");
   });
 
   it("normalizes function tool choice", () => {
-    assert.deepEqual(normalizeToolChoice({ type: "function", function: { name: "x" } }), { type: "function", name: "x" });
-    assert.equal(normalizeToolChoice("auto"), "auto");
+    expect(normalizeToolChoice({ type: "function", function: { name: "x" } })).toEqual({ type: "function", name: "x" });
+    expect(normalizeToolChoice("auto")).toBe("auto");
   });
 
   it("converts responses json to chat completion", () => {
@@ -78,10 +77,10 @@ describe("responses transform", () => {
       "gpt-4o"
     );
     const message = (completion.choices as Array<Record<string, unknown>>)[0].message as Record<string, unknown>;
-    assert.equal(message.content, "hello");
-    assert.equal(message.reasoning_content, "why");
-    assert.equal(((completion.choices as Array<Record<string, unknown>>)[0].finish_reason), "tool_calls");
-    assert.equal((completion.usage as Record<string, number>).prompt_tokens, 3);
+    expect(message.content).toBe("hello");
+    expect(message.reasoning_content).toBe("why");
+    expect(((completion.choices as Array<Record<string, unknown>>)[0].finish_reason)).toBe("tool_calls");
+    expect((completion.usage as Record<string, number>).prompt_tokens).toBe(3);
   });
 
   it("converts chat completion to responses json", () => {
@@ -92,10 +91,10 @@ describe("responses transform", () => {
       },
       "gpt-4o"
     );
-    assert.equal(response.object, "response");
+    expect(response.object).toBe("response");
     const output = response.output as Array<Record<string, unknown>>;
-    assert.equal(output[0].type, "message");
-    assert.equal(output[1].type, "function_call");
+    expect(output[0].type).toBe("message");
+    expect(output[1].type).toBe("function_call");
   });
 
   it("rebuilds a chat completion from an sse stream", async () => {
@@ -108,20 +107,20 @@ describe("responses transform", () => {
       "gpt-4o"
     );
     const message = (completion.choices as Array<Record<string, unknown>>)[0].message as Record<string, unknown>;
-    assert.equal(message.content, "ab");
-    assert.equal((completion.usage as Record<string, number>).completion_tokens, 2);
+    expect(message.content).toBe("ab");
+    expect((completion.usage as Record<string, number>).completion_tokens).toBe(2);
   });
 
   it("clamps prompt cache keys", () => {
-    assert.equal(clampPromptCacheKey("abc"), "abc");
-    assert.equal(clampPromptCacheKey("x".repeat(100)).length, 64);
+    expect(clampPromptCacheKey("abc")).toBe("abc");
+    expect(clampPromptCacheKey("x".repeat(100)).length).toBe(64);
   });
 
   it("maps responses usage from chat usage", () => {
     const usage = responsesUsageFromChat({ prompt_tokens: 10, completion_tokens: 5, prompt_tokens_details: { cached_tokens: 2 } });
-    assert.equal(usage.input_tokens, 10);
-    assert.equal((usage.input_tokens_details as Record<string, number>).cached_tokens, 2);
-    assert.equal(usage.total_tokens, 15);
+    expect(usage.input_tokens).toBe(10);
+    expect((usage.input_tokens_details as Record<string, number>).cached_tokens).toBe(2);
+    expect(usage.total_tokens).toBe(15);
   });
 });
 
@@ -141,10 +140,10 @@ describe("anthropic transform", () => {
       "claude-sonnet",
       true
     );
-    assert.equal(payload.model, "claude-sonnet");
-    assert.equal(payload.max_tokens, 100);
-    assert.equal(payload.system, "sys");
-    assert.equal((payload.tools as Array<Record<string, unknown>>)[0].name, "x");
+    expect(payload.model).toBe("claude-sonnet");
+    expect(payload.max_tokens).toBe(100);
+    expect(payload.system).toBe("sys");
+    expect((payload.tools as Array<Record<string, unknown>>)[0].name).toBe("x");
   });
 
   it("converts messages response to chat completion", () => {
@@ -162,10 +161,10 @@ describe("anthropic transform", () => {
       "claude"
     );
     const message = (completion.choices as Array<Record<string, unknown>>)[0].message as Record<string, unknown>;
-    assert.equal(message.content, "hi");
-    assert.equal(message.reasoning_content, "why");
-    assert.equal(((completion.choices as Array<Record<string, unknown>>)[0].finish_reason), "tool_calls");
+    expect(message.content).toBe("hi");
+    expect(message.reasoning_content).toBe("why");
+    expect(((completion.choices as Array<Record<string, unknown>>)[0].finish_reason)).toBe("tool_calls");
     const toolCalls = message.tool_calls as Array<Record<string, unknown>>;
-    assert.equal((toolCalls[0].function as Record<string, string>).arguments, '{"a":1}');
+    expect((toolCalls[0].function as Record<string, string>).arguments).toBe('{"a":1}');
   });
 });

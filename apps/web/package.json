@@ -8,11 +8,8 @@
     "predev": "bun run family-ranking",
     "prebuild": "bun run family-ranking",
     "pretest": "bun run family-ranking",
-    "pretest:unit": "bun run family-ranking",
     "family-ranking": "tsx ./scripts/family-ranking.ts",
-    "test": "tsx --test ./lib/*.test.ts && vitest run",
-    "test:unit": "tsx --test ./lib/*.test.ts",
-    "test:nuxt": "vitest run",
+    "test": "bun test",
     "lint": "nuxt prepare && eslint .",
     "typecheck": "nuxt prepare && vue-tsc --noEmit -p .nuxt/tsconfig.app.json && vue-tsc --noEmit -p .nuxt/tsconfig.server.json"
   },
@@ -42,9 +39,9 @@
     "@nuxt/a11y": "1.0.0-alpha.1",
     "@nuxt/eslint": "^1.16.0",
     "@nuxt/kit": "^4.5.2",
-    "@nuxt/test-utils": "^4.3.3",
     "@tailwindcss/postcss": "^4.3.2",
     "@tailwindcss/vite": "^4.3.2",
+    "@types/bun": "^1.4.3",
     "@types/node": "^26.1.1",
     "@vue/test-utils": "^2.5.1",
     "eslint": "^10.7.0",
@@ -54,7 +51,7 @@
     "tsx": "^4.23.13",
     "tw-animate-css": "^1.4.0",
     "typescript": "^6.0.3",
-    "vitest": "^5.0.3",
+    "vue": "^3.5.42",
     "vue-tsc": "^3.3.7"
   }
 }

@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, expect, it } from "bun:test";
 import { ProviderRegistry } from "./registry.js";
 import type { Registry } from "@opendum/models/runtime";
 
@@ -28,18 +27,18 @@ describe("provider registry", () => {
     });
     const names = registry.names();
     for (const name of EXPECTED) {
-      assert.ok(names.includes(name), `missing provider: ${name}`);
+      expect(names.includes(name), `missing provider: ${name}`).toBeTruthy();
     }
-    assert.equal(names.length, EXPECTED.length);
+    expect(names.length).toBe(EXPECTED.length);
   });
 
   it("reports credential refreshers", () => {
     const registry = new ProviderRegistry({ models: {} as Registry, fallback: null });
     const refreshable = registry.refreshableProviderNames();
     for (const name of ["antigravity", "cline", "codex", "kiro", "perch", "workbuddy"]) {
-      assert.ok(refreshable.includes(name), `missing refresher: ${name}`);
+      expect(refreshable.includes(name), `missing refresher: ${name}`).toBeTruthy();
     }
-    assert.ok(!refreshable.includes("openrouter"));
-    assert.ok(!refreshable.includes("opencode"));
+    expect(!refreshable.includes("openrouter")).toBeTruthy();
+    expect(!refreshable.includes("opencode")).toBeTruthy();
   });
 });

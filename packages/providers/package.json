@@ -13,7 +13,7 @@
     "./responses-transform": "./src/responses-transform.ts"
   },
   "scripts": {
-    "test": "tsx --test ./src/*.test.ts",
+    "test": "bun test",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -24,6 +24,7 @@
     "@opendum/redis": "workspace:*"
   },
   "devDependencies": {
+    "@types/bun": "^1.4.3",
     "@types/node": "^26.1.1",
     "tsx": "^4.23.13",
     "typescript": "^6.0.3"

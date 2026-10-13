@@ -1,10 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { defineComponent, h, ref } from "vue";
-import { mountSuspended } from "@nuxt/test-utils/runtime";
+import { mount } from "@vue/test-utils";
 
 import { useAnchorNavigation } from "~/composables/useAnchorNavigation";
 
 type ProbeApi = { activeAnchorId: string | null; handleNavClick: (item?: unknown, event?: MouseEvent) => void; scrollToAnchor: (id: string) => boolean };
+
+(globalThis as Record<string, unknown>).useRoute = () => ({ path: "/", query: {} });
 
 const Probe = defineComponent({
   setup() {
@@ -19,7 +21,7 @@ const Probe = defineComponent({
 
 describe("useAnchorNavigation", () => {
   it("starts without an active anchor and ignores missing sections", async () => {
-    const wrapper = await mountSuspended(Probe);
+    const wrapper = mount(Probe);
     const vm = wrapper.vm as unknown as ProbeApi;
     expect(vm.activeAnchorId).toBe(null);
     expect(typeof vm.handleNavClick).toBe("function");

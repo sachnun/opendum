@@ -1,5 +1,4 @@
-import { test } from "node:test";
-import assert from "node:assert/strict";
+import { expect, test } from "bun:test";
 
 import {
   MODEL_FAMILY_NAV_ITEMS,
@@ -11,26 +10,26 @@ import {
 const FEATURED_FAMILIES = MODEL_FAMILY_SORT_ORDER.filter((family) => family !== "Others");
 
 test("categorizeModelFamily keeps featured families and buckets the rest as Others", () => {
-  assert.ok(FEATURED_FAMILIES.length > 0, "expected at least one featured family");
+  expect(FEATURED_FAMILIES.length > 0, "expected at least one featured family").toBeTruthy();
   for (const family of FEATURED_FAMILIES) {
-    assert.equal(categorizeModelFamily(family), family);
+    expect(categorizeModelFamily(family)).toBe(family);
   }
-  assert.equal(categorizeModelFamily("mock-family"), "Others");
-  assert.equal(categorizeModelFamily("NotAFamily"), "Others");
-  assert.equal(categorizeModelFamily(undefined), "Others");
+  expect(categorizeModelFamily("mock-family")).toBe("Others");
+  expect(categorizeModelFamily("NotAFamily")).toBe("Others");
+  expect(categorizeModelFamily(undefined)).toBe("Others");
 });
 
 test("MODEL_FAMILY_SORT_ORDER lists each family once with Others last", () => {
-  assert.equal(MODEL_FAMILY_SORT_ORDER.at(-1), "Others");
-  assert.equal(MODEL_FAMILY_SORT_ORDER.filter((family) => family === "Others").length, 1);
-  assert.equal(new Set(MODEL_FAMILY_SORT_ORDER).size, MODEL_FAMILY_SORT_ORDER.length);
+  expect(MODEL_FAMILY_SORT_ORDER.at(-1)).toBe("Others");
+  expect(MODEL_FAMILY_SORT_ORDER.filter((family) => family === "Others").length).toBe(1);
+  expect(new Set(MODEL_FAMILY_SORT_ORDER).size).toBe(MODEL_FAMILY_SORT_ORDER.length);
 });
 
 test("MODEL_FAMILY_NAV_ITEMS mirrors the sort order", () => {
   const names = MODEL_FAMILY_NAV_ITEMS.map((item) => item.name);
-  assert.deepEqual(names, [...MODEL_FAMILY_SORT_ORDER]);
+  expect(names).toEqual([...MODEL_FAMILY_SORT_ORDER]);
   for (const item of MODEL_FAMILY_NAV_ITEMS) {
-    assert.equal(item.anchorId, getModelFamilyAnchorId(item.name));
-    assert.ok(item.anchorId.endsWith("-models"));
+    expect(item.anchorId).toBe(getModelFamilyAnchorId(item.name));
+    expect(item.anchorId.endsWith("-models")).toBeTruthy();
   }
 });

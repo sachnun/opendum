@@ -1,8 +1,7 @@
-import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, it } from "node:test";
+import { describe, expect, it } from "bun:test";
 import { fileURLToPath } from "node:url";
 import { Registry, suggestionScoreFor } from "./runtime.ts";
 
@@ -11,37 +10,37 @@ const registry = Registry.load(dataDir);
 
 describe("model suggestion score", () => {
   it("matches an identical value", () => {
-    assert.equal(suggestionScoreFor("gpt-4o", "gpt-4o"), 1);
+    expect(suggestionScoreFor("gpt-4o", "gpt-4o")).toBe(1);
   });
 
   it("matches a compacted typo above the threshold", () => {
-    assert.ok(suggestionScoreFor("gpt4o", "gpt-4o") >= 0.7);
+    expect(suggestionScoreFor("gpt4o", "gpt-4o") >= 0.7).toBeTruthy();
   });
 
   it("matches a substring strongly", () => {
     const score = suggestionScoreFor("claude", "claude-sonnet-4-6");
-    assert.ok(score >= 0.7);
-    assert.ok(score < 1);
+    expect(score >= 0.7).toBeTruthy();
+    expect(score < 1).toBeTruthy();
   });
 
   it("rejects an unrelated candidate", () => {
-    assert.ok(suggestionScoreFor("claude-sonnet-4-6", "gpt-4o") < 0.7);
+    expect(suggestionScoreFor("claude-sonnet-4-6", "gpt-4o") < 0.7).toBeTruthy();
   });
 
   it("handles empty input", () => {
-    assert.equal(suggestionScoreFor("", "gpt-4o"), 0);
-    assert.equal(suggestionScoreFor("gpt-4o", ""), 0);
+    expect(suggestionScoreFor("", "gpt-4o")).toBe(0);
+    expect(suggestionScoreFor("gpt-4o", "")).toBe(0);
   });
 });
 
 describe("access rules and case folding", () => {
   it("trims and folds model ids case-insensitively", () => {
     const sample = registry.allModels()[0];
-    assert.ok(sample, "expected at least one model");
-    assert.equal(registry.resolveAlias(sample), sample);
-    assert.equal(registry.resolveAlias(`  ${sample}  `), sample);
-    assert.equal(registry.resolveAlias(sample.toUpperCase()), sample);
-    assert.equal(registry.resolveAlias(sample), registry.resolveAlias(sample.toUpperCase()));
+    expect(sample).toBeTruthy();
+    expect(registry.resolveAlias(sample)).toBe(sample);
+    expect(registry.resolveAlias(`  ${sample}  `)).toBe(sample);
+    expect(registry.resolveAlias(sample.toUpperCase())).toBe(sample);
+    expect(registry.resolveAlias(sample)).toBe(registry.resolveAlias(sample.toUpperCase()));
   });
 });
 
@@ -68,11 +67,11 @@ describe("provider config merge", () => {
 
     const merged = Registry.load(authoredDir);
     const cfg = merged.providerModelConfig("muse-spark-1.3", "opencode");
-    assert.equal(cfg?.upstream, "muse-spark-1.3-free");
-    assert.equal(cfg?.contextWindow, 1000);
-    assert.equal(cfg?.maxOutputTokens, 100);
+    expect(cfg?.upstream).toBe("muse-spark-1.3-free");
+    expect(cfg?.contextWindow).toBe(1000);
+    expect(cfg?.maxOutputTokens).toBe(100);
     const custom = cfg?.custom as Record<string, unknown> | undefined;
-    assert.equal(custom?.responses_api, true);
-    assert.notEqual(cfg?.responses_api, false);
+    expect(custom?.responses_api).toBe(true);
+    expect(cfg?.responses_api).not.toBe(false);
   });
 });

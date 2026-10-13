@@ -1,5 +1,4 @@
-import { test } from "node:test";
-import assert from "node:assert/strict";
+import { expect, test } from "bun:test";
 
 import { buildCanonicalIndex } from "./canonical.ts";
 import {
@@ -39,18 +38,18 @@ test("planCanonicalization renames a model to its canonical id", () => {
     [model("nemotron-3-ultra", { providers: ["nvidia_nim"], providerConfig: { nvidia_nim: { upstream: "nvidia/nemotron-3-ultra-550b-a55b" } } })],
     index(),
   );
-  assert.equal(plan.actions.length, 1);
+  expect(plan.actions.length).toBe(1);
   const [action] = plan.actions;
-  assert.equal(action.kind, "rename");
-  assert.equal(action.from, "nemotron-3-ultra");
-  assert.equal(action.to, "nemotron-3-ultra-550b-a55b");
-  assert.equal(action.tier, "exact");
+  expect(action.kind).toBe("rename");
+  expect(action.from).toBe("nemotron-3-ultra");
+  expect(action.to).toBe("nemotron-3-ultra-550b-a55b");
+  expect(action.tier).toBe("exact");
 });
 
 test("planCanonicalization leaves an already-canonical model untouched", () => {
   const plan = planCanonicalization([model("deepseek-v4-flash", { providers: ["openrouter"] })], index());
-  assert.equal(plan.actions.length, 0);
-  assert.equal(plan.unresolved.length, 0);
+  expect(plan.actions.length).toBe(0);
+  expect(plan.unresolved.length).toBe(0);
 });
 
 test("planCanonicalization merges a provider variant into the canonical model", () => {
@@ -65,12 +64,12 @@ test("planCanonicalization merges a provider variant into the canonical model", 
     index(),
   );
   const merges = plan.actions.filter((action) => action.kind === "merge");
-  assert.equal(merges.length, 1);
+  expect(merges.length).toBe(1);
   const [merge] = merges;
-  assert.equal(merge.from, "deepseek-v4-flash-fast");
-  assert.equal(merge.to, "deepseek-v4-flash");
-  assert.deepEqual(merge.data.providers, ["example"]);
-  assert.deepEqual(merge.aliases, ["deepseek-v4-flash-fast"]);
+  expect(merge.from).toBe("deepseek-v4-flash-fast");
+  expect(merge.to).toBe("deepseek-v4-flash");
+  expect(merge.data.providers).toEqual(["example"]);
+  expect(merge.aliases).toEqual(["deepseek-v4-flash-fast"]);
 });
 
 test("planCanonicalization renames then merges in the same pass", () => {
@@ -81,9 +80,9 @@ test("planCanonicalization renames then merges in the same pass", () => {
     ],
     index(),
   );
-  assert.equal(plan.actions.length, 1);
-  assert.equal(plan.actions[0].kind, "rename");
-  assert.equal(plan.actions[0].to, "gemma-4-31b-it");
+  expect(plan.actions.length).toBe(1);
+  expect(plan.actions[0].kind).toBe("rename");
+  expect(plan.actions[0].to).toBe("gemma-4-31b-it");
 });
 
 test("planCanonicalization merges variants onto a shared canonical id that has no file", () => {
@@ -96,24 +95,24 @@ test("planCanonicalization merges variants onto a shared canonical id that has n
       models: { "minimax/MiniMax-M2.7": { name: "MiniMax M2.7" } },
     }),
   );
-  assert.deepEqual(plan.unresolved, []);
+  expect(plan.unresolved).toEqual([]);
   const rename = plan.actions.find((action) => action.kind === "rename");
   const merge = plan.actions.find((action) => action.kind === "merge");
-  assert.equal(rename?.to, "MiniMax-M2.7");
-  assert.equal(merge?.from, "minimax-m2.7-free");
-  assert.equal(merge?.to, "MiniMax-M2.7");
+  expect(rename?.to).toBe("MiniMax-M2.7");
+  expect(merge?.from).toBe("minimax-m2.7-free");
+  expect(merge?.to).toBe("MiniMax-M2.7");
 });
 
 test("planCanonicalization reports unresolvable models", () => {
   const plan = planCanonicalization([model("totally-private-model", { providers: ["x"] })], index());
-  assert.equal(plan.actions.length, 0);
-  assert.deepEqual(plan.unresolved, ["totally-private-model"]);
+  expect(plan.actions.length).toBe(0);
+  expect(plan.unresolved).toEqual(["totally-private-model"]);
 });
 
 test("planCanonicalization fails closed on an ambiguous canonical id", () => {
   const plan = planCanonicalization([model("gemma-4", { providers: ["perch"] })], index());
-  assert.equal(plan.actions.length, 0);
-  assert.deepEqual(plan.unresolved, ["gemma-4"]);
+  expect(plan.actions.length).toBe(0);
+  expect(plan.unresolved).toEqual(["gemma-4"]);
 });
 
 test("planCanonicalization does not rename a model onto an occupied id", () => {
@@ -124,9 +123,9 @@ test("planCanonicalization does not rename a model onto an occupied id", () => {
     ],
     index(),
   );
-  assert.equal(plan.actions.length, 1);
-  assert.equal(plan.actions[0].kind, "merge");
-  assert.equal(plan.actions[0].to, "nemotron-3-ultra-550b-a55b");
+  expect(plan.actions.length).toBe(1);
+  expect(plan.actions[0].kind).toBe("merge");
+  expect(plan.actions[0].to).toBe("nemotron-3-ultra-550b-a55b");
 });
 
 test("applyCanonicalMerge folds providers, config and aliases", () => {
@@ -152,12 +151,12 @@ test("applyCanonicalMerge folds providers, config and aliases", () => {
   };
 
   applyCanonicalMerge(target, merge);
-  assert.deepEqual(target.providers, ["example", "openrouter"]);
-  assert.deepEqual(target.aliases, ["deepseek-v4-flash-fast", "ds-flash"]);
-  assert.equal(target.providerConfig?.openrouter?.upstream, "deepseek/deepseek-v4-flash");
-  assert.equal(target.providerConfig?.example?.upstream, "deepseek/deepseek-v4-flash-fast");
-  assert.equal(target.providerConfig?.example?.free, true);
-  assert.equal(target.id, "deepseek-v4-flash");
+  expect(target.providers).toEqual(["example", "openrouter"]);
+  expect(target.aliases).toEqual(["deepseek-v4-flash-fast", "ds-flash"]);
+  expect(target.providerConfig?.openrouter?.upstream).toBe("deepseek/deepseek-v4-flash");
+  expect(target.providerConfig?.example?.upstream).toBe("deepseek/deepseek-v4-flash-fast");
+  expect(target.providerConfig?.example?.free).toBe(true);
+  expect(target.id).toBe("deepseek-v4-flash");
 });
 
 test("applyCanonicalMerge keeps the canonical provider config on conflict", () => {
@@ -177,7 +176,7 @@ test("applyCanonicalMerge keeps the canonical provider config on conflict", () =
     data: { providers: ["openrouter"], providerConfig: { openrouter: { upstream: "new" } } },
     aliases: [],
   });
-  assert.equal(target.providerConfig?.openrouter?.upstream, "old");
+  expect(target.providerConfig?.openrouter?.upstream).toBe("old");
 });
 
 test("applyCanonicalMerge carries generated fields the target is missing", () => {
@@ -206,13 +205,13 @@ test("applyCanonicalMerge carries generated fields the target is missing", () =>
     aliases: ["mimo-omni"],
   });
 
-  assert.equal(target.reasoning, true);
-  assert.deepEqual(target.reasoning_effort, ["low", "high"]);
-  assert.deepEqual(target.limit, { context: 200000, output: 65536 });
-  assert.deepEqual(target.cost, { input: 0.5, output: 1 });
-  assert.equal(target.scores?.artificialAnalysis?.index, 23.9);
-  assert.deepEqual(target.providers, ["example", "openrouter"]);
-  assert.equal(target.id, "mimo-v2-omni");
+  expect(target.reasoning).toBe(true);
+  expect(target.reasoning_effort).toEqual(["low", "high"]);
+  expect(target.limit).toEqual({ context: 200000, output: 65536 });
+  expect(target.cost).toEqual({ input: 0.5, output: 1 });
+  expect(target.scores?.artificialAnalysis?.index).toBe(23.9);
+  expect(target.providers).toEqual(["example", "openrouter"]);
+  expect(target.id).toBe("mimo-v2-omni");
 });
 
 test("applyCanonicalMerge does not let a merged duplicate outrank the target score", () => {
@@ -231,5 +230,5 @@ test("applyCanonicalMerge does not let a merged duplicate outrank the target sco
     data: { scores: { artificialAnalysis: { index: 12, estimated: true } } },
     aliases: [],
   });
-  assert.equal(target.scores?.artificialAnalysis?.index, 40);
+  expect(target.scores?.artificialAnalysis?.index).toBe(40);
 });

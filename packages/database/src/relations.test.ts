@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import { test } from "node:test";
+import { expect, test } from "bun:test";
 
 import {
   createTableRelationsHelpers,
@@ -43,10 +42,7 @@ function resolveRelations(definition: Relations): Map<string, ResolvedRelation> 
   const resolved = new Map<string, ResolvedRelation>();
 
   for (const [fieldName, relation] of Object.entries(config)) {
-    assert.ok(
-      relation instanceof One || relation instanceof Many,
-      `${fieldName} must be a relation`,
-    );
+    expect(relation instanceof One || relation instanceof Many).toBeTruthy();
     resolved.set(fieldName, resolve(relation));
   }
 
@@ -64,10 +60,7 @@ for (const definition of Object.values(relations)) {
   if (!(definition instanceof Relations)) continue;
 
   const sourceTable = getTableName(definition.table);
-  assert.ok(
-    !relationsBySourceTable.has(sourceTable),
-    `duplicate relations definition for table ${sourceTable}`,
-  );
+  expect(!relationsBySourceTable.has(sourceTable)).toBeTruthy();
   relationsBySourceTable.set(sourceTable, resolveRelations(definition));
 }
 
@@ -96,19 +89,13 @@ const tablesWithForeignKeys = new Set(
 );
 
 test("relations are declared for exactly the tables connected by foreign keys", () => {
-  assert.deepEqual(
-    [...relationsBySourceTable.keys()].sort(),
-    [...tablesWithForeignKeys].sort(),
-  );
+  expect([...relationsBySourceTable.keys()].sort()).toEqual([...tablesWithForeignKeys].sort());
 });
 
 test("relation targets exist in the schema", () => {
   for (const [sourceTable, definition] of relationsBySourceTable) {
     for (const [fieldName, relation] of definition) {
-      assert.ok(
-        tablesByName.has(relation.referencedTable),
-        `${sourceTable}.${fieldName} references unknown table ${relation.referencedTable}`,
-      );
+      expect(tablesByName.has(relation.referencedTable)).toBeTruthy();
     }
   }
 });
@@ -116,7 +103,8 @@ test("relation targets exist in the schema", () => {
 test("every foreign key has a matching to-one relation on its source table", () => {
   for (const foreignKey of foreignKeys) {
     const definition = relationsBySourceTable.get(foreignKey.sourceTable);
-    assert.ok(definition, `${foreignKey.sourceTable} has no relations`);
+    expect(definition, `${foreignKey.sourceTable} has no relations`).toBeTruthy();
+    if (!definition) return;
 
     const matches = [...definition].filter(
       ([, relation]) =>
@@ -126,35 +114,25 @@ test("every foreign key has a matching to-one relation on its source table", () 
         relation.references.join() === foreignKey.targetColumns.join(),
     );
 
-    assert.equal(
-      matches.length,
-      1,
-      `${foreignKey.sourceTable} -> ${foreignKey.targetTable} (${foreignKey.columns.join()}) needs exactly one matching to-one relation, found ${matches.length}`,
-    );
+    expect(matches.length).toBe(1);
   }
 });
 
 test("every foreign key is reachable back from its target table", () => {
   for (const foreignKey of foreignKeys) {
     const definition = relationsBySourceTable.get(foreignKey.targetTable);
-    assert.ok(definition, `${foreignKey.targetTable} has no relations`);
+    expect(definition, `${foreignKey.targetTable} has no relations`).toBeTruthy();
+    if (!definition) continue;
 
     const matches = [...definition].filter(
       ([, relation]) => relation.referencedTable === foreignKey.sourceTable,
     );
 
-    assert.ok(
-      matches.length > 0,
-      `${foreignKey.targetTable} needs a relation back to ${foreignKey.sourceTable}`,
-    );
+    expect(matches.length > 0).toBeTruthy();
 
     for (const [fieldName, relation] of matches) {
       if (relation.kind === "one") {
-        assert.deepEqual(
-          { fields: relation.references, references: relation.fields },
-          { fields: foreignKey.columns, references: foreignKey.targetColumns },
-          `${foreignKey.targetTable}.${fieldName} does not match the foreign key columns`,
-        );
+        expect({ fields: relation.references, references: relation.fields }).toEqual({ fields: foreignKey.columns, references: foreignKey.targetColumns });
       }
     }
   }
@@ -165,14 +143,11 @@ test("to-many relations are backed by a foreign key", () => {
     for (const [fieldName, relation] of definition) {
       if (relation.kind !== "many") continue;
 
-      assert.ok(
-        foreignKeys.some(
+      expect(foreignKeys.some(
           (foreignKey) =>
             foreignKey.sourceTable === relation.referencedTable &&
             foreignKey.targetTable === sourceTable,
-        ),
-        `${sourceTable}.${fieldName} has no foreign key from ${relation.referencedTable}`,
-      );
+        )).toBeTruthy();
     }
   }
 });
@@ -194,20 +169,13 @@ test("to-one relations follow a foreign key in one of its two directions", () =>
             foreignKey.targetColumns.join() === relation.fields.join()),
       );
 
-      assert.ok(
-        matches,
-        `${sourceTable}.${fieldName} does not match any foreign key between ${sourceTable} and ${relation.referencedTable}`,
-      );
+      expect(matches).toBeTruthy();
     }
   }
 });
 
 test("relation field names are unique per table", () => {
   for (const [sourceTable, definition] of relationsBySourceTable) {
-    assert.equal(
-      new Set(definition.keys()).size,
-      definition.size,
-      `duplicate relation field names on ${sourceTable}`,
-    );
+    expect(new Set(definition.keys()).size).toBe(definition.size);
   }
 });

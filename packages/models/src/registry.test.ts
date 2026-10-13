@@ -1,5 +1,4 @@
-import { test } from "node:test";
-import assert from "node:assert/strict";
+import { expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -27,33 +26,30 @@ test("buildModelIdMap lets the undated rolling id own the base key", () => {
     ["vendor/mock-model", "vendor/mock-model-0731", "vendor/other-model"],
     toKey,
   );
-  assert.equal(map.get("mock-model"), "vendor/mock-model");
-  assert.equal(map.get("mock-model-0731"), "vendor/mock-model-0731");
-  assert.equal(map.get("other-model"), "vendor/other-model");
+  expect(map.get("mock-model")).toBe("vendor/mock-model");
+  expect(map.get("mock-model-0731")).toBe("vendor/mock-model-0731");
+  expect(map.get("other-model")).toBe("vendor/other-model");
 });
 
 test("buildModelIdMap makes the newest date-pinned variant win", () => {
   const map = buildModelIdMap(["x/model-0731", "x/model-0813"], toKey);
-  assert.equal(map.get("model"), "x/model-0813");
-  assert.equal(map.get("model-0731"), "x/model-0731");
+  expect(map.get("model")).toBe("x/model-0813");
+  expect(map.get("model-0731")).toBe("x/model-0731");
 });
 
 test("buildModelIdMap returns keys in sorted order", () => {
   const map = buildModelIdMap(["x/zeta", "x/alpha", "x/mid"], toKey);
-  assert.deepEqual([...map.keys()], ["alpha", "mid", "zeta"]);
+  expect([...map.keys()]).toEqual(["alpha", "mid", "zeta"]);
 });
 
 test("getProviderUpstream prefers trimmed provider config upstream", () => {
   const data: ModelData = { providerConfig: { openrouter: { upstream: "  vendor/model  " } } };
-  assert.equal(getProviderUpstream(data, "openrouter", "fallback"), "vendor/model");
+  expect(getProviderUpstream(data, "openrouter", "fallback")).toBe("vendor/model");
 });
 
 test("getProviderUpstream falls back to the model id", () => {
-  assert.equal(getProviderUpstream({}, "openrouter", "model-id"), "model-id");
-  assert.equal(
-    getProviderUpstream({ providerConfig: { openrouter: { upstream: "   " } } }, "openrouter", "model-id"),
-    "model-id",
-  );
+  expect(getProviderUpstream({}, "openrouter", "model-id")).toBe("model-id");
+  expect(getProviderUpstream({ providerConfig: { openrouter: { upstream: "   " } } }, "openrouter", "model-id")).toBe("model-id");
 });
 
 test("writeModelJson drops family and orders keys deterministically", () => {
@@ -66,17 +62,17 @@ test("writeModelJson drops family and orders keys deterministically", () => {
       cost: { cacheWrite: 1, input: 2 },
     });
     const written = readFileSync(path, "utf-8");
-    assert.ok(!written.includes("family"), "family field must be removed");
-    assert.match(written, /"providers": \[\s*"zeta",\s*"opencode"\s*\]/);
-    assert.ok(written.indexOf('"id"') < written.indexOf('"providers"'));
-    assert.ok(written.indexOf('"input"') < written.indexOf('"cacheWrite"'));
-    assert.ok(written.endsWith("\n"));
+    expect(!written.includes("family")).toBeTruthy();
+    expect(written).toMatch(/"providers": \[\s*"zeta",\s*"opencode"\s*\]/);
+    expect(written.indexOf('"id"') < written.indexOf('"providers"')).toBeTruthy();
+    expect(written.indexOf('"input"') < written.indexOf('"cacheWrite"')).toBeTruthy();
+    expect(written.endsWith("\n")).toBeTruthy();
   });
 });
 
 function mergedData(dataDir: string, relativeId: string): ModelData {
   const entry = buildModelIndex(dataDir)[relativeId];
-  assert.ok(entry, `missing model ${relativeId}`);
+  expect(entry, `missing model ${relativeId}`).toBeTruthy();
   return entry.data;
 }
 
@@ -84,18 +80,18 @@ test("syncProviderModels adds, updates and removes provider entries", () => {
   withTempDir((dataDir) => {
     const map = new Map([["mock-model", "vendor/mock-model"]]);
     const added = syncProviderModels(dataDir, "openrouter", map);
-    assert.deepEqual(added.added, ["mock-model"]);
+    expect(added.added).toEqual(["mock-model"]);
 
     const data = mergedData(dataDir, "mock-model");
-    assert.deepEqual(data.providers, ["openrouter"]);
-    assert.equal(data.providerConfig?.openrouter?.upstream, "vendor/mock-model");
+    expect(data.providers).toEqual(["openrouter"]);
+    expect(data.providerConfig?.openrouter?.upstream).toBe("vendor/mock-model");
 
     const unchanged = syncProviderModels(dataDir, "openrouter", new Map([["mock-model", "vendor/mock-model"]]));
-    assert.deepEqual(unchanged.added, []);
-    assert.deepEqual(unchanged.updated, []);
+    expect(unchanged.added).toEqual([]);
+    expect(unchanged.updated).toEqual([]);
 
     const removed = syncProviderModels(dataDir, "openrouter", new Map());
-    assert.deepEqual(removed.removed, ["mock-model"]);
+    expect(removed.removed).toEqual(["mock-model"]);
   });
 });
 
@@ -103,8 +99,8 @@ test("syncProviderModels writes derived fields to generated only", () => {
   withTempDir((dataDir, generatedDir) => {
     syncProviderModels(dataDir, "openrouter", new Map([["mock-model", "vendor/mock-model"]]));
     const generated = JSON.parse(readFileSync(join(generatedDir, "mock-model.json"), "utf-8")) as ModelData;
-    assert.deepEqual(generated.providers, ["openrouter"]);
-    assert.equal(generated.providerConfig?.openrouter?.upstream, "vendor/mock-model");
+    expect(generated.providers).toEqual(["openrouter"]);
+    expect(generated.providerConfig?.openrouter?.upstream).toBe("vendor/mock-model");
   });
 });
 
@@ -114,11 +110,11 @@ test("renameModelFiles moves both halves and keeps the folder", () => {
     writeModelJson(join(dataDir, "gemma-3.json"), { ignored: true });
 
     const next = renameModelFiles({ modelsDir: dataDir, generatedDir, relativeId: "gemma-3" }, "gemma-3-12b-it");
-    assert.equal(next, "gemma-3-12b-it");
-    assert.throws(() => readFileSync(join(generatedDir, "gemma-3.json")));
-    assert.throws(() => readFileSync(join(dataDir, "gemma-3.json")));
-    assert.deepEqual(JSON.parse(readFileSync(join(generatedDir, "gemma-3-12b-it.json"), "utf-8")).providers, ["openrouter"]);
-    assert.deepEqual(JSON.parse(readFileSync(join(dataDir, "gemma-3-12b-it.json"), "utf-8")), { ignored: true });
+    expect(next).toBe("gemma-3-12b-it");
+    expect(() => readFileSync(join(generatedDir, "gemma-3.json"))).toThrow();
+    expect(() => readFileSync(join(dataDir, "gemma-3.json"))).toThrow();
+    expect(JSON.parse(readFileSync(join(generatedDir, "gemma-3-12b-it.json"), "utf-8")).providers).toEqual(["openrouter"]);
+    expect(JSON.parse(readFileSync(join(dataDir, "gemma-3-12b-it.json"), "utf-8"))).toEqual({ ignored: true });
   });
 });
 
@@ -128,21 +124,21 @@ test("renameModelFiles keeps the folder and refuses to clobber", () => {
     writeGeneratedModelJson(join(generatedDir, "vendor/new.json"), { providers: ["kiro"] });
 
     const next = renameModelFiles({ modelsDir: dataDir, generatedDir, relativeId: "vendor/old" }, "new");
-    assert.equal(next, "vendor/old");
-    assert.deepEqual(JSON.parse(readFileSync(join(generatedDir, "vendor/new.json"), "utf-8")).providers, ["kiro"]);
+    expect(next).toBe("vendor/old");
+    expect(JSON.parse(readFileSync(join(generatedDir, "vendor/new.json"), "utf-8")).providers).toEqual(["kiro"]);
 
     const moved = renameModelFiles({ modelsDir: dataDir, generatedDir, relativeId: "vendor/old" }, "renamed");
-    assert.equal(moved, "vendor/renamed");
+    expect(moved).toBe("vendor/renamed");
   });
 });
 
 test("buildModelIndex needs the generated half to expose providers", () => {
   withTempDir((dataDir, generatedDir) => {
     syncProviderModels(dataDir, "openrouter", new Map([["mock-model", "vendor/mock-model"]]));
-    assert.deepEqual(buildModelIndex(dataDir)["mock-model"].data.providers, ["openrouter"]);
+    expect(buildModelIndex(dataDir)["mock-model"].data.providers).toEqual(["openrouter"]);
 
     const authoredOnly = buildModelIndex(dataDir, { generatedDir: join(generatedDir, "absent") });
-    assert.equal(authoredOnly["mock-model"], undefined);
+    expect(authoredOnly["mock-model"]).toBeUndefined();
   });
 });
 
@@ -156,13 +152,13 @@ test("pruneDeadModelEntries drops uncurated dead entries and keeps the rest", ()
       providerConfig: { example: { agent: "base2-free" } },
     });
 
-    assert.deepEqual(pruneDeadModelEntries(dataDir), ["dead", "ignored-dead"]);
+    expect(pruneDeadModelEntries(dataDir)).toEqual(["dead", "ignored-dead"]);
 
     const index = buildModelIndex(dataDir);
-    assert.equal(index["dead"], undefined);
-    assert.equal(index["ignored-dead"], undefined);
-    assert.ok(index["live"]);
-    assert.ok(index["curated-dead"]);
+    expect(index["dead"]).toBeUndefined();
+    expect(index["ignored-dead"]).toBeUndefined();
+    expect(index["live"]).toBeTruthy();
+    expect(index["curated-dead"]).toBeTruthy();
   });
 });
 
@@ -170,8 +166,8 @@ test("syncProviderModels removes the file once the last provider leaves", () => 
   withTempDir((dataDir, generatedDir) => {
     syncProviderModels(dataDir, "openrouter", new Map([["mock-model", "vendor/mock-model"]]));
     syncProviderModels(dataDir, "openrouter", new Map());
-    assert.equal(buildModelIndex(dataDir)["mock-model"], undefined);
-    assert.throws(() => readFileSync(join(generatedDir, "mock-model.json")));
+    expect(buildModelIndex(dataDir)["mock-model"]).toBeUndefined();
+    expect(() => readFileSync(join(generatedDir, "mock-model.json"))).toThrow();
   });
 });
 
@@ -180,9 +176,10 @@ test("syncProviderModels adds aliases to a colliding parent", () => {
     syncProviderModels(dataDir, "openrouter", new Map([["base-model", "vendor/base-model"]]));
     const result = syncProviderModels(dataDir, "openrouter", new Map([["base-model-2", "vendor/base-model-2"]]));
     const parent = Object.values(buildModelIndex(dataDir)).find((entry) => entry.id === "base-model");
-    assert.ok(parent, "parent model must exist");
-    assert.deepEqual(result.added, [], "collision should merge instead of adding a new file");
-    assert.ok((parent.data.aliases ?? []).length > 0, "parent should gain aliases");
+    expect(parent).toBeTruthy();
+    if (!parent) return;
+    expect(result.added).toEqual([]);
+    expect((parent.data.aliases ?? []).length > 0).toBeTruthy();
   });
 });
 
@@ -191,12 +188,12 @@ test("syncProviderModels keeps minor versions as separate models", () => {
     syncProviderModels(dataDir, "kiro", new Map([["claude-opus-5", "claude-opus-5"]]));
     const result = syncProviderModels(dataDir, "antigravity", new Map([["claude-opus-5-5", "claude-opus-5-5-medium"]]));
 
-    assert.deepEqual(result.added, ["claude-opus-5-5"]);
-    assert.deepEqual(mergedData(dataDir, "anthropic/claude-opus-5").providers, ["kiro"], "base model must stay untouched");
+    expect(result.added).toEqual(["claude-opus-5-5"]);
+    expect(mergedData(dataDir, "anthropic/claude-opus-5").providers).toEqual(["kiro"]);
 
     const newer = mergedData(dataDir, "anthropic/claude-opus-5-5");
-    assert.deepEqual(newer.providers, ["antigravity"]);
-    assert.equal(newer.providerConfig?.antigravity?.upstream, "claude-opus-5-5-medium");
+    expect(newer.providers).toEqual(["antigravity"]);
+    expect(newer.providerConfig?.antigravity?.upstream).toBe("claude-opus-5-5-medium");
   });
 });
 
@@ -204,6 +201,6 @@ test("syncProviderModels still folds real revision suffixes into the parent", ()
   withTempDir((dataDir) => {
     syncProviderModels(dataDir, "openrouter", new Map([["mock-model", "vendor/mock-model"]]));
     const result = syncProviderModels(dataDir, "openrouter", new Map([["mock-model-2", "vendor/mock-model-2"]]));
-    assert.deepEqual(result.added, [], "revision suffix should merge into the parent");
+    expect(result.added).toEqual([]);
   });
 });

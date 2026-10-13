@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { defineComponent, h } from "vue";
-import { mountSuspended } from "@nuxt/test-utils/runtime";
+import { mount } from "@vue/test-utils";
 
 import { useMobileSidebar } from "~/composables/useMobileSidebar";
 
@@ -18,7 +18,7 @@ const Probe = defineComponent({
 
 describe("useMobileSidebar", () => {
   it("opens and closes the sidebar", async () => {
-    const wrapper = await mountSuspended(Probe);
+    const wrapper = mount(Probe);
     const vm = wrapper.vm as unknown as ProbeApi;
     expect(vm.mobileOpen).toBe(false);
 
