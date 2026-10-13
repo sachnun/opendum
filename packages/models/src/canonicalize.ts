@@ -50,9 +50,9 @@ function mergeProviderConfig(
   target: Record<string, ProviderModelConfig> | undefined,
   source: Record<string, ProviderModelConfig> | undefined,
 ): Record<string, ProviderModelConfig> {
-  const merged: Record<string, ProviderModelConfig> = { ...(target ?? {}) };
+  const merged: Record<string, ProviderModelConfig> = { ...target };
   for (const [provider, config] of Object.entries(source ?? {})) {
-    merged[provider] = { ...config, ...(merged[provider] ?? {}) };
+    merged[provider] = { ...config, ...merged[provider] };
   }
   return merged;
 }

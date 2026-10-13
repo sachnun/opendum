@@ -1,8 +1,7 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 
 import {
   bumpAccountRequestCount,
-  deactivateAPIKey,
   disableFailedAccount,
   getAccountCredentialsByID,
   getAccountHealthState,
@@ -52,12 +51,8 @@ import {
   type ProviderRegistry,
   type RefreshedCredentials,
 } from "@opendum/providers";
-import { cloneMap, numberAsInt, sleep, stringValue } from "./helpers.js";
+import { cloneMap, numberAsInt, sleep } from "./helpers.js";
 import {
-  AUTHLESS_ACCOUNT_PREFIX,
-  COOLDOWN_RECOVERY_RATIO,
-  MODEL_DEGRADED_THRESHOLD,
-  UNHEALTHY_IDLE_DECAY_MS,
   accountAccessDenial,
   accountNeedsCredentialRefresh,
   cooldownRecoveryCount,

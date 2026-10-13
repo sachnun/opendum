@@ -397,7 +397,7 @@ export function syncProviderModels(
     if (covered) return { baseKey: covered.fileId, entry: covered };
     return null;
   }
-  for (const [modelKey, upstreamName] of [...modelMap.entries()]) {
+  for (const [modelKey, upstreamName] of modelMap.entries()) {
     const parent = findParentForCollision(modelKey, upstreamName);
     if (!parent) continue;
 

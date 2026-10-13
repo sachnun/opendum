@@ -1120,7 +1120,7 @@ export function convertKiroEventsToCompletion(events: Json[], model: string, par
   if (!hasNativeReasoning) reasoning += flushReasoning;
   outputText += flushText + flushReasoning;
 
-  const toolCalls: Array<Json | null> = new Array(toolById.size).fill(null);
+  const toolCalls: Array<Json | null> = Array.from({ length: toolById.size }, () => null);
   for (const [id, call] of toolById) {
     toolCalls[call.index] = {
       id,

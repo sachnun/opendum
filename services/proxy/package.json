@@ -4,11 +4,11 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/main.ts",
-    "start": "tsx src/main.ts",
-    "typecheck": "tsc --noEmit",
+    "dev": "bun --watch src/main.ts",
+    "start": "bun src/main.ts",
+    "check": "bun check",
     "test": "vitest run",
-    "lint": "eslint ."
+    "lint": "oxlint ."
   },
   "dependencies": {
     "@opendum/auth": "workspace:*",
@@ -25,7 +25,6 @@
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
-    "tsx": "^4.23.13",
     "typescript": "^6.0.3",
     "vitest": "^5.0.3"
   }
