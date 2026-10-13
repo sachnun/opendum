@@ -1,16 +1,16 @@
-import type { H3Event } from "h3";
+import { createError, type RequestEvent } from "nuxt/server";
 
 import { createAuth, type AuthSession } from "~~/lib/auth";
 
-export async function getSessionFromEvent(event: H3Event): Promise<AuthSession> {
-  return await createAuth().api.getSession({ headers: event.headers });
+export async function getSessionFromEvent(event: RequestEvent): Promise<AuthSession> {
+  return await createAuth().api.getSession({ headers: event.req.headers });
 }
 
-export async function requireSession(event: H3Event): Promise<NonNullable<AuthSession>> {
+export async function requireSession(event: RequestEvent): Promise<NonNullable<AuthSession>> {
   const session = await getSessionFromEvent(event);
 
   if (!session?.user?.id) {
-    throw createError({ statusCode: 401, statusMessage: "Unauthorized" });
+    throw createError({ status: 401, statusText: "Unauthorized" });
   }
 
   return session as NonNullable<AuthSession>;

@@ -1,5 +1,4 @@
 import { createHmac } from "node:crypto";
-import { createError } from "h3";
 import { z } from "zod";
 
 import { parseBody, requireReadableUserId } from "~~/server/utils/api";
@@ -17,7 +16,7 @@ function getEndpointPath(endpoint: z.infer<typeof playgroundEndpointSchema>) {
 
 function signPlaygroundRequest(userId: string, timestamp: string, method: string, path: string) {
   const secret = process.env.BETTER_AUTH_SECRET;
-  if (!secret) throw createError({ statusCode: 500, statusMessage: "BETTER_AUTH_SECRET is required" });
+  if (!secret) throw createError({ status: 500, statusText: "BETTER_AUTH_SECRET is required" });
   return createHmac("sha256", secret).update(`${userId}\n${timestamp}\n${method}\n${path}`).digest("hex");
 }
 

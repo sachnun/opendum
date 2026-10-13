@@ -44,7 +44,8 @@ type ApiFetchOptions = Parameters<ApiFetch>[1];
 type ApiFetchBody = NonNullable<ApiFetchOptions>["body"];
 
 function post<T>(fetcher: ApiFetch, url: string, body?: ApiFetchBody, options?: ApiFetchOptions) {
-  return fetcher<T>(url, { ...options, method: "POST", body });
+  const request = fetcher as unknown as (url: string, options?: Record<string, unknown>) => Promise<T>;
+  return request(url, { ...options, method: "POST", body });
 }
 
 function cursorQuery(ids: string[], cursors?: Record<string, string>) {
