@@ -3,9 +3,7 @@ import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 import { loadModelEntries } from "@opendum/models/runtime";
 
-const redisXxhashStub = "\0redis-xxhash-stub";
 const modelRegistryVirtualModule = "virtual:opendum-model-registry";
-const modelRegistryVirtualModuleId = `\0${modelRegistryVirtualModule}`;
 
 function buildModelRegistryModule(): string {
   const dataDir = resolve(dirname(fileURLToPath(import.meta.url)), "../../packages/models/data");
@@ -24,6 +22,7 @@ export default defineNuxtConfig({
   spaLoadingTemplate: "./loading.html",
   experimental: {
     spaLoadingTemplateLocation: "within",
+    nitroAutoImports: true,
   },
   runtimeConfig: {
     public: {
@@ -42,40 +41,11 @@ export default defineNuxtConfig({
     ],
   },
   nitro: {
-    commonJS: {
-      ignoreTryCatch: true,
-    },
-    rollupConfig: {
-      external: ["pg-native"],
-      plugins: [
-        {
-          name: "redis-xxhash-stub",
-          resolveId(id) {
-            return id === "@node-rs/xxhash" ? redisXxhashStub : null;
-          },
-          load(id) {
-            if (id !== redisXxhashStub) return null;
-            return "export const xxh3 = { xxh64() { throw new Error('Redis digest commands are not supported in this build.'); } };";
-          },
-        },
-        {
-          name: "opendum-model-registry",
-          resolveId(id) {
-            return id === modelRegistryVirtualModule ? modelRegistryVirtualModuleId : null;
-          },
-          load(id) {
-            return id === modelRegistryVirtualModuleId ? buildModelRegistryModule() : null;
-          },
-        },
-      ],
+    virtual: {
+      [modelRegistryVirtualModule]: () => buildModelRegistryModule(),
     },
   },
   vite: {
-    build: {
-      cssMinify: "lightningcss",
-      reportCompressedSize: false,
-      sourcemap: false,
-    },
     optimizeDeps: {
       include: [
         "@internationalized/date",
@@ -90,13 +60,18 @@ export default defineNuxtConfig({
         "tailwind-merge",
       ],
     },
-    esbuild: {
-      legalComments: "none",
-    },
     plugins: [tailwindcss() as never],
   },
   typescript: {
     strict: true,
     typeCheck: false,
+    serverTsConfig: {
+      compilerOptions: {
+        paths: {
+          "~~": [".."],
+          "~~/*": ["../*"],
+        },
+      },
+    },
   },
 });

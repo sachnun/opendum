@@ -40,7 +40,7 @@ const route = useRoute();
 const api = useApi();
 const { isAuditMode } = useAudit();
 const invalidation = useInvalidate();
-const routeProvider = computed(() => String(route.params.provider));
+const routeProvider = computed(() => String("provider" in route.params ? route.params.provider : ""));
 const selectedProvider = computed<string>(() => getProviderFromSlug(routeProvider.value) ?? routeProvider.value);
 const { data: customProvidersData, refresh: refreshCustomProviders } = useCachedData(dataKeys.customProviders, () => api.customProviders.list());
 const customProvider = computed<CustomProviderListItem | null>(() => (customProvidersData.value ?? []).find((row) => row.slug === selectedProvider.value) ?? null);
