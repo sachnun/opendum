@@ -13,7 +13,7 @@
     "test": "tsx --test ./lib/*.test.ts && vitest run",
     "test:unit": "tsx --test ./lib/*.test.ts",
     "test:nuxt": "vitest run",
-    "lint": "nuxt prepare && eslint .",
+    "lint": "oxlint .",
     "check": "nuxt prepare && vue-tsc --noEmit -p .nuxt/tsconfig.app.json && vue-tsc --noEmit -p .nuxt/tsconfig.server.json"
   },
   "dependencies": {
@@ -40,14 +40,12 @@
   },
   "devDependencies": {
     "@nuxt/a11y": "1.0.0-alpha.1",
-    "@nuxt/eslint": "^1.16.0",
     "@nuxt/kit": "^4.5.2",
     "@nuxt/test-utils": "^4.3.3",
     "@tailwindcss/postcss": "^4.3.2",
     "@tailwindcss/vite": "^4.3.2",
     "@types/node": "^26.1.1",
     "@vue/test-utils": "^2.5.1",
-    "eslint": "^10.7.0",
     "fake-indexeddb": "^6.2.5",
     "happy-dom": "^20.14.5",
     "tailwindcss": "^4.3.2",

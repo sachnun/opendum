@@ -4,13 +4,15 @@
   "scripts": {
     "dev": "(bun run --filter @opendum/web dev & bun run --filter @opendum/proxy dev)",
     "build": "bun run --filter @opendum/web build && bun run --filter @opendum/proxy check",
+    "lint": "oxlint .",
     "db:push": "bun run --filter @opendum/database db:push",
     "db:generate": "bun run --filter @opendum/database db:generate",
     "db:migrate": "bun run --filter @opendum/database db:migrate",
     "models:refresh": "bun run --filter @opendum/models refresh && bun run --filter @opendum/web family-ranking"
   },
   "devDependencies": {
-    "edgeone": "^1.6.41"
+    "edgeone": "^1.6.41",
+    "oxlint": "^1.88.0"
   },
   "trustedDependencies": [
     "esbuild",
@@ -23,9 +25,6 @@
     "packages/*"
   ],
   "overrides": {
-    "postcss": "^8.5.28",
-    "typescript-eslint": "^8.62.1",
-    "@typescript-eslint/eslint-plugin": "^8.62.1",
-    "@typescript-eslint/parser": "^8.62.1"
+    "postcss": "^8.5.28"
   }
 }

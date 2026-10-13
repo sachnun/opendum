@@ -8,7 +8,7 @@
     "start": "tsx src/main.ts",
     "check": "bun check",
     "test": "vitest run",
-    "lint": "eslint ."
+    "lint": "oxlint ."
   },
   "dependencies": {
     "@opendum/auth": "workspace:*",

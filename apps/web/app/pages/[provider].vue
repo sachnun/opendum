@@ -311,15 +311,15 @@ function applyProviderDetailResponse(detail: ProviderDetailResponse): ProviderDe
   const clearedModelHealthIds = new Set(detail.clearedModelHealthByAccountId ?? []);
   const nextSupportedModelsByAccountId = {
     ...Object.fromEntries(Object.entries(current.supportedModelsByAccountId).filter(([accountId]) => !clearedSupportedModelIds.has(accountId))),
-    ...(detail.supportedModelsByAccountId ?? {}),
+    ...detail.supportedModelsByAccountId,
   };
   const nextDisabledModelsByAccountId = {
     ...Object.fromEntries(Object.entries(current.disabledModelsByAccountId).filter(([accountId]) => !clearedDisabledModelIds.has(accountId))),
-    ...(detail.disabledModelsByAccountId ?? {}),
+    ...detail.disabledModelsByAccountId,
   };
   const nextModelHealthByAccountId = {
     ...Object.fromEntries(Object.entries(current.modelHealthByAccountId).filter(([accountId]) => !clearedModelHealthIds.has(accountId))),
-    ...(detail.modelHealthByAccountId ?? {}),
+    ...detail.modelHealthByAccountId,
   };
 
   const next: ProviderDetailData = {

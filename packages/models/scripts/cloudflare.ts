@@ -18,7 +18,7 @@ import {
   syncProviderModels,
   persistModel,
 } from "#models/registry.ts";
-import { fetchJson, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "#models/http.ts";
+import { fetchJson } from "#models/http.ts";
 import { stripParamInfoKey } from "#models/clean-key.ts";
 
 const PROVIDER_NAME = "workers_ai";
@@ -28,7 +28,7 @@ const FETCH_CONCURRENCY = 8;
 const EXCLUDED_MODEL_KEY_TOKENS = ["guard"];
 
 async function mapWithConcurrency(items, concurrency, mapper) {
-  const results = new Array(items.length);
+  const results = Array.from({ length: items.length });
   let nextIndex = 0;
 
   async function worker() {

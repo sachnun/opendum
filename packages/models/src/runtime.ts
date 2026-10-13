@@ -200,7 +200,7 @@ function mergeProviderConfig(
 
   // Provider flags outside the known fields (for example opencode's
   // responses_api) are preserved under `custom`, matching the Go registry.
-  const custom: Record<string, unknown> = { ...(merged.custom ?? {}) };
+  const custom: Record<string, unknown> = { ...merged.custom };
   for (const [key, value] of Object.entries(authored)) {
     if (KNOWN_PROVIDER_CONFIG_KEYS.has(key)) continue;
     delete merged[key];
@@ -330,7 +330,7 @@ export class Registry {
     if (merged.reasoning_effort == null) merged.reasoning_effort = info.reasoning_effort;
     if (merged.modalities == null) merged.modalities = info.modalities;
     if (info.providerConfig && Object.keys(info.providerConfig).length > 0) {
-      merged.providerConfig = { ...(merged.providerConfig ?? {}), ...info.providerConfig };
+      merged.providerConfig = { ...merged.providerConfig, ...info.providerConfig };
     }
 
     this.models.set(modelId, merged);
@@ -686,8 +686,8 @@ function levenshteinDistance(a: string, b: string): number {
   const right = Array.from(b);
   if (left.length === 0) return right.length;
   if (right.length === 0) return left.length;
-  let previous = new Array<number>(right.length + 1);
-  let current = new Array<number>(right.length + 1);
+  let previous = Array.from<number>({ length: right.length + 1 });
+  let current = Array.from<number>({ length: right.length + 1 });
   for (let j = 0; j <= right.length; j += 1) previous[j] = j;
   for (let i = 0; i < left.length; i += 1) {
     current[0] = i + 1;
