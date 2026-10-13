@@ -55,7 +55,7 @@ jobs:
 
       - name: Build web
         working-directory: apps/web
-        run: bun run build
+        run: bun run build:edgeone
 
       - name: Deploy web to EdgeOne Pages
         working-directory: apps/web
