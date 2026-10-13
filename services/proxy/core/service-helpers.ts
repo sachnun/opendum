@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto";
-
 import type { Provider, ProviderAccount } from "@opendum/providers";
 import { stringValue } from "./helpers.js";
 import type { ProviderRoutingOptions, ProviderScore } from "./provider-performance.js";
@@ -313,7 +311,7 @@ export function extractSessionId(request: Request, body: Record<string, unknown>
   const text = firstUserText(body);
   if (text && text.trim().length > 20) {
     const trimmed = text.trim().slice(0, 100);
-    return `prompt:${createHash("sha256").update(trimmed).digest("hex").slice(0, 16)}`;
+    return `prompt:${new Bun.CryptoHasher("sha256").update(trimmed).digest("hex").slice(0, 16)}`;
   }
   return "";
 }

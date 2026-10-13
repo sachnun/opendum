@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { anthropicStream, passthroughNonStream, passthroughStream } from "../src/core/stream.js";
-import type { ResponseContext, StreamRecorder, UsageCounts } from "../src/core/types.js";
+import { anthropicStream, passthroughNonStream, passthroughStream } from "../core/stream.js";
+import type { ResponseContext, StreamRecorder, UsageCounts } from "../core/types.js";
 
 function sseResponse(chunks: string[]): Response {
   const encoder = new TextEncoder();

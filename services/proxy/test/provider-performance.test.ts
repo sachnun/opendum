@@ -9,8 +9,8 @@ import {
   scoreProviderMetrics,
   type ProviderRoutingOptions,
   type ProviderScore,
-} from "../src/core/provider-performance.js";
-import { orderProvidersByPerformance, prioritizeAccounts } from "../src/core/service-helpers.js";
+} from "../core/provider-performance.js";
+import { orderProvidersByPerformance, prioritizeAccounts } from "../core/service-helpers.js";
 
 const config = DEFAULT_PROVIDER_PERFORMANCE_CONFIG;
 

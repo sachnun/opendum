@@ -51,6 +51,10 @@ export function mapSlice(value: unknown): Record<string, unknown>[] {
   );
 }
 
+export function utf8ByteLength(value: string): number {
+  return new TextEncoder().encode(value).byteLength;
+}
+
 export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {

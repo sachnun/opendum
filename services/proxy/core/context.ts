@@ -1,5 +1,3 @@
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
 import { AuthService } from "@opendum/auth";
 import { closeRedis, openRedis, type OpendumRedis } from "@opendum/core/redis";
 import { resolveModelsDir } from "@opendum/models";
@@ -7,8 +5,8 @@ import { Registry as ModelRegistry } from "@opendum/models/runtime";
 import { UnroxyEgress, assertPublicHost, createGuardedFetch, type GuardedFetch } from "@opendum/core/egress";
 import { ProviderRegistry, RedisFallbackRouter, type EgressFetch } from "@opendum/providers";
 import { db, closeDatabase } from "@opendum/database";
-import type { ProxyConfig } from "./config.js";
-import { ProxyService } from "./core/service.js";
+import type { ProxyConfig } from "../config.js";
+import { ProxyService } from "./service.js";
 
 export type ProxyContext = {
   config: ProxyConfig;
@@ -22,14 +20,21 @@ export type ProxyContext = {
   closeDirect: () => Promise<void>;
 };
 
-function resolveModelsDirForService(): string {
+async function resolveModelsDirForService(): Promise<string> {
+  const cwd = process.cwd();
   const candidates = [
-    resolve(process.cwd(), "../../packages/models/data"),
-    resolve(process.cwd(), "packages/models/data"),
+    `${cwd}/../../packages/models/data`,
+    `${cwd}/packages/models/data`,
     "/app/packages/models/data",
   ];
   for (const candidate of candidates) {
-    if (existsSync(candidate)) return candidate;
+    const normalized = Bun.fileURLToPath(new URL(candidate, "file:///"));
+    try {
+      const stats = await Bun.file(normalized).stat();
+      if (stats.isDirectory()) return normalized;
+    } catch {
+      continue;
+    }
   }
   return resolveModelsDir();
 }
@@ -64,7 +69,7 @@ async function fetchThroughRedirects(
 }
 
 export async function createContext(config: ProxyConfig): Promise<ProxyContext> {
-  const models = ModelRegistry.load(resolveModelsDirForService());
+  const models = ModelRegistry.load(await resolveModelsDirForService());
   const redis = await openRedis(config.redisUrl);
   const auth = new AuthService(models, redis);
 

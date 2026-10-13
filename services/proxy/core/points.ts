@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import {
   creditPointBalance,
   debitPointBalance,
@@ -33,7 +32,7 @@ async function ensurePointBalance(database: Database, userId: string, now: Date)
   if (affected > 0) {
     await insertPointTransactionOnConflictDoNothing(
       {
-        id: randomUUID(),
+        id: crypto.randomUUID(),
         userId,
         amount: INITIAL_POINT_BALANCE,
         type: "initial_grant",
@@ -75,7 +74,7 @@ export async function reserveRoamingPoint(
     userId,
     model,
     amount: ROAMING_MINIMUM_POINTS,
-    debitId: randomUUID(),
+    debitId: crypto.randomUUID(),
   };
   const now = new Date();
   return database.transaction(async (tx) => {
@@ -110,7 +109,7 @@ export async function refundRoamingPoint(database: Database, reservation: PointR
   await database.transaction(async (tx) => {
     const txDb = tx as unknown as Tx;
     await ensurePointBalance(txDb, reservation.userId, now);
-    const transactionId = randomUUID();
+    const transactionId = crypto.randomUUID();
     const affected = await insertPointTransactionOnConflictDoNothing(
       {
         id: transactionId,
@@ -146,7 +145,7 @@ export async function adjustRoamingPoints(
   await database.transaction(async (tx) => {
     const txDb = tx as unknown as Tx;
     await ensurePointBalance(txDb, reservation.userId, now);
-    const transactionId = randomUUID();
+    const transactionId = crypto.randomUUID();
     const affected = await insertPointTransactionOnConflictDoNothing(
       {
         id: transactionId,
@@ -195,7 +194,7 @@ export async function creditSharingPoint(
   await database.transaction(async (tx) => {
     const txDb = tx as unknown as Tx;
     await ensurePointBalance(txDb, ownerUserId, now);
-    const transactionId = randomUUID();
+    const transactionId = crypto.randomUUID();
     const affected = await insertPointTransactionOnConflictDoNothing(
       {
         id: transactionId,

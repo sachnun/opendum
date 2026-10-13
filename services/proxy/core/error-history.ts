@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto";
-import { randomUUID } from "node:crypto";
 import type { OpendumRedis } from "@opendum/core/redis";
 
 const ERROR_HISTORY_KEY_PREFIX = "opendum:provider-account:error-history";
@@ -37,7 +35,7 @@ export function errorHistoryDedupeKey(
   statusCode: number,
   message: string
 ): string {
-  const hash = createHash("sha256")
+  const hash = new Bun.CryptoHasher("sha256")
     .update([accountId, model ?? "", String(statusCode), message].join("\u0000"))
     .digest("hex");
   return `${ERROR_HISTORY_DEDUPE_PREFIX}:${accountId}:${hash}`;
@@ -60,7 +58,7 @@ export async function upsertErrorHistory(
   } catch {
     entryId = null;
   }
-  if (!entryId) entryId = randomUUID();
+  if (!entryId) entryId = crypto.randomUUID();
   const entry: Entry = {
     id: entryId,
     providerAccountId: accountId,

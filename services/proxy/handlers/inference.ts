@@ -1,5 +1,5 @@
 import { type H3Event } from "h3";
-import type { ProxyContext } from "../context.js";
+import type { ProxyContext } from "../core/context.js";
 import { extractSessionId } from "../core/service.js";
 import type { EndpointAdapter } from "../core/types.js";
 

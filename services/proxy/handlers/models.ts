@@ -1,5 +1,5 @@
 import { type H3Event } from "h3";
-import type { ProxyContext } from "../context.js";
+import type { ProxyContext } from "../core/context.js";
 import { jsonResponse } from "./errors.js";
 
 export async function handleModels(event: H3Event, context: ProxyContext): Promise<Response> {

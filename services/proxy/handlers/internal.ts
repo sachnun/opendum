@@ -4,8 +4,9 @@ import { fetchAccountQuota, isQuotaProvider } from "@opendum/providers/quota";
 import type { QuotaContext, QuotaJournal } from "@opendum/providers/quota";
 import { assertPublicHost, PrivateHostError } from "@opendum/core/egress";
 import { decrypt } from "@opendum/core/crypto";
-import type { ProxyContext } from "../context.js";
-import { validateInternalSignature } from "../middleware/internal-signature.js";
+import type { ProxyContext } from "../core/context.js";
+import { utf8ByteLength } from "../core/helpers.js";
+import { validateInternalSignature } from "../core/internal-signature.js";
 import { jsonResponse } from "./errors.js";
 
 const MAX_QUOTA_BODY_BYTES = 64 * 1024;
@@ -43,7 +44,7 @@ function quotaContext(context: ProxyContext): QuotaContext {
 
 export async function handleQuota(event: H3Event, context: ProxyContext): Promise<Response> {
   const rawBody = await event.req.text();
-  if (Buffer.byteLength(rawBody, "utf8") > MAX_QUOTA_BODY_BYTES) {
+  if (utf8ByteLength(rawBody) > MAX_QUOTA_BODY_BYTES) {
     return jsonResponse({ success: false, error: "Invalid quota payload" }, 400);
   }
   const valid = await validateInternalSignature(context.config.betterAuthSecret, event.req, "/internal/quota", rawBody);
@@ -124,7 +125,7 @@ function resolveRelayTarget(url: string, method: string): { method: string; targ
 
 export async function handleRefresh(event: H3Event, context: ProxyContext): Promise<Response> {
   const rawBody = await event.req.text();
-  if (Buffer.byteLength(rawBody, "utf8") > MAX_RELAY_BODY_BYTES) {
+  if (utf8ByteLength(rawBody) > MAX_RELAY_BODY_BYTES) {
     return relayError(400, "Invalid internal refresh payload");
   }
   const valid = await validateInternalSignature(context.config.betterAuthSecret, event.req, "/internal/refresh", rawBody);

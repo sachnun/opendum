@@ -8,8 +8,8 @@ import type { OpendumRedis } from "@opendum/core/redis";
 const db = createDatabaseQueryMocks();
 mock.module("@opendum/database/queries", () => db);
 
-const { ProxyService } = await import("../src/core/service.js");
-const { chatCompletionsConfig } = await import("../src/core/endpoints.js");
+const { ProxyService } = await import("../core/service.js");
+const { chatCompletionsConfig } = await import("../core/endpoints.js");
 type ProxyServiceInstance = InstanceType<typeof ProxyService>;
 
 function validAuth(overrides: Partial<AuthResult> = {}): AuthResult {

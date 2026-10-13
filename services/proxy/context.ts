@@ -1,6 +1,6 @@
 import { loadEnv, loadEnvFile } from "@opendum/core/config";
-import { toProxyConfig } from "../src/config.js";
-import { createContext, disposeContext, type ProxyContext } from "../src/context.js";
+import { toProxyConfig } from "./config.js";
+import { createContext, disposeContext, type ProxyContext } from "./core/context.js";
 
 let contextPromise: Promise<ProxyContext> | undefined;
 let refreshController: AbortController | undefined;

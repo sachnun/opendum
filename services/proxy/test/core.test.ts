@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test";
-import { chatCompletionsConfig, messagesConfig, responsesConfig, transformAnthropicToOpenAI, transformOpenAIToAnthropic } from "../src/core/endpoints.js";
-import { SseScanner } from "../src/core/sse.js";
-import { isRouteError } from "../src/core/types.js";
-import { retryMetadata, sanitizedProxyError, shouldRotate } from "../src/core/errors.js";
+import { chatCompletionsConfig, messagesConfig, responsesConfig, transformAnthropicToOpenAI, transformOpenAIToAnthropic } from "../core/endpoints.js";
+import { SseScanner } from "../core/sse.js";
+import { isRouteError } from "../core/types.js";
+import { retryMetadata, sanitizedProxyError, shouldRotate } from "../core/errors.js";
 
 describe("chat completions parse", () => {
   it("rejects a missing model", () => {

@@ -1,5 +1,3 @@
-import { randomUUID } from "node:crypto";
-
 import {
   bumpAccountRequestCount,
   disableFailedAccount,
@@ -1147,7 +1145,7 @@ export class ProxyService implements StreamRecorder {
       const nextErrors = 1;
       await insertModelHealth(
         {
-          id: randomUUID(),
+          id: crypto.randomUUID(),
           providerAccountId: accountId,
           model: resolved,
           consecutiveErrors: nextErrors,
@@ -1250,7 +1248,7 @@ export class ProxyService implements StreamRecorder {
     try {
       await insertUsageLog(
         {
-          id: randomUUID(),
+          id: crypto.randomUUID(),
           userId: params.userId,
           providerAccountId,
           proxyApiKeyId: params.proxyApiKeyId || null,
@@ -1597,7 +1595,7 @@ export class ProxyService implements StreamRecorder {
   }
 
   private async acquireRefreshLock(accountId: string): Promise<{ value: string; acquired: boolean }> {
-    const value = randomUUID();
+    const value = crypto.randomUUID();
     try {
       const result = await this.redis.set(`${TOKEN_REFRESH_LOCK_PREFIX}${accountId}`, value, {
         NX: true,
