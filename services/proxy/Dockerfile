@@ -4,6 +4,7 @@ WORKDIR /app
 
 COPY dist ./dist
 COPY packages/models/data ./packages/models/data
+COPY packages/models/generated ./packages/models/generated
 
 ENV NODE_ENV=production
 
