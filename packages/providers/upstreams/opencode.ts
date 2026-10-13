@@ -71,9 +71,13 @@ function opencodeId(prefix: string, descending: boolean): string {
   return out;
 }
 
-function canonicalId(prefix: string, seed: string): string {
+function canonicalId(prefix: string, seed: string, descending: boolean): string {
   const sum = createHash("sha256").update(seed).digest();
-  let out = `${prefix}_${sum.subarray(0, 6).toString("hex")}`;
+  const time = Buffer.from(sum.subarray(0, 6));
+  const counter = descending ? 0xffe : 0x001;
+  time[4] = (time[4] & 0xf0) | ((counter >> 8) & 0x0f);
+  time[5] = counter & 0xff;
+  let out = `${prefix}_${time.toString("hex")}`;
   for (const byte of sum.subarray(6, 20)) out += ID_ALPHABET[byte % ID_ALPHABET.length];
   return out;
 }
@@ -84,13 +88,13 @@ const REQUEST_PATTERN = /^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$/;
 function sessionId(seed: string): string {
   if (SESSION_PATTERN.test(seed)) return seed;
   if (!seed) return opencodeId("ses", true);
-  return canonicalId("ses", seed);
+  return canonicalId("ses", seed, true);
 }
 
 function requestId(seed: string): string {
   if (REQUEST_PATTERN.test(seed)) return seed;
   if (!seed) return opencodeId("msg", false);
-  return canonicalId("msg", seed);
+  return canonicalId("msg", seed, false);
 }
 
 function opencodeHeaders(body: Json): Record<string, string> {
