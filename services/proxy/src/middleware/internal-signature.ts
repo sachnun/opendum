@@ -1,4 +1,4 @@
-import { internalSignature, signaturesMatch } from "@opendum/crypto";
+import { internalSignature, signaturesMatch } from "@opendum/core/crypto";
 
 const INTERNAL_WINDOW_MS = 2 * 60 * 1000;
 

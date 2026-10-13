@@ -4,9 +4,9 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { buildAaIndex, parseLeaderboard, resolveAaScore } from "#models/aa.ts";
-import { modelProbes } from "#models/probes.ts";
-import { fetchText } from "#models/http.ts";
+import { buildAaIndex, parseLeaderboard, resolveAaScore } from "#models/sync/aa.ts";
+import { modelProbes } from "#models/model/probes.ts";
+import { fetchText } from "#models/sync/http.ts";
 import { buildModelIndex, generatedModelPath, readModelJson, writeGeneratedModelJson } from "#models/registry.ts";
 
 const LEADERBOARD_URL = "https://artificialanalysis.ai/leaderboards/models";

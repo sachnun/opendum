@@ -18,8 +18,8 @@ import {
   syncProviderModels,
   persistModel,
 } from "#models/registry.ts";
-import { fetchJson } from "#models/http.ts";
-import { stripParamInfoKey } from "#models/clean-key.ts";
+import { fetchJson } from "#models/sync/http.ts";
+import { stripParamInfoKey } from "#models/model/clean-key.ts";
 
 const PROVIDER_NAME = "workers_ai";
 const WORKERS_AI_MODELS_API_URL = "https://api.github.com/repos/cloudflare/cloudflare-docs/contents/src/content/workers-ai-models?ref=production";

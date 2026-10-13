@@ -3,8 +3,8 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { syncProviderModels } from "#models/registry.ts";
-import { fetchText, fetchJson } from "#models/http.ts";
-import { stripParamInfoKey } from "#models/clean-key.ts";
+import { fetchText, fetchJson } from "#models/sync/http.ts";
+import { stripParamInfoKey } from "#models/model/clean-key.ts";
 import { syncCliVersion } from "./version-sync.ts";
 
 const OPENCODE_MODELS_URL = "https://opencode.ai/zen/v1/models";
@@ -19,17 +19,17 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const OPENCODE_VERSION_TARGETS = [
   {
     label: "opencode provider",
-    path: resolve(REPO_ROOT, "packages/providers/src/opencode.ts"),
+    path: resolve(REPO_ROOT, "packages/providers/upstreams/opencode.ts"),
     pattern: /(const USER_AGENT = "opencode\/)(\d+\.\d+\.\d+)(")/,
   },
   {
     label: "codex provider",
-    path: resolve(REPO_ROOT, "packages/providers/src/codex.ts"),
+    path: resolve(REPO_ROOT, "packages/providers/upstreams/codex.ts"),
     pattern: /(User-Agent": `opencode\/)(\d+\.\d+\.\d+)( \()/,
   },
   {
     label: "codex quota fetcher",
-    path: resolve(REPO_ROOT, "packages/quota/src/fetchers.ts"),
+    path: resolve(REPO_ROOT, "packages/providers/quota/fetchers/codex.ts"),
     pattern: /(User-Agent": `opencode\/)(\d+\.\d+\.\d+)( \()/,
   },
   {

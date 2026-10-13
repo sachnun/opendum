@@ -3,16 +3,16 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts",
-    "./clean-key": "./src/clean-key.ts",
-    "./families": "./src/families.ts",
-    "./merge": "./src/merge.ts",
-    "./probes": "./src/probes.ts",
-    "./registry": "./src/registry.ts",
-    "./runtime": "./src/runtime.ts"
+    ".": "./index.ts",
+    "./clean-key": "./model/clean-key.ts",
+    "./families": "./model/families.ts",
+    "./merge": "./model/merge.ts",
+    "./probes": "./model/probes.ts",
+    "./registry": "./registry.ts",
+    "./runtime": "./runtime.ts"
   },
   "imports": {
-    "#models/*": "./src/*"
+    "#models/*": "./*"
   },
   "scripts": {
     "refresh": "bun ./scripts/models.ts",

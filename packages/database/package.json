@@ -3,13 +3,13 @@
   "version": "0.1.0",
   "type": "module",
   "private": true,
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "main": "./index.ts",
+  "types": "./index.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./schema": "./src/schema/index.ts",
-    "./relations": "./src/relations.ts",
-    "./queries": "./src/queries/index.ts"
+    ".": "./index.ts",
+    "./schema": "./schema/index.ts",
+    "./relations": "./relations.ts",
+    "./queries": "./queries/index.ts"
   },
   "scripts": {
     "db:push": "drizzle-kit push",

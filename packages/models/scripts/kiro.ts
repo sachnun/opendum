@@ -19,8 +19,8 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { syncProviderModels } from "#models/registry.ts";
-import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS, fetchText } from "#models/http.ts";
-import { stripParamInfoKey } from "#models/clean-key.ts";
+import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS, fetchText } from "#models/sync/http.ts";
+import { stripParamInfoKey } from "#models/model/clean-key.ts";
 import { syncCliVersion } from "./version-sync.ts";
 
 const KIRO_DOCS_URL = "https://kiro.dev/docs/models/";
@@ -34,12 +34,12 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const KIRO_IDE_VERSION_TARGETS = [
   {
     label: "kiro provider",
-    path: resolve(REPO_ROOT, "packages/providers/src/kiro.ts"),
+    path: resolve(REPO_ROOT, "packages/providers/upstreams/kiro/index.ts"),
     pattern: /(KiroIDE-)(\d+\.\d+\.\d+)(")/,
   },
   {
     label: "kiro quota fetcher",
-    path: resolve(REPO_ROOT, "packages/quota/src/fetchers.ts"),
+    path: resolve(REPO_ROOT, "packages/providers/quota/fetchers/kiro.ts"),
     pattern: /(KiroIDE-)(\d+\.\d+\.\d+)(")/,
   },
 ];

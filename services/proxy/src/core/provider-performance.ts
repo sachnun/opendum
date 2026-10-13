@@ -1,4 +1,4 @@
-import type { OpendumRedis } from "@opendum/redis";
+import type { OpendumRedis } from "@opendum/core/redis";
 
 export type ProviderPerformanceConfig = {
   sampleTtlSeconds: number;

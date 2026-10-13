@@ -36,10 +36,10 @@ import {
   updateRefreshedCredentials,
 } from "@opendum/database/queries";
 import type { Database } from "@opendum/database";
-import { decrypt, encrypt, playgroundSignature, signaturesMatch } from "@opendum/crypto";
+import { decrypt, encrypt, playgroundSignature, signaturesMatch } from "@opendum/core/crypto";
 import type { Registry } from "@opendum/models/runtime";
-import type { OpendumRedis } from "@opendum/redis";
-import { SessionAffinity, preferSticky } from "@opendum/redis";
+import type { OpendumRedis } from "@opendum/core/redis";
+import { SessionAffinity, preferSticky } from "@opendum/core/redis";
 import type { AuthResult, AuthService, ModelValidationResult } from "@opendum/auth";
 import {
   adaptForResponsesClient,

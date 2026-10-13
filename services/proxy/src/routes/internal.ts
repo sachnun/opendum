@@ -1,9 +1,9 @@
 import { defineHandler, type H3, type H3Event } from "h3";
 import { getQuotaAccount } from "@opendum/database/queries";
-import { fetchAccountQuota, isQuotaProvider } from "@opendum/quota";
-import type { QuotaContext, QuotaJournal } from "@opendum/quota";
-import { assertPublicHost, PrivateHostError } from "@opendum/egress";
-import { decrypt } from "@opendum/crypto";
+import { fetchAccountQuota, isQuotaProvider } from "@opendum/providers/quota";
+import type { QuotaContext, QuotaJournal } from "@opendum/providers/quota";
+import { assertPublicHost, PrivateHostError } from "@opendum/core/egress";
+import { decrypt } from "@opendum/core/crypto";
 import type { ProxyContext } from "../context.js";
 import { validateInternalSignature } from "../middleware/internal-signature.js";
 import { jsonResponse } from "./errors.js";

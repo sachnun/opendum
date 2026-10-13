@@ -1,4 +1,4 @@
-import type { Env } from "@opendum/config";
+import type { Env } from "@opendum/core/config";
 
 export type ProxyConfig = {
   host: string;

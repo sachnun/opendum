@@ -5,5 +5,5 @@
     "types": ["node", "bun"],
     "allowImportingTsExtensions": true
   },
-  "include": ["src/**/*"]
+  "include": ["*.ts", "**/*.ts"]
 }

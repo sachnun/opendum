@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import type { OpendumRedis } from "@opendum/redis";
+import type { OpendumRedis } from "@opendum/core/redis";
 import type { ProviderAccount } from "@opendum/providers";
 import {
   DEFAULT_PROVIDER_PERFORMANCE_CONFIG,

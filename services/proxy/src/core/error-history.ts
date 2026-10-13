@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { randomUUID } from "node:crypto";
-import type { OpendumRedis } from "@opendum/redis";
+import type { OpendumRedis } from "@opendum/core/redis";
 
 const ERROR_HISTORY_KEY_PREFIX = "opendum:provider-account:error-history";
 const ERROR_HISTORY_ENTRY_PREFIX = "opendum:provider-account:error-history-entry";
