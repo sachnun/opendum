@@ -5,7 +5,7 @@ import {
   buildConnector,
   fetch as undiciFetch,
   type RequestInit as UndiciRequestInit,
-} from "undici";
+} from "undici/index.js";
 import { PrivateHostError, isPrivateIp } from "./ssrf.js";
 
 export type GuardedFetchOptions = {

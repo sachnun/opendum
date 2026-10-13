@@ -1,18 +1,12 @@
-FROM node:24-bookworm-slim
-
-RUN corepack enable
+FROM oven/bun:1-alpine
 
 WORKDIR /app
 
-COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
-COPY packages ./packages
-COPY services ./services
-COPY apps/web/package.json ./apps/web/package.json
-
-RUN pnpm install --frozen-lockfile --filter @opendum/proxy...
+COPY dist ./dist
+COPY packages/models/data ./packages/models/data
 
 ENV NODE_ENV=production
 
 EXPOSE 8000
 
-CMD ["pnpm", "--filter", "@opendum/proxy", "start"]
+CMD ["bun", "--smol", "dist/main.js"]

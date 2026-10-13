@@ -22,6 +22,10 @@ concurrency:
   group: koyeb-proxy-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  IMAGE_REGISTRY: ttl.sh
+  IMAGE_TTL: 24h
+
 jobs:
   deploy:
     if: github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
@@ -44,20 +48,15 @@ jobs:
         with:
           ref: main
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: pnpm
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: bun install --frozen-lockfile --filter @opendum/proxy
 
       - name: Test proxy
-        run: pnpm --filter @opendum/proxy test
+        working-directory: services/proxy
+        run: bunx vitest run
 
       - name: Validate Koyeb configuration
         run: |
@@ -69,6 +68,17 @@ jobs:
           test -n "$KOYEB_ORG_ID"
           test -f services/proxy/Dockerfile
 
+      - name: Bundle proxy
+        run: bun build services/proxy/src/main.ts --target=bun --outdir dist
+
+      - name: Build and push image
+        run: |
+          set -euo pipefail
+          IMAGE="$IMAGE_REGISTRY/opendum-proxy-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}:$IMAGE_TTL"
+          docker build -f services/proxy/Dockerfile -t "$IMAGE" .
+          docker push "$IMAGE"
+          echo "PROXY_IMAGE=$IMAGE" >> "$GITHUB_ENV"
+
       - name: Install Koyeb CLI
         run: |
           curl -fsSL https://raw.githubusercontent.com/koyeb/koyeb-cli/master/install.sh | sh
@@ -79,12 +89,8 @@ jobs:
           set -euo pipefail
           export KOYEB_TOKEN
           ORG=(--organization "$KOYEB_ORG_ID")
-          GIT_REPO="github.com/${{ github.repository }}"
           COMMON_ARGS=(
-            --git "$GIT_REPO"
-            --git-branch main
-            --git-builder docker
-            --git-docker-dockerfile services/proxy/Dockerfile
+            --docker "$PROXY_IMAGE"
             --type web
             --instance-type "$KOYEB_INSTANCE_TYPE"
             --regions "$KOYEB_REGION"
@@ -102,7 +108,16 @@ jobs:
             koyeb apps create "$KOYEB_APP" "${ORG[@]}"
           fi
           if koyeb services get "$KOYEB_SERVICE" --app "$KOYEB_APP" "${ORG[@]}" >/dev/null 2>&1; then
-            koyeb services update "$KOYEB_APP/$KOYEB_SERVICE" "${ORG[@]}" "${COMMON_ARGS[@]}" "${SCALE_ARGS[@]}" --wait --wait-timeout 10m
-          else
-            koyeb services create "$KOYEB_SERVICE" --app "$KOYEB_APP" "${ORG[@]}" "${COMMON_ARGS[@]}" "${SCALE_ARGS[@]}" --wait --wait-timeout 10m
+            SOURCE=$(koyeb services get "$KOYEB_SERVICE" --app "$KOYEB_APP" "${ORG[@]}" -o json)
+            if grep -qE '"git"|git:' <<<"$SOURCE"; then
+              koyeb services delete "$KOYEB_APP/$KOYEB_SERVICE" "${ORG[@]}"
+              for _ in $(seq 1 60); do
+                koyeb services get "$KOYEB_SERVICE" --app "$KOYEB_APP" "${ORG[@]}" >/dev/null 2>&1 || break
+                sleep 5
+              done
+            else
+              koyeb services update "$KOYEB_APP/$KOYEB_SERVICE" "${ORG[@]}" "${COMMON_ARGS[@]}" "${SCALE_ARGS[@]}" --wait --wait-timeout 10m
+              exit 0
+            fi
           fi
+          koyeb services create "$KOYEB_SERVICE" --app "$KOYEB_APP" "${ORG[@]}" "${COMMON_ARGS[@]}" "${SCALE_ARGS[@]}" --wait --wait-timeout 10m
