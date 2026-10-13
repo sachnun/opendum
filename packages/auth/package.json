@@ -7,7 +7,8 @@
     ".": "./index.ts",
     "./service": "./service.ts",
     "./types": "./types.ts",
-    "./custom-store": "./store/custom.ts"
+    "./custom-store": "./store/custom.ts",
+    "./effect": "./effect.ts"
   },
   "scripts": {
     "test": "bun test --pass-with-no-tests",
@@ -16,7 +17,8 @@
   "dependencies": {
     "@opendum/core": "workspace:*",
     "@opendum/database": "workspace:*",
-    "@opendum/models": "workspace:*"
+    "@opendum/models": "workspace:*",
+    "effect": "4.0.4"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
