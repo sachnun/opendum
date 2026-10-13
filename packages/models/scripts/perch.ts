@@ -3,7 +3,7 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildModelIndex, syncProviderModels } from "#models/registry.ts";
-import { fetchText, fetchJson } from "#models/sync/http.ts";
+import { runFetchText, runFetchJson } from "#models/sync/http.ts";
 import { normalizeKey, normalizeName } from "#models/model/similarity.ts";
 import { syncCliVersion } from "./version-sync.ts";
 
@@ -30,7 +30,7 @@ const PERCH_CLI_VERSION_TARGETS = [
 ];
 
 async function syncCliVersionFromNpm() {
-  const metadata = await fetchJson(PERCH_CLI_NPM_URL, { label: "perchai-cli npm metadata" });
+  const metadata = await runFetchJson(PERCH_CLI_NPM_URL, { label: "perchai-cli npm metadata" });
   const latestVersion = metadata?.version;
   if (typeof latestVersion !== "string" || !/^\d+\.\d+\.\d+$/.test(latestVersion)) {
     console.warn("[perch] Could not determine the latest CLI version from npm, skipping.");
@@ -85,7 +85,7 @@ function extractStarterPool(html) {
 }
 
 async function fetchStarterPool() {
-  const html = await fetchText(PERCH_DOCS_URL, {
+  const html = await runFetchText(PERCH_DOCS_URL, {
     label: "Perch models docs",
     headers: { "User-Agent": "Mozilla/5.0 (compatible; opendum-model-sync)" },
   });

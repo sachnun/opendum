@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 import { buildAaIndex, parseLeaderboard, resolveAaScore } from "#models/sync/aa.ts";
 import { modelProbes } from "#models/model/probes.ts";
-import { fetchText } from "#models/sync/http.ts";
+import { runFetchText } from "#models/sync/http.ts";
 import { buildModelIndex, generatedModelPath, readModelJson, writeGeneratedModelJson } from "#models/registry.ts";
 
 const LEADERBOARD_URL = "https://artificialanalysis.ai/leaderboards/models";
@@ -18,7 +18,7 @@ async function main(): Promise<void> {
   const modelsDir = resolve(scriptDir, "../data");
   const dryRun = process.argv.includes("--dry-run");
 
-  const html = await fetchText(LEADERBOARD_URL, {
+  const html = await runFetchText(LEADERBOARD_URL, {
     label: "Artificial Analysis leaderboard",
     headers: { "User-Agent": USER_AGENT },
   });

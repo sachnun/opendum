@@ -1,7 +1,9 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
+import { Effect } from "effect";
 
 import { inferFamilyFromFolder } from "./model/families.ts";
+import { ModelParseFailure, ModelReadFailure, ModelsDirectoryFailure, asError } from "./errors.ts";
 
 export type ModelModalities = {
   input?: string[];
@@ -116,12 +118,12 @@ function readModelEntries(dir: string, required: boolean): ModelEntry[] {
   let stat;
   try {
     stat = statSync(dir);
-  } catch {
-    if (required) throw new Error(`models directory not found: ${dir}`);
+  } catch (cause) {
+    if (required) throw new ModelsDirectoryFailure({ message: `models directory not found: ${dir}`, path: dir, cause });
     return [];
   }
   if (!stat.isDirectory()) {
-    if (required) throw new Error(`models path is not a directory: ${dir}`);
+    if (required) throw new ModelsDirectoryFailure({ message: `models path is not a directory: ${dir}`, path: dir });
     return [];
   }
 
@@ -135,7 +137,12 @@ function readModelEntries(dir: string, required: boolean): ModelEntry[] {
         continue;
       }
       if (!name.endsWith(".json")) continue;
-      const parsed = JSON.parse(readFileSync(fullPath, "utf8")) as ModelInfo;
+      let parsed: ModelInfo;
+      try {
+        parsed = JSON.parse(readFileSync(fullPath, "utf8")) as ModelInfo;
+      } catch (cause) {
+        throw new ModelParseFailure({ message: `invalid model JSON: ${fullPath}`, path: fullPath, cause });
+      }
       const parent = dirname(fullPath);
       entries.push({
         fileId: basename(name, ".json"),
@@ -237,6 +244,30 @@ function collectModelEntries(authoredDir: string, generatedDir: string): ModelEn
 
 export function loadModelEntries(dir: string): ModelEntry[] {
   return collectModelEntries(dir, resolveGeneratedDir(dir));
+}
+
+/**
+ * Effect wrapper around {@link loadModelEntries} exposing directory, read, and
+ * parse problems on the typed failure channel.
+ */
+export function tryLoadModelEntries(
+  dir: string
+): Effect.Effect<ModelEntry[], ModelsDirectoryFailure | ModelReadFailure | ModelParseFailure> {
+  return Effect.try({
+    try: () => loadModelEntries(dir),
+    catch: (cause) => cause,
+  }).pipe(
+    Effect.mapError((cause) => {
+      if (
+        cause instanceof ModelsDirectoryFailure ||
+        cause instanceof ModelReadFailure ||
+        cause instanceof ModelParseFailure
+      ) {
+        return cause;
+      }
+      return new ModelReadFailure({ message: asError(cause).message, path: dir, cause });
+    })
+  );
 }
 
 export type FlagshipFamily = {

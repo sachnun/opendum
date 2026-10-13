@@ -3,7 +3,7 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildModelIndex, persistModel, syncProviderModels } from "#models/registry.ts";
-import { sleep, fetchText, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "#models/sync/http.ts";
+import { fetchDecoded, runFetchText, runOrThrow } from "#models/sync/http.ts";
 
 const CODEX_MODELS_URL =
   "https://raw.githubusercontent.com/openai/codex/main/codex-rs/models-manager/models.json";
@@ -35,39 +35,20 @@ const PAID_CODEX_TIERS = [
  * Returns the parsed array of model entries.
  */
 async function fetchCodexModels() {
-  let lastError = null;
+  return runOrThrow(
+    fetchDecoded(
+      CODEX_MODELS_URL,
+      { label: "Codex CLI models", headers: { Accept: "application/json" } },
+      async (response) => {
+        const payload = await response.json();
+        if (!payload || !Array.isArray(payload.models)) {
+          throw new Error("Unexpected Codex models.json payload format");
+        }
 
-  for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt += 1) {
-    try {
-      const response = await fetch(CODEX_MODELS_URL, {
-        headers: { Accept: "application/json" },
-        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          `Failed to fetch models (${response.status} ${response.statusText})`
-        );
+        return payload.models;
       }
-
-      const payload = await response.json();
-      if (!payload || !Array.isArray(payload.models)) {
-        throw new Error("Unexpected Codex models.json payload format");
-      }
-
-      return payload.models;
-    } catch (error) {
-      lastError = error;
-
-      if (attempt < MAX_FETCH_ATTEMPTS) {
-        await sleep(attempt * 1_000);
-      }
-    }
-  }
-
-  throw lastError instanceof Error
-    ? lastError
-    : new Error("Failed to fetch Codex CLI model list");
+    )
+  );
 }
 
 /**
@@ -106,7 +87,7 @@ function normalizeModelName(value) {
  * ChatGPT plan.
  */
 async function fetchFreePlanModelNames() {
-  const markdown = await fetchText(CODEX_PRICING_DOCS_URL, {
+  const markdown = await runFetchText(CODEX_PRICING_DOCS_URL, {
     label: "Codex pricing docs",
     headers: { Accept: "text/markdown" },
   });

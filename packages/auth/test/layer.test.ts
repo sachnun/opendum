@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { Effect } from "effect";
-import { AuthServiceTag, validateAPIKey } from "@opendum/auth/effect";
+import { AuthServiceTag, validateAPIKey } from "@opendum/auth/layer";
 import type { AuthResult } from "@opendum/auth";
 
 function result(overrides: Partial<AuthResult> = {}): AuthResult {
@@ -19,7 +19,7 @@ function result(overrides: Partial<AuthResult> = {}): AuthResult {
   };
 }
 
-describe("auth effect service", () => {
+describe("auth service layer", () => {
   it("exposes validateAPIKey through the service tag", async () => {
     const program = validateAPIKey("Bearer token").pipe(
       Effect.provideService(AuthServiceTag, {
@@ -31,7 +31,7 @@ describe("auth effect service", () => {
     expect(value.userId).toBe("user-1");
   });
 
-  it("propagates an invalid result without failing the effect", async () => {
+  it("propagates an invalid result without failing the program", async () => {
     const program = validateAPIKey("Bearer bad").pipe(
       Effect.provideService(AuthServiceTag, {
         auth: { validateAPIKey: async () => result({ valid: false, error: "Invalid API key" }) } as never,

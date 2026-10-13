@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 import {
   baseQuotaInfo,
   clampFraction,
@@ -14,22 +15,34 @@ import {
 import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay } from "../types.js";
 import { fetchJsonData, type Json } from "./shared.js";
 
-export async function fetchZenmuxQuota(
+export function fetchZenmuxQuota(
   ctx: QuotaContext,
   account: QuotaAccount,
   forceRefresh: boolean
-): Promise<AccountQuotaInfo> {
+): Effect.Effect<AccountQuotaInfo> {
   const platformKey = account.accountId?.trim() ?? "";
-  if (!platformKey) return expiredQuotaInfo("Platform key is required for ZenMux quota.");
-  const { data, error } = await fetchJsonData(
-    ctx, account, forceRefresh, "zenmux:subscription", "GET",
+  if (!platformKey) {
+    return Effect.succeed(expiredQuotaInfo("Platform key is required for ZenMux quota."));
+  }
+  return fetchJsonData(
+    ctx,
+    account,
+    forceRefresh,
+    "zenmux:subscription",
+    "GET",
     "https://zenmux.ai/api/v1/management/subscription/detail",
-    { Authorization: `Bearer ${platformKey}`, Accept: "application/json" }, null
+    { Authorization: `Bearer ${platformKey}`, Accept: "application/json" },
+    null
+  ).pipe(
+    Effect.map(({ data, error }) => {
+      if (error || !data) {
+        return errorQuotaInfo(`ZenMux subscription endpoint failed: ${error ?? "unknown error"}`);
+      }
+      const record = parseQuotaRecord(data.data);
+      if (!record) return errorQuotaInfo("ZenMux subscription response did not include data");
+      return baseQuotaInfo("success", zenmuxGroups(record));
+    })
   );
-  if (error || !data) return errorQuotaInfo(`ZenMux subscription endpoint failed: ${error ?? "unknown error"}`);
-  const record = parseQuotaRecord(data.data);
-  if (!record) return errorQuotaInfo("ZenMux subscription response did not include data");
-  return baseQuotaInfo("success", zenmuxGroups(record));
 }
 
 function zenmuxGroups(data: Json): QuotaGroupDisplay[] {

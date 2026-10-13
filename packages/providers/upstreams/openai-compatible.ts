@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
 import { stringValue } from "../core/helpers.js";
 import {
@@ -19,11 +20,13 @@ import {
   postJSONWithEgressFallback,
   postJSONWithHeaders,
   postJSONWithoutAuth,
+  transportFailure,
   type FetchLike,
   type Logger,
+  type ProviderTransportFailure,
   type UpstreamTransport,
 } from "../core/http.js";
-import type { Provider, ProviderAccount, ProviderRequest } from "../types.js";
+import type { Provider, ProviderAccount, ProviderFailure, ProviderRequest } from "../types.js";
 
 export const SUPPORTED_ZENMUX = new Set([
   "model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream",
@@ -109,56 +112,75 @@ export class OpenAICompatibleProvider implements Provider, ResponsesNativeProvid
     this.logger = options.logger;
   }
 
-  async makeRequest(request: ProviderRequest): Promise<Response> {
+  makeRequest(request: ProviderRequest): Effect.Effect<Response, ProviderFailure> {
     const body = request.body;
     const model = this.normalizeModel(stringValue(body.model));
     const modelName = this.resolveModel(model);
     const onStart = request.onUpstreamResponseStart;
+    const direct = this.transport.direct;
 
     if (this.requiresResponsesAPI(model)) {
-      const payload = await buildResponsesApiPayload(body, modelName, request.stream, this.transport.direct);
-      const resp = await this.post("/responses", request, payload, model, this.extraRequestHeaders(request.account));
-      if (resp.status < 200 || resp.status >= 300) return resp;
-      if (Array.isArray(body._responsesInput)) return resp;
-      if (request.stream && resp.body) {
-        return sseResponse(responsesSseToChatStream(resp.body, modelName));
-      }
-      if (!resp.body) return resp;
-      const data = (await resp.json()) as Json;
-      return jsonResponse(200, responsesJsonToChatCompletion(data, modelName));
+      return Effect.gen({ self: this }, function* () {
+        const payload = yield* Effect.tryPromise({
+          try: () => buildResponsesApiPayload(body, modelName, request.stream, direct),
+          catch: (cause) => transportFailure(this.name, cause),
+        });
+        const resp = yield* this.post("/responses", request, payload, model, this.extraRequestHeaders(request.account));
+        if (resp.status < 200 || resp.status >= 300) return resp;
+        if (Array.isArray(body._responsesInput)) return resp;
+        if (request.stream && resp.body) {
+          return sseResponse(responsesSseToChatStream(resp.body, modelName));
+        }
+        if (!resp.body) return resp;
+        const data = (yield* Effect.promise(() => resp.json())) as Json;
+        return jsonResponse(200, responsesJsonToChatCompletion(data, modelName));
+      });
     }
 
     const payload = this.buildPayload(body, model, modelName, request.stream);
-    if (this.convertImages(model)) {
-      const messages = payload.messages;
-      if (Array.isArray(messages)) {
-        payload.messages = await convertImageURLsToBase64(this.transport.direct, messages);
-      }
-    }
+    const convertImages = this.convertImages(model);
     void onStart;
-    return this.post("/chat/completions", request, payload, model, this.extraRequestHeaders(request.account));
+    return Effect.gen({ self: this }, function* () {
+      if (convertImages) {
+        const messages = payload.messages;
+        if (Array.isArray(messages)) {
+          payload.messages = yield* Effect.tryPromise({
+            try: () => convertImageURLsToBase64(direct, messages),
+            catch: (cause) => transportFailure(this.name, cause),
+          });
+        }
+      }
+      return yield* this.post(
+        "/chat/completions",
+        request,
+        payload,
+        model,
+        this.extraRequestHeaders(request.account)
+      );
+    });
   }
 
   responsesNative(model: string): boolean {
     return this.requiresResponsesAPI(this.normalizeModel(model));
   }
 
-  private async post(
+  private post(
     path: string,
     request: ProviderRequest,
     payload: unknown,
     model: string,
     extraHeaders: Record<string, string> | undefined
-  ): Promise<Response> {
+  ): Effect.Effect<Response, ProviderFailure> {
     const credentials = request.credentials;
     const authless = credentials.trim() === "" && this.authlessModel(model);
     const onStart = request.onUpstreamResponseStart;
-    const execute = (fetchFn: FetchLike, url: string): Promise<Response> => {
-      if (authless) return postJSONWithoutAuth(fetchFn, url, payload, request.stream, onStart);
+    const name = this.name;
+    const execute = (fetchFn: FetchLike, url: string): Effect.Effect<Response, ProviderTransportFailure> => {
+      if (authless) return postJSONWithoutAuth(name, fetchFn, url, payload, request.stream, onStart);
       if (extraHeaders && Object.keys(extraHeaders).length > 0) {
-        return postJSONWithHeaders(fetchFn, url, credentials, payload, request.stream, extraHeaders, onStart);
+        return postJSONWithHeaders(name, fetchFn, url, credentials, payload, request.stream, extraHeaders, onStart);
       }
-      return postJSON(fetchFn, url, credentials, payload, request.stream, onStart);
+      return postJSON(name, fetchFn, url, credentials, payload, request.stream, onStart);
     };
 
     const primary = this.baseUrl + path;
@@ -166,7 +188,7 @@ export class OpenAICompatibleProvider implements Provider, ResponsesNativeProvid
       return postJSONWithEgressFallback(
         this.transport,
         this.fallback,
-        this.name,
+        name,
         primary,
         credentials,
         payload,
@@ -177,7 +199,14 @@ export class OpenAICompatibleProvider implements Provider, ResponsesNativeProvid
       );
     }
     const fallbackUrl = this.fallbackBaseUrl ? this.fallbackBaseUrl + path : "";
-    return postExecuteWithFallback(this.transport.direct, this.fallback, this.name, primary, fallbackUrl, execute);
+    return postExecuteWithFallback(
+      this.transport.direct,
+      this.fallback,
+      name,
+      primary,
+      fallbackUrl,
+      execute
+    );
   }
 
   private buildPayload(body: Json, model: string, modelName: string, stream: boolean): Json {

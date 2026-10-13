@@ -3,7 +3,7 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildModelIdMap, syncProviderModels } from "#models/registry.ts";
-import { fetchText } from "#models/sync/http.ts";
+import { runFetchText } from "#models/sync/http.ts";
 
 const PROVIDER_NAME = "harbor";
 const HARBOR_MODELS_URL = "https://tokenharbor.ai/models";
@@ -68,7 +68,7 @@ function buildModelMap(modelIds) {
 }
 
 async function fetchHarborFreeModelIds() {
-  const html = await fetchText(HARBOR_MODELS_URL, { label: "Harbor /models catalog page" });
+  const html = await runFetchText(HARBOR_MODELS_URL, { label: "Harbor /models catalog page" });
   const entries = parseModelEntries(html);
 
   const ids = entries

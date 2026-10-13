@@ -1,4 +1,5 @@
-import { getQuotaJson, putQuotaCache, encodeQuery } from "../cache.js";
+import { Effect } from "effect";
+import { putQuotaCache, encodeQuery } from "../cache.js";
 import {
   baseQuotaInfo,
   clampFraction,
@@ -13,14 +14,14 @@ import {
   parseResetIso,
 } from "../helpers.js";
 import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay } from "../types.js";
-import type { Json } from "./shared.js";
+import { quotaAttempt, type Json } from "./shared.js";
 
-export async function fetchKiroQuota(
+export function fetchKiroQuota(
   ctx: QuotaContext,
   account: QuotaAccount,
   accessToken: string,
   forceRefresh: boolean
-): Promise<AccountQuotaInfo> {
+): Effect.Effect<AccountQuotaInfo> {
   const values = new URLSearchParams();
   values.set("origin", "AI_EDITOR");
   const profileArn = account.accountId?.trim() ?? "";
@@ -28,36 +29,43 @@ export async function fetchKiroQuota(
   const target = encodeQuery("https://q.us-east-1.amazonaws.com/", values);
   const body: Json = { origin: "AI_EDITOR" };
   if (profileArn) body.profileArn = profileArn;
-  let result;
-  try {
-    result = await getQuotaJson(ctx, account, forceRefresh, "kiro:GetUsageLimits", "POST", target, {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/x-amz-json-1.0",
-      Accept: "application/json",
-      "User-Agent": "KiroIDE-1.2.56",
-      "x-amz-user-agent": "KiroIDE-1.2.56",
-      "x-amz-target": "AmazonCodeWhispererService.GetUsageLimits",
-      "x-amzn-codewhisperer-optout": "true",
-      "x-amzn-kiro-agent-mode": "vibe",
-      "amz-sdk-request": "attempt=1; max=3",
-    }, body);
-  } catch (error) {
-    return errorQuotaInfo(error instanceof Error ? error.message : String(error));
-  }
-  if (result.statusCode < 200 || result.statusCode >= 300) {
-    return errorQuotaInfo(`Kiro usage limits quota endpoint failed: HTTP ${result.statusCode} ${result.raw}`);
-  }
-  let payload: Json;
-  try {
-    payload = JSON.parse(result.raw) as Json;
-  } catch {
-    return errorQuotaInfo("Kiro usage limits response was not valid JSON");
-  }
-  const record = parseQuotaRecord(payload.data) ?? payload;
-  const groups = kiroGroups(record);
-  if (groups.length === 0) return errorQuotaInfo("Kiro usage limits are unavailable for this account");
-  await putQuotaCache(ctx, result);
-  return baseQuotaInfo("success", groups);
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${accessToken}`,
+    "Content-Type": "application/x-amz-json-1.0",
+    Accept: "application/json",
+    "User-Agent": "KiroIDE-1.2.56",
+    "x-amz-user-agent": "KiroIDE-1.2.56",
+    "x-amz-target": "AmazonCodeWhispererService.GetUsageLimits",
+    "x-amzn-codewhisperer-optout": "true",
+    "x-amzn-kiro-agent-mode": "vibe",
+    "amz-sdk-request": "attempt=1; max=3",
+  };
+
+  return quotaAttempt(ctx, account, forceRefresh, "kiro:GetUsageLimits", "POST", target, headers, body).pipe(
+    Effect.flatMap((attempt) => {
+      if (!attempt.ok) return Effect.succeed(errorQuotaInfo(attempt.message));
+      const { result } = attempt;
+      if (result.statusCode < 200 || result.statusCode >= 300) {
+        return Effect.succeed(
+          errorQuotaInfo(`Kiro usage limits quota endpoint failed: HTTP ${result.statusCode} ${result.raw}`)
+        );
+      }
+      const parsed = (() => {
+        try {
+          return JSON.parse(result.raw) as Json;
+        } catch {
+          return null;
+        }
+      })();
+      if (!parsed) return Effect.succeed(errorQuotaInfo("Kiro usage limits response was not valid JSON"));
+      const record = parseQuotaRecord(parsed.data) ?? parsed;
+      const groups = kiroGroups(record);
+      if (groups.length === 0) {
+        return Effect.succeed(errorQuotaInfo("Kiro usage limits are unavailable for this account"));
+      }
+      return putQuotaCache(ctx, result).pipe(Effect.as(baseQuotaInfo("success", groups)));
+    })
+  );
 }
 
 function titleWords(value: string): string {

@@ -98,7 +98,7 @@ describe("typed proxy errors", () => {
   });
 });
 
-describe("effect schedules", () => {
+describe("retry schedules", () => {
   it("retries transient failures with a bounded schedule", async () => {
     let attempts = 0;
     const flaky = Effect.suspend(() => {

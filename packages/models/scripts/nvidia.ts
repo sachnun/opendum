@@ -3,7 +3,8 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildModelIndex, syncProviderModels, getProviderUpstream } from "#models/registry.ts";
-import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "#models/sync/http.ts";
+import { Effect } from "effect";
+import { fetchDecoded, MAX_FETCH_ATTEMPTS, retryTransient, runOrThrow } from "#models/sync/http.ts";
 import { stripParamInfoKey } from "#models/model/clean-key.ts";
 
 const PROVIDER_NAME = "nvidia_nim";
@@ -198,88 +199,45 @@ function buildModelMap(modelIds, existingKeys, llmModelKeys) {
 }
 
 async function fetchNvidiaGenerativeModelKeys() {
-  let lastError = null;
-
-  for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt += 1) {
-    try {
-      const pages = await Promise.all(
-        NVIDIA_MODEL_DOCS_URLS.map(async (url) => {
-          const response = await fetch(url, {
-            headers: {
-              Accept: "text/html",
-            },
-            signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-          });
-
-          if (!response.ok) {
-            throw new Error(
-              `Failed to fetch Nvidia model docs (${response.status} ${response.statusText})`
-            );
-          }
-
-          return response.text();
+  const pages = Effect.all(
+    NVIDIA_MODEL_DOCS_URLS.map((url) =>
+      fetchDecoded(url, { label: "Nvidia model docs", headers: { Accept: "text/html" } }, (response) =>
+        response.text()
+      )
+    )
+  );
+  return runOrThrow(
+    retryTransient(
+      pages.pipe(
+        Effect.flatMap((values) => {
+          const modelKeys = new Set(values.flatMap((page) => [...extractNvidiaGenerativeModelKeys(page)]));
+          return modelKeys.size === 0
+            ? Effect.fail(new Error("Unexpected Nvidia model docs payload format"))
+            : Effect.succeed(modelKeys);
         })
-      );
-      const modelKeys = new Set(
-        pages.flatMap((page) => [...extractNvidiaGenerativeModelKeys(page)])
-      );
-      if (modelKeys.size === 0) {
-        throw new Error("Unexpected Nvidia model docs payload format");
-      }
-
-      return modelKeys;
-    } catch (error) {
-      lastError = error;
-
-      if (attempt < MAX_FETCH_ATTEMPTS) {
-        await sleep(attempt * 1_000);
-      }
-    }
-  }
-
-  throw lastError instanceof Error
-    ? lastError
-    : new Error("Failed to fetch Nvidia generative model list");
+      ),
+      MAX_FETCH_ATTEMPTS
+    )
+  );
 }
 
 async function fetchNvidiaModelIds() {
-  let lastError = null;
+  return runOrThrow(
+    fetchDecoded(
+      NVIDIA_MODELS_URL,
+      { label: "Nvidia NIM models", headers: { Accept: "application/json" } },
+      async (response) => {
+        const payload = await response.json();
+        if (!payload || !Array.isArray(payload.data)) {
+          throw new Error("Unexpected Nvidia /v1/models payload format");
+        }
 
-  for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt += 1) {
-    try {
-      const response = await fetch(NVIDIA_MODELS_URL, {
-        headers: {
-          Accept: "application/json",
-        },
-        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          `Failed to fetch models (${response.status} ${response.statusText})`
-        );
+        return payload.data
+          .map((item) => (typeof item?.id === "string" ? item.id.trim() : ""))
+          .filter((id) => id.length > 0);
       }
-
-      const payload = await response.json();
-      if (!payload || !Array.isArray(payload.data)) {
-        throw new Error("Unexpected Nvidia /v1/models payload format");
-      }
-
-      return payload.data
-        .map((item) => (typeof item?.id === "string" ? item.id.trim() : ""))
-        .filter((id) => id.length > 0);
-    } catch (error) {
-      lastError = error;
-
-      if (attempt < MAX_FETCH_ATTEMPTS) {
-        await sleep(attempt * 1_000);
-      }
-    }
-  }
-
-  throw lastError instanceof Error
-    ? lastError
-    : new Error("Failed to fetch Nvidia NIM model list");
+    )
+  );
 }
 
 async function main() {

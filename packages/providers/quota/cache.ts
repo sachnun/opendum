@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
-import type { QuotaAccount, QuotaContext, QuotaFetch } from "./types.js";
+import { Effect } from "effect";
+import type { QuotaAccount, QuotaContext } from "./types.js";
+import { QuotaFetchFailure } from "../core/errors.js";
 
 const RAW_CACHE_PREFIX = "opendum:quota:raw";
 const RAW_CACHE_MIN_TTL_SECONDS = 60;
@@ -46,7 +48,37 @@ function cacheHeaders(headers: Headers): Record<string, string[]> {
   return out;
 }
 
-export async function getQuotaJson(
+function decodeCachedEntry(raw: string, cacheKey: string): QuotaJsonResult | null {
+  const entry = JSON.parse(raw) as { statusCode: number; header?: Record<string, string[]>; body: string };
+  if (entry.statusCode <= 0) return null;
+  const header = new Headers();
+  for (const [key, values] of Object.entries(entry.header ?? {})) {
+    for (const value of values) header.append(key, value);
+  }
+  return {
+    statusCode: entry.statusCode,
+    header,
+    raw: Buffer.from(entry.body, "base64").toString("utf8"),
+    cacheKey,
+    fromCache: true,
+  };
+}
+
+function quotaFetchFailure(provider: string, target: string, cause: unknown): QuotaFetchFailure {
+  return new QuotaFetchFailure({
+    message: cause instanceof Error ? cause.message : String(cause),
+    provider,
+    target,
+    cause,
+  });
+}
+
+/**
+ * Effect-native quota request with an optional journal backed read-through
+ * cache. Cache misses and cache failures fall through to a live request, so a
+ * broken journal can never fail a quota fetch.
+ */
+export function getQuotaJson(
   ctx: QuotaContext,
   account: QuotaAccount,
   forceRefresh: boolean,
@@ -55,64 +87,61 @@ export async function getQuotaJson(
   target: string,
   headers: Record<string, string>,
   body: unknown
-): Promise<QuotaJsonResult> {
+): Effect.Effect<QuotaJsonResult, QuotaFetchFailure> {
   const encodedBody = body === null || body === undefined ? "" : JSON.stringify(body);
   const cacheKey = rawCacheKey(account, cacheName, method, target, encodedBody);
 
-  if (!forceRefresh && ctx.journal) {
-    try {
-      const raw = await ctx.journal.get(cacheKey);
-      if (raw) {
-        const entry = JSON.parse(raw) as { statusCode: number; header?: Record<string, string[]>; body: string };
-        if (entry.statusCode > 0) {
-          const header = new Headers();
-          for (const [key, values] of Object.entries(entry.header ?? {})) {
-            for (const value of values) header.append(key, value);
-          }
-          return {
-            statusCode: entry.statusCode,
-            header,
-            raw: Buffer.from(entry.body, "base64").toString("utf8"),
-            cacheKey,
-            fromCache: true,
-          };
-        }
-      }
-    } catch {
-      // fall through to a live request
-    }
-  }
+  const fromCache = Effect.gen(function* () {
+    if (forceRefresh || !ctx.journal) return null;
+    const raw = yield* Effect.tryPromise({
+      try: () => ctx.journal!.get(cacheKey),
+      catch: (cause) => cause,
+    }).pipe(Effect.orElseSucceed(() => null));
+    if (!raw) return null;
+    return yield* Effect.try(() => decodeCachedEntry(raw, cacheKey)).pipe(
+      Effect.orElseSucceed(() => null)
+    );
+  });
 
-  const init: RequestInit = { method };
-  const requestHeaders = new Headers();
-  for (const [key, value] of Object.entries(headers)) requestHeaders.set(key, value);
-  if (Object.keys(headers).length > 0) init.headers = requestHeaders;
-  if (encodedBody) init.body = encodedBody;
-  const response = await ctx.fetch(target, init);
-  const raw = await response.text();
-  return { statusCode: response.status, header: response.headers, raw, cacheKey, fromCache: false };
+  const live = Effect.tryPromise({
+    try: async () => {
+      const init: RequestInit = { method };
+      const requestHeaders = new Headers();
+      for (const [key, value] of Object.entries(headers)) requestHeaders.set(key, value);
+      if (Object.keys(headers).length > 0) init.headers = requestHeaders;
+      if (encodedBody) init.body = encodedBody;
+      const response = await ctx.fetch(target, init);
+      const raw = await response.text();
+      return { statusCode: response.status, header: response.headers, raw, cacheKey, fromCache: false };
+    },
+    catch: (cause) => quotaFetchFailure(account.provider, target, cause),
+  });
+
+  return Effect.gen(function* () {
+    const cached = yield* fromCache;
+    if (cached) return cached;
+    return yield* live;
+  });
 }
 
-export async function putQuotaCache(ctx: QuotaContext, result: QuotaJsonResult): Promise<void> {
-  if (!ctx.journal || result.fromCache || result.cacheKey === "") return;
-  if (result.statusCode < 200 || result.statusCode >= 300) return;
+export function putQuotaCache(
+  ctx: QuotaContext,
+  result: QuotaJsonResult
+): Effect.Effect<void> {
+  if (!ctx.journal || result.fromCache || result.cacheKey === "") return Effect.void;
+  if (result.statusCode < 200 || result.statusCode >= 300) return Effect.void;
   const entry = {
     statusCode: result.statusCode,
     header: cacheHeaders(result.header),
     body: Buffer.from(result.raw, "utf8").toString("base64"),
   };
-  try {
-    await ctx.journal.set(result.cacheKey, JSON.stringify(entry), rawCacheTtlSeconds());
-  } catch {
-    return;
-  }
+  return Effect.tryPromise({
+    try: () => ctx.journal!.set(result.cacheKey, JSON.stringify(entry), rawCacheTtlSeconds()),
+    catch: (cause) => cause,
+  }).pipe(Effect.ignore);
 }
 
 export function encodeQuery(base: string, values: URLSearchParams): string {
   const encoded = values.toString();
   return encoded ? `${base}?${encoded}` : base;
-}
-
-export function quotaFetchFor(ctx: QuotaContext): QuotaFetch {
-  return ctx.fetch;
 }

@@ -106,14 +106,12 @@ export async function handleQuota(event: H3Event, context: ProxyContext): Promis
         tier: row.tier,
         accessToken: row.accessToken,
       };
-      const result = yield* Effect.tryPromise({
-        try: () => fetchAccountQuota(quotaContext(context), account, Boolean(decoded.forceRefresh)),
-        catch: (error) => (error instanceof Error ? error : new Error("Failed to fetch quota")),
-      }).pipe(Effect.result);
-      if (result._tag === "Failure") {
-        return jsonResponse({ success: false, error: result.failure.message }, 200);
-      }
-      return jsonResponse({ success: true, data: result.success }, 200);
+      const result = yield* fetchAccountQuota(
+        quotaContext(context),
+        account,
+        Boolean(decoded.forceRefresh)
+      );
+      return jsonResponse({ success: true, data: result }, 200);
     }).pipe(Effect.withSpan("handleQuota"))
   );
 }

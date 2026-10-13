@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 import {
   baseQuotaInfo,
   errorQuotaInfo,
@@ -7,23 +8,34 @@ import {
 import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay } from "../types.js";
 import { fetchJsonData, type Json } from "./shared.js";
 
-export async function fetchHyperQuota(
+export function fetchHyperQuota(
   ctx: QuotaContext,
   account: QuotaAccount,
   forceRefresh: boolean
-): Promise<AccountQuotaInfo> {
+): Effect.Effect<AccountQuotaInfo> {
   let apiKey: string;
   try {
     apiKey = ctx.decrypt(account.accessToken ?? "");
   } catch {
-    return expiredQuotaInfo("API key is missing or invalid. Please reconnect this account.");
+    return Effect.succeed(
+      expiredQuotaInfo("API key is missing or invalid. Please reconnect this account.")
+    );
   }
-  const { data, error } = await fetchJsonData(
-    ctx, account, forceRefresh, "hyper:credits", "GET", "https://hyper.charm.land/v1/credits",
-    { Authorization: `Bearer ${apiKey.trim()}`, Accept: "application/json" }, null
+  return fetchJsonData(
+    ctx,
+    account,
+    forceRefresh,
+    "hyper:credits",
+    "GET",
+    "https://hyper.charm.land/v1/credits",
+    { Authorization: `Bearer ${apiKey.trim()}`, Accept: "application/json" },
+    null
+  ).pipe(
+    Effect.map(({ data, error }) => {
+      if (error || !data) return errorQuotaInfo(error ?? "Charm credits request failed");
+      return baseQuotaInfo("success", hyperGroups(data));
+    })
   );
-  if (error || !data) return errorQuotaInfo(error ?? "Charm credits request failed");
-  return baseQuotaInfo("success", hyperGroups(data));
 }
 
 function hyperGroups(payload: Json): QuotaGroupDisplay[] {

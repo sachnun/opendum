@@ -187,10 +187,10 @@ export class ProxyService implements StreamRecorder {
     sessionId: string,
     request?: Request
   ): Promise<Response> {
-    return Effect.runPromise(this.handleEffect(cfg, body, authHeader, sessionId, request));
+    return Effect.runPromise(this.runPipeline(cfg, body, authHeader, sessionId, request));
   }
 
-  handleEffect(
+  runPipeline(
     cfg: EndpointAdapter,
     body: Record<string, unknown>,
     authHeader: string,
@@ -1510,7 +1510,7 @@ export class ProxyService implements StreamRecorder {
     });
     const response = !stream && this.requestTimeoutMs > 0
       ? await Effect.runPromise(
-          Effect.promise(() => request).pipe(
+          request.pipe(
             Effect.timeoutOrElse({
               duration: this.requestTimeoutMs,
               orElse: () => Effect.fail(new Error("upstream request timed out")),
@@ -1520,7 +1520,7 @@ export class ProxyService implements StreamRecorder {
             })
           )
         )
-      : await request;
+      : await Effect.runPromise(request);
     if (response.status >= 200 && response.status < 300) {
       return adaptForResponsesClient(providerImpl as unknown as { responsesNative?(model: string): boolean }, response, payload, stream);
     }
@@ -1611,7 +1611,7 @@ export class ProxyService implements StreamRecorder {
       if (!current.refreshToken) return { credentials: null, account: current, error: null };
       refreshToken = decrypt(this.secret, current.refreshToken);
       void Effect.runFork(Metric.update(tokenRefreshes, 1));
-      const refreshed = await refresher.refreshCredentials(refreshToken, current);
+      const refreshed = await Effect.runPromise(refresher.refreshCredentials(refreshToken, current));
       const updated = await this.persistRefreshedCredentials(current, refreshed);
       await this.clearRefreshFailures(current.id);
       return { credentials: refreshed.accessToken, account: updated, error: null };

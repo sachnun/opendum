@@ -6,7 +6,7 @@
  * `modalities` without hand-maintaining those fields.
  */
 
-import { fetchJson } from "./http.ts";
+import { runFetchJson } from "./http.ts";
 import { buildIndex, resolveCandidates, type IndexedModel } from "../model/similarity.ts";
 import {
   MODELSDEV_CANONICAL_URL,
@@ -441,7 +441,7 @@ export async function fetchExternalRegistries(
 
   for (const source of SOURCES) {
     try {
-      const payload = await fetchJson(source.url, { label: `external registry ${source.name}` });
+      const payload = await runFetchJson(source.url, { label: `external registry ${source.name}` });
       const entries = source.extract(payload);
       registries[source.name] = {
         entries,
@@ -457,7 +457,7 @@ export async function fetchExternalRegistries(
 
   let canonicalModelsJson: unknown;
   try {
-    canonicalModelsJson = await fetchJson(MODELSDEV_CANONICAL_URL, { label: "models.dev canonical models" });
+    canonicalModelsJson = await runFetchJson(MODELSDEV_CANONICAL_URL, { label: "models.dev canonical models" });
     const count = Object.keys(asRecord(canonicalModelsJson) ?? {}).length;
     logger(`[metadata] canonical models: ${count} entries`);
   } catch (error) {

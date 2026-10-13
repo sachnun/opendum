@@ -15,11 +15,11 @@ afterEach(() => {
   mock.restore();
 });
 
-describe("internal relay effect", () => {
+describe("internal relay", () => {
   it("fails with a typed not-configured error when the proxy url is missing", async () => {
     delete process.env.NUXT_PUBLIC_PROXY_URL;
-    const { fetchInternalEffect } = await import("../../server/lib/proxy/internal-relay.js");
-    const exit = await Effect.runPromiseExit(fetchInternalEffect("/internal/quota", {}));
+    const { relayRequest } = await import("../../server/lib/proxy/internal-relay.js");
+    const exit = await Effect.runPromiseExit(relayRequest("/internal/quota", {}));
     expect(exit._tag).toBe("Failure");
   });
 
@@ -32,8 +32,8 @@ describe("internal relay effect", () => {
       return new Response(JSON.stringify({ success: true }), { status: 200 });
     }) as unknown as typeof fetch;
 
-    const { fetchInternalEffect } = await import("../../server/lib/proxy/internal-relay.js");
-    const response = await Effect.runPromise(fetchInternalEffect("/internal/quota", { userId: "u" }));
+    const { relayRequest } = await import("../../server/lib/proxy/internal-relay.js");
+    const response = await Effect.runPromise(relayRequest("/internal/quota", { userId: "u" }));
     expect(response.status).toBe(200);
     expect(calls[0]?.url).toBe("https://proxy.example.com/internal/quota");
     const headers = new Headers(calls[0]?.headers);
@@ -50,8 +50,8 @@ describe("internal relay effect", () => {
       return new Response("{}", { status: 200 });
     }) as unknown as typeof fetch;
 
-    const { fetchInternalEffect } = await import("../../server/lib/proxy/internal-relay.js");
-    const response = await Effect.runPromise(fetchInternalEffect("/internal/refresh", {}));
+    const { relayRequest } = await import("../../server/lib/proxy/internal-relay.js");
+    const response = await Effect.runPromise(relayRequest("/internal/refresh", {}));
     expect(response.status).toBe(200);
     expect(attempts).toBe(2);
   });

@@ -1,4 +1,5 @@
-import { getQuotaJson, putQuotaCache } from "../cache.js";
+import { Effect } from "effect";
+import { putQuotaCache } from "../cache.js";
 import {
   baseQuotaInfo,
   errorQuotaInfo,
@@ -8,14 +9,14 @@ import {
   parseQuotaString,
 } from "../helpers.js";
 import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay } from "../types.js";
-import { quotaFallbackTier, type Json } from "./shared.js";
+import { quotaAttempt, quotaFallbackTier, type Json } from "./shared.js";
 
-export async function fetchCodexQuota(
+export function fetchCodexQuota(
   ctx: QuotaContext,
   account: QuotaAccount,
   accessToken: string,
   forceRefresh: boolean
-): Promise<AccountQuotaInfo> {
+): Effect.Effect<AccountQuotaInfo> {
   const fallbackTier = quotaFallbackTier(account);
   const headers: Record<string, string> = {
     Authorization: `Bearer ${accessToken}`,
@@ -27,34 +28,43 @@ export async function fetchCodexQuota(
   };
   const accountId = account.accountId?.trim() || extractAccountIdFromJwt(accessToken);
   if (accountId) headers["ChatGPT-Account-Id"] = accountId;
-  let result;
-  try {
-    result = await getQuotaJson(ctx, account, forceRefresh, "codex:usage", "GET", "https://chatgpt.com/backend-api/wham/usage", headers, null);
-  } catch (error) {
-    return errorQuotaInfo(error instanceof Error ? error.message : String(error));
-  }
-  const headerGroups = parseCodexHeaderGroups(result.header, fallbackTier);
-  if (result.statusCode < 200 || result.statusCode >= 300) {
-    if (headerGroups.length > 0) return baseQuotaInfo("success", headerGroups);
-    return errorQuotaInfo(`Codex quota endpoint failed: HTTP ${result.statusCode} ${result.raw}`);
-  }
-  let payload: Json = {};
-  try {
-    payload = JSON.parse(result.raw) as Json;
-  } catch {
-    payload = {};
-  }
-  const tier = parseQuotaString(payload.plan_type) || fallbackTier;
-  const apiGroups = parseCodexApiGroups(payload, tier);
-  if (apiGroups.length > 0) {
-    await putQuotaCache(ctx, result);
-    return baseQuotaInfo("success", apiGroups);
-  }
-  if (headerGroups.length > 0) {
-    await putQuotaCache(ctx, result);
-    return baseQuotaInfo("success", headerGroups);
-  }
-  return errorQuotaInfo("Codex quota payload did not include usable quota data");
+
+  return quotaAttempt(
+    ctx,
+    account,
+    forceRefresh,
+    "codex:usage",
+    "GET",
+    "https://chatgpt.com/backend-api/wham/usage",
+    headers,
+    null
+  ).pipe(
+    Effect.flatMap((attempt) => {
+      if (!attempt.ok) return Effect.succeed(errorQuotaInfo(attempt.message));
+      const { result } = attempt;
+      const headerGroups = parseCodexHeaderGroups(result.header, fallbackTier);
+      if (result.statusCode < 200 || result.statusCode >= 300) {
+        if (headerGroups.length > 0) return Effect.succeed(baseQuotaInfo("success", headerGroups));
+        return Effect.succeed(
+          errorQuotaInfo(`Codex quota endpoint failed: HTTP ${result.statusCode} ${result.raw}`)
+        );
+      }
+      const payload = (() => {
+        try {
+          return JSON.parse(result.raw) as Json;
+        } catch {
+          return {} as Json;
+        }
+      })();
+      const tier = parseQuotaString(payload.plan_type) || fallbackTier;
+      const apiGroups = parseCodexApiGroups(payload, tier);
+      const groups = apiGroups.length > 0 ? apiGroups : headerGroups;
+      if (groups.length === 0) {
+        return Effect.succeed(errorQuotaInfo("Codex quota payload did not include usable quota data"));
+      }
+      return putQuotaCache(ctx, result).pipe(Effect.as(baseQuotaInfo("success", groups)));
+    })
+  );
 }
 
 function extractAccountIdFromJwt(token: string): string {

@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
 import type { OpendumRedis } from "@opendum/core/redis";
 import {
@@ -19,11 +20,13 @@ import {
   responsesJsonToChatCompletion,
   responsesSseToChatStream,
 } from "../transform/responses.js";
-import type { UpstreamTransport } from "../core/http.js";
+import { transportFailure, type UpstreamTransport } from "../core/http.js";
+import { ProviderCredentialFailure, asError } from "../core/errors.js";
 import type {
   CredentialRefresher,
   Provider,
   ProviderAccount,
+  ProviderFailure,
   ProviderRequest,
   RefreshedCredentials,
   RefreshBufferProvider,
@@ -210,49 +213,63 @@ export class CodexProvider implements Provider, CredentialRefresher, RefreshBuff
     return CODEX_REFRESH_BUFFER_MS;
   }
 
-  async refreshCredentials(refreshToken: string, _account: ProviderAccount): Promise<RefreshedCredentials> {
-    const form = new URLSearchParams({
-      grant_type: "refresh_token",
-      refresh_token: refreshToken.trim(),
-      client_id: CODEX_CLIENT_ID,
-    });
-    const resp = await this.transport.direct(CODEX_TOKEN_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Accept: "application/json",
+  refreshCredentials(
+    refreshToken: string,
+    _account: ProviderAccount
+  ): Effect.Effect<RefreshedCredentials, ProviderCredentialFailure> {
+    const transport = this.transport;
+    return Effect.tryPromise({
+      try: async () => {
+        const form = new URLSearchParams({
+          grant_type: "refresh_token",
+          refresh_token: refreshToken.trim(),
+          client_id: CODEX_CLIENT_ID,
+        });
+        const resp = await transport.direct(CODEX_TOKEN_ENDPOINT, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            Accept: "application/json",
+          },
+          body: form.toString(),
+        });
+        const text = await resp.text();
+        if (resp.status < 200 || resp.status >= 300) {
+          throw new Error(`codex token refresh failed: ${resp.status} ${text.slice(0, 1024)}`);
+        }
+        const token = JSON.parse(text) as {
+          access_token?: string;
+          refresh_token?: string;
+          expires_in?: number;
+          id_token?: string;
+        };
+        const accessToken = token.access_token ?? "";
+        if (!accessToken) throw new Error("codex token refresh returned empty access token");
+        const nextRefresh = token.refresh_token || refreshToken;
+        const expiresIn = token.expires_in && token.expires_in > 0 ? token.expires_in : 3600;
+        let accountId = extractAccountIdFromJwt(accessToken);
+        if (!accountId && token.id_token) accountId = extractAccountIdFromJwt(token.id_token);
+        let tier = "";
+        if (token.id_token) tier = extractTierFromJwt(token.id_token);
+        if (!tier) tier = extractTierFromJwt(accessToken);
+        return {
+          accessToken,
+          refreshToken: nextRefresh,
+          expiresAt: new Date(Date.now() + expiresIn * 1000),
+          tier,
+          accountId,
+        };
       },
-      body: form.toString(),
+      catch: (cause) =>
+        new ProviderCredentialFailure({
+          message: asError(cause).message,
+          provider: "codex",
+          cause,
+        }),
     });
-    const text = await resp.text();
-    if (resp.status < 200 || resp.status >= 300) {
-      throw new Error(`codex token refresh failed: ${resp.status} ${text.slice(0, 1024)}`);
-    }
-    const token = JSON.parse(text) as {
-      access_token?: string;
-      refresh_token?: string;
-      expires_in?: number;
-      id_token?: string;
-    };
-    const accessToken = token.access_token ?? "";
-    if (!accessToken) throw new Error("codex token refresh returned empty access token");
-    const nextRefresh = token.refresh_token || refreshToken;
-    const expiresIn = token.expires_in && token.expires_in > 0 ? token.expires_in : 3600;
-    let accountId = extractAccountIdFromJwt(accessToken);
-    if (!accountId && token.id_token) accountId = extractAccountIdFromJwt(token.id_token);
-    let tier = "";
-    if (token.id_token) tier = extractTierFromJwt(token.id_token);
-    if (!tier) tier = extractTierFromJwt(accessToken);
-    return {
-      accessToken,
-      refreshToken: nextRefresh,
-      expiresAt: new Date(Date.now() + expiresIn * 1000),
-      tier,
-      accountId,
-    };
   }
 
-  async makeRequest(request: ProviderRequest): Promise<Response> {
+  makeRequest(request: ProviderRequest): Effect.Effect<Response, ProviderFailure> {
     const modelName = this.resolveModel(stringValue(request.body.model));
     const account = request.account;
     let accountId = account.accountId?.trim() ?? "";
@@ -264,16 +281,18 @@ export class CodexProvider implements Provider, CredentialRefresher, RefreshBuff
       }
     }
     if (!this.isModelAllowed(modelName)) {
-      return jsonResponse(400, {
-        error: {
-          message: `Model "${modelName}" is not supported for Codex when using a ChatGPT account. Use one of: ${this.supportedModelNames().join(
-            ", "
-          )}.`,
-          type: "invalid_request_error",
-          param: "model",
-          code: "unsupported_codex_chatgpt_model",
-        },
-      });
+      return Effect.succeed(
+        jsonResponse(400, {
+          error: {
+            message: `Model "${modelName}" is not supported for Codex when using a ChatGPT account. Use one of: ${this.supportedModelNames().join(
+              ", "
+            )}.`,
+            type: "invalid_request_error",
+            param: "model",
+            code: "unsupported_codex_chatgpt_model",
+          },
+        })
+      );
     }
 
     const payload = this.buildPayload(request.body, modelName, true);
@@ -288,26 +307,33 @@ export class CodexProvider implements Provider, CredentialRefresher, RefreshBuff
     const sessionId = stringValue(request.body._sessionId);
     if (sessionId) headers.session_id = sessionId;
 
-    const resp = await this.transport.direct(CODEX_API_BASE_URL, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(payload),
-    });
-    if (resp.status < 200 || resp.status >= 300) return resp;
-    request.onUpstreamResponseStart?.();
-    void this.updateQuotaFromHeaders(account.id, resp.headers);
-    if (request.stream && resp.body) {
-      return new Response(responsesSseToChatStream(resp.body, modelName), {
-        status: 200,
-        headers: {
-          "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache",
-          Connection: "keep-alive",
-        },
+    const transport = this.transport;
+    return Effect.gen({ self: this }, function* () {
+      const resp = yield* Effect.tryPromise({
+        try: () =>
+          transport.direct(CODEX_API_BASE_URL, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(payload),
+          }),
+        catch: (cause) => transportFailure("codex", cause, CODEX_API_BASE_URL),
       });
-    }
-    const text = await resp.text();
-    return jsonResponse(200, responsesStreamToCompletion(text, modelName));
+      if (resp.status < 200 || resp.status >= 300) return resp;
+      request.onUpstreamResponseStart?.();
+      void this.updateQuotaFromHeaders(account.id, resp.headers);
+      if (request.stream && resp.body) {
+        return new Response(responsesSseToChatStream(resp.body, modelName), {
+          status: 200,
+          headers: {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            Connection: "keep-alive",
+          },
+        });
+      }
+      const text = yield* Effect.promise(() => resp.text());
+      return jsonResponse(200, responsesStreamToCompletion(text, modelName));
+    });
   }
 
   private async updateQuotaFromHeaders(accountId: string, headers: Headers): Promise<void> {

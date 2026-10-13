@@ -1,9 +1,11 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
+import { Effect } from "effect";
 
 import { aliasesFromUpstream, isDateToken } from "./model/clean-key.ts";
 import { inferModelFolder } from "./model/families.ts";
 import { mergeModelData, splitModelData } from "./model/merge.ts";
+import { ModelParseFailure, asError } from "./errors.ts";
 import type { JsonValue, ModelData, ModelIndex, ModelIndexEntry } from "./types.ts";
 
 const MODEL_FILE_EXTENSION = ".json";
@@ -90,6 +92,24 @@ function normalizeModelData(data: ModelData): Record<string, JsonValue> {
 
 export function readModelJson(content: string): ModelData {
   return JSON.parse(content) as ModelData;
+}
+
+/**
+ * Effect wrapper around {@link readModelJson} that reports invalid JSON as a
+ * typed parse failure instead of a thrown `SyntaxError`.
+ */
+export function tryReadModelJson(
+  content: string,
+  path = "<inline>"
+): Effect.Effect<ModelData, ModelParseFailure> {
+  return Effect.try({
+    try: () => readModelJson(content),
+    catch: (cause) => cause,
+  }).pipe(
+    Effect.mapError(
+      (cause) => new ModelParseFailure({ message: asError(cause).message, path, cause })
+    )
+  );
 }
 
 function hasMinorVersionSuffix(base: string | undefined, numericSuffix: string | undefined): boolean {

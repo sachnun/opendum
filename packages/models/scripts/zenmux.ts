@@ -3,7 +3,7 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildModelIdMap, syncProviderModels } from "#models/registry.ts";
-import { fetchJson } from "#models/sync/http.ts";
+import { runFetchJson } from "#models/sync/http.ts";
 import { stripParamInfoKey } from "#models/model/clean-key.ts";
 
 const PROVIDER_NAME = "zenmux";
@@ -28,7 +28,7 @@ function buildModelMap(modelIds) {
 }
 
 async function fetchZenmuxFreePlanModelIds() {
-  const plans = await fetchJson(ZENMUX_PLANS_URL, { label: "ZenMux subscription plans" });
+  const plans = await runFetchJson(ZENMUX_PLANS_URL, { label: "ZenMux subscription plans" });
   if (!plans || !Array.isArray(plans.data)) {
     throw new Error("Unexpected ZenMux get_all_plans payload format");
   }
@@ -50,7 +50,7 @@ async function fetchZenmuxFreePlanModelIds() {
     throw new Error("No models found in ZenMux Free Plan");
   }
 
-  const allModels = await fetchJson(ZENMUX_MODELS_URL, { label: "ZenMux /v1/models" });
+  const allModels = await runFetchJson(ZENMUX_MODELS_URL, { label: "ZenMux /v1/models" });
   if (!allModels || !Array.isArray(allModels.data)) {
     throw new Error("Unexpected ZenMux /v1/models payload format");
   }

@@ -1,4 +1,5 @@
 import { randomBytes, createHash } from "node:crypto";
+import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
 import {
   chatSseToChatCompletion,
@@ -16,12 +17,14 @@ import {
   postExecuteWithFallback,
   postJSONWithHeaders,
   postWithEgressFallback,
+  transportFailure,
   type FetchLike,
   type Logger,
+  type ProviderTransportFailure,
   type UpstreamTransport,
 } from "../core/http.js";
 import type { FallbackState } from "../core/fallback.js";
-import type { Provider, ProviderRequest } from "../types.js";
+import type { Provider, ProviderFailure, ProviderRequest } from "../types.js";
 
 const CHAT_ENDPOINT = "https://opencode.ai/zen/v1/chat/completions";
 const RESPONSES_ENDPOINT = "https://opencode.ai/zen/v1/responses";
@@ -152,48 +155,70 @@ export class OpencodeProvider implements Provider {
     return true;
   }
 
-  async makeRequest(request: ProviderRequest): Promise<Response> {
+  makeRequest(request: ProviderRequest): Effect.Effect<Response, ProviderFailure> {
     const body = request.body;
     let model = stringValue(body.model);
     if (model.startsWith("opencode/")) model = model.slice("opencode/".length);
     const modelName = this.registry.upstreamModelName(model, "opencode");
     const headers = opencodeHeaders(body);
     ensureFingerprintTools(body);
+    const direct = this.transport.direct;
 
     if (this.requiresResponsesAPI(model)) {
-      const payload = await buildResponsesApiPayload(body, modelName, true, this.transport.direct);
-      const resp = await this.post(RESPONSES_ENDPOINT, FALLBACK_RESPONSES_ENDPOINT, payload, true, headers, request.onUpstreamResponseStart);
-      if (resp.status < 200 || resp.status >= 300) return resp;
-      if (Array.isArray(body._responsesInput)) {
-        if (request.stream) return resp;
+      return Effect.gen({ self: this }, function* () {
+        const payload = yield* Effect.tryPromise({
+          try: () => buildResponsesApiPayload(body, modelName, true, direct),
+          catch: (cause) => transportFailure("opencode", cause),
+        });
+        const resp = yield* this.post(
+          RESPONSES_ENDPOINT,
+          FALLBACK_RESPONSES_ENDPOINT,
+          payload,
+          true,
+          headers,
+          request.onUpstreamResponseStart
+        );
+        if (resp.status < 200 || resp.status >= 300) return resp;
+        if (Array.isArray(body._responsesInput)) {
+          if (request.stream) return resp;
+          if (!resp.body) return resp;
+          const data = yield* Effect.promise(() => responsesSseToResponsesJson(resp.body as ReadableStream<Uint8Array>));
+          return jsonResponse(200, data);
+        }
         if (!resp.body) return resp;
-        const data = await responsesSseToResponsesJson(resp.body);
+        if (request.stream) return sseResponse(responsesSseToChatStream(resp.body, modelName));
+        const data = yield* Effect.promise(() =>
+          chatSseToChatCompletion(responsesSseToChatStream(resp.body as ReadableStream<Uint8Array>, modelName), modelName)
+        );
         return jsonResponse(200, data);
-      }
-      if (!resp.body) return resp;
-      if (request.stream) return sseResponse(responsesSseToChatStream(resp.body, modelName));
-      const data = await chatSseToChatCompletion(responsesSseToChatStream(resp.body, modelName), modelName);
-      return jsonResponse(200, data);
+      });
     }
 
     if (this.requiresMessagesAPI(model)) {
-      const payload = await buildAnthropicMessagesPayload(body, modelName, true, this.transport.direct);
-      const resp = await this.post(
-        MESSAGES_ENDPOINT,
-        FALLBACK_MESSAGES_ENDPOINT,
-        payload,
-        true,
-        headers,
-        request.onUpstreamResponseStart
-      );
-      if (resp.status < 200 || resp.status >= 300) return resp;
-      if (!resp.body) return resp;
-      if (request.stream) return sseResponse(anthropicMessagesSseToChatStream(resp.body, modelName));
-      const data = await chatSseToChatCompletion(
-        anthropicMessagesSseToChatStream(resp.body, modelName),
-        modelName
-      );
-      return jsonResponse(200, data);
+      return Effect.gen({ self: this }, function* () {
+        const payload = yield* Effect.tryPromise({
+          try: () => buildAnthropicMessagesPayload(body, modelName, true, direct),
+          catch: (cause) => transportFailure("opencode", cause),
+        });
+        const resp = yield* this.post(
+          MESSAGES_ENDPOINT,
+          FALLBACK_MESSAGES_ENDPOINT,
+          payload,
+          true,
+          headers,
+          request.onUpstreamResponseStart
+        );
+        if (resp.status < 200 || resp.status >= 300) return resp;
+        if (!resp.body) return resp;
+        if (request.stream) return sseResponse(anthropicMessagesSseToChatStream(resp.body, modelName));
+        const data = yield* Effect.promise(() =>
+          chatSseToChatCompletion(
+            anthropicMessagesSseToChatStream(resp.body as ReadableStream<Uint8Array>, modelName),
+            modelName
+          )
+        );
+        return jsonResponse(200, data);
+      });
     }
 
     const payload: Json = {};
@@ -202,12 +227,21 @@ export class OpencodeProvider implements Provider {
     }
     payload.model = modelName;
     payload.stream = true;
-    const resp = await this.post(CHAT_ENDPOINT, FALLBACK_CHAT_ENDPOINT, payload, true, headers, request.onUpstreamResponseStart);
-    if (resp.status < 200 || resp.status >= 300) return resp;
-    if (request.stream) return resp;
-    if (!resp.body) return resp;
-    const data = await chatSseToChatCompletion(resp.body, modelName);
-    return jsonResponse(200, data);
+    return Effect.gen({ self: this }, function* () {
+      const resp = yield* this.post(
+        CHAT_ENDPOINT,
+        FALLBACK_CHAT_ENDPOINT,
+        payload,
+        true,
+        headers,
+        request.onUpstreamResponseStart
+      );
+      if (resp.status < 200 || resp.status >= 300) return resp;
+      if (request.stream) return resp;
+      if (!resp.body) return resp;
+      const data = yield* Effect.promise(() => chatSseToChatCompletion(resp.body as ReadableStream<Uint8Array>, modelName));
+      return jsonResponse(200, data);
+    });
   }
 
   responsesNative(model: string): boolean {
@@ -229,9 +263,9 @@ export class OpencodeProvider implements Provider {
     stream: boolean,
     headers: Record<string, string>,
     onStart?: () => void
-  ): Promise<Response> {
-    const execute = (fetchFn: FetchLike, target: string): Promise<Response> =>
-      postJSONWithHeaders(fetchFn, target, PUBLIC_API_KEY, payload, stream, headers, onStart);
+  ): Effect.Effect<Response, ProviderFailure> {
+    const execute = (fetchFn: FetchLike, target: string): Effect.Effect<Response, ProviderTransportFailure> =>
+      postJSONWithHeaders("opencode", fetchFn, target, PUBLIC_API_KEY, payload, stream, headers, onStart);
     if (this.transport.egressReady()) {
       return postWithEgressFallback({
         transport: this.transport,

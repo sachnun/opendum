@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 import {
   baseQuotaInfo,
   clampFraction,
@@ -10,23 +11,34 @@ import {
 import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay } from "../types.js";
 import { fetchJsonData, type Json } from "./shared.js";
 
-export async function fetchOpenRouterQuota(
+export function fetchOpenRouterQuota(
   ctx: QuotaContext,
   account: QuotaAccount,
   forceRefresh: boolean
-): Promise<AccountQuotaInfo> {
+): Effect.Effect<AccountQuotaInfo> {
   let apiKey: string;
   try {
     apiKey = ctx.decrypt(account.accessToken ?? "");
   } catch {
-    return expiredQuotaInfo("API key is missing or invalid. Please reconnect this account.");
+    return Effect.succeed(
+      expiredQuotaInfo("API key is missing or invalid. Please reconnect this account.")
+    );
   }
-  const key = await fetchJsonData(ctx, account, forceRefresh, "openrouter:key", "GET", "https://openrouter.ai/api/v1/key", { Authorization: `Bearer ${apiKey.trim()}`, Accept: "application/json" }, null);
-  const credits = await fetchJsonData(ctx, account, forceRefresh, "openrouter:credits", "GET", "https://openrouter.ai/api/v1/credits", { Authorization: `Bearer ${apiKey.trim()}`, Accept: "application/json" }, null);
-  if (key.error && credits.error) return errorQuotaInfo(key.error);
-  const keyData = parseQuotaRecord(key.data?.data) ?? {};
-  const creditsData = parseQuotaRecord(credits.data?.data) ?? {};
-  return baseQuotaInfo("success", openRouterGroups(keyData, creditsData));
+  const headers = { Authorization: `Bearer ${apiKey.trim()}`, Accept: "application/json" };
+  return Effect.all(
+    [
+      fetchJsonData(ctx, account, forceRefresh, "openrouter:key", "GET", "https://openrouter.ai/api/v1/key", headers, null),
+      fetchJsonData(ctx, account, forceRefresh, "openrouter:credits", "GET", "https://openrouter.ai/api/v1/credits", headers, null),
+    ],
+    { concurrency: 2 }
+  ).pipe(
+    Effect.map(([key, credits]) => {
+      if (key.error && credits.error) return errorQuotaInfo(key.error);
+      const keyData = parseQuotaRecord(key.data?.data) ?? {};
+      const creditsData = parseQuotaRecord(credits.data?.data) ?? {};
+      return baseQuotaInfo("success", openRouterGroups(keyData, creditsData));
+    })
+  );
 }
 
 function openRouterGroups(keyData: Json, creditsData: Json): QuotaGroupDisplay[] {

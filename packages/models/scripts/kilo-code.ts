@@ -3,7 +3,7 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildModelIdMap, syncProviderModels } from "#models/registry.ts";
-import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "#models/sync/http.ts";
+import { fetchDecoded, runOrThrow } from "#models/sync/http.ts";
 import { stripParamInfoKey } from "#models/model/clean-key.ts";
 
 const KILO_CODE_MODELS_URL = "https://api.kilo.ai/api/gateway/models";
@@ -43,39 +43,20 @@ function buildModelMap(models) {
 }
 
 async function fetchKiloCodeModels() {
-  let lastError = null;
+  return runOrThrow(
+    fetchDecoded(
+      KILO_CODE_MODELS_URL,
+      { label: "Kilo Code models", headers: { Accept: "application/json" } },
+      async (response) => {
+        const payload = await response.json();
+        if (!payload || !Array.isArray(payload.data)) {
+          throw new Error("Unexpected Kilo Gateway /models payload format");
+        }
 
-  for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt += 1) {
-    try {
-      const response = await fetch(KILO_CODE_MODELS_URL, {
-        headers: { Accept: "application/json" },
-        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          `Failed to fetch models (${response.status} ${response.statusText})`
-        );
+        return payload.data.filter((item) => isEligibleModel(item));
       }
-
-      const payload = await response.json();
-      if (!payload || !Array.isArray(payload.data)) {
-        throw new Error("Unexpected Kilo Gateway /models payload format");
-      }
-
-      return payload.data.filter((item) => isEligibleModel(item));
-    } catch (error) {
-      lastError = error;
-
-      if (attempt < MAX_FETCH_ATTEMPTS) {
-        await sleep(attempt * 1_000);
-      }
-    }
-  }
-
-  throw lastError instanceof Error
-    ? lastError
-    : new Error("Failed to fetch Kilo Code model list");
+    )
+  );
 }
 
 async function main() {

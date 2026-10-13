@@ -3,7 +3,7 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildModelIndex, persistModel, syncProviderModels } from "#models/registry.ts";
-import { fetchJson } from "#models/sync/http.ts";
+import { runFetchJson } from "#models/sync/http.ts";
 import { stripParamInfoKey } from "#models/model/clean-key.ts";
 
 const PROVIDER_NAME = "hyper";
@@ -88,7 +88,7 @@ function enrichNewModels(modelsDir, addedKeys, modelMap, metadataLookup) {
 }
 
 async function fetchHyperModels() {
-  const payload = await fetchJson(HYPER_MODELS_URL, {
+  const payload = await runFetchJson(HYPER_MODELS_URL, {
     label: "Hyper /v1/models",
   });
   if (!payload || !Array.isArray(payload.data)) {

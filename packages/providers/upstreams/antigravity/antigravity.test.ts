@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
 
 import { AntigravityProvider } from "./index.js";
@@ -71,12 +72,14 @@ describe("antigravity retired notice", () => {
 describe("antigravity makeRequest", () => {
   it("streams the upstream content to the client", async () => {
     const provider = antigravityProvider(stubTransport(STREAM));
-    const resp = await provider.makeRequest({
-      account: { id: "a", userId: "u", provider: "antigravity", projectId: "proj" },
-      credentials: "token",
-      body: { model: "gemini-3.5-flash-medium", messages: [{ role: "user", content: "hi" }] },
-      stream: true,
-    });
+    const resp = await Effect.runPromise(
+      provider.makeRequest({
+        account: { id: "a", userId: "u", provider: "antigravity", projectId: "proj" },
+        credentials: "token",
+        body: { model: "gemini-3.5-flash-medium", messages: [{ role: "user", content: "hi" }] },
+        stream: true,
+      })
+    );
     const text = await resp.text();
     expect(text).toMatch(/hello/);
     expect(text).toMatch(/data: \[DONE\]/);
@@ -85,12 +88,14 @@ describe("antigravity makeRequest", () => {
   it("injects the antigravity system instruction from the model family", async () => {
     let sent = "";
     const provider = antigravityProvider(stubTransport(STREAM, (value) => (sent = value)));
-    await provider.makeRequest({
-      account: { id: "a", userId: "u", provider: "antigravity", projectId: "proj" },
-      credentials: "token",
-      body: { model: "gemini-3.5-flash-medium", messages: [{ role: "user", content: "hi" }] },
-      stream: true,
-    });
+    await Effect.runPromise(
+      provider.makeRequest({
+        account: { id: "a", userId: "u", provider: "antigravity", projectId: "proj" },
+        credentials: "token",
+        body: { model: "gemini-3.5-flash-medium", messages: [{ role: "user", content: "hi" }] },
+        stream: true,
+      })
+    );
     const payload = JSON.parse(sent) as {
       request?: { systemInstruction?: { parts?: { text?: string }[] } };
     };

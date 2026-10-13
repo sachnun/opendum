@@ -1,4 +1,5 @@
-import { getQuotaJson, putQuotaCache } from "../cache.js";
+import { Effect } from "effect";
+import { putQuotaCache } from "../cache.js";
 import {
   baseQuotaInfo,
   clampFraction,
@@ -10,44 +11,69 @@ import {
   parseResetIso,
 } from "../helpers.js";
 import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay } from "../types.js";
-import type { Json } from "./shared.js";
+import { quotaAttempt, type Json } from "./shared.js";
 
-export async function fetchAntigravityQuota(
+export function fetchAntigravityQuota(
   ctx: QuotaContext,
   account: QuotaAccount,
   accessToken: string,
   forceRefresh: boolean
-): Promise<AccountQuotaInfo> {
+): Effect.Effect<AccountQuotaInfo> {
   const projectId = account.projectId?.trim() ?? "";
-  if (!projectId) return errorQuotaInfo("Antigravity account is missing projectId. Re-authenticate this account.");
-  const endpoints = ["https://daily-cloudcode-pa.googleapis.com", "https://cloudcode-pa.googleapis.com"];
-  let lastErr = "";
-  for (const endpoint of endpoints) {
-    let result;
-    try {
-      result = await getQuotaJson(ctx, account, forceRefresh, "antigravity:fetchAvailableModels", "POST", `${endpoint}/v1internal:fetchAvailableModels`, {
+  if (!projectId) {
+    return Effect.succeed(
+      errorQuotaInfo("Antigravity account is missing projectId. Re-authenticate this account.")
+    );
+  }
+  const endpoints = [
+    "https://daily-cloudcode-pa.googleapis.com",
+    "https://cloudcode-pa.googleapis.com",
+  ];
+
+  const attemptEndpoint = (endpoint: string): Effect.Effect<AccountQuotaInfo, string> =>
+    quotaAttempt(
+      ctx,
+      account,
+      forceRefresh,
+      "antigravity:fetchAvailableModels",
+      "POST",
+      `${endpoint}/v1internal:fetchAvailableModels`,
+      {
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
         "User-Agent": `antigravity/2.23.0 ${process.platform}/${process.arch}`,
-      }, { project: projectId });
-    } catch (error) {
-      lastErr = error instanceof Error ? error.message : String(error);
-      continue;
-    }
-    if (result.statusCode < 200 || result.statusCode >= 300) {
-      lastErr = `HTTP ${result.statusCode} ${result.raw}`;
-      continue;
-    }
-    try {
-      const payload = JSON.parse(result.raw) as Json;
-      await putQuotaCache(ctx, result);
-      return baseQuotaInfo("success", antigravityGroups(payload));
-    } catch (error) {
-      lastErr = error instanceof Error ? error.message : String(error);
-      continue;
-    }
-  }
-  return errorQuotaInfo(`Failed to fetch Antigravity quota data: ${lastErr}`);
+      },
+      { project: projectId }
+    ).pipe(
+      Effect.flatMap((attempt) => {
+        if (!attempt.ok) return Effect.fail(attempt.message);
+        const { result } = attempt;
+        if (result.statusCode < 200 || result.statusCode >= 300) {
+          return Effect.fail(`HTTP ${result.statusCode} ${result.raw}`);
+        }
+        const parsed = (() => {
+          try {
+            return JSON.parse(result.raw) as Json;
+          } catch {
+            return null;
+          }
+        })();
+        if (!parsed) return Effect.fail("response was not valid JSON");
+        return putQuotaCache(ctx, result).pipe(Effect.as(baseQuotaInfo("success", antigravityGroups(parsed))));
+      })
+    );
+
+  const combined = endpoints.reduce<Effect.Effect<AccountQuotaInfo, string> | null>(
+    (previous, endpoint) =>
+      previous === null ? attemptEndpoint(endpoint) : previous.pipe(Effect.catch(() => attemptEndpoint(endpoint))),
+    null
+  ) as Effect.Effect<AccountQuotaInfo, string>;
+
+  return combined.pipe(
+    Effect.catch((message) =>
+      Effect.succeed(errorQuotaInfo(`Failed to fetch Antigravity quota data: ${message}`))
+    )
+  );
 }
 
 function antigravityGroups(payload: Json): QuotaGroupDisplay[] {

@@ -9,7 +9,8 @@
     "./merge": "./model/merge.ts",
     "./probes": "./model/probes.ts",
     "./registry": "./registry.ts",
-    "./runtime": "./runtime.ts"
+    "./runtime": "./runtime.ts",
+    "./errors": "./errors.ts"
   },
   "imports": {
     "#models/*": "./*"
@@ -20,6 +21,7 @@
     "check": "bun check"
   },
   "dependencies": {
+    "effect": "4.0.4",
     "fuzzball": "^2.2.6"
   },
   "devDependencies": {
