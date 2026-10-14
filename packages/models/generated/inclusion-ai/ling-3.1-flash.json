@@ -1,6 +1,5 @@
 {
   "providers": [
-    "opencode",
     "zenmux"
   ],
   "reasoning": true,
@@ -33,11 +32,6 @@
     }
   },
   "providerConfig": {
-    "opencode": {
-      "upstream": "ling-3.1-flash-free",
-      "contextWindow": 262144,
-      "maxOutputTokens": 32768
-    },
     "zenmux": {
       "upstream": "inclusionai/ling-3.1-flash",
       "contextWindow": 262144,
