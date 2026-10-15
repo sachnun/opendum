@@ -2,6 +2,7 @@ export type {
   AccountQuotaInfo,
   QuotaAccount,
   QuotaContext,
+  QuotaFetcher,
   QuotaGroupDisplay,
   QuotaJournal,
 } from "./types.js";
@@ -19,7 +20,7 @@ export {
   parseResetIso,
 } from "./helpers.js";
 export { encodeQuery, getQuotaJson, putQuotaCache } from "./cache.js";
-export { fetchAccountQuota, isQuotaProvider, quotaProvidersWithoutToken } from "./registry.js";
+export { QuotaRegistry, fetchAccountQuota, isQuotaProvider, quotaProvidersWithoutToken } from "./registry.js";
 export { quotaFallbackTier } from "./fetchers/shared.js";
 export { QuotaFetchFailure, QuotaJournalFailure } from "../core/errors.js";
 export type { QuotaFailure } from "../core/errors.js";

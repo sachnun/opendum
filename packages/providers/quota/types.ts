@@ -1,3 +1,5 @@
+import type { Effect } from "effect";
+
 export type QuotaGroupDisplay = {
   name: string;
   displayName: string;
@@ -26,11 +28,16 @@ export type QuotaAccount = {
   accessToken?: string;
 };
 
-export type QuotaFetcher = (
-  account: QuotaAccount,
-  accessToken: string,
-  forceRefresh: boolean
-) => Promise<AccountQuotaInfo>;
+export interface QuotaFetcher {
+  readonly provider: string;
+  readonly withoutToken: boolean;
+  fetch(
+    ctx: QuotaContext,
+    account: QuotaAccount,
+    accessToken: string,
+    forceRefresh: boolean
+  ): Effect.Effect<AccountQuotaInfo>;
+}
 
 export type QuotaJournal = {
   get(key: string): Promise<string | null>;
