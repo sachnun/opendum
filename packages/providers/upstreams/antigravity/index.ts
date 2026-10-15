@@ -276,7 +276,7 @@ export class AntigravityProvider implements Provider, CredentialRefresher, Refre
     "https://cloudcode-pa.googleapis.com",
   ];
   private readonly defaultProject = "rising-fact-p41fc";
-  private readonly userAgent = `antigravity/2.23.0 ${process.platform}/${process.arch}`;
+  private readonly userAgent = `antigravity/2.23.1 ${process.platform}/${process.arch}`;
   private readonly apiClient = "google-cloud-sdk vscode_cloudshelleditor/0.1";
   private readonly clientMetadata =
     '{"ideType":"IDE_UNSPECIFIED","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI"}';
