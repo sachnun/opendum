@@ -26,19 +26,25 @@ import {
 import type { FallbackState } from "../core/fallback.js";
 import type { Provider, ProviderFailure, ProviderRequest } from "../types.js";
 
-const CHAT_ENDPOINT = "https://opencode.ai/zen/v1/chat/completions";
-const RESPONSES_ENDPOINT = "https://opencode.ai/zen/v1/responses";
-const MESSAGES_ENDPOINT = "https://opencode.ai/zen/v1/messages";
-const FALLBACK_CHAT_ENDPOINT = "https://unroxy.koyeb.app/opencode.ai/zen/v1/chat/completions";
-const FALLBACK_RESPONSES_ENDPOINT = "https://unroxy.koyeb.app/opencode.ai/zen/v1/responses";
-const FALLBACK_MESSAGES_ENDPOINT = "https://unroxy.koyeb.app/opencode.ai/zen/v1/messages";
+const CHAT_ENDPOINT = "https://opencode.ai/inference/v1/chat/completions";
+const RESPONSES_ENDPOINT = "https://opencode.ai/inference/v1/responses";
+const MESSAGES_ENDPOINT = "https://opencode.ai/inference/v1/messages";
+const FALLBACK_CHAT_ENDPOINT = "https://unroxy.koyeb.app/opencode.ai/inference/v1/chat/completions";
+const FALLBACK_RESPONSES_ENDPOINT = "https://unroxy.koyeb.app/opencode.ai/inference/v1/responses";
+const FALLBACK_MESSAGES_ENDPOINT = "https://unroxy.koyeb.app/opencode.ai/inference/v1/messages";
 const PUBLIC_API_KEY = "public";
 const CLIENT = "cli";
 const USER_AGENT = "opencode/1.19.0";
 const ID_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-const FINGERPRINT_TOOLS = ["bash", "glob", "grep", "read"];
+const FINGERPRINT_TOOL_NAMES = ["bash", "edit", "glob", "grep", "read", "skill", "task", "todowrite", "webfetch", "websearch", "write"];
+const SCHEMA_REQUIRED_TOOL_NAMES = new Set(FINGERPRINT_TOOL_NAMES);
+const REQUIRED_TOOL_NAME = "read";
 const FINGERPRINT_DESCRIPTION =
   "Do not call. Reserved OpenCode fingerprint stub with no implementation; use the host application's own tools instead.";
+const FINGERPRINT_PARAMETERS = {
+  type: "object",
+  properties: { description: { type: "string", description: "Reserved; never called." } },
+};
 
 export const SUPPORTED_OPENCODE = new Set([
   "model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream",
@@ -71,30 +77,43 @@ function opencodeId(prefix: string, descending: boolean): string {
   return out;
 }
 
-function canonicalId(prefix: string, seed: string, descending: boolean): string {
-  const sum = createHash("sha256").update(seed).digest();
-  const time = Buffer.from(sum.subarray(0, 6));
-  const counter = descending ? 0xffe : 0x001;
-  time[4] = (time[4] & 0xf0) | ((counter >> 8) & 0x0f);
-  time[5] = counter & 0xff;
-  let out = `${prefix}_${time.toString("hex")}`;
-  for (const byte of sum.subarray(6, 20)) out += ID_ALPHABET[byte % ID_ALPHABET.length];
+const SESSION_PATTERN = /^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$/;
+const REQUEST_PATTERN = /^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$/;
+const SESSION_COUNTER_HEX = "ffe";
+
+/**
+ * Whether a session id carries the shape the free tier accepts. The upstream validates the
+ * last 12 bits as an inverted per-millisecond counter and refuses anything outside
+ * `0xfc0..0xfff`; the remaining 36 bits are not inspected.
+ */
+function isCanonicalSession(seed: string): boolean {
+  if (!SESSION_PATTERN.test(seed)) return false;
+  const counter = Number.parseInt(seed.slice(13, 16), 16);
+  return counter >= 0xfc0;
+}
+
+/**
+ * Render an id the free tier accepts, deterministically from a seed so one conversation
+ * keeps one upstream session. Only the last 12 bits are constrained, so they are pinned to
+ * the counter the official client sends while the rest is derived from the seed.
+ */
+function canonicalId(prefix: string, seed: string): string {
+  const hash = createHash("sha256").update(`${prefix}\u0000${seed}`).digest();
+  const time = `${hash.subarray(0, 6).toString("hex").slice(0, 9)}${SESSION_COUNTER_HEX}`;
+  let out = `${prefix}_${time}`;
+  for (const byte of hash.subarray(6, 20)) out += ID_ALPHABET[byte % ID_ALPHABET.length];
   return out;
 }
 
-const SESSION_PATTERN = /^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$/;
-const REQUEST_PATTERN = /^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$/;
-
 function sessionId(seed: string): string {
-  if (SESSION_PATTERN.test(seed)) return seed;
-  if (!seed) return opencodeId("ses", true);
-  return canonicalId("ses", seed, true);
+  if (isCanonicalSession(seed)) return seed;
+  return canonicalId("ses", seed || "opencode-session");
 }
 
 function requestId(seed: string): string {
   if (REQUEST_PATTERN.test(seed)) return seed;
   if (!seed) return opencodeId("msg", false);
-  return canonicalId("msg", seed, false);
+  return canonicalId("msg", seed);
 }
 
 function opencodeHeaders(body: Json): Record<string, string> {
@@ -106,30 +125,70 @@ function opencodeHeaders(body: Json): Record<string, string> {
     "User-Agent": USER_AGENT,
     "X-Opencode-Project": project,
     "X-Opencode-Session": session,
+    "X-Opencode-Session-Id": session,
     "X-Opencode-Request": request,
     "X-Opencode-Client": CLIENT,
   };
 }
 
+function toolName(raw: unknown): string {
+  const tool = (raw ?? {}) as Json;
+  const fn = (tool.function ?? {}) as Json;
+  return stringValue(fn.name) || stringValue(tool.name);
+}
+
+function hasSchema(raw: unknown): boolean {
+  const tool = (raw ?? {}) as Json;
+  const fn = (tool.function ?? {}) as Json;
+  const parameters = (fn.parameters ?? tool.parameters ?? tool.input_schema ?? tool.inputSchema) as Json | undefined;
+  const properties = parameters?.properties;
+  return Boolean(properties && typeof properties === "object" && Object.keys(properties as Json).length > 0);
+}
+
+function fingerprintTool(name: string): Json {
+  return {
+    type: "function",
+    function: {
+      name,
+      description: FINGERPRINT_DESCRIPTION,
+      parameters: FINGERPRINT_PARAMETERS,
+    },
+  };
+}
+
+/**
+ * Bring a Chat Completions body up to the free tier request contract: the upstream
+ * answers 403 FreeTierError unless the request streams, declares at least one tool, and
+ * carries a `read` tool whose `parameters.properties` is non-empty.
+ */
 function ensureFingerprintTools(body: Json): void {
-  const tools = Array.isArray(body.tools) ? body.tools : [];
-  const present = new Set<string>();
-  for (const raw of tools) {
-    const tool = (raw ?? {}) as Json;
-    const fn = (tool.function ?? {}) as Json;
-    const name = stringValue(fn.name) || stringValue(tool.name);
-    if (name) present.add(name);
+  const tools = Array.isArray(body.tools) ? [...body.tools] : [];
+  for (let index = 0; index < tools.length; index += 1) {
+    const name = toolName(tools[index]);
+    if (!SCHEMA_REQUIRED_TOOL_NAMES.has(name) || hasSchema(tools[index])) continue;
+    const existing = (tools[index] ?? {}) as Json;
+    const fn = (existing.function ?? {}) as Json;
+    tools[index] = { ...existing, function: { ...fn, parameters: FINGERPRINT_PARAMETERS } };
   }
-  for (const name of FINGERPRINT_TOOLS) {
-    if (present.has(name)) continue;
-    tools.push({
-      type: "function",
-      function: {
-        name,
-        description: FINGERPRINT_DESCRIPTION,
-        parameters: { type: "object", properties: {} },
-      },
-    });
+  if (!tools.some((tool) => toolName(tool) === REQUIRED_TOOL_NAME)) {
+    tools.unshift(fingerprintTool(REQUIRED_TOOL_NAME));
+  }
+  body.tools = tools;
+}
+
+/**
+ * The Responses surface takes the flat tool shape, so it needs its own contract pass:
+ * streaming plus at least one flat tool with a non-empty parameter object.
+ */
+function ensureResponsesFingerprintTools(body: Json): void {
+  const tools = Array.isArray(body.tools) ? [...body.tools] : [];
+  for (let index = 0; index < tools.length; index += 1) {
+    const name = toolName(tools[index]);
+    if (!SCHEMA_REQUIRED_TOOL_NAMES.has(name) || hasSchema(tools[index])) continue;
+    tools[index] = { ...(tools[index] as Json), parameters: FINGERPRINT_PARAMETERS };
+  }
+  if (!tools.some((tool) => toolName(tool) === REQUIRED_TOOL_NAME)) {
+    tools.unshift(fingerprintTool(REQUIRED_TOOL_NAME));
   }
   body.tools = tools;
 }
@@ -165,7 +224,9 @@ export class OpencodeProvider implements Provider {
     if (model.startsWith("opencode/")) model = model.slice("opencode/".length);
     const modelName = this.registry.upstreamModelName(model, "opencode");
     const headers = opencodeHeaders(body);
-    ensureFingerprintTools(body);
+    body.stream = true;
+    if (this.requiresResponsesAPI(model)) ensureResponsesFingerprintTools(body);
+    else ensureFingerprintTools(body);
     const direct = this.transport.direct;
 
     if (this.requiresResponsesAPI(model)) {
