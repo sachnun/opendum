@@ -6,21 +6,18 @@ import { ProviderCredentialFailure } from "../../core/errors.js";
 import { OAuthTokenExchange } from "../../core/oauth-token-exchange.js";
 import { KIRO_REFRESH_ENDPOINT } from "../../endpoints.js";
 import {
-  KiroParserState,
-  KiroThinkingSplitter,
+  KiroStreamParser,
   buildKiroRequest,
   convertKiroEventsToCompletion,
   kiroApiUrlForAccount,
   kiroErrorMessage,
   kiroNumberAsFloat,
   kiroReasoningContent,
-  kiroThinkingRequested,
   kiroUsage,
   kiroUsageFromContext,
   lastModelSegment,
   normalizeKiroTier,
   parseKiroBracketToolCalls,
-  parseKiroJsonEvents,
   type Json,
 } from "./transform.js";
 import type {
@@ -106,7 +103,6 @@ export class KiroProvider implements Provider, CredentialRefresher, RefreshBuffe
   makeRequest(request: ProviderRequest): Effect.Effect<Response, ProviderFailure> {
     const body = request.body;
     const modelName = lastModelSegment(stringValue(body.model));
-    const thinkingEnabled = kiroThinkingRequested(this.registry, body);
     const payload = buildKiroRequest(this.registry, body);
     const accountId = request.account.accountId?.trim();
     if (accountId) payload.profileArn = accountId;
@@ -144,7 +140,7 @@ export class KiroProvider implements Provider, CredentialRefresher, RefreshBuffe
         }
 
         if (request.stream) {
-          return new Response(kiroSseStream(resp.body, modelName, thinkingEnabled), {
+          return new Response(kiroSseStream(resp.body, modelName), {
             status: 200,
             headers: {
               "Content-Type": "text/event-stream",
@@ -154,20 +150,15 @@ export class KiroProvider implements Provider, CredentialRefresher, RefreshBuffe
           });
         }
         const rawText = yield* Effect.promise(() => resp.text());
-        const events = parseKiroJsonEvents(rawText, new KiroParserState());
-        return jsonResponse(200, convertKiroEventsToCompletion(events, modelName, thinkingEnabled));
+        const events = new KiroStreamParser().feed(rawText);
+        return jsonResponse(200, convertKiroEventsToCompletion(events, modelName));
       })
     );
   }
 }
 
-async function* transformKiroSse(
-  source: ReadableStream<Uint8Array>,
-  model: string,
-  parseThinking: boolean
-): AsyncGenerator<string> {
-  const state = new KiroParserState();
-  const splitter = new KiroThinkingSplitter(parseThinking);
+async function* transformKiroSse(source: ReadableStream<Uint8Array>, model: string): AsyncGenerator<string> {
+  const parser = new KiroStreamParser();
   const completionId = randomId("chatcmpl");
   let sentRole = false;
   let toolCallCount = 0;
@@ -228,7 +219,7 @@ async function* transformKiroSse(
     }
     if (typeof event.content === "string" && event.followupPrompt === undefined) {
       totalContent += event.content;
-      let [contentDelta, reasoningDelta] = splitter.process(event.content, false);
+      let [contentDelta, reasoningDelta] = parser.processContent(event.content, false);
       if (hasNativeReasoning && reasoningDelta) reasoningDelta = "";
       emitContent(contentDelta, reasoningDelta);
       void contentDelta;
@@ -272,19 +263,19 @@ async function* transformKiroSse(
       const { done, value } = await reader.read();
       if (done) break;
       const text = decoder.decode(value, { stream: true });
-      for (const event of parseKiroJsonEvents(text, state)) processEvent(event);
+      for (const event of parser.feed(text)) processEvent(event);
       for (const chunk of pending.splice(0)) yield chunk;
     }
     const tail = decoder.decode();
     if (tail) {
-      for (const event of parseKiroJsonEvents(tail, state)) processEvent(event);
+      for (const event of parser.feed(tail)) processEvent(event);
     }
-    for (const event of parseKiroJsonEvents("", state)) processEvent(event);
+    for (const event of parser.finish()) processEvent(event);
   } finally {
     reader.releaseLock();
   }
 
-  let [flushContent, flushReasoning] = splitter.flush();
+  let [flushContent, flushReasoning] = parser.flushContent();
   if (hasNativeReasoning) flushReasoning = "";
   emitContent(flushContent, flushReasoning);
   for (const call of parseKiroBracketToolCalls(totalContent)) {
@@ -310,13 +301,9 @@ async function* transformKiroSse(
   void flushReasoning;
 }
 
-function kiroSseStream(
-  source: ReadableStream<Uint8Array>,
-  model: string,
-  parseThinking: boolean
-): ReadableStream<Uint8Array> {
+function kiroSseStream(source: ReadableStream<Uint8Array>, model: string): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
-  const iterator = transformKiroSse(source, model, parseThinking)[Symbol.asyncIterator]();
+  const iterator = transformKiroSse(source, model)[Symbol.asyncIterator]();
   return new ReadableStream<Uint8Array>({
     async pull(controller) {
       const { done, value } = await iterator.next();
@@ -332,4 +319,4 @@ function kiroSseStream(
   });
 }
 
-export { normalizeKiroTier, parseKiroJsonEvents, convertKiroEventsToCompletion };
+export { KiroStreamParser, normalizeKiroTier, convertKiroEventsToCompletion };

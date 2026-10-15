@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { convertKiroEventsToCompletion } from "./transform.js";
+import { KiroStreamParser, convertKiroEventsToCompletion } from "./transform.js";
 
 type Json = Record<string, unknown>;
 
@@ -20,8 +20,7 @@ describe("convertKiroEventsToCompletion", () => {
         { stop: true },
         { usage: { inputTokens: 3, outputTokens: 4 } },
       ],
-      "claude-sonnet-4.5",
-      true
+      "claude-sonnet-4.5"
     );
 
     expect(completion.id).toMatch(/^chatcmpl/);
@@ -40,8 +39,7 @@ describe("convertKiroEventsToCompletion", () => {
   it("extracts bracket tool calls out of the content", () => {
     const completion = convertKiroEventsToCompletion(
       [{ content: 'sure [Called search with args:{"q":"x"}] done' }, { usage: { inputTokens: 1, outputTokens: 2 } }],
-      "m",
-      true
+      "m"
     );
 
     const { message, finishReason } = choiceOf(completion);
@@ -53,7 +51,7 @@ describe("convertKiroEventsToCompletion", () => {
   });
 
   it("nulls empty content, defaults blank arguments and derives usage from context", () => {
-    const completion = convertKiroEventsToCompletion([{ name: "f", toolUseId: "toolu_2" }, { stop: true }], "m", true);
+    const completion = convertKiroEventsToCompletion([{ name: "f", toolUseId: "toolu_2" }, { stop: true }], "m");
 
     const { message, finishReason } = choiceOf(completion);
     expect(message.content).toBeNull();
@@ -63,5 +61,37 @@ describe("convertKiroEventsToCompletion", () => {
     ]);
     expect(finishReason).toBe("tool_calls");
     expect(completion.usage).toEqual({ prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 });
+  });
+});
+
+describe("KiroStreamParser", () => {
+  it("frames json events across chunk boundaries", () => {
+    const parser = new KiroStreamParser();
+    expect(parser.feed('{"con')).toEqual([]);
+    expect(parser.feed('tent":"hel')).toEqual([]);
+    expect(parser.feed('lo"}')).toEqual([{ content: "hello" }]);
+    expect(parser.feed('{"toolUseEvent":{"name":"search","toolUseId":"t1","input":"{}"}}')).toEqual([
+      { name: "search", toolUseId: "t1", input: "{}", type: "toolUseEvent" },
+    ]);
+    expect(parser.finish()).toEqual([]);
+  });
+
+  it("keeps an unterminated json tail without emitting on finish", () => {
+    const parser = new KiroStreamParser();
+    expect(parser.feed('{"content":"unterminated')).toEqual([]);
+    expect(parser.finish()).toEqual([]);
+  });
+
+  it("extracts thinking across chunks and holds back a partial tag", () => {
+    const parser = new KiroStreamParser();
+    expect(parser.processContent("hi <thin")).toEqual(["", ""]);
+    expect(parser.processContent("king>because</thinking> ok")).toEqual(["hi  ok", "because"]);
+    expect(parser.flushContent()).toEqual(["", ""]);
+  });
+
+  it("holds back a tail while waiting for a possible tag start", () => {
+    const parser = new KiroStreamParser();
+    expect(parser.processContent("0123456789abc")).toEqual(["01", ""]);
+    expect(parser.flushContent()).toEqual(["23456789abc", ""]);
   });
 });
