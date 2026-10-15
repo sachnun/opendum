@@ -1,4 +1,3 @@
-import { Effect } from "effect";
 import type { Provider, ProviderAccount } from "@opendum/providers";
 import { tierPolicyFor } from "./account-tier-policy.js";
 import { stringValue } from "./helpers.js";
@@ -13,16 +12,7 @@ export function isSyntheticProviderAccountId(accountId: string): boolean {
   return accountId === "opencode" || accountId.startsWith(AUTHLESS_ACCOUNT_PREFIX);
 }
 
-/**
- * Runs a best-effort promise-based side effect and discards both its result
- * and any failure, so fire-and-forget work can never fail a request.
- */
-export function ignoringErrors<A>(fn: () => Promise<A>) {
-  return Effect.tryPromise({
-    try: fn,
-    catch: (error) => (error instanceof Error ? error : new Error(String(error))),
-  }).pipe(Effect.ignore);
-}
+export { ignoringErrors } from "@opendum/core/best-effort";
 
 export function normalizeAccessMode(mode: string): string {
   return mode === "whitelist" || mode === "blacklist" ? mode : "all";

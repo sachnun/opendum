@@ -1,5 +1,6 @@
 import { AuthService } from "@opendum/auth";
 import type { AccountModelAvailability } from "@opendum/auth";
+import { Effect } from "effect";
 import type { OpendumRedis } from "@opendum/core/redis";
 import { getRedisClient } from "../redis.js";
 import { registry } from "./models.js";
@@ -62,7 +63,7 @@ export async function getAccountModelAvailability(
   options: { includeInactiveAccounts?: boolean } = {}
 ): Promise<AccountModelAvailability> {
   const service = new AuthService(registry, dummyRedis);
-  return service.getAccountModelAvailabilityWithSharing(userId, false, options);
+  return Effect.runPromise(service.getAccountModelAvailabilityWithSharing(userId, false, options));
 }
 
 export function isModelUsableByAccounts(

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import type { AuthResult, AuthService, ModelValidationResult } from "@opendum/auth";
+import { Effect } from "effect";
 import type { ProviderRegistry } from "@opendum/providers";
 import type { Registry } from "@opendum/models/runtime";
 import type { OpendumRedis } from "@opendum/core/redis";
@@ -100,9 +101,9 @@ const chatBody = { model: "gpt-4o", messages: [{ role: "user", content: "hi" }] 
 describe("ProxyService.handle", () => {
   it("rejects an invalid API key with 401", async () => {
     const auth = {
-      validateAPIKey: async () => ({ ...validAuth(), valid: false, error: "Invalid API key" }),
-      validateModelForUser: async () => validModel(),
-      bumpAnalyticsCacheVersionThrottled: async () => undefined,
+      validateAPIKey: () => Effect.succeed({ ...validAuth(), valid: false, error: "Invalid API key" }),
+      validateModelForUser: () => Effect.succeed(validModel()),
+      bumpAnalyticsCacheVersionThrottled: () => Effect.void,
     } as unknown as AuthService;
     const service = buildService({ auth });
     const response = await service.handle(cfg, chatBody, "Bearer bad", "");
@@ -114,9 +115,10 @@ describe("ProxyService.handle", () => {
 
   it("rejects an invalid model with 400", async () => {
     const auth = {
-      validateAPIKey: async () => validAuth(),
-      validateModelForUser: async () => ({ ...validModel(), valid: false, model: "nope", error: "Invalid model: nope.", param: "model", code: "invalid_model" }),
-      bumpAnalyticsCacheVersionThrottled: async () => undefined,
+      validateAPIKey: () => Effect.succeed(validAuth()),
+      validateModelForUser: () =>
+        Effect.succeed({ ...validModel(), valid: false, model: "nope", error: "Invalid model: nope.", param: "model", code: "invalid_model" }),
+      bumpAnalyticsCacheVersionThrottled: () => Effect.void,
     } as unknown as AuthService;
     const service = buildService({ auth });
     const response = await service.handle(cfg, { ...chatBody, model: "nope" }, "Bearer ok", "");
@@ -128,12 +130,14 @@ describe("ProxyService.handle", () => {
 
   it("rejects a rate-limited request with 429", async () => {
     const auth = {
-      validateAPIKey: async () =>
-        validAuth({
-          rateLimitRules: [{ target: "gpt-4o", targetType: "model", perMinute: 1, perHour: null, perDay: null }],
-        }),
-      validateModelForUser: async () => validModel(),
-      bumpAnalyticsCacheVersionThrottled: async () => undefined,
+      validateAPIKey: () =>
+        Effect.succeed(
+          validAuth({
+            rateLimitRules: [{ target: "gpt-4o", targetType: "model", perMinute: 1, perHour: null, perDay: null }],
+          })
+        ),
+      validateModelForUser: () => Effect.succeed(validModel()),
+      bumpAnalyticsCacheVersionThrottled: () => Effect.void,
     } as unknown as AuthService;
     const service = buildService({ auth, redis: fakeRedis({ get: async () => "1" }) });
     const response = await service.handle(cfg, chatBody, "Bearer ok", "");
@@ -144,9 +148,9 @@ describe("ProxyService.handle", () => {
 
   it("returns 503 configuration_error when no accounts exist", async () => {
     const auth = {
-      validateAPIKey: async () => validAuth(),
-      validateModelForUser: async () => validModel(),
-      bumpAnalyticsCacheVersionThrottled: async () => undefined,
+      validateAPIKey: () => Effect.succeed(validAuth()),
+      validateModelForUser: () => Effect.succeed(validModel()),
+      bumpAnalyticsCacheVersionThrottled: () => Effect.void,
     } as unknown as AuthService;
     const service = buildService({ auth });
     const response = await service.handle(cfg, chatBody, "Bearer ok", "");
@@ -158,9 +162,9 @@ describe("ProxyService.handle", () => {
 
   it("rejects an invalid playground session with 401", async () => {
     const auth = {
-      validateAPIKey: async () => validAuth(),
-      validateModelForUser: async () => validModel(),
-      bumpAnalyticsCacheVersionThrottled: async () => undefined,
+      validateAPIKey: () => Effect.succeed(validAuth()),
+      validateModelForUser: () => Effect.succeed(validModel()),
+      bumpAnalyticsCacheVersionThrottled: () => Effect.void,
     } as unknown as AuthService;
     const service = buildService({ auth });
     const request = new Request("http://localhost/v1/chat/completions", {

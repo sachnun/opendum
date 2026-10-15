@@ -144,6 +144,6 @@ export class UsageRecorder implements StreamRecorder {
       duration: params.durationMs,
       createdAt: new Date(),
     });
-    await this.auth.bumpAnalyticsCacheVersionThrottled(params.userId);
+    await Effect.runPromise(this.auth.bumpAnalyticsCacheVersionThrottled(params.userId));
   }
 }

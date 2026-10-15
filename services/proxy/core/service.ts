@@ -184,7 +184,7 @@ export class ProxyService implements StreamRecorder {
       const playground = this.playground.authenticate(request);
       const authResult = playground.handled
         ? playground.result
-        : yield* Effect.promise(() => this.auth.validateAPIKey(authHeader));
+        : yield* this.auth.validateAPIKey(authHeader);
       if (!authResult.valid) {
         return this.routeError(cfg, { status: 401, message: authResult.error, type: "authentication_error" });
       }
@@ -202,13 +202,11 @@ export class ProxyService implements StreamRecorder {
         parsedRequest.modelParam = selector.model;
       }
 
-      const validation = yield* Effect.promise(() =>
-        this.auth.validateModelForUser(authResult.userId, parsedRequest.modelParam, {
-          mode: authResult.modelAccessMode,
-          models: authResult.modelAccessList,
-          roamingEnabled: authResult.roamingEnabled,
-        })
-      );
+      const validation = yield* this.auth.validateModelForUser(authResult.userId, parsedRequest.modelParam, {
+        mode: authResult.modelAccessMode,
+        models: authResult.modelAccessList,
+        roamingEnabled: authResult.roamingEnabled,
+      });
       if (!validation.valid) {
         return this.routeError(cfg, {
           status: 400,

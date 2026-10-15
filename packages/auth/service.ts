@@ -1,10 +1,10 @@
+import { Effect } from "effect";
 import { hashString } from "@opendum/core/crypto";
+import { ignoringErrors, tryAsync } from "@opendum/core/best-effort";
 import type { Registry } from "@opendum/models/runtime";
 import {
   analyticsVersionBumpKey,
   analyticsVersionKey,
-  apiKeyLastUsedKey,
-  apiKeyValidationKey,
   disabledModelsKey,
   type OpendumRedis,
 } from "@opendum/core/redis";
@@ -16,8 +16,13 @@ import {
   listDisabledModelsByAccounts,
   listDisabledModelsByUser,
   listSharedAccounts,
-  touchAPIKeyLastUsed,
 } from "@opendum/database/queries";
+import {
+  APIKeyCache,
+  INVALID_CACHE_TTL_SECONDS,
+  VALID_CACHE_TTL_SECONDS,
+  type CachedAPIKeyValidation,
+} from "./api-key-cache.js";
 import {
   type CustomProviderModelRecord,
   type CustomProviderReader,
@@ -33,33 +38,17 @@ import {
   emptyAvailability,
 } from "./types.js";
 
-const VALID_TTL_SECONDS = 45;
-const INVALID_TTL_SECONDS = 10;
-const LAST_USED_TTL_SECONDS = 60;
 const DISABLED_MODELS_TTL_SECONDS = 60;
 const ANALYTICS_VERSION_TTL_SECONDS = 30 * 24 * 60 * 60;
 const ANALYTICS_BUMP_TTL_SECONDS = 15;
 
 const AUTHLESS_PROVIDER_NAMES = ["opencode"];
 
-type CacheValue = {
-  valid: boolean;
-  userId?: string;
-  apiKeyId?: string;
-  modelAccessMode?: string;
-  modelAccessList?: string[];
-  accountAccessMode?: string;
-  accountAccessList?: string[];
-  roamingEnabled?: boolean;
-  expiresAtMs?: number;
-  rateLimitRules?: RateLimitRule[];
-  error?: string;
-};
-
 export class AuthService {
   private readonly registry: Registry;
   private readonly redis: OpendumRedis;
   private readonly customProviders: CustomProviderReader;
+  private readonly keyCache: APIKeyCache;
 
   constructor(
     registry: Registry,
@@ -69,217 +58,222 @@ export class AuthService {
     this.registry = registry;
     this.redis = redis;
     this.customProviders = customProviders;
+    this.keyCache = new APIKeyCache(redis);
   }
 
-  async validateAPIKey(authHeader: string): Promise<AuthResult> {
-    if (!authHeader.trim()) {
-      return emptyAuthResult("Missing Authorization header");
-    }
-    const token = bearerToken(authHeader);
-    if (!token) {
-      return emptyAuthResult("Invalid Authorization header format");
-    }
-
-    const keyHash = hashString(token);
-    const cached = await this.getCachedAPIKeyValidation(keyHash);
-    if (cached) {
-      if (!cached.valid) {
-        return emptyAuthResult(defaultString(cached.error ?? "", "Invalid API key"));
+  validateAPIKey(authHeader: string): Effect.Effect<AuthResult> {
+    return Effect.gen({ self: this }, function* () {
+      if (!authHeader.trim()) {
+        return emptyAuthResult("Missing Authorization header");
       }
-      if (cached.expiresAtMs === undefined || cached.expiresAtMs > Date.now()) {
-        void this.touchAPIKeyLastUsed(cached.apiKeyId ?? "");
-        return this.resultFromCache(cached);
+      const token = bearerToken(authHeader);
+      if (!token) {
+        return emptyAuthResult("Invalid Authorization header format");
       }
-      await this.invalidateAPIKeyValidation(keyHash, cached.apiKeyId ?? "");
-    }
 
-    const apiKey = await getAPIKeyByHash(keyHash);
-    if (!apiKey) {
-      await this.setCachedAPIKeyValidation(
-        keyHash,
-        { valid: false, error: "Invalid API key" },
-        INVALID_TTL_SECONDS
-      );
-      return emptyAuthResult("Invalid API key");
-    }
+      const keyHash = hashString(token);
+      const cached = yield* this.keyCache.get(keyHash);
+      if (cached) {
+        if (!cached.valid) {
+          return emptyAuthResult(defaultString(cached.error ?? "", "Invalid API key"));
+        }
+        if (cached.expiresAtMs === undefined || cached.expiresAtMs > Date.now()) {
+          yield* Effect.forkDetach(this.keyCache.touch(cached.apiKeyId ?? ""));
+          return this.resultFromCache(cached);
+        }
+        yield* this.invalidateAPIKeyValidation(keyHash, cached.apiKeyId ?? "");
+      }
 
-    if (!apiKey.isActive) {
-      await this.setCachedAPIKeyValidation(
-        keyHash,
-        { valid: false, apiKeyId: apiKey.id, error: "API key has been revoked" },
-        INVALID_TTL_SECONDS
-      );
-      return emptyAuthResult("API key has been revoked");
-    }
+      const apiKey = yield* Effect.promise(() => getAPIKeyByHash(keyHash));
+      if (!apiKey) {
+        yield* this.keyCache.set(
+          keyHash,
+          { valid: false, error: "Invalid API key" },
+          INVALID_CACHE_TTL_SECONDS
+        );
+        return emptyAuthResult("Invalid API key");
+      }
 
-    if (apiKey.expiresAt && apiKey.expiresAt.getTime() < Date.now()) {
-      void deactivateAPIKey(apiKey.id);
-      await this.setCachedAPIKeyValidation(
-        keyHash,
-        { valid: false, apiKeyId: apiKey.id, error: "API key has expired" },
-        INVALID_TTL_SECONDS
-      );
-      return emptyAuthResult("API key has expired");
-    }
+      if (!apiKey.isActive) {
+        yield* this.keyCache.set(
+          keyHash,
+          { valid: false, apiKeyId: apiKey.id, error: "API key has been revoked" },
+          INVALID_CACHE_TTL_SECONDS
+        );
+        return emptyAuthResult("API key has been revoked");
+      }
 
-    const rules = await this.getRateLimitRules(apiKey.id);
-    const modelMode = normalizeAccessMode(apiKey.modelAccessMode);
-    const modelList = this.normalizeModelAccessList(apiKey.modelAccessList);
-    const accountMode = normalizeAccessMode(apiKey.accountAccessMode);
-    const accountList = normalizeAccountList(apiKey.accountAccessList);
+      if (apiKey.expiresAt && apiKey.expiresAt.getTime() < Date.now()) {
+        yield* Effect.forkDetach(Effect.promise(() => deactivateAPIKey(apiKey.id)));
+        yield* this.keyCache.set(
+          keyHash,
+          { valid: false, apiKeyId: apiKey.id, error: "API key has expired" },
+          INVALID_CACHE_TTL_SECONDS
+        );
+        return emptyAuthResult("API key has expired");
+      }
 
-    let expiresAtMs: number | undefined;
-    let cacheTtl = VALID_TTL_SECONDS;
-    if (apiKey.expiresAt) {
-      expiresAtMs = apiKey.expiresAt.getTime();
-      const untilExpiry = (apiKey.expiresAt.getTime() - Date.now()) / 1000;
-      if (untilExpiry > 0 && untilExpiry < cacheTtl) cacheTtl = untilExpiry;
-      if (cacheTtl < 1) cacheTtl = 1;
-    }
+      const rules = yield* this.getRateLimitRules(apiKey.id);
+      const modelMode = normalizeAccessMode(apiKey.modelAccessMode);
+      const modelList = this.normalizeModelAccessList(apiKey.modelAccessList);
+      const accountMode = normalizeAccessMode(apiKey.accountAccessMode);
+      const accountList = normalizeAccountList(apiKey.accountAccessList);
 
-    const value: CacheValue = {
-      valid: true,
-      userId: apiKey.userId,
-      apiKeyId: apiKey.id,
-      modelAccessMode: modelMode,
-      modelAccessList: modelList,
-      accountAccessMode: accountMode,
-      accountAccessList: accountList,
-      roamingEnabled: apiKey.roamingEnabled,
-      expiresAtMs,
-      rateLimitRules: rules,
-    };
-    await this.setCachedAPIKeyValidation(keyHash, value, cacheTtl);
-    void this.touchAPIKeyLastUsed(apiKey.id);
-    return this.resultFromCache(value);
+      let expiresAtMs: number | undefined;
+      let cacheTtl = VALID_CACHE_TTL_SECONDS;
+      if (apiKey.expiresAt) {
+        expiresAtMs = apiKey.expiresAt.getTime();
+        const untilExpiry = (apiKey.expiresAt.getTime() - Date.now()) / 1000;
+        if (untilExpiry > 0 && untilExpiry < cacheTtl) cacheTtl = untilExpiry;
+        if (cacheTtl < 1) cacheTtl = 1;
+      }
+
+      const value: CachedAPIKeyValidation = {
+        valid: true,
+        userId: apiKey.userId,
+        apiKeyId: apiKey.id,
+        modelAccessMode: modelMode,
+        modelAccessList: modelList,
+        accountAccessMode: accountMode,
+        accountAccessList: accountList,
+        roamingEnabled: apiKey.roamingEnabled,
+        expiresAtMs,
+        rateLimitRules: rules,
+      };
+      yield* this.keyCache.set(keyHash, value, cacheTtl);
+      yield* Effect.forkDetach(this.keyCache.touch(apiKey.id));
+      return this.resultFromCache(value);
+    });
   }
 
-  async invalidateAPIKeyValidation(keyHash: string, apiKeyId: string): Promise<void> {
-    const keys = [apiKeyValidationKey(keyHash)];
-    if (apiKeyId) keys.push(apiKeyLastUsedKey(apiKeyId));
-    try {
-      await this.redis.del(keys);
-    } catch {
-      return;
-    }
+  invalidateAPIKeyValidation(keyHash: string, apiKeyId: string): Effect.Effect<void> {
+    return this.keyCache.invalidate(keyHash, apiKeyId);
   }
 
-  async disabledModelSetForUser(userId: string): Promise<Set<string>> {
-    const cached = await this.getCachedDisabledModels(userId);
-    if (cached) return new Set(cached);
-    const rows = await listDisabledModelsByUser(userId);
-    const modelList = this.normalizeDisabledModelList(rows.map((row) => row.trim()));
-    await this.setCachedDisabledModels(userId, modelList);
-    return new Set(modelList);
+  disabledModelSetForUser(userId: string): Effect.Effect<Set<string>> {
+    return Effect.gen({ self: this }, function* () {
+      const cached = yield* this.getCachedDisabledModels(userId);
+      if (cached) return new Set(cached);
+      const rows = yield* Effect.promise(() => listDisabledModelsByUser(userId));
+      const modelList = this.normalizeDisabledModelList(rows.map((row) => row.trim()));
+      yield* this.setCachedDisabledModels(userId, modelList);
+      return new Set(modelList);
+    });
   }
 
-  async isModelDisabledForUser(userId: string, model: string): Promise<boolean> {
-    const set = await this.disabledModelSetForUser(userId);
-    return set.has(this.registry.resolveAlias(model));
+  isModelDisabledForUser(userId: string, model: string): Effect.Effect<boolean> {
+    return Effect.gen({ self: this }, function* () {
+      const set = yield* this.disabledModelSetForUser(userId);
+      return set.has(this.registry.resolveAlias(model));
+    });
   }
 
-  async getAccountModelAvailabilityWithSharing(
+  getAccountModelAvailabilityWithSharing(
     userId: string,
     includeShared: boolean,
     options: { includeInactiveAccounts?: boolean } = {}
-  ): Promise<AccountModelAvailability> {
-    const availability = emptyAvailability();
+  ): Effect.Effect<AccountModelAvailability> {
+    return Effect.gen({ self: this }, function* () {
+      const availability = emptyAvailability();
 
-    for (const provider of AUTHLESS_PROVIDER_NAMES) {
-      availability.activeProviders.add(provider);
-      availability.accountCountByProvider.set(provider, 1);
-      availability.activeAccountIdsByProvider.set(provider, [provider]);
-    }
-    for (const [provider, models] of this.registry.authlessProviderModels()) {
-      if (models.length === 0) continue;
-      availability.activeProviders.add(provider);
-      availability.accountCountByProvider.set(
-        provider,
-        (availability.accountCountByProvider.get(provider) ?? 0) + 1
-      );
-      availability.activeAccountIdsByProvider.set(provider, [
-        ...(availability.activeAccountIdsByProvider.get(provider) ?? []),
-        provider,
-      ]);
-      const set = availability.authlessProviderModels.get(provider) ?? new Set<string>();
-      for (const model of models) set.add(model);
-      availability.authlessProviderModels.set(provider, set);
-    }
-
-    const now = new Date();
-    const accounts = await listActiveAccountTiers(userId, now, options.includeInactiveAccounts === true);
-    const accountProvider = new Map<string, string>();
-    const accountIds: string[] = [];
-    for (const account of accounts) {
-      availability.activeProviders.add(account.provider);
-      availability.accountCountByProvider.set(
-        account.provider,
-        (availability.accountCountByProvider.get(account.provider) ?? 0) + 1
-      );
-      const list = availability.activeAccountIdsByProvider.get(account.provider) ?? [];
-      list.push(account.id);
-      availability.activeAccountIdsByProvider.set(account.provider, list);
-      accountProvider.set(account.id, account.provider);
-      accountIds.push(account.id);
-      if (account.tier && account.tier.trim()) {
-        availability.accountTierById.set(account.id, account.tier.trim().toLowerCase());
+      for (const provider of AUTHLESS_PROVIDER_NAMES) {
+        availability.activeProviders.add(provider);
+        availability.accountCountByProvider.set(provider, 1);
+        availability.activeAccountIdsByProvider.set(provider, [provider]);
       }
-    }
-
-    if (accountIds.length > 0) {
-      const disabledRows = await listDisabledModelsByAccounts(accountIds);
-      for (const row of disabledRows) {
-        const provider = accountProvider.get(row.providerAccountId);
-        if (!provider) continue;
-        const key = `${provider}:${this.registry.resolveAlias(row.model)}`;
-        availability.disabledCountByProviderModel.set(
-          key,
-          (availability.disabledCountByProviderModel.get(key) ?? 0) + 1
+      for (const [provider, models] of this.registry.authlessProviderModels()) {
+        if (models.length === 0) continue;
+        availability.activeProviders.add(provider);
+        availability.accountCountByProvider.set(
+          provider,
+          (availability.accountCountByProvider.get(provider) ?? 0) + 1
         );
+        availability.activeAccountIdsByProvider.set(provider, [
+          ...(availability.activeAccountIdsByProvider.get(provider) ?? []),
+          provider,
+        ]);
+        const set = availability.authlessProviderModels.get(provider) ?? new Set<string>();
+        for (const model of models) set.add(model);
+        availability.authlessProviderModels.set(provider, set);
       }
-    }
 
-    const { aliased, standalone } = await this.customProviderModelSets(userId);
-    for (const [slug, models] of aliased) {
-      if ((availability.accountCountByProvider.get(slug) ?? 0) === 0) continue;
-      availability.customProviderModels.set(slug, models);
-    }
-    for (const [slug, models] of standalone) {
-      availability.customProviderStandaloneModels.set(slug, models);
-    }
-
-    if (!includeShared) return availability;
-
-    const sharedAccounts = await listSharedAccounts(userId, now);
-    const sharedAccountProvider = new Map<string, string>();
-    const sharedAccountIds: string[] = [];
-    for (const account of sharedAccounts) {
-      availability.sharedAccountCountByProvider.set(
-        account.provider,
-        (availability.sharedAccountCountByProvider.get(account.provider) ?? 0) + 1
+      const now = new Date();
+      const accounts = yield* Effect.promise(() =>
+        listActiveAccountTiers(userId, now, options.includeInactiveAccounts === true)
       );
-      sharedAccountProvider.set(account.id, account.provider);
-      sharedAccountIds.push(account.id);
-      if (account.tier && account.tier.trim()) {
-        const list = availability.sharedAccountTiersByProvider.get(account.provider) ?? [];
-        list.push(account.tier.trim().toLowerCase());
-        availability.sharedAccountTiersByProvider.set(account.provider, list);
-      }
-    }
-    if (sharedAccountIds.length > 0) {
-      const disabledRows = await listDisabledModelsByAccounts(sharedAccountIds);
-      for (const row of disabledRows) {
-        const provider = sharedAccountProvider.get(row.providerAccountId);
-        if (!provider) continue;
-        const key = `${provider}:${this.registry.resolveAlias(row.model)}`;
-        availability.sharedDisabledCountByProviderModel.set(
-          key,
-          (availability.sharedDisabledCountByProviderModel.get(key) ?? 0) + 1
+      const accountProvider = new Map<string, string>();
+      const accountIds: string[] = [];
+      for (const account of accounts) {
+        availability.activeProviders.add(account.provider);
+        availability.accountCountByProvider.set(
+          account.provider,
+          (availability.accountCountByProvider.get(account.provider) ?? 0) + 1
         );
+        const list = availability.activeAccountIdsByProvider.get(account.provider) ?? [];
+        list.push(account.id);
+        availability.activeAccountIdsByProvider.set(account.provider, list);
+        accountProvider.set(account.id, account.provider);
+        accountIds.push(account.id);
+        if (account.tier && account.tier.trim()) {
+          availability.accountTierById.set(account.id, account.tier.trim().toLowerCase());
+        }
       }
-    }
 
-    return availability;
+      if (accountIds.length > 0) {
+        const disabledRows = yield* Effect.promise(() => listDisabledModelsByAccounts(accountIds));
+        for (const row of disabledRows) {
+          const provider = accountProvider.get(row.providerAccountId);
+          if (!provider) continue;
+          const key = `${provider}:${this.registry.resolveAlias(row.model)}`;
+          availability.disabledCountByProviderModel.set(
+            key,
+            (availability.disabledCountByProviderModel.get(key) ?? 0) + 1
+          );
+        }
+      }
+
+      const { aliased, standalone } = yield* this.customProviderModelSets(userId);
+      for (const [slug, models] of aliased) {
+        if ((availability.accountCountByProvider.get(slug) ?? 0) === 0) continue;
+        availability.customProviderModels.set(slug, models);
+      }
+      for (const [slug, models] of standalone) {
+        availability.customProviderStandaloneModels.set(slug, models);
+      }
+
+      if (!includeShared) return availability;
+
+      const sharedAccounts = yield* Effect.promise(() => listSharedAccounts(userId, now));
+      const sharedAccountProvider = new Map<string, string>();
+      const sharedAccountIds: string[] = [];
+      for (const account of sharedAccounts) {
+        availability.sharedAccountCountByProvider.set(
+          account.provider,
+          (availability.sharedAccountCountByProvider.get(account.provider) ?? 0) + 1
+        );
+        sharedAccountProvider.set(account.id, account.provider);
+        sharedAccountIds.push(account.id);
+        if (account.tier && account.tier.trim()) {
+          const list = availability.sharedAccountTiersByProvider.get(account.provider) ?? [];
+          list.push(account.tier.trim().toLowerCase());
+          availability.sharedAccountTiersByProvider.set(account.provider, list);
+        }
+      }
+      if (sharedAccountIds.length > 0) {
+        const disabledRows = yield* Effect.promise(() => listDisabledModelsByAccounts(sharedAccountIds));
+        for (const row of disabledRows) {
+          const provider = sharedAccountProvider.get(row.providerAccountId);
+          if (!provider) continue;
+          const key = `${provider}:${this.registry.resolveAlias(row.model)}`;
+          availability.sharedDisabledCountByProviderModel.set(
+            key,
+            (availability.sharedDisabledCountByProviderModel.get(key) ?? 0) + 1
+          );
+        }
+      }
+
+      return availability;
+    });
   }
 
   isModelUsableByAccounts(model: string, availability: AccountModelAvailability): boolean {
@@ -365,81 +359,91 @@ export class AuthService {
     return valid(provider, model);
   }
 
-  async validateModelForUser(
+  validateModelForUser(
     userId: string,
     modelParam: string,
     access: ModelAccess
-  ): Promise<ModelValidationResult> {
-    const [provider, rawModel] = parseModelParam(modelParam);
-    const mode = normalizeAccessMode(access.mode);
-    const modelSet = new Set<string>();
-    for (const model of this.normalizeModelList(access.models)) modelSet.add(model);
-    for (const model of access.models) {
-      const trimmed = model.trim();
-      if (trimmed) modelSet.add(trimmed);
-    }
-
-    if (provider && this.customProviders) {
-      const custom = await this.customModelResult(userId, provider, rawModel);
-      if (custom) {
-        if (!custom.valid) return custom;
-        if (mode === "whitelist" || mode === "blacklist") {
-          let listed = modelSet.has(custom.model);
-          if (!listed && custom.alias) listed = modelSet.has(custom.alias);
-          if (mode === "whitelist" && !listed) {
-            return this.invalidModelResult(custom.provider, custom.model, modelParam, null);
-          }
-          if (mode === "blacklist" && listed) {
-            return this.invalidModelResult(custom.provider, custom.model, modelParam, null);
-          }
-        }
-        const modelToCheck = custom.alias || custom.model;
-        if (await this.isModelDisabledForUser(userId, modelToCheck)) {
-          return disabled(custom.provider, custom.model);
-        }
-        return custom;
+  ): Effect.Effect<ModelValidationResult> {
+    return Effect.gen({ self: this }, function* () {
+      const [provider, rawModel] = parseModelParam(modelParam);
+      const mode = normalizeAccessMode(access.mode);
+      const modelSet = new Set<string>();
+      for (const model of this.normalizeModelList(access.models)) modelSet.add(model);
+      for (const model of access.models) {
+        const trimmed = model.trim();
+        if (trimmed) modelSet.add(trimmed);
       }
-    }
 
-    const base = this.validateModel(modelParam);
-    if (!base.valid && base.code !== "invalid_model") return base;
-
-    let isInvalid = !base.valid;
-    if (!isInvalid && mode === "whitelist") isInvalid = !this.isModelListed(modelSet, base.model, provider);
-    if (!isInvalid && mode === "blacklist") isInvalid = this.isModelListed(modelSet, base.model, provider);
-    if (!isInvalid) {
-      if (await this.isModelDisabledForUser(userId, base.model)) {
-        return disabled(base.provider, base.model);
+      if (provider && this.customProviders) {
+        const custom = yield* this.customModelResult(userId, provider, rawModel);
+        if (custom) {
+          if (!custom.valid) return custom;
+          if (mode === "whitelist" || mode === "blacklist") {
+            let listed = modelSet.has(custom.model);
+            if (!listed && custom.alias) listed = modelSet.has(custom.alias);
+            if (mode === "whitelist" && !listed) {
+              return this.invalidModelResult(custom.provider, custom.model, modelParam, null);
+            }
+            if (mode === "blacklist" && listed) {
+              return this.invalidModelResult(custom.provider, custom.model, modelParam, null);
+            }
+          }
+          const modelToCheck = custom.alias || custom.model;
+          if (yield* this.isModelDisabledForUser(userId, modelToCheck)) {
+            return disabled(custom.provider, custom.model);
+          }
+          return custom;
+        }
       }
-      return base;
-    }
 
-    const candidates = await this.usableModelCandidates(userId, provider, mode, modelSet, access.roamingEnabled);
-    const suggestProvider = base.valid ? base.provider : provider;
-    const suggestModel = base.valid ? base.model : rawModel;
-    return this.invalidModelResult(suggestProvider, suggestModel, modelParam, candidates);
+      const base = this.validateModel(modelParam);
+      if (!base.valid && base.code !== "invalid_model") return base;
+
+      let isInvalid = !base.valid;
+      if (!isInvalid && mode === "whitelist") isInvalid = !this.isModelListed(modelSet, base.model, provider);
+      if (!isInvalid && mode === "blacklist") isInvalid = this.isModelListed(modelSet, base.model, provider);
+      if (!isInvalid) {
+        if (yield* this.isModelDisabledForUser(userId, base.model)) {
+          return disabled(base.provider, base.model);
+        }
+        return base;
+      }
+
+      const candidates = yield* this.usableModelCandidates(
+        userId,
+        provider,
+        mode,
+        modelSet,
+        access.roamingEnabled
+      );
+      const suggestProvider = base.valid ? base.provider : provider;
+      const suggestModel = base.valid ? base.model : rawModel;
+      return this.invalidModelResult(suggestProvider, suggestModel, modelParam, candidates);
+    });
   }
 
-  async listUserCustomModels(userId: string): Promise<Array<Record<string, unknown>>> {
-    const { standalone } = await this.customProviderModelSets(userId);
-    const now = Math.floor(Date.now() / 1000);
-    const items: Array<Record<string, unknown>> = [];
-    for (const [slug, models] of standalone) {
-      for (const modelId of models) {
-        items.push({
-          id: `${slug}/${modelId}`,
-          object: "model",
-          created: now,
-          owned_by: `custom:${slug}`,
-        });
+  listUserCustomModels(userId: string): Effect.Effect<Array<Record<string, unknown>>> {
+    return Effect.gen({ self: this }, function* () {
+      const { standalone } = yield* this.customProviderModelSets(userId);
+      const now = Math.floor(Date.now() / 1000);
+      const items: Array<Record<string, unknown>> = [];
+      for (const [slug, models] of standalone) {
+        for (const modelId of models) {
+          items.push({
+            id: `${slug}/${modelId}`,
+            object: "model",
+            created: now,
+            owned_by: `custom:${slug}`,
+          });
+        }
       }
-    }
-    return items;
+      return items;
+    });
   }
 
-  async bumpAnalyticsCacheVersionThrottled(userId: string): Promise<void> {
-    if (!userId) return;
-    try {
+  bumpAnalyticsCacheVersionThrottled(userId: string): Effect.Effect<void> {
+    if (!userId) return Effect.void;
+    return ignoringErrors(async () => {
       const updated = await this.redis.set(analyticsVersionBumpKey(userId), "1", {
         NX: true,
         EX: ANALYTICS_BUMP_TTL_SECONDS,
@@ -449,9 +453,7 @@ export class AuthService {
       if (version === 1) {
         await this.redis.expire(analyticsVersionKey(userId), ANALYTICS_VERSION_TTL_SECONDS);
       }
-    } catch {
-      return;
-    }
+    });
   }
 
   private isCodexChatGPTModel(model: string): boolean {
@@ -471,18 +473,21 @@ export class AuthService {
     return [...values].sort((a, b) => a.localeCompare(b));
   }
 
-  private async getRateLimitRules(apiKeyId: string): Promise<RateLimitRule[]> {
-    const rows = await listAPIKeyRateLimits(apiKeyId);
-    return rows.map((row) => ({
-      target: row.target,
-      targetType: row.targetType === "family" ? "family" : "model",
-      perMinute: row.perMinute,
-      perHour: row.perHour,
-      perDay: row.perDay,
-    }));
+  private getRateLimitRules(apiKeyId: string): Effect.Effect<RateLimitRule[]> {
+    return Effect.promise(() => listAPIKeyRateLimits(apiKeyId)).pipe(
+      Effect.map((rows) =>
+        rows.map((row) => ({
+          target: row.target,
+          targetType: row.targetType === "family" ? "family" : "model",
+          perMinute: row.perMinute,
+          perHour: row.perHour,
+          perDay: row.perDay,
+        }))
+      )
+    );
   }
 
-  private resultFromCache(cached: CacheValue): AuthResult {
+  private resultFromCache(cached: CachedAPIKeyValidation): AuthResult {
     return {
       valid: true,
       userId: cached.userId ?? "",
@@ -497,139 +502,105 @@ export class AuthService {
     };
   }
 
-  private async getCachedAPIKeyValidation(keyHash: string): Promise<CacheValue | null> {
-    try {
-      const raw = await this.redis.get(apiKeyValidationKey(keyHash));
-      if (!raw) return null;
-      return JSON.parse(raw) as CacheValue;
-    } catch {
-      return null;
-    }
-  }
-
-  private async setCachedAPIKeyValidation(
-    keyHash: string,
-    value: CacheValue,
-    ttlSeconds: number
-  ): Promise<void> {
-    try {
-      await this.redis.set(apiKeyValidationKey(keyHash), JSON.stringify(value), {
-        EX: Math.max(1, Math.round(ttlSeconds)),
-      });
-    } catch {
-      return;
-    }
-  }
-
-  private async touchAPIKeyLastUsed(apiKeyId: string): Promise<void> {
-    if (!apiKeyId) return;
-    try {
-      const updated = await this.redis.set(apiKeyLastUsedKey(apiKeyId), "1", {
-        NX: true,
-        EX: LAST_USED_TTL_SECONDS,
-      });
-      if (!updated) return;
-      await touchAPIKeyLastUsed(apiKeyId);
-    } catch {
-      return;
-    }
-  }
-
-  private async getCachedDisabledModels(userId: string): Promise<string[] | null> {
-    try {
+  private getCachedDisabledModels(userId: string): Effect.Effect<string[] | null> {
+    return tryAsync(async () => {
       const raw = await this.redis.get(disabledModelsKey(userId));
       if (!raw) return null;
       const parsed = JSON.parse(raw) as { models?: string[] };
       return this.normalizeDisabledModelList(parsed.models ?? []);
-    } catch {
-      return null;
-    }
+    }, null);
   }
 
-  private async setCachedDisabledModels(userId: string, models: string[]): Promise<void> {
-    try {
-      await this.redis.set(
+  private setCachedDisabledModels(userId: string, models: string[]): Effect.Effect<void> {
+    return ignoringErrors(() =>
+      this.redis.set(
         disabledModelsKey(userId),
         JSON.stringify({ models: this.normalizeDisabledModelList(models) }),
         { EX: DISABLED_MODELS_TTL_SECONDS }
-      );
-    } catch {
-      return;
-    }
-  }
-
-  private async customModelResult(
-    userId: string,
-    slug: string,
-    rawModel: string
-  ): Promise<ModelValidationResult | null> {
-    const custom = await this.customProviders.getProvider(userId, slug);
-    if (!custom) return null;
-    const rows = await this.customProviders.listModels(custom.id);
-    for (const row of rows) {
-      if (row.modelId !== rawModel) continue;
-      const result = valid(slug, `${slug}/${rawModel}`);
-      if (row.aliased) {
-        const canonical = this.registry.resolveAlias(row.modelId);
-        if (this.registry.isSupported(canonical)) result.alias = canonical;
-      }
-      result.vision = visionForCustomModel(this.registry, row);
-      return result;
-    }
-    return invalid(
-      slug,
-      rawModel,
-      `Model "${rawModel}" is not registered under your custom provider "${slug}".`,
-      "model",
-      "invalid_model"
+      )
     );
   }
 
-  private async customProviderModelSets(userId: string) {
-    const aliased = new Map<string, Set<string>>();
-    const standalone = new Map<string, string[]>();
-    const providers = await this.customProviders.listProviders(userId);
-    for (const custom of providers) {
-      const rows = await this.customProviders.listModels(custom.id);
+  private customModelResult(
+    userId: string,
+    slug: string,
+    rawModel: string
+  ): Effect.Effect<ModelValidationResult | null> {
+    return Effect.gen({ self: this }, function* () {
+      const custom = yield* Effect.promise(() => this.customProviders.getProvider(userId, slug));
+      if (!custom) return null;
+      const rows = yield* Effect.promise(() => this.customProviders.listModels(custom.id));
       for (const row of rows) {
-        const canonical = this.registry.resolveAlias(row.modelId);
-        if (row.aliased && this.registry.isSupported(canonical)) {
-          const set = aliased.get(custom.slug) ?? new Set<string>();
-          set.add(canonical);
-          aliased.set(custom.slug, set);
-          continue;
+        if (row.modelId !== rawModel) continue;
+        const result = valid(slug, `${slug}/${rawModel}`);
+        if (row.aliased) {
+          const canonical = this.registry.resolveAlias(row.modelId);
+          if (this.registry.isSupported(canonical)) result.alias = canonical;
         }
-        const list = standalone.get(custom.slug) ?? [];
-        list.push(row.modelId);
-        standalone.set(custom.slug, list);
+        result.vision = visionForCustomModel(this.registry, row);
+        return result;
       }
-    }
-    return { aliased, standalone };
+      return invalid(
+        slug,
+        rawModel,
+        `Model "${rawModel}" is not registered under your custom provider "${slug}".`,
+        "model",
+        "invalid_model"
+      );
+    });
   }
 
-  private async usableModelCandidates(
+  private customProviderModelSets(
+    userId: string
+  ): Effect.Effect<{ aliased: Map<string, Set<string>>; standalone: Map<string, string[]> }> {
+    return Effect.gen({ self: this }, function* () {
+      const aliased = new Map<string, Set<string>>();
+      const standalone = new Map<string, string[]>();
+      const providers = yield* Effect.promise(() => this.customProviders.listProviders(userId));
+      for (const custom of providers) {
+        const rows = yield* Effect.promise(() => this.customProviders.listModels(custom.id));
+        for (const row of rows) {
+          const canonical = this.registry.resolveAlias(row.modelId);
+          if (row.aliased && this.registry.isSupported(canonical)) {
+            const set = aliased.get(custom.slug) ?? new Set<string>();
+            set.add(canonical);
+            aliased.set(custom.slug, set);
+            continue;
+          }
+          const list = standalone.get(custom.slug) ?? [];
+          list.push(row.modelId);
+          standalone.set(custom.slug, list);
+        }
+      }
+      return { aliased, standalone };
+    });
+  }
+
+  private usableModelCandidates(
     userId: string,
     provider: string | null,
     mode: string,
     modelSet: Set<string>,
     roamingEnabled: boolean
-  ): Promise<string[]> {
-    const candidates = provider ? this.registry.modelsForProvider(provider) : this.registry.allModels();
-    const disabledSet = await this.disabledModelSetForUser(userId);
-    const availability = await this.getAccountModelAvailabilityWithSharing(userId, roamingEnabled);
-    const values: string[] = [];
-    for (const candidate of candidates) {
-      const canonical = this.registry.resolveAlias(candidate);
-      if (disabledSet.has(canonical)) continue;
-      const usable =
-        this.isModelUsableByAccounts(canonical, availability) ||
-        (roamingEnabled && this.isModelUsableBySharedAccounts(canonical, availability));
-      if (!usable) continue;
-      if (mode === "whitelist" && !modelSet.has(canonical)) continue;
-      if (mode === "blacklist" && modelSet.has(canonical)) continue;
-      values.push(candidate);
-    }
-    return values;
+  ): Effect.Effect<string[]> {
+    return Effect.gen({ self: this }, function* () {
+      const candidates = provider ? this.registry.modelsForProvider(provider) : this.registry.allModels();
+      const disabledSet = yield* this.disabledModelSetForUser(userId);
+      const availability = yield* this.getAccountModelAvailabilityWithSharing(userId, roamingEnabled);
+      const values: string[] = [];
+      for (const candidate of candidates) {
+        const canonical = this.registry.resolveAlias(candidate);
+        if (disabledSet.has(canonical)) continue;
+        const usable =
+          this.isModelUsableByAccounts(canonical, availability) ||
+          (roamingEnabled && this.isModelUsableBySharedAccounts(canonical, availability));
+        if (!usable) continue;
+        if (mode === "whitelist" && !modelSet.has(canonical)) continue;
+        if (mode === "blacklist" && modelSet.has(canonical)) continue;
+        values.push(candidate);
+      }
+      return values;
+    });
   }
 
   private invalidModelResult(

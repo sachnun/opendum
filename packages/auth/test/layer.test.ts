@@ -23,7 +23,7 @@ describe("auth service layer", () => {
   it("exposes validateAPIKey through the service tag", async () => {
     const program = validateAPIKey("Bearer token").pipe(
       Effect.provideService(AuthServiceTag, {
-        auth: { validateAPIKey: async () => result() } as never,
+        auth: { validateAPIKey: () => Effect.succeed(result()) } as never,
       })
     );
     const value = await Effect.runPromise(program);
@@ -34,7 +34,7 @@ describe("auth service layer", () => {
   it("propagates an invalid result without failing the program", async () => {
     const program = validateAPIKey("Bearer bad").pipe(
       Effect.provideService(AuthServiceTag, {
-        auth: { validateAPIKey: async () => result({ valid: false, error: "Invalid API key" }) } as never,
+        auth: { validateAPIKey: () => Effect.succeed(result({ valid: false, error: "Invalid API key" })) } as never,
       })
     );
     const value = await Effect.runPromise(program);

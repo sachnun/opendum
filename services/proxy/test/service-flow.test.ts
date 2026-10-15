@@ -56,9 +56,9 @@ describe("ProxyService full flow", () => {
       modelsForProvider: () => [],
     } as unknown as Registry;
     const auth = {
-      validateAPIKey: async () => validAuth(),
-      validateModelForUser: async () => validModel(),
-      bumpAnalyticsCacheVersionThrottled: async () => undefined,
+      validateAPIKey: () => Effect.succeed(validAuth()),
+      validateModelForUser: () => Effect.succeed(validModel()),
+      bumpAnalyticsCacheVersionThrottled: () => Effect.void,
     } as unknown as AuthService;
     const redis = { get: async () => null, set: async () => "OK", del: async () => 1, zAdd: async () => 1, zRemRangeByRank: async () => 0, expire: async () => true } as unknown as OpendumRedis;
 

@@ -14,7 +14,7 @@ export const validateAPIKey = (
 ): Effect.Effect<AuthResult, never, AuthServiceTag> =>
   Effect.gen(function* () {
     const { auth } = yield* AuthServiceTag;
-    return yield* Effect.promise(() => auth.validateAPIKey(authHeader));
+    return yield* auth.validateAPIKey(authHeader);
   });
 
 export const validateModelForUser = (
@@ -24,5 +24,5 @@ export const validateModelForUser = (
 ): Effect.Effect<ModelValidationResult, never, AuthServiceTag> =>
   Effect.gen(function* () {
     const { auth } = yield* AuthServiceTag;
-    return yield* Effect.promise(() => auth.validateModelForUser(userId, modelParam, access));
+    return yield* auth.validateModelForUser(userId, modelParam, access);
   });
