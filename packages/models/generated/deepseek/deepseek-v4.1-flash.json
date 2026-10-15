@@ -5,7 +5,8 @@
     "hyper",
     "workbuddy",
     "zenmux",
-    "perch"
+    "perch",
+    "opencode"
   ],
   "aliases": [
     "deepseek-v4.1-flash-sg"
@@ -50,6 +51,11 @@
     "hyper": {
       "contextWindow": 1048576,
       "maxOutputTokens": 262144
+    },
+    "opencode": {
+      "upstream": "deepseek-v4.1-flash-free",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 384000
     },
     "perch": {
       "upstream": "deepseek-flash-starter",
