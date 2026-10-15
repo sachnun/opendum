@@ -66,7 +66,3 @@ export async function closeDatabase(): Promise<void> {
   globalForDb.db = undefined;
   await current.$client.end();
 }
-
-if (process.env.NODE_ENV !== "production") {
-  globalForDb.db ??= getDb();
-}
