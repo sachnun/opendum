@@ -19,7 +19,7 @@ import type { Database } from "@opendum/database";
 import { decrypt, encrypt } from "@opendum/core/crypto";
 import type { Registry } from "@opendum/models/runtime";
 import type { OpendumRedis } from "@opendum/core/redis";
-import { SessionAffinity, preferSticky } from "@opendum/core/redis";
+import { SessionAffinity } from "@opendum/core/redis";
 import type { AuthResult, AuthService, ModelValidationResult } from "@opendum/auth";
 import {
   adaptForResponsesClient,
@@ -40,7 +40,6 @@ import {
   normalizeAccessMode,
   normalizeAccountIds,
   parseRefreshErrorStatusCode,
-  prioritizeAccounts,
   proxyAccessRuleRestrictsTier,
   proxyTierSatisfiesRule,
   quotaFallbackTierLocal,
@@ -84,6 +83,7 @@ import {
 import { AccountHealthService, MAX_STORED_ERROR_LEN } from "./account-health.js";
 import { PlaygroundAuthenticator } from "./playground-auth.js";
 import { RoamingPointService } from "./roaming-points.js";
+import { PriorityOrderStrategy, StickySessionStrategy, composeRoutingStrategies } from "./routing.js";
 import { UsageRecorder } from "./usage-recorder.js";
 import type {
   AccountRotationFailure,
@@ -962,11 +962,13 @@ export class ProxyService implements StreamRecorder {
     const eligible = await this.getEligibleAccounts(userId, model, provider, exclude, excludeProviders, accountAccess);
     if (eligible.length === 0) return { account: null, configured: false };
     const routing = await this.performanceRouting(model, provider === null);
-    let prioritized = prioritizeAccounts(eligible, provider === null, this.models.providersForModel(model), routing);
     const stickyId = await this.affinity.lookup(userId, sessionId);
-    if (stickyId && !isSyntheticProviderAccountId(stickyId)) {
-      prioritized = preferSticky(prioritized, (account) => account.id === stickyId);
-    }
+    const strategy = composeRoutingStrategies(new PriorityOrderStrategy(), new StickySessionStrategy(stickyId));
+    const prioritized = strategy.order(eligible, {
+      crossProvider: provider === null,
+      providerPriority: this.models.providersForModel(model),
+      routingOptions: routing,
+    });
     const selected = await this.pickHealthyAccount(prioritized, model);
     if (!selected) return { account: null, configured: true };
     await this.rememberAffinityAccount(userId, sessionId, selected);
@@ -1006,7 +1008,11 @@ export class ProxyService implements StreamRecorder {
     const enabled = rows.filter((row) => !disabledSet.has(row.id) && this.canAccountUseModel(row, model));
     if (enabled.length === 0) return { account: null, configured: true };
     const routing = await this.performanceRouting(model, provider === null);
-    const prioritized = prioritizeAccounts(enabled, provider === null, targetProviders, routing);
+    const prioritized = new PriorityOrderStrategy().order(enabled, {
+      crossProvider: provider === null,
+      providerPriority: targetProviders,
+      routingOptions: routing,
+    });
     return { account: await this.pickHealthyAccount(prioritized, model), configured: true };
   }
 

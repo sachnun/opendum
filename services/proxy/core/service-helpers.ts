@@ -1,5 +1,6 @@
 import { Effect } from "effect";
 import type { Provider, ProviderAccount } from "@opendum/providers";
+import { tierPolicyFor } from "./account-tier-policy.js";
 import { stringValue } from "./helpers.js";
 import type { ProviderRoutingOptions, ProviderScore } from "./provider-performance.js";
 
@@ -225,22 +226,7 @@ export function paidFirst(accounts: ProviderAccount[]): ProviderAccount[] {
 }
 
 export function isPaidAccountTier(provider: string, tier: string | null): boolean {
-  if (!tier) return false;
-  const value = tier.trim().toLowerCase();
-  switch (provider) {
-    case "antigravity":
-      return value === "paid" || value === "standard-tier" || value.startsWith("g1-");
-    case "kiro":
-      return value === "pro" || value === "pro+" || value === "pro-plus" || value === "power";
-    default:
-      break;
-  }
-  const paid = new Set([
-    "paid", "standard-tier", "plus", "pro", "pro-plus", "pro+", "prolite", "power", "team", "go",
-    "self_serve_business_usage_based", "business", "enterprise_cbp_usage_based", "enterprise", "edu",
-    "education", "hc",
-  ]);
-  return paid.has(value);
+  return tierPolicyFor(provider).isPaid(tier);
 }
 
 export function nullableTimeBefore(a: Date | null | undefined, b: Date | null | undefined): boolean {
