@@ -10,6 +10,7 @@ import {
 } from "../../core/helpers.js";
 import type { ProviderAccount } from "../../types.js";
 import { KIRO_REGION } from "../../endpoints.js";
+import { SseCompletionCollector } from "../../transform/collector.js";
 
 export const KIRO_API_BASE_URL = "https://q.%s.amazonaws.com/generateAssistantResponse";
 export const KIRO_THINKING_START = "<thinking>";
@@ -1078,7 +1079,7 @@ export function convertKiroEventsToCompletion(events: Json[], model: string, par
   let explicitUsage: Json | null = null;
   const splitter = new KiroThinkingSplitter(parseThinking);
   let hasNativeReasoning = false;
-  const toolById = new Map<string, { index: number; name: string; args: string }>();
+  const toolById = new Map<string, { name: string; args: string }>();
 
   for (const event of events) {
     if (event.contextUsagePercentage !== undefined) contextUsagePercentage = kiroNumberAsFloat(event.contextUsagePercentage);
@@ -1102,10 +1103,10 @@ export function convertKiroEventsToCompletion(events: Json[], model: string, par
     if (name && toolUseId) {
       activeToolId = toolUseId;
       if (!toolById.has(toolUseId)) {
-        toolById.set(toolUseId, { index: toolById.size, name, args: "" });
+        toolById.set(toolUseId, { name, args: "" });
       }
       const input = stringValue(event.input);
-      if (input) (toolById.get(toolUseId) as { args: string }).args += input;
+      if (input) (toolById.get(toolUseId) as { name: string; args: string }).args += input;
     }
     const input = stringValue(event.input);
     if (input && !stringValue(event.name) && activeToolId) {
@@ -1120,39 +1121,29 @@ export function convertKiroEventsToCompletion(events: Json[], model: string, par
   if (!hasNativeReasoning) reasoning += flushReasoning;
   outputText += flushText + flushReasoning;
 
-  const toolCalls: Array<Json | null> = Array.from({ length: toolById.size }, () => null);
+  const collector = new SseCompletionCollector({
+    model,
+    nullableContent: true,
+    normalizeToolArguments: (args) => defaultEmpty(args, "{}"),
+  });
   for (const [id, call] of toolById) {
-    toolCalls[call.index] = {
-      id,
-      type: "function",
-      function: { name: call.name, arguments: defaultEmpty(call.args, "{}") },
-    };
+    collector.addToolCall({ key: id, id, name: call.name, arguments: call.args });
   }
   const bracketCalls = parseKiroBracketToolCalls(content);
   if (bracketCalls.length > 0) {
     content = cleanKiroBracketToolCalls(content, bracketCalls);
     for (const call of bracketCalls) {
-      toolCalls.push({
+      collector.addToolCall({
+        key: call.id,
         id: call.id,
-        type: "function",
-        function: { name: call.name, arguments: call.arguments },
+        name: call.name,
+        arguments: call.arguments,
       });
     }
   }
-
-  const message: Json = { role: "assistant", content: null };
-  if (content) message.content = content;
-  if (reasoning) message.reasoning_content = reasoning;
-  if (toolCalls.length > 0) message.tool_calls = toolCalls;
-  const finish = toolCalls.length > 0 ? "tool_calls" : "stop";
-  const usage = explicitUsage ?? kiroUsageFromContext(model, contextUsagePercentage, outputText);
-  return {
-    id: randomId("chatcmpl"),
-    object: "chat.completion",
-    created: Math.floor(Date.now() / 1000),
-    model,
-    choices: [{ index: 0, message, finish_reason: finish }],
-    usage,
-  };
+  collector.addContent(content);
+  collector.addReasoning(reasoning);
+  collector.setUsage(explicitUsage ?? kiroUsageFromContext(model, contextUsagePercentage, outputText));
+  return collector.toCompletion();
 }
 

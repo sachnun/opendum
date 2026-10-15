@@ -4,7 +4,7 @@ import type { Registry } from "@opendum/models/runtime";
 import { WORKBUDDY_BASE_URL, WORKBUDDY_DOMAIN } from "../endpoints.js";
 import type { UpstreamTransport } from "../core/http.js";
 import type { ProviderAccount } from "../types.js";
-import { WorkbuddyProvider } from "./workbuddy.js";
+import { WorkbuddyProvider, workbuddyStreamToCompletion } from "./workbuddy.js";
 
 const account = { id: "acc-1" } as unknown as ProviderAccount;
 const FALLBACK_TTL_MS = 31536000 * 1000;
@@ -89,5 +89,43 @@ describe("WorkbuddyProvider.refreshCredentials", () => {
     const emptyToken = await refresh(provider({ body: JSON.stringify({ code: 0, data: { accessToken: "  " } }) }));
     expect(emptyToken.ok).toBe(false);
     if (!emptyToken.ok) expect(emptyToken.error.message).toBe("workbuddy token refresh returned empty token");
+  });
+});
+
+describe("workbuddyStreamToCompletion", () => {
+  it("aggregates content, reasoning and tool call fragments", () => {
+    const sse = [
+      'data: {"choices":[{"delta":{"content":"he"}}]}',
+      'data: {"choices":[{"delta":{"content":[{"type":"text","text":"llo"}],"reasoning_content":" why"}}]}',
+      'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"search","arguments":"{\\"q\\":"}}]}}]}',
+      'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\\"x\\"}"}}]},"finish_reason":"tool_calls"}]}',
+      'data: {"usage":{"prompt_tokens":3,"completion_tokens":4,"total_tokens":7}}',
+      "data: [DONE]",
+    ].join("\n");
+
+    const completion = workbuddyStreamToCompletion(sse, "gpt-5.1-codex");
+    expect(completion.id).toBe("chatcmpl-workbuddy");
+    expect(completion.model).toBe("gpt-5.1-codex");
+    const choice = (completion.choices as Array<Record<string, unknown>>)[0] as Record<string, unknown>;
+    const message = choice.message as Record<string, unknown>;
+    expect(message.content).toBe("hello why");
+    expect(message.tool_calls).toEqual([
+      { id: "call_1", type: "function", function: { name: "search", arguments: '{"q":"x"}' } },
+    ]);
+    expect(choice.finish_reason).toBe("tool_calls");
+    expect(completion.usage).toEqual({ prompt_tokens: 3, completion_tokens: 4, total_tokens: 7 });
+  });
+
+  it("upgrades a stop finish reason when tool calls are present", () => {
+    const sse = [
+      'data: {"choices":[{"delta":{"tool_calls":[{"index":2,"function":{"name":"f","arguments":"{}"}}]}}]}',
+      'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}',
+    ].join("\n");
+
+    const completion = workbuddyStreamToCompletion(sse, "m");
+    const choice = (completion.choices as Array<Record<string, unknown>>)[0] as Record<string, unknown>;
+    const message = choice.message as Record<string, unknown>;
+    expect(choice.finish_reason).toBe("tool_calls");
+    expect((message.tool_calls as Array<Record<string, unknown>>)[0]?.id).toBe("call_2");
   });
 });

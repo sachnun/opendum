@@ -4,6 +4,7 @@ import { jsonResponse, numberFromAny, parseSseDataLines, stringValue } from "../
 import { normalizeProviderFailure, transportFailure, type UpstreamTransport } from "../core/http.js";
 import { ProviderCredentialFailure } from "../core/errors.js";
 import { OAuthTokenExchange } from "../core/oauth-token-exchange.js";
+import { SseCompletionCollector } from "../transform/collector.js";
 import type {
   CredentialRefresher,
   Provider,
@@ -184,71 +185,36 @@ function workbuddyDeltaText(value: unknown): string {
 }
 
 export function workbuddyStreamToCompletion(text: string, model: string): Json {
-  const events = parseSseDataLines(text);
-  let content = "";
-  const toolCalls = new Map<number, { id: string; type: string; name: string; args: string }>();
-  const toolOrder: number[] = [];
-  let finishReason = "stop";
-  let usage: Json = {};
-
-  for (const event of events) {
+  const collector = new SseCompletionCollector({ model, id: "chatcmpl-workbuddy" });
+  for (const event of parseSseDataLines(text)) {
     const nextUsage = event.usage;
     if (nextUsage !== null && typeof nextUsage === "object" && Object.keys(nextUsage as Json).length > 0) {
-      usage = nextUsage as Json;
+      collector.setUsage(nextUsage as Json);
     }
     const choices = Array.isArray(event.choices) ? event.choices : [];
     if (choices.length === 0) continue;
     const choice = (choices[0] ?? {}) as Json;
-    if (!choice) continue;
-    const reason = stringValue(choice.finish_reason);
-    if (reason) finishReason = reason;
+    collector.setFinishReason(stringValue(choice.finish_reason));
     const delta = choice.delta;
     if (delta === null || typeof delta !== "object") continue;
     const d = delta as Json;
-    content += workbuddyDeltaText(d.content);
-    if (typeof d.reasoning_content === "string") content += d.reasoning_content;
+    collector.addContent(workbuddyDeltaText(d.content));
+    if (typeof d.reasoning_content === "string") collector.addContent(d.reasoning_content);
     const fragments = Array.isArray(d.tool_calls) ? d.tool_calls : [];
     for (const raw of fragments) {
       const fragment = (raw ?? {}) as Json;
-      const index = numberFromAny(fragment.index);
-      let acc = toolCalls.get(index);
-      if (!acc) {
-        acc = { id: "", type: "", name: "", args: "" };
-        toolCalls.set(index, acc);
-        toolOrder.push(index);
-      }
-      const id = stringValue(fragment.id);
-      if (id) acc.id = id;
-      const type = stringValue(fragment.type);
-      if (type) acc.type = type;
       const fn = fragment.function;
-      if (fn !== null && typeof fn === "object" && !Array.isArray(fn)) {
-        const f = fn as Json;
-        const name = stringValue(f.name);
-        if (name) acc.name += name;
-        if (typeof f.arguments === "string") acc.args += f.arguments;
-      }
+      const hasFunction = fn !== null && typeof fn === "object" && !Array.isArray(fn);
+      const args = hasFunction ? (fn as Json).arguments : undefined;
+      collector.addToolCall({
+        key: numberFromAny(fragment.index),
+        id: stringValue(fragment.id),
+        type: stringValue(fragment.type),
+        name: hasFunction ? stringValue((fn as Json).name) : "",
+        nameMode: "append",
+        arguments: typeof args === "string" ? args : "",
+      });
     }
   }
-
-  const message: Json = { role: "assistant", content };
-  if (toolOrder.length > 0) {
-    message.tool_calls = toolOrder.map((index) => {
-      const acc = toolCalls.get(index) as { id: string; type: string; name: string; args: string };
-      return {
-        id: acc.id || `call_${index}`,
-        type: acc.type || "function",
-        function: { name: acc.name, arguments: acc.args },
-      };
-    });
-    if (finishReason === "stop") finishReason = "tool_calls";
-  }
-  return {
-    id: "chatcmpl-workbuddy",
-    object: "chat.completion",
-    created: Math.floor(Date.now() / 1000),
-    model,
-    choices: [{ index: 0, message, finish_reason: finishReason }],
-    usage,
-  };
+  return collector.toCompletion();
 }

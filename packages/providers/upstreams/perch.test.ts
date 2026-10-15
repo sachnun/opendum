@@ -4,7 +4,7 @@ import type { Registry } from "@opendum/models/runtime";
 import { PERCH_APP_URL, PERCH_AUTH_CONFIG_PATH } from "../endpoints.js";
 import type { UpstreamTransport } from "../core/http.js";
 import type { ProviderAccount } from "../types.js";
-import { PerchProvider } from "./perch.js";
+import { PerchProvider, perchSseToChatCompletion } from "./perch.js";
 
 const account = { id: "acc-1" } as unknown as ProviderAccount;
 const SUPABASE_URL = "https://perch-supabase.test";
@@ -93,5 +93,79 @@ describe("PerchProvider.refreshCredentials", () => {
     const result = await refresh(provider({ body: JSON.stringify({ access_token: "  " }) }));
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.message).toBe("perch token refresh returned empty access token");
+  });
+});
+
+function sse(...events: Array<Record<string, unknown>>): Response {
+  return new Response(events.map((event) => `data: ${JSON.stringify(event)}`).join("\n"));
+}
+
+function choiceOf(completion: Record<string, unknown>): { message: Record<string, unknown>; finishReason: string } {
+  const choice = (completion.choices as Array<Record<string, unknown>>)[0] as Record<string, unknown>;
+  return { message: choice.message as Record<string, unknown>, finishReason: choice.finish_reason as string };
+}
+
+describe("perchSseToChatCompletion", () => {
+  it("aggregates answer, reasoning and tool call events", async () => {
+    const completion = await perchSseToChatCompletion(
+      sse(
+        { type: "reasoning_delta", text: " think" },
+        { type: "answer_delta", text: "he" },
+        { type: "answer_delta", text: "llo" },
+        {
+          type: "tool_call_delta",
+          toolCalls: [{ id: "call_1", name: "search", rawArgumentsText: '{"q":' }],
+        },
+        { type: "tool_use_end", toolCalls: [{ id: "call_1", arguments: { q: "x" } }] },
+        { type: "done", ok: true, usage: { inputTokens: 3, outputTokens: 4, cacheReadInputTokens: 1 } }
+      ),
+      "perch-model",
+      true
+    );
+
+    expect(completion.id).toMatch(/^chatcmpl/);
+    expect(completion.model).toBe("perch-model");
+    const { message, finishReason } = choiceOf(completion);
+    expect(message.content).toBe("hello");
+    expect(message.reasoning_content).toBe(" think");
+    expect(message.tool_calls).toEqual([
+      { id: "call_1", type: "function", function: { name: "search", arguments: '{"q":"x"}' } },
+    ]);
+    expect(finishReason).toBe("tool_calls");
+    expect(completion.usage).toEqual({
+      prompt_tokens: 4,
+      completion_tokens: 4,
+      total_tokens: 8,
+      prompt_tokens_details: { cached_tokens: 1 },
+    });
+  });
+
+  it("drops reasoning, nulls empty content and defaults blank arguments", async () => {
+    const completion = await perchSseToChatCompletion(
+      sse(
+        { type: "reasoning_delta", text: "hmm" },
+        { type: "tool_call_delta", toolCalls: [{ id: "call_2", name: "f", rawArgumentsText: "  " }] },
+        { type: "done", ok: true }
+      ),
+      "m",
+      false
+    );
+
+    const { message, finishReason } = choiceOf(completion);
+    expect(message.content).toBeNull();
+    expect(message.reasoning_content).toBeUndefined();
+    expect((message.tool_calls as Array<Record<string, unknown>>)[0]).toEqual({
+      id: "call_2",
+      type: "function",
+      function: { name: "f", arguments: "{}" },
+    });
+    expect(finishReason).toBe("tool_calls");
+    expect(completion.usage).toEqual({ prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 });
+  });
+
+  it("fails on rejected done events", async () => {
+    await expect(
+      perchSseToChatCompletion(sse({ type: "done", ok: false, error: "quota exceeded" }), "m", false)
+    ).rejects.toThrow("quota exceeded");
   });
 });

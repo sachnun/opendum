@@ -3,6 +3,7 @@ import type { Registry } from "@opendum/models/runtime";
 import type { OpendumRedis } from "@opendum/core/redis";
 import {
   cloneAnyMap,
+  defaultStringValue,
   extractInstructions,
   filterKeys,
   jsonResponse,
@@ -13,12 +14,14 @@ import {
   stringValue,
   uniqueStrings,
 } from "../core/helpers.js";
+import { SseCompletionCollector } from "../transform/collector.js";
 import {
   convertToolsForResponses,
   messagesToResponsesInput,
   normalizeResponsesInput,
-  responsesJsonToChatCompletion,
+  responseUsageToChatUsage,
   responsesSseToChatStream,
+  toChatCallId,
 } from "../transform/responses.js";
 import { transportFailure, type UpstreamTransport } from "../core/http.js";
 import { ProviderCredentialFailure } from "../core/errors.js";
@@ -428,8 +431,12 @@ export class CodexProvider implements Provider, CredentialRefresher, RefreshBuff
 
 export function responsesStreamToCompletion(text: string, model: string): Json {
   const events = parseSseDataLines(text);
-  const completion: Json = { output: [], usage: {} };
-  let messageContent = "";
+  const collector = new SseCompletionCollector({
+    model,
+    nullableContent: true,
+    normalizeToolArguments: (args) => defaultStringValue(args, "{}"),
+    forceToolFinishReason: true,
+  });
   const reasoningParts = new Map<string, string>();
   const reasoningOrder: string[] = [];
   const appendReasoning = (key: string, part: string): void => {
@@ -460,12 +467,13 @@ export function responsesStreamToCompletion(text: string, model: string): Json {
     if (textValue) appendReasoning("text:0", textValue);
   };
 
-  const toolCalls: Json[] = [];
   let currentTool: Json | null = null;
+  let status = "";
+  let rawUsage: unknown = {};
   for (const event of events) {
     switch (stringValue(event.type)) {
       case "response.output_text.delta":
-        messageContent += stringValue(event.delta);
+        collector.addContent(stringValue(event.delta));
         break;
       case "response.reasoning.delta":
       case "response.reasoning_text.delta":
@@ -511,7 +519,13 @@ export function responsesStreamToCompletion(text: string, model: string): Json {
         const item = (event.item ?? {}) as Json;
         if (item.type === "reasoning") addReasoningItem(item);
         if (currentTool) {
-          toolCalls.push(currentTool);
+          const callId = toChatCallId(defaultStringValue(currentTool.call_id, stringValue(currentTool.id)));
+          collector.addToolCall({
+            key: callId,
+            id: callId,
+            name: stringValue(currentTool.name),
+            arguments: stringValue(currentTool.arguments),
+          });
           currentTool = null;
         }
         break;
@@ -519,8 +533,8 @@ export function responsesStreamToCompletion(text: string, model: string): Json {
       case "response.completed":
       case "response.done": {
         const response = (event.response ?? event) as Json;
-        completion.status = response.status;
-        completion.usage = response.usage;
+        status = stringValue(response.status);
+        rawUsage = response.usage;
         break;
       }
       default:
@@ -528,16 +542,12 @@ export function responsesStreamToCompletion(text: string, model: string): Json {
     }
   }
 
-  const output: unknown[] = [];
-  if (messageContent) {
-    output.push({ type: "message", content: [{ type: "output_text", text: messageContent }] });
-  }
   const reasoningText = reasoningOrder
     .map((key) => reasoningParts.get(key) ?? "")
     .filter((value) => value)
     .join("\n\n");
-  if (reasoningText) output.push({ type: "reasoning", text: reasoningText });
-  output.push(...toolCalls);
-  completion.output = output;
-  return responsesJsonToChatCompletion(completion, model);
+  collector.addReasoning(reasoningText);
+  collector.setFinishReason(status === "incomplete" ? "length" : "stop");
+  collector.setUsage(responseUsageToChatUsage(rawUsage));
+  return collector.toCompletion();
 }
