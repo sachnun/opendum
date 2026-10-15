@@ -1,7 +1,6 @@
 {
   "id": "claude-haiku-5-5",
   "providers": [
-    "harbor",
     "zenmux"
   ],
   "aliases": [
@@ -45,11 +44,6 @@
     }
   },
   "providerConfig": {
-    "harbor": {
-      "upstream": "claude-haiku-5.5:free",
-      "contextWindow": 1000000,
-      "maxOutputTokens": 128000
-    },
     "zenmux": {
       "upstream": "anthropic/claude-haiku-5.5",
       "contextWindow": 1000000,
