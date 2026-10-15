@@ -2,7 +2,8 @@ import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
 import { jsonResponse, randomId, stringValue } from "../../core/helpers.js";
 import { normalizeProviderFailure, transportFailure, type UpstreamTransport } from "../../core/http.js";
-import { ProviderCredentialFailure, asError } from "../../core/errors.js";
+import { ProviderCredentialFailure } from "../../core/errors.js";
+import { OAuthTokenExchange } from "../../core/oauth-token-exchange.js";
 import { KIRO_REFRESH_ENDPOINT } from "../../endpoints.js";
 import {
   KiroParserState,
@@ -41,10 +42,30 @@ export class KiroProvider implements Provider, CredentialRefresher, RefreshBuffe
   readonly name = "kiro";
   private readonly registry: Registry;
   private readonly transport: UpstreamTransport;
+  private readonly exchange: OAuthTokenExchange;
 
   constructor(options: KiroOptions) {
     this.registry = options.registry;
     this.transport = options.transport;
+    this.exchange = new OAuthTokenExchange({
+      provider: "kiro",
+      tokenUrl: KIRO_REFRESH_ENDPOINT,
+      transport: options.transport,
+      request: (refreshToken) => ({
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json", "User-Agent": "KiroIDE" },
+        body: JSON.stringify({ refreshToken: refreshToken.trim() }),
+      }),
+      parse: async (payload, refreshToken) => {
+        const token = payload as { accessToken?: string; refreshToken?: string; expiresIn?: number };
+        const accessToken = (token.accessToken ?? "").trim();
+        if (!accessToken) throw new Error("kiro token refresh returned empty access token");
+        const nextRefresh = token.refreshToken || refreshToken;
+        const expiresIn = token.expiresIn && token.expiresIn > 0 ? token.expiresIn : 3600;
+        const tier = await this.fetchSubscriptionTier(accessToken);
+        return { accessToken, refreshToken: nextRefresh, expiresAt: new Date(Date.now() + expiresIn * 1000), tier };
+      },
+    });
   }
 
   refreshBuffer(): number {
@@ -53,35 +74,9 @@ export class KiroProvider implements Provider, CredentialRefresher, RefreshBuffe
 
   refreshCredentials(
     refreshToken: string,
-    _account: ProviderAccount
+    account: ProviderAccount
   ): Effect.Effect<RefreshedCredentials, ProviderCredentialFailure> {
-    const transport = this.transport;
-    return Effect.tryPromise({
-      try: async () => {
-        const resp = await transport.direct(KIRO_REFRESH_ENDPOINT, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Accept: "application/json", "User-Agent": "KiroIDE" },
-          body: JSON.stringify({ refreshToken: refreshToken.trim() }),
-        });
-        const text = await resp.text();
-        if (resp.status < 200 || resp.status >= 300) {
-          throw new Error(`kiro token refresh failed: ${resp.status} ${text.slice(0, 1024)}`);
-        }
-        const token = JSON.parse(text) as { accessToken?: string; refreshToken?: string; expiresIn?: number };
-        const accessToken = (token.accessToken ?? "").trim();
-        if (!accessToken) throw new Error("kiro token refresh returned empty access token");
-        const nextRefresh = token.refreshToken || refreshToken;
-        const expiresIn = token.expiresIn && token.expiresIn > 0 ? token.expiresIn : 3600;
-        const tier = await this.fetchSubscriptionTier(accessToken);
-        return { accessToken, refreshToken: nextRefresh, expiresAt: new Date(Date.now() + expiresIn * 1000), tier };
-      },
-      catch: (cause) =>
-        new ProviderCredentialFailure({
-          message: asError(cause).message,
-          provider: "kiro",
-          cause,
-        }),
-    });
+    return this.exchange.exchange(refreshToken, account);
   }
 
   private async fetchSubscriptionTier(accessToken: string): Promise<string> {

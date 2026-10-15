@@ -2,7 +2,8 @@ import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
 import { jsonResponse, numberFromAny, parseSseDataLines, stringValue } from "../core/helpers.js";
 import { normalizeProviderFailure, transportFailure, type UpstreamTransport } from "../core/http.js";
-import { ProviderCredentialFailure, asError } from "../core/errors.js";
+import { ProviderCredentialFailure } from "../core/errors.js";
+import { OAuthTokenExchange } from "../core/oauth-token-exchange.js";
 import type {
   CredentialRefresher,
   Provider,
@@ -52,34 +53,28 @@ export class WorkbuddyProvider implements Provider, CredentialRefresher {
   readonly name = "workbuddy";
   private readonly registry: Registry;
   private readonly transport: UpstreamTransport;
+  private readonly exchange: OAuthTokenExchange;
 
   constructor(options: WorkbuddyOptions) {
     this.registry = options.registry;
     this.transport = options.transport;
-  }
-
-  refreshCredentials(
-    refreshToken: string,
-    _account: ProviderAccount
-  ): Effect.Effect<RefreshedCredentials, ProviderCredentialFailure> {
-    return Effect.tryPromise({
-      try: async () => {
-        const resp = await this.transport.direct(`${WORKBUDDY_API_BASE}${WORKBUDDY_REFRESH_PATH}`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-            "X-Domain": WORKBUDDY_DOMAIN,
-            "X-Refresh-Token": refreshToken.trim(),
-            "X-Auth-Refresh-Source": WORKBUDDY_REFRESH_SOURCE,
-          },
-          body: "{}",
-        });
-        const text = await resp.text();
-        if (resp.status < 200 || resp.status >= 300) {
-          throw new Error(`workbuddy token refresh failed: ${resp.status} ${text.slice(0, 1024)}`);
-        }
-        const parsed = JSON.parse(text) as {
+    this.exchange = new OAuthTokenExchange({
+      provider: "workbuddy",
+      tokenUrl: `${WORKBUDDY_API_BASE}${WORKBUDDY_REFRESH_PATH}`,
+      transport: options.transport,
+      request: (refreshToken) => ({
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          "X-Domain": WORKBUDDY_DOMAIN,
+          "X-Refresh-Token": refreshToken.trim(),
+          "X-Auth-Refresh-Source": WORKBUDDY_REFRESH_SOURCE,
+        },
+        body: "{}",
+      }),
+      parse: (payload, refreshToken) => {
+        const parsed = payload as {
           code?: number;
           data?: { accessToken?: string; refreshToken?: string; expiresIn?: number; expiresAt?: number };
         };
@@ -87,20 +82,20 @@ export class WorkbuddyProvider implements Provider, CredentialRefresher {
         if (parsed.code !== 0 || !accessToken) {
           throw new Error("workbuddy token refresh returned empty token");
         }
-        const nextRefresh = (parsed.data?.refreshToken ?? "").trim() || refreshToken.trim();
         return {
           accessToken,
-          refreshToken: nextRefresh,
+          refreshToken: (parsed.data?.refreshToken ?? "").trim() || refreshToken.trim(),
           expiresAt: workbuddyExpiry(parsed.data?.expiresAt ?? 0, parsed.data?.expiresIn ?? 0),
         };
       },
-      catch: (cause) =>
-        new ProviderCredentialFailure({
-          message: asError(cause).message,
-          provider: "workbuddy",
-          cause,
-        }),
     });
+  }
+
+  refreshCredentials(
+    refreshToken: string,
+    account: ProviderAccount
+  ): Effect.Effect<RefreshedCredentials, ProviderCredentialFailure> {
+    return this.exchange.exchange(refreshToken, account);
   }
 
   makeRequest(request: ProviderRequest): Effect.Effect<Response, ProviderFailure> {

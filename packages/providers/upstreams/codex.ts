@@ -21,7 +21,8 @@ import {
   responsesSseToChatStream,
 } from "../transform/responses.js";
 import { transportFailure, type UpstreamTransport } from "../core/http.js";
-import { ProviderCredentialFailure, asError } from "../core/errors.js";
+import { ProviderCredentialFailure } from "../core/errors.js";
+import { OAuthTokenExchange } from "../core/oauth-token-exchange.js";
 import type {
   CredentialRefresher,
   Provider,
@@ -201,43 +202,31 @@ export class CodexProvider implements Provider, CredentialRefresher, RefreshBuff
   private readonly transport: UpstreamTransport;
   private readonly redis: OpendumRedis | null;
   private readonly onAccountId: ((accountId: string) => void) | undefined;
+  private readonly exchange: OAuthTokenExchange;
 
   constructor(options: CodexOptions) {
     this.registry = options.registry;
     this.transport = options.transport;
     this.redis = options.redis ?? null;
     this.onAccountId = options.onAccountId;
-  }
-
-  refreshBuffer(): number {
-    return CODEX_REFRESH_BUFFER_MS;
-  }
-
-  refreshCredentials(
-    refreshToken: string,
-    _account: ProviderAccount
-  ): Effect.Effect<RefreshedCredentials, ProviderCredentialFailure> {
-    const transport = this.transport;
-    return Effect.tryPromise({
-      try: async () => {
-        const form = new URLSearchParams({
+    this.exchange = new OAuthTokenExchange({
+      provider: "codex",
+      tokenUrl: CODEX_TOKEN_ENDPOINT,
+      transport: options.transport,
+      request: (refreshToken) => ({
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Accept: "application/json",
+        },
+        body: new URLSearchParams({
           grant_type: "refresh_token",
           refresh_token: refreshToken.trim(),
           client_id: CODEX_CLIENT_ID,
-        });
-        const resp = await transport.direct(CODEX_TOKEN_ENDPOINT, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-            Accept: "application/json",
-          },
-          body: form.toString(),
-        });
-        const text = await resp.text();
-        if (resp.status < 200 || resp.status >= 300) {
-          throw new Error(`codex token refresh failed: ${resp.status} ${text.slice(0, 1024)}`);
-        }
-        const token = JSON.parse(text) as {
+        }).toString(),
+      }),
+      parse: (payload, refreshToken) => {
+        const token = payload as {
           access_token?: string;
           refresh_token?: string;
           expires_in?: number;
@@ -260,13 +249,18 @@ export class CodexProvider implements Provider, CredentialRefresher, RefreshBuff
           accountId,
         };
       },
-      catch: (cause) =>
-        new ProviderCredentialFailure({
-          message: asError(cause).message,
-          provider: "codex",
-          cause,
-        }),
     });
+  }
+
+  refreshBuffer(): number {
+    return CODEX_REFRESH_BUFFER_MS;
+  }
+
+  refreshCredentials(
+    refreshToken: string,
+    account: ProviderAccount
+  ): Effect.Effect<RefreshedCredentials, ProviderCredentialFailure> {
+    return this.exchange.exchange(refreshToken, account);
   }
 
   makeRequest(request: ProviderRequest): Effect.Effect<Response, ProviderFailure> {

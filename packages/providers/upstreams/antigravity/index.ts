@@ -36,7 +36,8 @@ import {
 export type { ToolSchemaMap } from "./transform.js";
 import { convertImageURLsToBase64 } from "../../core/images.js";
 import { normalizeProviderFailure, transportFailure, type UpstreamTransport } from "../../core/http.js";
-import { ProviderCredentialFailure, asError } from "../../core/errors.js";
+import { ProviderCredentialFailure } from "../../core/errors.js";
+import { OAuthTokenExchange } from "../../core/oauth-token-exchange.js";
 import type {
   CredentialRefresher,
   Provider,
@@ -280,41 +281,29 @@ export class AntigravityProvider implements Provider, CredentialRefresher, Refre
   private readonly apiClient = "google-cloud-sdk vscode_cloudshelleditor/0.1";
   private readonly clientMetadata =
     '{"ideType":"IDE_UNSPECIFIED","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI"}';
+  private readonly exchange: OAuthTokenExchange;
 
   constructor(options: AntigravityOptions) {
     this.registry = options.registry;
     this.transport = options.transport;
     this.redis = options.redis ?? null;
     this.persistAccountInfo = options.persistAccountInfo;
-  }
-
-  refreshBuffer(): number {
-    return 60 * 60 * 1000;
-  }
-
-  refreshCredentials(
-    refreshToken: string,
-    _account: ProviderAccount
-  ): Effect.Effect<RefreshedCredentials, ProviderCredentialFailure> {
-    const transport = this.transport;
-    return Effect.tryPromise({
-      try: async () => {
-        const form = new URLSearchParams({
+    this.exchange = new OAuthTokenExchange({
+      provider: "antigravity",
+      tokenUrl: GOOGLE_OAUTH_TOKEN_ENDPOINT,
+      transport: options.transport,
+      request: (refreshToken) => ({
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
           client_id: this.clientId,
           client_secret: this.clientSecret,
           refresh_token: refreshToken.trim(),
           grant_type: "refresh_token",
-        });
-        const resp = await transport.direct(GOOGLE_OAUTH_TOKEN_ENDPOINT, {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: form.toString(),
-        });
-        const text = await resp.text();
-        if (resp.status < 200 || resp.status >= 300) {
-          throw new Error(`antigravity token refresh failed: ${resp.status} ${text.slice(0, 1024)}`);
-        }
-        const token = JSON.parse(text) as { access_token?: string; refresh_token?: string; expires_in?: number };
+        }).toString(),
+      }),
+      parse: async (payload, refreshToken) => {
+        const token = payload as { access_token?: string; refresh_token?: string; expires_in?: number };
         if (!token.access_token) throw new Error("antigravity token refresh returned empty access token");
         const nextRefresh = token.refresh_token || refreshToken;
         const expiresIn = token.expires_in && token.expires_in > 0 ? token.expires_in : 3600;
@@ -329,13 +318,18 @@ export class AntigravityProvider implements Provider, CredentialRefresher, Refre
           email: info.email,
         };
       },
-      catch: (cause) =>
-        new ProviderCredentialFailure({
-          message: asError(cause).message,
-          provider: "antigravity",
-          cause,
-        }),
     });
+  }
+
+  refreshBuffer(): number {
+    return 60 * 60 * 1000;
+  }
+
+  refreshCredentials(
+    refreshToken: string,
+    account: ProviderAccount
+  ): Effect.Effect<RefreshedCredentials, ProviderCredentialFailure> {
+    return this.exchange.exchange(refreshToken, account);
   }
 
   private setGoogleHeaders(headers: Record<string, string>, accessToken: string, stream: boolean): void {

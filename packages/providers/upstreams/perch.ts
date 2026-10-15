@@ -10,7 +10,8 @@ import {
   stringValue,
 } from "../core/helpers.js";
 import { normalizeProviderFailure, transportFailure, type UpstreamTransport } from "../core/http.js";
-import { ProviderCredentialFailure, asError } from "../core/errors.js";
+import { ProviderCredentialFailure } from "../core/errors.js";
+import { OAuthTokenExchange } from "../core/oauth-token-exchange.js";
 import type {
   CredentialRefresher,
   Provider,
@@ -329,37 +330,28 @@ export class PerchProvider implements Provider, CredentialRefresher, RefreshBuff
   readonly name = "perch";
   private readonly registry: Registry;
   private readonly transport: UpstreamTransport;
+  private readonly exchange: OAuthTokenExchange;
 
   constructor(options: PerchOptions) {
     this.registry = options.registry;
     this.transport = options.transport;
-  }
-
-  refreshBuffer(): number {
-    return PERCH_REFRESH_BUFFER_MS;
-  }
-
-  refreshCredentials(
-    refreshToken: string,
-    _account: ProviderAccount
-  ): Effect.Effect<RefreshedCredentials, ProviderCredentialFailure> {
-    const transport = this.transport;
-    return Effect.tryPromise({
-      try: async () => {
-        const config = await fetchPerchAuthConfig(transport);
-        const resp = await transport.direct(
-          `${config.supabaseUrl}/auth/v1/token?grant_type=refresh_token`,
-          {
-            method: "POST",
-            headers: { ...perchTokenHeaders(config), Accept: "application/json" },
-            body: JSON.stringify({ refresh_token: refreshToken.trim() }),
-          }
-        );
-        const text = await resp.text();
-        if (resp.status < 200 || resp.status >= 300) {
-          throw new Error(`perch token refresh failed: ${resp.status} ${text.slice(0, 1024)}`);
-        }
-        const token = JSON.parse(text) as {
+    this.exchange = new OAuthTokenExchange({
+      provider: "perch",
+      tokenUrl: async () => {
+        const config = await fetchPerchAuthConfig(this.transport);
+        return `${config.supabaseUrl}/auth/v1/token?grant_type=refresh_token`;
+      },
+      transport: options.transport,
+      request: async (refreshToken) => {
+        const config = await fetchPerchAuthConfig(this.transport);
+        return {
+          method: "POST",
+          headers: { ...perchTokenHeaders(config), Accept: "application/json" },
+          body: JSON.stringify({ refresh_token: refreshToken.trim() }),
+        };
+      },
+      parse: (payload, refreshToken) => {
+        const token = payload as {
           access_token?: string;
           refresh_token?: string;
           expires_at?: number;
@@ -373,13 +365,18 @@ export class PerchProvider implements Provider, CredentialRefresher, RefreshBuff
         const nextRefresh = (token.refresh_token ?? "").trim() || refreshToken.trim();
         return { accessToken, refreshToken: nextRefresh, expiresAt };
       },
-      catch: (cause) =>
-        new ProviderCredentialFailure({
-          message: asError(cause).message,
-          provider: "perch",
-          cause,
-        }),
     });
+  }
+
+  refreshBuffer(): number {
+    return PERCH_REFRESH_BUFFER_MS;
+  }
+
+  refreshCredentials(
+    refreshToken: string,
+    account: ProviderAccount
+  ): Effect.Effect<RefreshedCredentials, ProviderCredentialFailure> {
+    return this.exchange.exchange(refreshToken, account);
   }
 
   makeRequest(request: ProviderRequest): Effect.Effect<Response, ProviderFailure> {
