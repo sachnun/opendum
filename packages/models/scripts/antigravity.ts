@@ -22,7 +22,7 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildModelIndex, persistModel, syncProviderModels } from "#models/registry.ts";
+import { buildModelIndex, persistModel, syncProviderModels } from "#models/model-store.ts";
 import { runFetchText } from "#models/sync/http.ts";
 import { syncCliVersion } from "./version-sync.ts";
 

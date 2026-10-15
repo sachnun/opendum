@@ -2,7 +2,7 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildModelIdMap, syncProviderModels } from "#models/registry.ts";
+import { buildModelIdMap, syncProviderModels } from "#models/model-store.ts";
 import { runFetchText } from "#models/sync/http.ts";
 
 const PROVIDER_NAME = "harbor";

@@ -6,7 +6,7 @@ import { homedir, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { buildModelIndex, persistModel, syncProviderModels } from "#models/registry.ts";
+import { buildModelIndex, persistModel, syncProviderModels } from "#models/model-store.ts";
 import { runFetchJson } from "#models/sync/http.ts";
 
 const PROVIDER_NAME = "workbuddy";

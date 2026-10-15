@@ -18,7 +18,7 @@ import { existsSync, mkdirSync, renameSync, rmSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import { inferModelFolder } from "#models/model/families.ts";
-import { buildModelIndex, persistModel, renameModelFiles, resolveGeneratedDir } from "#models/registry.ts";
+import { buildModelIndex, persistModel, renameModelFiles, resolveGeneratedDir } from "#models/model-store.ts";
 import { applyCanonicalMerge, planCanonicalization } from "#models/model/canonicalize.ts";
 import { modelProbes } from "#models/model/probes.ts";
 import type { ModelData } from "#models/types.ts";

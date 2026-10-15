@@ -1,4 +1,4 @@
-import type { ModelInfo, ProviderAccessRule, ProviderModelConfig } from "./runtime.ts";
+import type { ModelInfo, ProviderAccessRule, ProviderModelConfig } from "./registry.ts";
 
 export type AccessPolicyCatalog = {
   info(model: string): ModelInfo | null;

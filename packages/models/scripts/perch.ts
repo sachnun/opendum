@@ -2,7 +2,7 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildModelIndex, syncProviderModels } from "#models/registry.ts";
+import { buildModelIndex, syncProviderModels } from "#models/model-store.ts";
 import { runFetchText, runFetchJson } from "#models/sync/http.ts";
 import { normalizeKey, normalizeName } from "#models/model/similarity.ts";
 import { syncCliVersion } from "./version-sync.ts";

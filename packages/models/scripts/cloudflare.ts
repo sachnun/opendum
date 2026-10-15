@@ -17,7 +17,7 @@ import {
   getProviderUpstream,
   syncProviderModels,
   persistModel,
-} from "#models/registry.ts";
+} from "#models/model-store.ts";
 import { runFetchJson } from "#models/sync/http.ts";
 import { stripParamInfoKey } from "#models/model/clean-key.ts";
 

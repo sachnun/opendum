@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { db, customProvider, customProviderModel, providerAccount } from "@opendum/database";
 import { stripParamInfoKey } from "@opendum/models/clean-key";
-import { buildModelIdMap } from "@opendum/models/registry";
+import { buildModelIdMap } from "@opendum/models/model-store";
 import { decrypt, encrypt, hashString } from "~~/server/lib/encryption";
 import { fetchInternalProvider, InternalRelayNotConfiguredError } from "~~/server/lib/proxy/internal-relay";
 import { PROVIDER_ACCOUNT_KEYS } from "./account-providers";

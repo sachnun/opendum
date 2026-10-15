@@ -2,7 +2,7 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildModelIndex, syncProviderModels, getProviderUpstream } from "#models/registry.ts";
+import { buildModelIndex, syncProviderModels, getProviderUpstream } from "#models/model-store.ts";
 import { Effect } from "effect";
 import { fetchDecoded, MAX_FETCH_ATTEMPTS, retryTransient, runOrThrow } from "#models/sync/http.ts";
 import { stripParamInfoKey } from "#models/model/clean-key.ts";

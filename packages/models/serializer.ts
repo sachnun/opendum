@@ -1,4 +1,4 @@
-import type { ModelInfo } from "./runtime.ts";
+import type { ModelInfo } from "./registry.ts";
 
 type Json = Record<string, unknown>;
 

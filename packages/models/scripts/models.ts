@@ -4,7 +4,7 @@ import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildModelIndex, pruneDeadModelEntries } from "#models/registry.ts";
+import { buildModelIndex, pruneDeadModelEntries } from "#models/model-store.ts";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const modelsDir = resolve(scriptDir, "../data");

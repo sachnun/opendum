@@ -8,8 +8,8 @@ import {
   asError,
   modelFailureMessage,
 } from "./errors.ts";
-import { tryLoadModelEntries } from "./runtime.ts";
-import { tryReadModelJson } from "./registry.ts";
+import { tryLoadModelEntries } from "./registry.ts";
+import { tryReadModelJson } from "./model-store.ts";
 
 function failureOf<E>(exit: Exit.Exit<unknown, E>): E {
   const option = Exit.findErrorOption(exit);

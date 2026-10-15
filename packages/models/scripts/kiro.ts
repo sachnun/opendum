@@ -18,7 +18,7 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { syncProviderModels } from "#models/registry.ts";
+import { syncProviderModels } from "#models/model-store.ts";
 import { fetchDecoded, runFetchText, FETCH_TIMEOUT_MS, runOrThrow } from "#models/sync/http.ts";
 import { stripParamInfoKey } from "#models/model/clean-key.ts";
 import { syncCliVersion } from "./version-sync.ts";

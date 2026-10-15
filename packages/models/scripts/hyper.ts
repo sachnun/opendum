@@ -2,7 +2,7 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildModelIndex, persistModel, syncProviderModels } from "#models/registry.ts";
+import { buildModelIndex, persistModel, syncProviderModels } from "#models/model-store.ts";
 import { runFetchJson } from "#models/sync/http.ts";
 import { stripParamInfoKey } from "#models/model/clean-key.ts";
 

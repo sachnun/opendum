@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import type { ModelInfo } from "./runtime.ts";
+import type { ModelInfo } from "./registry.ts";
 import { OpenAIModelSerializer } from "./serializer.ts";
 
 function serializerOf(models: Record<string, ModelInfo>): OpenAIModelSerializer {

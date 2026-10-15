@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { AccessPolicy } from "./access-policy.ts";
-import type { ModelInfo } from "./runtime.ts";
+import type { ModelInfo } from "./registry.ts";
 
 function policyOf(models: Record<string, ModelInfo>): AccessPolicy {
   return new AccessPolicy({
