@@ -1,23 +1,23 @@
 import { describe, expect, it } from "bun:test";
-import { chatCompletionsConfig, messagesConfig, responsesConfig, transformAnthropicToOpenAI, transformOpenAIToAnthropic } from "../core/endpoints.js";
+import { ChatCompletionsAdapter, MessagesAdapter, ResponsesAdapter, endpointAdapters, transformAnthropicToOpenAI, transformOpenAIToAnthropic } from "../core/endpoints.js";
 import { SseScanner } from "../core/sse.js";
 import { isRouteError } from "../core/types.js";
 import { retryMetadata, sanitizedProxyError, shouldRotate } from "../core/errors.js";
 
 describe("chat completions parse", () => {
   it("rejects a missing model", () => {
-    const parsed = chatCompletionsConfig().parse({ messages: [] });
+    const parsed = new ChatCompletionsAdapter().parse({ messages: [] });
     expect(isRouteError(parsed)).toBe(true);
     if (isRouteError(parsed)) expect(parsed.status).toBe(400);
   });
 
   it("rejects a missing messages array", () => {
-    const parsed = chatCompletionsConfig().parse({ model: "gpt-4o" });
+    const parsed = new ChatCompletionsAdapter().parse({ model: "gpt-4o" });
     expect(isRouteError(parsed)).toBe(true);
   });
 
   it("parses a valid request and builds a payload", () => {
-    const parsed = chatCompletionsConfig().parse({
+    const parsed = new ChatCompletionsAdapter().parse({
       model: "gpt-4o",
       messages: [{ role: "user", content: "hi" }],
       stream: true,
@@ -27,7 +27,7 @@ describe("chat completions parse", () => {
     if (isRouteError(parsed)) return;
     expect(parsed.stream).toBe(true);
     expect(parsed.reasoningRequested).toBe(true);
-    const built = chatCompletionsConfig().build(parsed, "gpt-4o", true, "sess-1");
+    const built = new ChatCompletionsAdapter().build(parsed, "gpt-4o", true, "sess-1");
     expect(built.model).toBe("gpt-4o");
     expect(built._sessionId).toBe("sess-1");
     expect(built._includeReasoning).toBe(true);
@@ -36,7 +36,7 @@ describe("chat completions parse", () => {
 
 describe("messages transform", () => {
   it("converts anthropic request to openai", () => {
-    const parsed = messagesConfig().parse({
+    const parsed = new MessagesAdapter().parse({
       model: "claude-sonnet-4-6",
       max_tokens: 128,
       system: "be nice",
@@ -44,7 +44,7 @@ describe("messages transform", () => {
     });
     expect(isRouteError(parsed)).toBe(false);
     if (isRouteError(parsed)) return;
-    const built = messagesConfig().build(parsed, "claude-sonnet-4-6", false, "");
+    const built = new MessagesAdapter().build(parsed, "claude-sonnet-4-6", false, "");
     expect(built.max_tokens).toBe(128);
     const messages = built.messages as Array<Record<string, unknown>>;
     expect(messages[0].role).toBe("system");
@@ -83,7 +83,7 @@ describe("messages transform", () => {
 
 describe("responses parse", () => {
   it("converts responses input into messages", () => {
-    const parsed = responsesConfig().parse({
+    const parsed = new ResponsesAdapter().parse({
       model: "gpt-4o",
       input: [{ role: "user", content: [{ type: "input_text", text: "yo" }] }],
       max_output_tokens: 64,
@@ -91,10 +91,20 @@ describe("responses parse", () => {
     expect(isRouteError(parsed)).toBe(false);
     if (isRouteError(parsed)) return;
     expect(parsed.paramsForError.max_tokens).toBe(64);
-    const built = responsesConfig().build(parsed, "gpt-4o", false, "");
+    const built = new ResponsesAdapter().build(parsed, "gpt-4o", false, "");
     expect(built._responsesInput).toBeArray();
     const messages = built.messages as Array<Record<string, unknown>>;
     expect(messages[0].role).toBe("user");
+  });
+});
+
+describe("endpoint adapters", () => {
+  it("exposes the three endpoints by name", () => {
+    const adapters = endpointAdapters();
+    expect(Object.keys(adapters).sort()).toEqual(["chat_completions", "messages", "responses"]);
+    expect(adapters.chat_completions.endpoint).toBe("chat_completions");
+    expect(adapters.messages.format).toBe("anthropic");
+    expect(adapters.responses.noAccountsStatusCode).toBe(503);
   });
 });
 

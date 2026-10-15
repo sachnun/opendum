@@ -9,7 +9,7 @@ const db = createDatabaseQueryMocks();
 mock.module("@opendum/database/queries", () => db);
 
 const { ProxyService } = await import("../core/service.js");
-const { chatCompletionsConfig } = await import("../core/endpoints.js");
+const { ChatCompletionsAdapter } = await import("../core/endpoints.js");
 type ProxyServiceInstance = InstanceType<typeof ProxyService>;
 
 function validAuth(overrides: Partial<AuthResult> = {}): AuthResult {
@@ -96,7 +96,7 @@ function buildService(options: {
   });
 }
 
-const cfg = chatCompletionsConfig();
+const cfg = new ChatCompletionsAdapter();
 const chatBody = { model: "gpt-4o", messages: [{ role: "user", content: "hi" }] };
 
 describe("ProxyService.handle", () => {

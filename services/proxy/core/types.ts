@@ -50,22 +50,6 @@ export type ResponseContext = {
   onStreamComplete?: (reason: StreamCompletion) => void;
 };
 
-export type EndpointAdapter = {
-  endpoint: string;
-  format: ErrorFormat;
-  rateLimitStatusCode: number;
-  noAccountsStatusCode: number;
-  parse: (body: Record<string, unknown>) => ParsedEndpointRequest | RouteError;
-  build: (
-    parsed: ParsedEndpointRequest,
-    model: string,
-    stream: boolean,
-    sessionId: string
-  ) => Record<string, unknown>;
-  handleStream: (ctx: ResponseContext, recorder: StreamRecorder) => Promise<Response>;
-  handleNonStream: (ctx: ResponseContext, recorder: StreamRecorder) => Promise<Response>;
-};
-
 export type AccountRotationFailure = {
   accountId: string;
   failedAt: Date;

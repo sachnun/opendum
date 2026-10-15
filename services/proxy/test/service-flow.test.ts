@@ -10,7 +10,7 @@ const db = createDatabaseQueryMocks();
 mock.module("@opendum/database/queries", () => db);
 
 const { ProxyService } = await import("../core/service.js");
-const { chatCompletionsConfig } = await import("../core/endpoints.js");
+const { ChatCompletionsAdapter } = await import("../core/endpoints.js");
 
 function sseResponse(chunks: string[]): Response {
   const encoder = new TextEncoder();
@@ -78,7 +78,7 @@ describe("ProxyService full flow", () => {
     });
 
     const response = await service.handle(
-      chatCompletionsConfig(),
+      new ChatCompletionsAdapter(),
       { model: "gpt-4o", messages: [{ role: "user", content: "hi" }], stream: true },
       "Bearer ok",
       ""

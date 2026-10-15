@@ -71,9 +71,9 @@ import { AccountRotationService } from "./account-rotation.js";
 import { PlaygroundAuthenticator } from "./playground-auth.js";
 import { RoamingPointService } from "./roaming-points.js";
 import { UsageRecorder } from "./usage-recorder.js";
+import type { EndpointAdapter } from "./endpoints.js";
 import type {
   AccountRotationFailure,
-  EndpointAdapter,
   ParsedEndpointRequest,
   ResponseContext,
   RouteError,
