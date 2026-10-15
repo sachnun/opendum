@@ -1,4 +1,4 @@
-import type { Database } from "@opendum/database";
+import type { PointPort } from "./repositories.js";
 import type { Registry } from "@opendum/models/runtime";
 import {
   refundRoamingPoint,
@@ -16,12 +16,12 @@ import type { UsageCounts } from "./types.js";
  */
 export class RoamingPointService {
   constructor(
-    private readonly database: Database,
+    private readonly points: PointPort,
     private readonly models: Registry
   ) {}
 
   reserve(userId: string, model: string): Promise<PointReservation | null> {
-    return reserveRoamingPoint(this.database, userId, model);
+    return reserveRoamingPoint(this.points, userId, model);
   }
 
   async settle(
@@ -30,10 +30,10 @@ export class RoamingPointService {
     model: string,
     usage: UsageCounts
   ): Promise<void> {
-    await settleRoamingPoint(this.database, this.models, ownerUserId, reservation, model, usage);
+    await settleRoamingPoint(this.points, this.models, ownerUserId, reservation, model, usage);
   }
 
   async refund(reservation: PointReservation): Promise<void> {
-    await refundRoamingPoint(this.database, reservation);
+    await refundRoamingPoint(this.points, reservation);
   }
 }

@@ -1,4 +1,4 @@
-import type { Database } from "../client.js";
+import type { DbExecutor } from "../client.js";
 import {
   bumpAccountRequestCount,
   getAccountHealthState,
@@ -26,7 +26,7 @@ import {
  * recovery markers. Delegates to the query layer with the database bound.
  */
 export class ModelHealthRepository {
-  constructor(private readonly database: Database) {}
+  constructor(private readonly database: DbExecutor) {}
 
   bumpAccountRequestCount(params: Parameters<typeof bumpAccountRequestCount>[0]) {
     return bumpAccountRequestCount(params, this.database);

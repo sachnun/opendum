@@ -1,10 +1,10 @@
 import { and, eq, inArray, isNull, lte, ne, or } from "drizzle-orm";
-import { db, type Database } from "../client.js";
+import { db, type DbExecutor } from "../client.js";
 import { providerAccount, providerAccountDisabledModel } from "../schema/accounts.js";
 import { disabledModel } from "../schema/keys.js";
 import { userSharingSetting } from "../schema/usage.js";
 
-export async function listDisabledModelsByUser(userId: string, database: Database = db) {
+export async function listDisabledModelsByUser(userId: string, database: DbExecutor = db) {
   const rows = await database
     .select({ model: disabledModel.model })
     .from(disabledModel)
@@ -16,7 +16,7 @@ export async function listActiveAccountTiers(
   userId: string,
   now: Date,
   includeInactive = false,
-  database: Database = db
+  database: DbExecutor = db
 ) {
   const conditions = [eq(providerAccount.userId, userId)];
   if (!includeInactive) {
@@ -35,7 +35,7 @@ export async function listActiveAccountTiers(
 
 export async function listDisabledModelsByAccounts(
   accountIds: string[],
-  database: Database = db
+  database: DbExecutor = db
 ) {
   if (accountIds.length === 0) return [];
   return database
@@ -47,7 +47,7 @@ export async function listDisabledModelsByAccounts(
     .where(inArray(providerAccountDisabledModel.providerAccountId, accountIds));
 }
 
-export async function listSharedAccounts(userId: string, now: Date, database: Database = db) {
+export async function listSharedAccounts(userId: string, now: Date, database: DbExecutor = db) {
   return database
     .select({
       id: providerAccount.id,

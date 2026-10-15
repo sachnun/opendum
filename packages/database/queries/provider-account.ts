@@ -1,5 +1,5 @@
 import { and, asc, eq, inArray, isNull, lte, ne, notInArray, or, sql } from "drizzle-orm";
-import { db, type Database } from "../client.js";
+import { db, type DbExecutor } from "../client.js";
 import {
   providerAccount,
   providerAccountDisabledModel,
@@ -19,7 +19,7 @@ export type EligibleAccountParams = {
 
 export async function listEligibleAccounts(
   params: EligibleAccountParams,
-  database: Database = db
+  database: DbExecutor = db
 ) {
   const conditions = [
     eq(providerAccount.userId, params.userId),
@@ -64,7 +64,7 @@ export async function listEligibleAccounts(
 
 export async function listSharedEligibleAccounts(
   params: Omit<EligibleAccountParams, "useWhitelist" | "useBlacklist" | "accountIds">,
-  database: Database = db
+  database: DbExecutor = db
 ) {
   const conditions = [
     ne(providerAccount.userId, params.userId),
@@ -107,7 +107,7 @@ export async function getQuotaAccount(
   id: string,
   userId: string,
   provider: string,
-  database: Database = db
+  database: DbExecutor = db
 ) {
   const [row] = await database
     .select({
@@ -140,7 +140,7 @@ export async function getQuotaAccount(
 
 export async function listExpiringRefreshableAccounts(
   params: { provider: string; now: Date; expiresBefore: Date; batchLimit: number },
-  database: Database = db
+  database: DbExecutor = db
 ) {
   return database
     .select({
@@ -170,7 +170,7 @@ export async function listExpiringRefreshableAccounts(
     .limit(params.batchLimit);
 }
 
-export async function getAccountCredentialsByID(id: string, database: Database = db) {
+export async function getAccountCredentialsByID(id: string, database: DbExecutor = db) {
   const [row] = await database
     .select({
       id: providerAccount.id,
@@ -191,7 +191,7 @@ export async function getAccountCredentialsByID(id: string, database: Database =
   return row ?? null;
 }
 
-export async function getAccountOwnerUserID(id: string, database: Database = db) {
+export async function getAccountOwnerUserID(id: string, database: DbExecutor = db) {
   const [row] = await database
     .select({ userId: providerAccount.userId })
     .from(providerAccount)
@@ -213,7 +213,7 @@ export type RefreshedCredentials = {
 
 export async function updateRefreshedCredentials(
   params: RefreshedCredentials,
-  database: Database = db
+  database: DbExecutor = db
 ) {
   await database
     .update(providerAccount)
@@ -232,7 +232,7 @@ export async function updateRefreshedCredentials(
 
 export async function recordAccountError(
   params: { id: string; at: Date; code: number | null },
-  database: Database = db
+  database: DbExecutor = db
 ) {
   await database
     .update(providerAccount)
@@ -247,7 +247,7 @@ export async function recordAccountError(
 
 export async function disableFailedAccount(
   params: { id: string; status: string; at: Date },
-  database: Database = db
+  database: DbExecutor = db
 ) {
   const result = await database
     .update(providerAccount)
@@ -258,7 +258,7 @@ export async function disableFailedAccount(
 
 export async function updateCodexAccountID(
   params: { id: string; accountId: string | null },
-  database: Database = db
+  database: DbExecutor = db
 ) {
   await database
     .update(providerAccount)
@@ -268,7 +268,7 @@ export async function updateCodexAccountID(
 
 export async function updateAntigravityAccountInfo(
   params: { id: string; projectId: string | null; tier: string | null; email: string | null },
-  database: Database = db
+  database: DbExecutor = db
 ) {
   await database
     .update(providerAccount)
@@ -276,7 +276,7 @@ export async function updateAntigravityAccountInfo(
     .where(eq(providerAccount.id, params.id));
 }
 
-export async function getForcedAccount(id: string, userId: string, database: Database = db) {
+export async function getForcedAccount(id: string, userId: string, database: DbExecutor = db) {
   const [row] = await database
     .select({
       id: providerAccount.id,
@@ -298,7 +298,7 @@ export async function getForcedAccount(id: string, userId: string, database: Dat
 
 export async function listDisabledAccountIDs(
   params: { accountIds: string[]; models: string[] },
-  database: Database = db
+  database: DbExecutor = db
 ) {
   if (params.accountIds.length === 0 || params.models.length === 0) return [];
   return database

@@ -1,4 +1,4 @@
-import type { Database } from "../client.js";
+import type { DbExecutor } from "../client.js";
 import {
   creditPointBalance,
   debitPointBalance,
@@ -14,7 +14,15 @@ import {
  * database bound.
  */
 export class PointRepository {
-  constructor(private readonly database: Database) {}
+  constructor(private readonly database: DbExecutor) {}
+
+  /**
+   * Runs `run` inside a database transaction with a transaction-bound
+   * repository, so balance and transaction writes stay atomic.
+   */
+  transaction<T>(run: (points: PointRepository) => Promise<T>): Promise<T> {
+    return this.database.transaction(async (tx) => run(new PointRepository(tx)));
+  }
 
   creditPointBalance(params: Parameters<typeof creditPointBalance>[0]) {
     return creditPointBalance(params, this.database);

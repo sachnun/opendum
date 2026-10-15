@@ -1,27 +1,5 @@
 import { Effect } from "effect";
-import type { Database } from "@opendum/database";
-import {
-  bumpAccountRequestCount,
-  getAccountHealthState,
-  getAccountOwnerUserID,
-  getModelHealth,
-  insertModelHealth,
-  listModelHealthByAccount,
-  markAccountRecoveredByRotation,
-  markAccountSuccess,
-  markUsageLimitedHealth,
-  recordRequestError,
-  setAccountActive,
-  setAccountCooldown,
-  setAccountHealthFailed,
-  setAccountUsageLimited,
-  updateModelHealthCounters,
-  updateModelHealthFailure,
-  updateModelHealthFailureWithStatus,
-  updateModelHealthStatus,
-  updateModelHealthSuccess,
-  updateModelHealthSuccessWithStatus,
-} from "@opendum/database/queries";
+import type { ModelHealthPort, ProviderAccountPort } from "./repositories.js";
 import type { OpendumRedis } from "@opendum/core/redis";
 import type { Registry } from "@opendum/models/runtime";
 import { upsertErrorHistory } from "./error-history.js";
@@ -41,7 +19,8 @@ const FAILED_COOLDOWN_MS = 10 * 60 * 1000;
 const ACCOUNT_COOLDOWN_UNHEALTHY_THRESHOLD = 10;
 
 export type AccountHealthOptions = {
-  database: Database;
+  accounts: ProviderAccountPort;
+  health: ModelHealthPort;
   models: Registry;
   redis: OpendumRedis;
 };
@@ -51,44 +30,44 @@ export type AccountHealthOptions = {
  * account cooldowns, rotation recovery, request counts and error history.
  */
 export class AccountHealthService {
-  private readonly database: Database;
+  private readonly accounts: ProviderAccountPort;
+  private readonly health: ModelHealthPort;
   private readonly models: Registry;
   private readonly redis: OpendumRedis;
 
   constructor(options: AccountHealthOptions) {
-    this.database = options.database;
+    this.accounts = options.accounts;
+    this.health = options.health;
     this.models = options.models;
     this.redis = options.redis;
   }
 
   async refreshAccountHealthFromModels(accountId: string, now: Date): Promise<boolean> {
     if (isSyntheticProviderAccountId(accountId)) return false;
-    const account = await getAccountHealthState(accountId, this.database);
+    const account = await this.health.getAccountHealthState(accountId);
     if (!account) return false;
-    const rows = await listModelHealthByAccount(accountId, this.database);
+    const rows = await this.health.listModelHealthByAccount(accountId);
     const applyCooldownRecovery =
       account.status === "failed" && account.disabledUntil !== null && account.disabledUntil.getTime() <= now.getTime();
     const total = await this.normalizeModelHealthRows(rows, now, applyCooldownRecovery);
 
     if (account.disabledUntil && account.disabledUntil.getTime() > now.getTime()) {
       if (account.consecutiveErrors !== total) {
-        await setAccountHealthFailed(
-          { id: accountId, consecutiveErrors: total, status: "failed", at: now },
-          this.database
+        await this.health.setAccountHealthFailed(
+          { id: accountId, consecutiveErrors: total, status: "failed", at: now }
         );
       }
       return true;
     }
     if (total >= ACCOUNT_COOLDOWN_UNHEALTHY_THRESHOLD) {
-      await setAccountCooldown(
+      await this.health.setAccountCooldown(
         {
           id: accountId,
           status: "failed",
           at: now,
           consecutiveErrors: total,
           disabledUntil: new Date(now.getTime() + FAILED_COOLDOWN_MS),
-        },
-        this.database
+        }
       );
       return true;
     }
@@ -97,13 +76,13 @@ export class AccountHealthService {
       (account.disabledUntil !== null && account.disabledUntil.getTime() <= now.getTime()) ||
       account.consecutiveErrors !== total
     ) {
-      await setAccountActive({ id: accountId, status: "active", at: now, consecutiveErrors: total }, this.database);
+      await this.health.setAccountActive({ id: accountId, status: "active", at: now, consecutiveErrors: total });
     }
     return false;
   }
 
   private async normalizeModelHealthRows(
-    rows: Awaited<ReturnType<typeof listModelHealthByAccount>>,
+    rows: Awaited<ReturnType<ModelHealthPort["listModelHealthByAccount"]>>,
     now: Date,
     applyCooldownRecovery: boolean
   ): Promise<number> {
@@ -116,15 +95,13 @@ export class AccountHealthService {
       total += count;
       if (count === row.consecutiveErrors && !statusChanged && !applyCooldownRecovery) continue;
       if (row.status === "failed" || statusChanged) {
-        await updateModelHealthStatus(
-          { id: row.id, consecutiveErrors: count, unhealthyCountUpdatedAt: now, status, statusChangedAt: now },
-          this.database
+        await this.health.updateModelHealthStatus(
+          { id: row.id, consecutiveErrors: count, unhealthyCountUpdatedAt: now, status, statusChangedAt: now }
         );
         continue;
       }
-      await updateModelHealthCounters(
-        { id: row.id, consecutiveErrors: count, unhealthyCountUpdatedAt: now },
-        this.database
+      await this.health.updateModelHealthCounters(
+        { id: row.id, consecutiveErrors: count, unhealthyCountUpdatedAt: now }
       );
     }
     return total;
@@ -133,9 +110,9 @@ export class AccountHealthService {
   async markAccountSuccess(accountId: string, model: string): Promise<void> {
     if (isSyntheticProviderAccountId(accountId)) return;
     const now = new Date();
-    await markAccountSuccess({ id: accountId, at: now }, this.database);
+    await this.health.markAccountSuccess({ id: accountId, at: now });
     const resolved = this.models.resolveAlias(model);
-    const health = await getModelHealth(accountId, resolved, this.database);
+    const health = await this.health.getModelHealth(accountId, resolved);
     if (!health) {
       await this.refreshAccountHealthFromModels(accountId, now);
       return;
@@ -143,7 +120,7 @@ export class AccountHealthService {
     const nextErrors = successRecoveryCount(health, now);
     const nextStatus = modelHealthStatus(nextErrors);
     if (nextStatus !== health.status) {
-      await updateModelHealthSuccessWithStatus(
+      await this.health.updateModelHealthSuccessWithStatus(
         {
           id: health.id,
           consecutiveErrors: nextErrors,
@@ -151,13 +128,11 @@ export class AccountHealthService {
           unhealthyCountUpdatedAt: now,
           status: nextStatus,
           statusChangedAt: now,
-        },
-        this.database
+        }
       );
     } else {
-      await updateModelHealthSuccess(
-        { id: health.id, consecutiveErrors: nextErrors, lastSuccessAt: now, unhealthyCountUpdatedAt: now },
-        this.database
+      await this.health.updateModelHealthSuccess(
+        { id: health.id, consecutiveErrors: nextErrors, lastSuccessAt: now, unhealthyCountUpdatedAt: now }
       );
     }
     await this.refreshAccountHealthFromModels(accountId, now);
@@ -167,14 +142,14 @@ export class AccountHealthService {
     const now = new Date();
     if (isSyntheticProviderAccountId(accountId)) return now;
     const stored = message.length > MAX_STORED_ERROR_LEN ? message.slice(0, MAX_STORED_ERROR_LEN) : message;
-    await recordRequestError({ id: accountId, at: now, code: statusCode }, this.database);
+    await this.health.recordRequestError({ id: accountId, at: now, code: statusCode });
     const resolved = this.models.resolveAlias(model);
-    const health = await getModelHealth(accountId, resolved, this.database);
+    const health = await this.health.getModelHealth(accountId, resolved);
     if (health) {
       const nextErrors = effectiveUnhealthyCount(health, now) + 1;
       const nextStatus = modelHealthStatus(nextErrors);
       if (nextStatus !== health.status) {
-        await updateModelHealthFailureWithStatus(
+        await this.health.updateModelHealthFailureWithStatus(
           {
             id: health.id,
             consecutiveErrors: nextErrors,
@@ -183,24 +158,22 @@ export class AccountHealthService {
             unhealthyCountUpdatedAt: now,
             status: nextStatus,
             statusChangedAt: now,
-          },
-          this.database
+          }
         );
       } else {
-        await updateModelHealthFailure(
+        await this.health.updateModelHealthFailure(
           {
             id: health.id,
             consecutiveErrors: nextErrors,
             lastErrorAt: now,
             lastErrorCode: statusCode,
             unhealthyCountUpdatedAt: now,
-          },
-          this.database
+          }
         );
       }
     } else {
       const nextErrors = 1;
-      await insertModelHealth(
+      await this.health.insertModelHealth(
         {
           id: crypto.randomUUID(),
           providerAccountId: accountId,
@@ -212,12 +185,11 @@ export class AccountHealthService {
           unhealthyCountUpdatedAt: now,
           createdAt: now,
           updatedAt: now,
-        },
-        this.database
+        }
       );
     }
     await this.refreshAccountHealthFromModels(accountId, now);
-    const ownerUserId = await getAccountOwnerUserID(accountId, this.database);
+    const ownerUserId = await this.accounts.getAccountOwnerUserID(accountId);
     if (ownerUserId) {
       await upsertErrorHistory(this.redis, accountId, ownerUserId, resolved, statusCode, stored, now);
     }
@@ -227,20 +199,18 @@ export class AccountHealthService {
   async markAccountUsageLimited(accountId: string, model: string, disabledUntil: Date, failedAt: Date): Promise<void> {
     if (isSyntheticProviderAccountId(accountId)) return;
     const resolved = this.models.resolveAlias(model);
-    await markUsageLimitedHealth(
+    await this.health.markUsageLimitedHealth(
       {
         providerAccountId: accountId,
         model: resolved,
         status: "failed",
         at: failedAt,
         consecutiveErrors: ACCOUNT_COOLDOWN_UNHEALTHY_THRESHOLD,
-      },
-      this.database
+      }
     );
     await this.refreshAccountHealthFromModels(accountId, failedAt);
-    await setAccountUsageLimited(
-      { id: accountId, disabledUntil, status: "failed", at: failedAt },
-      this.database
+    await this.health.setAccountUsageLimited(
+      { id: accountId, disabledUntil, status: "failed", at: failedAt }
     );
   }
 
@@ -254,7 +224,7 @@ export class AccountHealthService {
     const recoveredAt = new Date();
     for (const [accountId, failedAt] of latest) {
       if (isSyntheticProviderAccountId(accountId)) continue;
-      await markAccountRecoveredByRotation({ id: accountId, at: recoveredAt, beforeOrAt: failedAt }, this.database);
+      await this.health.markAccountRecoveredByRotation({ id: accountId, at: recoveredAt, beforeOrAt: failedAt });
     }
   }
 
@@ -267,6 +237,6 @@ export class AccountHealthService {
 
   bumpRequestCount(accountId: string): void {
     if (isSyntheticProviderAccountId(accountId)) return;
-    void Effect.runFork(ignoringErrors(() => bumpAccountRequestCount({ id: accountId, at: new Date() }, this.database)));
+    void Effect.runFork(ignoringErrors(() => this.health.bumpAccountRequestCount({ id: accountId, at: new Date() })));
   }
 }

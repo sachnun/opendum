@@ -1,16 +1,12 @@
-import { describe, expect, it, mock } from "bun:test";
-import { createDatabaseQueryMocks } from "./database-mock.js";
+import { describe, expect, it } from "bun:test";
 import type { AuthResult, AuthService, ModelValidationResult } from "@opendum/auth";
 import { Effect } from "effect";
 import type { Provider, ProviderRegistry } from "@opendum/providers";
 import type { Registry } from "@opendum/models/runtime";
 import type { OpendumRedis } from "@opendum/core/redis";
-
-const db = createDatabaseQueryMocks();
-mock.module("@opendum/database/queries", () => db);
-
-const { ProxyService } = await import("../core/service.js");
-const { ChatCompletionsAdapter } = await import("../core/endpoints.js");
+import { ProxyService } from "../core/service.js";
+import { ChatCompletionsAdapter } from "../core/endpoints.js";
+import { createFakeRepositories } from "./fake-repositories.js";
 
 function sseResponse(chunks: string[]): Response {
   const encoder = new TextEncoder();
@@ -66,9 +62,10 @@ describe("ProxyService full flow", () => {
     } as unknown as AuthService;
     const redis = { get: async () => null, set: async () => "OK", del: async () => 1, zAdd: async () => 1, zRemRangeByRank: async () => 0, expire: async () => true } as unknown as OpendumRedis;
 
-    db.insertUsageLog.mockClear();
+    const repositories = createFakeRepositories();
     const service = new ProxyService({
       database: {} as never,
+      repositories,
       redis,
       models,
       auth,
@@ -87,9 +84,9 @@ describe("ProxyService full flow", () => {
     expect(response.headers.get("content-type")).toBe("text/event-stream");
     const text = await response.text();
     expect(text).toMatch(/hello/);
-    for (let attempt = 0; attempt < 50 && db.insertUsageLog.mock.calls.length === 0; attempt += 1) {
+    for (let attempt = 0; attempt < 50 && repositories.usage.insertUsageLog.mock.calls.length === 0; attempt += 1) {
       await Bun.sleep(10);
     }
-    expect(db.insertUsageLog.mock.calls.length >= 1).toBe(true);
+    expect(repositories.usage.insertUsageLog.mock.calls.length >= 1).toBe(true);
   });
 });

@@ -1,15 +1,4 @@
 import { Effect, Metric, Result, Schedule } from "effect";
-import {
-  disableFailedAccount,
-  getAccountCredentialsByID,
-  getAccountOwnerUserID,
-  getForcedAccount,
-  getCustomProvider,
-  listCustomProviderModels,
-  listExpiringRefreshableAccounts,
-  recordAccountError,
-  updateRefreshedCredentials,
-} from "@opendum/database/queries";
 import type { Database } from "@opendum/database";
 import { decrypt, encrypt } from "@opendum/core/crypto";
 import type { Registry } from "@opendum/models/runtime";
@@ -71,6 +60,7 @@ import { AccountRotationService } from "./account-rotation.js";
 import { PlaygroundAuthenticator } from "./playground-auth.js";
 import { RoamingPointService } from "./roaming-points.js";
 import { UsageRecorder } from "./usage-recorder.js";
+import { createProxyRepositories, type ProxyRepositories } from "./repositories.js";
 import type { EndpointAdapter } from "./endpoints.js";
 import type {
   AccountRotationFailure,
@@ -92,6 +82,7 @@ const REFRESH_MAX_CONSECUTIVE_FAILURES = 5;
 
 export type ProxyServiceOptions = {
   database: Database;
+  repositories?: Partial<ProxyRepositories>;
   redis: OpendumRedis;
   models: Registry;
   auth: AuthService;
@@ -119,13 +110,13 @@ type RoamingCompletionContext = {
 };
 
 export class ProxyService implements StreamRecorder {
-  private readonly database: Database;
   private readonly redis: OpendumRedis;
   private readonly models: Registry;
   private readonly auth: AuthService;
   private readonly providers: ProviderRegistry;
   private readonly secret: string;
   private readonly requestTimeoutMs: number;
+  private readonly repositories: ProxyRepositories;
   private readonly rotation: AccountRotationService;
   private readonly performance: ProviderPerformance;
   private readonly health: AccountHealthService;
@@ -134,30 +125,33 @@ export class ProxyService implements StreamRecorder {
   private readonly playground: PlaygroundAuthenticator;
 
   constructor(options: ProxyServiceOptions) {
-    this.database = options.database;
     this.redis = options.redis;
     this.models = options.models;
     this.auth = options.auth;
     this.providers = options.providers;
     this.secret = options.betterAuthSecret;
     this.requestTimeoutMs = options.requestTimeoutMs;
+    this.repositories = { ...createProxyRepositories(options.database), ...options.repositories };
     this.performance = new ProviderPerformance(options.redis);
     this.health = new AccountHealthService({
-      database: options.database,
+      accounts: this.repositories.accounts,
+      health: this.repositories.health,
       models: options.models,
       redis: options.redis,
     });
     this.rotation = new AccountRotationService({
-      database: options.database,
+      accounts: this.repositories.accounts,
+      modelHealth: this.repositories.health,
+      customProviders: this.repositories.customProviders,
       models: options.models,
       providers: options.providers,
       health: this.health,
       performance: this.performance,
       affinity: new SessionAffinity(options.redis, options.providers.names()),
     });
-    this.roaming = new RoamingPointService(options.database, options.models);
+    this.roaming = new RoamingPointService(this.repositories.points, options.models);
     this.usage = new UsageRecorder({
-      database: options.database,
+      usage: this.repositories.usage,
       redis: options.redis,
       auth: options.auth,
       models: options.models,
@@ -410,7 +404,7 @@ export class ProxyService implements StreamRecorder {
     const model = modelParam.slice(index + 1).trim();
     if (!prefix || !model || this.isKnownModelProviderPrefix(prefix)) return null;
     if (userId) {
-      const custom = await getCustomProvider(userId, prefix.toLowerCase(), this.database);
+      const custom = await this.repositories.customProviders.getCustomProvider(userId, prefix.toLowerCase());
       if (custom) return null;
     }
     return { accountId: prefix, model };
@@ -452,7 +446,7 @@ export class ProxyService implements StreamRecorder {
       return synthetic;
     }
 
-    const row = await getForcedAccount(id, userId, this.database);
+    const row = await this.repositories.accounts.getForcedAccount(id, userId);
     if (!row) {
       return {
         status: 400,
@@ -523,9 +517,9 @@ export class ProxyService implements StreamRecorder {
   }
 
   private async isCustomAccountModel(account: ProviderAccount, model: string): Promise<boolean> {
-    const custom = await getCustomProvider(account.userId, account.provider, this.database);
+    const custom = await this.repositories.customProviders.getCustomProvider(account.userId, account.provider);
     if (!custom) return false;
-    const rows = await listCustomProviderModels(custom.id, this.database);
+    const rows = await this.repositories.customProviders.listCustomProviderModels(custom.id);
     const target = model.startsWith(`${account.provider}/`)
       ? model.slice(account.provider.length + 1)
       : model;
@@ -827,6 +821,10 @@ export class ProxyService implements StreamRecorder {
     return resolved.credentials;
   }
 
+  async quotaAccount(accountId: string, userId: string, provider: string) {
+    return this.repositories.accounts.getQuotaAccount(accountId, userId, provider);
+  }
+
   private async makeProviderRequest(
     account: ProviderAccount,
     payload: Record<string, unknown>,
@@ -897,7 +895,7 @@ export class ProxyService implements StreamRecorder {
 
   private async loadProviderAccountCredentials(account: ProviderAccount): Promise<ProviderAccount> {
     if (account.accessToken && account.refreshToken) return account;
-    const row = await getAccountCredentialsByID(account.id, this.database);
+    const row = await this.repositories.accounts.getAccountCredentialsByID(account.id);
     if (!row) return account;
     return {
       id: row.id,
@@ -977,7 +975,7 @@ export class ProxyService implements StreamRecorder {
   }
 
   private async loadProviderAccountCredentialsByID(accountId: string): Promise<ProviderAccount> {
-    const row = await getAccountCredentialsByID(accountId, this.database);
+    const row = await this.repositories.accounts.getAccountCredentialsByID(accountId);
     if (!row) throw new Error("provider account not found");
     return {
       id: row.id,
@@ -1010,7 +1008,7 @@ export class ProxyService implements StreamRecorder {
     if (refreshed.paidTier) tier = refreshed.paidTier;
     const email = refreshed.email ? refreshed.email : account.email ?? null;
     const accountId = refreshed.accountId ? refreshed.accountId : account.accountId ?? null;
-    await updateRefreshedCredentials(
+    await this.repositories.accounts.updateRefreshedCredentials(
       {
         id: account.id,
         accessToken: encryptedAccess,
@@ -1020,8 +1018,7 @@ export class ProxyService implements StreamRecorder {
         tier,
         email,
         accountId,
-      },
-      this.database
+      }
     );
     return {
       ...account,
@@ -1085,13 +1082,13 @@ export class ProxyService implements StreamRecorder {
       await this.redis.expire(`${REFRESH_FAIL_COUNT_PREFIX}${account.id}`, REFRESH_FAIL_COUNT_TTL_SECONDS);
       return count;
     }, 1);
-    await recordAccountError({ id: account.id, at: now, code: statusCode }, this.database);
-    const ownerUserId = account.userId || (await getAccountOwnerUserID(account.id, this.database)) || "";
+    await this.repositories.accounts.recordAccountError({ id: account.id, at: now, code: statusCode });
+    const ownerUserId = account.userId || (await this.repositories.accounts.getAccountOwnerUserID(account.id)) || "";
     if (ownerUserId) {
       await upsertErrorHistory(this.redis, account.id, ownerUserId, null, statusCode, `Token refresh failed: ${message}`, now);
     }
     if (failCount >= REFRESH_MAX_CONSECUTIVE_FAILURES) {
-      await disableFailedAccount({ id: account.id, status: "failed", at: now }, this.database);
+      await this.repositories.accounts.disableFailedAccount({ id: account.id, status: "failed", at: now });
     }
   }
 
@@ -1135,9 +1132,8 @@ export class ProxyService implements StreamRecorder {
             const buffer = refreshBufferFor(providerImpl);
             const accounts = yield* Effect.tryPromise({
               try: () =>
-                listExpiringRefreshableAccounts(
-                  { provider: name, now, expiresBefore: new Date(now.getTime() + buffer), batchLimit: 500 },
-                  this.database
+                this.repositories.accounts.listExpiringRefreshableAccounts(
+                  { provider: name, now, expiresBefore: new Date(now.getTime() + buffer), batchLimit: 500 }
                 ),
               catch: (error) => (error instanceof Error ? error : new Error(String(error))),
             }).pipe(Effect.result);
@@ -1178,13 +1174,9 @@ export class ProxyService implements StreamRecorder {
   }
 
   async customProviderForAccount(userId: string, provider: string): Promise<Provider | null> {
-    const {
-      getCustomProvider,
-      listCustomProviderModels,
-    } = await import("@opendum/database/queries");
-    const custom = await getCustomProvider(userId, provider, this.database);
+    const custom = await this.repositories.customProviders.getCustomProvider(userId, provider);
     if (!custom) return null;
-    const rows = await listCustomProviderModels(custom.id, this.database);
+    const rows = await this.repositories.customProviders.listCustomProviderModels(custom.id);
     return compileCustomProvider({
       provider: { slug: custom.slug, baseUrl: custom.baseUrl, extraHeaders: custom.extraHeaders ?? null },
       models: rows.map((row) => ({

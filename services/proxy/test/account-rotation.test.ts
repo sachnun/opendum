@@ -1,16 +1,13 @@
-import { describe, expect, it, mock } from "bun:test";
-import type { Database } from "@opendum/database";
+import { describe, expect, it } from "bun:test";
 import type { SessionAffinity } from "@opendum/core/redis";
 import type { ProviderAccount, ProviderRegistry } from "@opendum/providers";
 import type { Registry } from "@opendum/models/runtime";
 import type { AccountHealthService } from "../core/account-health.js";
 import type { ProviderPerformance } from "../core/provider-performance.js";
-import { createDatabaseQueryMocks } from "./database-mock.js";
+import { AccountRotationService } from "../core/account-rotation.js";
+import { createFakeRepositories } from "./fake-repositories.js";
 
-const db = createDatabaseQueryMocks();
-mock.module("@opendum/database/queries", () => db);
-
-const { AccountRotationService } = await import("../core/account-rotation.js");
+const repositories = createFakeRepositories();
 
 function account(extra: Partial<ProviderAccount> = {}): ProviderAccount {
   return { id: "acc-1", userId: "u", provider: "openai", status: "active", lastUsedAt: null, ...extra } as unknown as ProviderAccount;
@@ -18,7 +15,9 @@ function account(extra: Partial<ProviderAccount> = {}): ProviderAccount {
 
 function rotation(models: Partial<Registry>): InstanceType<typeof AccountRotationService> {
   return new AccountRotationService({
-    database: db as unknown as Database,
+    accounts: repositories.accounts,
+    modelHealth: repositories.health,
+    customProviders: repositories.customProviders,
     models: models as Registry,
     providers: {} as unknown as ProviderRegistry,
     health: {} as unknown as AccountHealthService,

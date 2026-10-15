@@ -1,13 +1,5 @@
 import { Effect } from "effect";
-import type { Database } from "@opendum/database";
-import {
-  getModelHealth,
-  listCustomProviderModels,
-  listCustomProviders,
-  listDisabledAccountIDs,
-  listEligibleAccounts,
-  listSharedEligibleAccounts,
-} from "@opendum/database/queries";
+import type { CustomProviderPort, ModelHealthPort, ProviderAccountPort } from "./repositories.js";
 import type { SessionAffinity } from "@opendum/core/redis";
 import type { AuthResult, ModelValidationResult } from "@opendum/auth";
 import type { ProviderAccount, ProviderRegistry } from "@opendum/providers";
@@ -30,7 +22,9 @@ import {
 export type AccountSelection = { account: ProviderAccount | null; configured: boolean };
 
 export type AccountRotationOptions = {
-  database: Database;
+  accounts: ProviderAccountPort;
+  modelHealth: ModelHealthPort;
+  customProviders: CustomProviderPort;
   models: Registry;
   providers: ProviderRegistry;
   health: AccountHealthService;
@@ -43,7 +37,9 @@ export type AccountRotationOptions = {
  * sticky ordering, health filtering, and session-affinity bookkeeping.
  */
 export class AccountRotationService {
-  private readonly database: Database;
+  private readonly accounts: ProviderAccountPort;
+  private readonly modelHealth: ModelHealthPort;
+  private readonly customProviders: CustomProviderPort;
   private readonly models: Registry;
   private readonly providers: ProviderRegistry;
   private readonly health: AccountHealthService;
@@ -51,7 +47,9 @@ export class AccountRotationService {
   private readonly affinity: SessionAffinity;
 
   constructor(options: AccountRotationOptions) {
-    this.database = options.database;
+    this.accounts = options.accounts;
+    this.modelHealth = options.modelHealth;
+    this.customProviders = options.customProviders;
     this.models = options.models;
     this.providers = options.providers;
     this.health = options.health;
@@ -131,9 +129,8 @@ export class AccountRotationService {
     const targetProviders = provider ? [provider] : this.models.providersForModel(model);
     if (targetProviders.length === 0) return { account: null, configured: false };
     const now = new Date();
-    const sharedRows = await listSharedEligibleAccounts(
-      { userId: _userId, providers: targetProviders, now, excludeIds: exclude, excludeProviders },
-      this.database
+    const sharedRows = await this.accounts.listSharedEligibleAccounts(
+      { userId: _userId, providers: targetProviders, now, excludeIds: exclude, excludeProviders }
     );
     const rows: ProviderAccount[] = sharedRows.map((row) => ({
       id: row.id,
@@ -149,7 +146,7 @@ export class AccountRotationService {
     if (rows.length === 0) return { account: null, configured: false };
     const lookupKeys = this.models.lookupKeys(model);
     const ids = rows.map((row) => row.id);
-    const disabled = await listDisabledAccountIDs({ accountIds: ids, models: lookupKeys }, this.database);
+    const disabled = await this.accounts.listDisabledAccountIDs({ accountIds: ids, models: lookupKeys });
     const disabledSet = new Set(disabled.map((row) => row.providerAccountId));
     const enabled = rows.filter((row) => !disabledSet.has(row.id) && this.canAccountUseModel(row, model));
     if (enabled.length === 0) return { account: null, configured: true };
@@ -199,7 +196,7 @@ export class AccountRotationService {
     const now = new Date();
     const mode = normalizeAccessMode(accountAccess.mode);
     const accounts = normalizeAccountIds(accountAccess.accounts);
-    const dbRows = await listEligibleAccounts(
+    const dbRows = await this.accounts.listEligibleAccounts(
       {
         userId,
         providers: targetProviders,
@@ -209,8 +206,7 @@ export class AccountRotationService {
         useWhitelist: mode === "whitelist" && accounts.length > 0,
         accountIds: accounts,
         useBlacklist: mode === "blacklist" && accounts.length > 0,
-      },
-      this.database
+      }
     );
     for (const row of dbRows) {
       rows.push({
@@ -229,7 +225,7 @@ export class AccountRotationService {
 
     const lookupKeys = this.models.lookupKeys(model);
     const ids = rows.map((row) => row.id);
-    const disabled = await listDisabledAccountIDs({ accountIds: ids, models: lookupKeys }, this.database);
+    const disabled = await this.accounts.listDisabledAccountIDs({ accountIds: ids, models: lookupKeys });
     const disabledSet = new Set(disabled.map((row) => row.providerAccountId));
     const enabled = rows.filter(
       (row) => isSyntheticProviderAccountId(row.id) || (!disabledSet.has(row.id) && this.canAccountUseModel(row, model))
@@ -239,14 +235,14 @@ export class AccountRotationService {
   }
 
   private async customProviderSlugsForModel(userId: string, model: string): Promise<string[]> {
-    const providers = await listCustomProviders(userId, this.database);
+    const providers = await this.customProviders.listCustomProviders(userId);
     if (providers.length === 0) return [];
     const canonical = this.models.resolveAlias(model);
     const results = await Effect.runPromise(
       Effect.forEach(
         providers,
         (custom) =>
-          Effect.promise(() => listCustomProviderModels(custom.id, this.database)).pipe(
+          Effect.promise(() => this.customProviders.listCustomProviderModels(custom.id)).pipe(
             Effect.map((rows) =>
               rows.some((row) => row.aliased && this.models.resolveAlias(row.modelId) === canonical)
                 ? custom.slug
@@ -277,7 +273,7 @@ export class AccountRotationService {
       if (isSyntheticProviderAccountId(account.id)) return account;
       const coolingDown = await this.health.refreshAccountHealthFromModels(account.id, now);
       if (coolingDown) continue;
-      const health = await getModelHealth(account.id, this.models.resolveAlias(model), this.database);
+      const health = await this.modelHealth.getModelHealth(account.id, this.models.resolveAlias(model));
       if (health && health.status === "degraded") {
         if (!degraded) degraded = account;
         continue;

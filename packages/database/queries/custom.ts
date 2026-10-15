@@ -1,8 +1,8 @@
 import { and, asc, eq } from "drizzle-orm";
-import { db, type Database } from "../client.js";
+import { db, type DbExecutor } from "../client.js";
 import { customProvider, customProviderModel } from "../schema/custom.js";
 
-export async function listCustomProviders(userId: string, database: Database = db) {
+export async function listCustomProviders(userId: string, database: DbExecutor = db) {
   return database
     .select()
     .from(customProvider)
@@ -13,7 +13,7 @@ export async function listCustomProviders(userId: string, database: Database = d
 export async function getCustomProvider(
   userId: string,
   slug: string,
-  database: Database = db
+  database: DbExecutor = db
 ) {
   const [row] = await database
     .select()
@@ -29,7 +29,7 @@ export async function getCustomProvider(
   return row ?? null;
 }
 
-export async function listCustomProviderModels(providerId: string, database: Database = db) {
+export async function listCustomProviderModels(providerId: string, database: DbExecutor = db) {
   return database
     .select()
     .from(customProviderModel)

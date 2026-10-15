@@ -1,15 +1,12 @@
-import { describe, expect, it, mock } from "bun:test";
-import { createDatabaseQueryMocks } from "./database-mock.js";
+import { describe, expect, it } from "bun:test";
 import type { AuthResult, AuthService, ModelValidationResult } from "@opendum/auth";
 import type { ProviderRegistry } from "@opendum/providers";
 import type { Registry } from "@opendum/models/runtime";
 import type { OpendumRedis } from "@opendum/core/redis";
+import { ProxyService } from "../core/service.js";
+import { ChatCompletionsAdapter } from "../core/endpoints.js";
+import { createFakeRepositories } from "./fake-repositories.js";
 
-const db = createDatabaseQueryMocks();
-mock.module("@opendum/database/queries", () => db);
-
-const { ProxyService } = await import("../core/service.js");
-const { ChatCompletionsAdapter } = await import("../core/endpoints.js");
 type ProxyServiceInstance = InstanceType<typeof ProxyService>;
 
 function validAuth(overrides: Partial<AuthResult> = {}): AuthResult {
@@ -87,6 +84,7 @@ function buildService(options: {
 }): ProxyServiceInstance {
   return new ProxyService({
     database: {} as never,
+    repositories: createFakeRepositories(),
     redis: options.redis ?? fakeRedis(),
     models: options.models ?? fakeModels(),
     auth: options.auth,

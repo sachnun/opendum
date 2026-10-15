@@ -1,6 +1,5 @@
 import { Effect, Option, Result, Schema } from "effect";
 import { type H3Event } from "h3";
-import { getQuotaAccount } from "@opendum/database/queries";
 import { fetchAccountQuota, isQuotaProvider } from "@opendum/providers/quota";
 import type { QuotaContext, QuotaJournal } from "@opendum/providers/quota";
 import { assertPublicHost, PrivateHostError } from "@opendum/core/egress";
@@ -88,7 +87,7 @@ export async function handleQuota(event: H3Event, context: ProxyContext): Promis
         return jsonResponse({ success: false, error: `provider ${provider} is not supported for quota` }, 200);
       }
 
-      const row = yield* Effect.promise(() => getQuotaAccount(accountId, userId, provider));
+      const row = yield* Effect.promise(() => context.service.quotaAccount(accountId, userId, provider));
       if (!row) return jsonResponse({ success: false, error: "Account not found" }, 404);
 
       const account = {

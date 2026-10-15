@@ -1,10 +1,6 @@
-import { describe, expect, it, mock } from "bun:test";
+import { describe, expect, it } from "bun:test";
 import { mockEvent } from "h3";
-import { createDatabaseQueryMocks } from "./database-mock.js";
 import config from "../nitro.config.js";
-
-const db = createDatabaseQueryMocks();
-mock.module("@opendum/database/queries", () => db);
 
 const health = (await import("../routes/health.get.js")).default;
 const fallback = (await import("../routes/[...].js")).default;

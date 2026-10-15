@@ -1,6 +1,5 @@
 import { Effect } from "effect";
-import { insertUsageLog } from "@opendum/database/queries";
-import type { Database } from "@opendum/database";
+import type { UsagePort } from "./repositories.js";
 import type { AuthResult, AuthService, ModelValidationResult } from "@opendum/auth";
 import type { OpendumRedis } from "@opendum/core/redis";
 import type { Registry } from "@opendum/models/runtime";
@@ -27,7 +26,7 @@ export type UsageLogRecord = {
 };
 
 export type UsageRecorderOptions = {
-  database: Database;
+  usage: UsagePort;
   redis: OpendumRedis;
   auth: AuthService;
   models: Registry;
@@ -41,7 +40,7 @@ export type UsageRecorderOptions = {
  * the Hypercredits balance snapshot kept in Redis.
  */
 export class UsageRecorder implements StreamRecorder {
-  private readonly database: Database;
+  private readonly usage: UsagePort;
   private readonly redis: OpendumRedis;
   private readonly auth: AuthService;
   private readonly models: Registry;
@@ -49,7 +48,7 @@ export class UsageRecorder implements StreamRecorder {
   private readonly health: AccountHealthService;
 
   constructor(options: UsageRecorderOptions) {
-    this.database = options.database;
+    this.usage = options.usage;
     this.redis = options.redis;
     this.auth = options.auth;
     this.models = options.models;
@@ -131,23 +130,20 @@ export class UsageRecorder implements StreamRecorder {
     const providerAccountId = params.providerAccountId && !isSyntheticProviderAccountId(params.providerAccountId)
       ? params.providerAccountId
       : null;
-    await insertUsageLog(
-      {
-        id: crypto.randomUUID(),
-        userId: params.userId,
-        providerAccountId,
-        proxyApiKeyId: params.proxyApiKeyId || null,
-        model: params.model,
-        inputTokens: params.inputTokens,
-        outputTokens: params.outputTokens,
-        cachedTokens: params.cachedTokens,
-        cacheWriteTokens: params.cacheWriteTokens,
-        statusCode: params.statusCode,
-        duration: params.durationMs,
-        createdAt: new Date(),
-      },
-      this.database
-    );
+    await this.usage.insertUsageLog({
+      id: crypto.randomUUID(),
+      userId: params.userId,
+      providerAccountId,
+      proxyApiKeyId: params.proxyApiKeyId || null,
+      model: params.model,
+      inputTokens: params.inputTokens,
+      outputTokens: params.outputTokens,
+      cachedTokens: params.cachedTokens,
+      cacheWriteTokens: params.cacheWriteTokens,
+      statusCode: params.statusCode,
+      duration: params.durationMs,
+      createdAt: new Date(),
+    });
     await this.auth.bumpAnalyticsCacheVersionThrottled(params.userId);
   }
 }

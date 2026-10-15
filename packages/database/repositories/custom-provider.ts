@@ -1,4 +1,4 @@
-import type { Database } from "../client.js";
+import type { DbExecutor } from "../client.js";
 import {
   getCustomProvider,
   listCustomProviderModels,
@@ -10,7 +10,7 @@ import {
  * Delegates to the query layer with the database bound.
  */
 export class CustomProviderRepository {
-  constructor(private readonly database: Database) {}
+  constructor(private readonly database: DbExecutor) {}
 
   listCustomProviders(userId: string) {
     return listCustomProviders(userId, this.database);

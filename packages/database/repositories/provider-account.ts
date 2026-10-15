@@ -1,4 +1,4 @@
-import type { Database } from "../client.js";
+import type { DbExecutor } from "../client.js";
 import {
   disableFailedAccount,
   getAccountCredentialsByID,
@@ -19,7 +19,7 @@ import {
  * this port instead of the raw query functions.
  */
 export class ProviderAccountRepository {
-  constructor(private readonly database: Database) {}
+  constructor(private readonly database: DbExecutor) {}
 
   listEligibleAccounts(params: Parameters<typeof listEligibleAccounts>[0]) {
     return listEligibleAccounts(params, this.database);
