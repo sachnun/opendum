@@ -4,14 +4,9 @@ import {
   getAccountCredentialsByID,
   getAccountOwnerUserID,
   getForcedAccount,
-  getModelHealth,
   getCustomProvider,
   listCustomProviderModels,
-  listCustomProviders,
-  listDisabledAccountIDs,
-  listEligibleAccounts,
   listExpiringRefreshableAccounts,
-  listSharedEligibleAccounts,
   recordAccountError,
   updateRefreshedCredentials,
 } from "@opendum/database/queries";
@@ -37,19 +32,10 @@ import {
   accountNeedsCredentialRefresh,
   ignoringErrors,
   isSyntheticProviderAccountId,
-  normalizeAccessMode,
-  normalizeAccountIds,
   parseRefreshErrorStatusCode,
-  proxyAccessRuleRestrictsTier,
-  proxyTierSatisfiesRule,
-  quotaFallbackTierLocal,
   refreshBufferFor,
-  sortAccountsByProviderPriority,
 } from "./service-helpers.js";
-import {
-  ProviderPerformance,
-  type ProviderRoutingOptions,
-} from "./provider-performance.js";
+import { ProviderPerformance } from "./provider-performance.js";
 import {
   buildAccountErrorMessage,
   codexUsageLimitDisabledUntil,
@@ -81,9 +67,9 @@ import {
   type PointReservation,
 } from "./points.js";
 import { AccountHealthService, MAX_STORED_ERROR_LEN } from "./account-health.js";
+import { AccountRotationService } from "./account-rotation.js";
 import { PlaygroundAuthenticator } from "./playground-auth.js";
 import { RoamingPointService } from "./roaming-points.js";
-import { PriorityOrderStrategy, StickySessionStrategy, composeRoutingStrategies } from "./routing.js";
 import { UsageRecorder } from "./usage-recorder.js";
 import type {
   AccountRotationFailure,
@@ -140,7 +126,7 @@ export class ProxyService implements StreamRecorder {
   private readonly providers: ProviderRegistry;
   private readonly secret: string;
   private readonly requestTimeoutMs: number;
-  private readonly affinity: SessionAffinity;
+  private readonly rotation: AccountRotationService;
   private readonly performance: ProviderPerformance;
   private readonly health: AccountHealthService;
   private readonly usage: UsageRecorder;
@@ -155,12 +141,19 @@ export class ProxyService implements StreamRecorder {
     this.providers = options.providers;
     this.secret = options.betterAuthSecret;
     this.requestTimeoutMs = options.requestTimeoutMs;
-    this.affinity = new SessionAffinity(options.redis, options.providers.names());
     this.performance = new ProviderPerformance(options.redis);
     this.health = new AccountHealthService({
       database: options.database,
       models: options.models,
       redis: options.redis,
+    });
+    this.rotation = new AccountRotationService({
+      database: options.database,
+      models: options.models,
+      providers: options.providers,
+      health: this.health,
+      performance: this.performance,
+      affinity: new SessionAffinity(options.redis, options.providers.names()),
     });
     this.roaming = new RoamingPointService(options.database, options.models);
     this.usage = new UsageRecorder({
@@ -529,27 +522,6 @@ export class ProxyService implements StreamRecorder {
     return null;
   }
 
-  private async customProviderSlugsForModel(userId: string, model: string): Promise<string[]> {
-    const providers = await listCustomProviders(userId, this.database);
-    if (providers.length === 0) return [];
-    const canonical = this.models.resolveAlias(model);
-    const results = await Effect.runPromise(
-      Effect.forEach(
-        providers,
-        (custom) =>
-          Effect.promise(() => listCustomProviderModels(custom.id, this.database)).pipe(
-            Effect.map((rows) =>
-              rows.some((row) => row.aliased && this.models.resolveAlias(row.modelId) === canonical)
-                ? custom.slug
-                : null
-            )
-          ),
-        { concurrency: 4 }
-      )
-    );
-    return results.filter((slug): slug is string => slug !== null);
-  }
-
   private async isCustomAccountModel(account: ProviderAccount, model: string): Promise<boolean> {
     const custom = await getCustomProvider(account.userId, account.provider, this.database);
     if (!custom) return false;
@@ -558,13 +530,6 @@ export class ProxyService implements StreamRecorder {
       ? model.slice(account.provider.length + 1)
       : model;
     return rows.some((row) => row.modelId === model || row.modelId === target);
-  }
-
-  private canAccountUseModel(account: ProviderAccount, model: string): boolean {
-    const rule = this.models.providerAccessRule(model, account.provider);
-    if (!rule || !proxyAccessRuleRestrictsTier(rule.minTier, rule.allowedTiers)) return true;
-    const tier = account.tier ?? quotaFallbackTierLocal(account);
-    return proxyTierSatisfiesRule(tier, rule.minTier, rule.allowedTiers);
   }
 
   private async validateSelectedAccountModel(
@@ -591,7 +556,7 @@ export class ProxyService implements StreamRecorder {
         code: "provider_account_provider_mismatch",
       };
     }
-    if (!this.canAccountUseModel(account, validation.model)) {
+    if (!this.rotation.canAccountUseModel(account, validation.model)) {
       return {
         status: 400,
         message: `Selected provider account tier does not allow model "${validation.model}"`,
@@ -637,7 +602,7 @@ export class ProxyService implements StreamRecorder {
         let roaming: PointReservation | null = null;
         if (!account) {
           const selection = yield* Effect.promise(() =>
-            this.nextAttemptAccount(
+            this.rotation.nextAttemptAccount(
               authResult,
               validation,
               tried,
@@ -842,209 +807,6 @@ export class ProxyService implements StreamRecorder {
       messages: parsed.messagesForError,
       parameters: parsed.paramsForError,
     };
-  }
-
-  private async nextAttemptAccount(
-    authResult: AuthResult,
-    validation: ModelValidationResult,
-    tried: string[],
-    sharedTried: string[],
-    excludedProviders: string[],
-    useShared: boolean,
-    sessionId: string
-  ): Promise<{ account: ProviderAccount | null; configured: boolean }> {
-    if (useShared) {
-      const result = await this.getNextSharedAccount(
-        authResult.userId,
-        validation.model,
-        validation.provider,
-        sharedTried,
-        excludedProviders
-      );
-      return { account: result.account, configured: result.configured };
-    }
-    return this.getNextAvailableAccount(
-      authResult.userId,
-      validation.model,
-      validation.provider,
-      tried,
-      excludedProviders,
-      { mode: authResult.accountAccessMode, accounts: authResult.accountAccessList },
-      sessionId
-    );
-  }
-
-  private async getEligibleAccounts(
-    userId: string,
-    model: string,
-    provider: string | null,
-    exclude: string[],
-    excludeProviders: string[],
-    accountAccess: { mode: string; accounts: string[] }
-  ): Promise<ProviderAccount[]> {
-    const targetProviders = provider
-      ? [provider]
-      : [...new Set([...this.models.providersForModel(model), ...(await this.customProviderSlugsForModel(userId, model))])];
-    if (targetProviders.length === 0) return [];
-
-    const rows: ProviderAccount[] = [];
-    for (const targetProvider of targetProviders) {
-      let account: ProviderAccount | null = null;
-      if (this.providers.isAuthless(targetProvider)) {
-        account = { id: targetProvider, userId: "", provider: targetProvider, isActive: true, status: "active" };
-      } else if (this.models.isAuthlessProviderModel(model, targetProvider)) {
-        account = {
-          id: `authless:${targetProvider}`,
-          userId: "",
-          provider: targetProvider,
-          isActive: true,
-          status: "active",
-        };
-      }
-      if (!account) continue;
-      if (exclude.includes(account.id)) continue;
-      if (excludeProviders.includes(account.provider)) continue;
-      if (accountAccessDenial(account.id, accountAccess)) continue;
-      rows.push(account);
-    }
-
-    const now = new Date();
-    const mode = normalizeAccessMode(accountAccess.mode);
-    const accounts = normalizeAccountIds(accountAccess.accounts);
-    const dbRows = await listEligibleAccounts(
-      {
-        userId,
-        providers: targetProviders,
-        now,
-        excludeIds: exclude,
-        excludeProviders,
-        useWhitelist: mode === "whitelist" && accounts.length > 0,
-        accountIds: accounts,
-        useBlacklist: mode === "blacklist" && accounts.length > 0,
-      },
-      this.database
-    );
-    for (const row of dbRows) {
-      rows.push({
-        id: row.id,
-        userId: row.userId,
-        provider: row.provider,
-        tier: row.tier,
-        accountId: row.accountId,
-        status: row.status,
-        disabledUntil: row.disabledUntil,
-        lastUsedAt: row.lastUsedAt,
-        createdAt: row.createdAt,
-      });
-    }
-    if (rows.length === 0) return [];
-
-    const lookupKeys = this.models.lookupKeys(model);
-    const ids = rows.map((row) => row.id);
-    const disabled = await listDisabledAccountIDs({ accountIds: ids, models: lookupKeys }, this.database);
-    const disabledSet = new Set(disabled.map((row) => row.providerAccountId));
-    const enabled = rows.filter(
-      (row) => isSyntheticProviderAccountId(row.id) || (!disabledSet.has(row.id) && this.canAccountUseModel(row, model))
-    );
-    if (provider === null) sortAccountsByProviderPriority(enabled, targetProviders);
-    return enabled;
-  }
-
-  private async getNextAvailableAccount(
-    userId: string,
-    model: string,
-    provider: string | null,
-    exclude: string[],
-    excludeProviders: string[],
-    accountAccess: { mode: string; accounts: string[] },
-    sessionId: string
-  ): Promise<{ account: ProviderAccount | null; configured: boolean }> {
-    const eligible = await this.getEligibleAccounts(userId, model, provider, exclude, excludeProviders, accountAccess);
-    if (eligible.length === 0) return { account: null, configured: false };
-    const routing = await this.performanceRouting(model, provider === null);
-    const stickyId = await this.affinity.lookup(userId, sessionId);
-    const strategy = composeRoutingStrategies(new PriorityOrderStrategy(), new StickySessionStrategy(stickyId));
-    const prioritized = strategy.order(eligible, {
-      crossProvider: provider === null,
-      providerPriority: this.models.providersForModel(model),
-      routingOptions: routing,
-    });
-    const selected = await this.pickHealthyAccount(prioritized, model);
-    if (!selected) return { account: null, configured: true };
-    await this.rememberAffinityAccount(userId, sessionId, selected);
-    return { account: selected, configured: true };
-  }
-
-  private async getNextSharedAccount(
-    _userId: string,
-    model: string,
-    provider: string | null,
-    exclude: string[],
-    excludeProviders: string[]
-  ): Promise<{ account: ProviderAccount | null; configured: boolean }> {
-    const targetProviders = provider ? [provider] : this.models.providersForModel(model);
-    if (targetProviders.length === 0) return { account: null, configured: false };
-    const now = new Date();
-    const sharedRows = await listSharedEligibleAccounts(
-      { userId: _userId, providers: targetProviders, now, excludeIds: exclude, excludeProviders },
-      this.database
-    );
-    const rows: ProviderAccount[] = sharedRows.map((row) => ({
-      id: row.id,
-      userId: row.userId,
-      provider: row.provider,
-      tier: row.tier,
-      accountId: row.accountId,
-      status: row.status,
-      disabledUntil: row.disabledUntil,
-      lastUsedAt: row.lastUsedAt,
-      createdAt: row.createdAt,
-    }));
-    if (rows.length === 0) return { account: null, configured: false };
-    const lookupKeys = this.models.lookupKeys(model);
-    const ids = rows.map((row) => row.id);
-    const disabled = await listDisabledAccountIDs({ accountIds: ids, models: lookupKeys }, this.database);
-    const disabledSet = new Set(disabled.map((row) => row.providerAccountId));
-    const enabled = rows.filter((row) => !disabledSet.has(row.id) && this.canAccountUseModel(row, model));
-    if (enabled.length === 0) return { account: null, configured: true };
-    const routing = await this.performanceRouting(model, provider === null);
-    const prioritized = new PriorityOrderStrategy().order(enabled, {
-      crossProvider: provider === null,
-      providerPriority: targetProviders,
-      routingOptions: routing,
-    });
-    return { account: await this.pickHealthyAccount(prioritized, model), configured: true };
-  }
-
-  private async performanceRouting(model: string, enabled: boolean): Promise<ProviderRoutingOptions | undefined> {
-    if (!enabled) return undefined;
-    const scores = await this.performance.scoresForModel(this.models.resolveAlias(model));
-    if (scores.size === 0) return undefined;
-    return this.performance.routingOptions(scores);
-  }
-
-  private async pickHealthyAccount(
-    prioritized: ProviderAccount[],
-    model: string
-  ): Promise<ProviderAccount | null> {
-    const now = new Date();
-    const lookupKeys = this.models.lookupKeys(model);
-    let degraded: ProviderAccount | null = null;
-    for (const account of prioritized) {
-      if (isSyntheticProviderAccountId(account.id)) return account;
-      const coolingDown = await this.health.refreshAccountHealthFromModels(account.id, now);
-      if (coolingDown) continue;
-      const health = await getModelHealth(account.id, this.models.resolveAlias(model), this.database);
-      if (health && health.status === "degraded") {
-        if (!degraded) degraded = account;
-        continue;
-      }
-      void lookupKeys;
-      this.health.bumpRequestCount(account.id);
-      return account;
-    }
-    if (degraded) this.health.bumpRequestCount(degraded.id);
-    return degraded;
   }
 
   storeHypercreditsUsage(accountId: string, remaining: number | null, cost: number): void {
@@ -1335,16 +1097,6 @@ export class ProxyService implements StreamRecorder {
 
   private async clearRefreshFailures(accountId: string): Promise<void> {
     await Effect.runPromise(ignoringErrors(() => this.redis.del(`${REFRESH_FAIL_COUNT_PREFIX}${accountId}`)));
-  }
-
-  private async rememberAffinityAccount(
-    userId: string,
-    sessionId: string,
-    account: ProviderAccount
-  ): Promise<void> {
-    if (!sessionId || isSyntheticProviderAccountId(account.id)) return;
-    if (!this.affinity.enabled(account.provider)) return;
-    await this.affinity.store(userId, sessionId, account.id);
   }
 
   refreshTokenLoop(intervalMs: number): Effect.Effect<void, never> {
