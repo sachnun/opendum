@@ -17,8 +17,8 @@ export const MODEL_FAMILY_RANKING: readonly ModelFamilyRankingEntry[] = [
   { name: "DeepSeek", anchorId: "deepseek-models", score: 39.5 },
   { name: "Xiaomi", anchorId: "xiaomi-models", score: 37.9 },
   { name: "MiniMax", anchorId: "minimax-models", score: 29.2 },
+  { name: "NVIDIA", anchorId: "nvidia-models", score: 26.5 },
   { name: "Thinking Machines", anchorId: "thinking-machines-models", score: 25.7 },
   { name: "Hunyuan", anchorId: "hunyuan-models", score: 25.3 },
   { name: "Upstage", anchorId: "upstage-models", score: 24.1 },
-  { name: "NVIDIA", anchorId: "nvidia-models", score: 22.9 },
 ];

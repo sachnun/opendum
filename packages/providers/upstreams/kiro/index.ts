@@ -93,7 +93,7 @@ export class KiroProvider implements Provider, CredentialRefresher, RefreshBuffe
           "Content-Type": "application/x-amz-json-1.0",
           Accept: "application/json",
           "x-amz-target": "AmazonCodeWhispererService.GetUsageLimits",
-          "User-Agent": "KiroIDE-1.3.0",
+          "User-Agent": "KiroIDE-1.3.11",
         },
         body: JSON.stringify({ origin: "AI_EDITOR" }),
       });
