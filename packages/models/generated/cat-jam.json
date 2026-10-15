@@ -19,7 +19,7 @@
     ]
   },
   "limit": {
-    "context": 262144,
+    "context": 1048576,
     "output": 131072
   },
   "cost": {
@@ -30,7 +30,7 @@
   "providerConfig": {
     "opencode": {
       "upstream": "cat-jam-free",
-      "contextWindow": 262144,
+      "contextWindow": 1048576,
       "maxOutputTokens": 131072
     }
   }

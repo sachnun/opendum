@@ -1,0 +1,19 @@
+{
+  "providers": [
+    "workers_ai"
+  ],
+  "reasoning": false,
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "providerConfig": {
+    "workers_ai": {
+      "upstream": "@cf/daily-co/phonellm-mini-alpha-2"
+    }
+  }
+}

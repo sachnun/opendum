@@ -11,7 +11,6 @@ export const MODEL_FAMILY_RANKING: readonly ModelFamilyRankingEntry[] = [
   { name: "Meta", anchorId: "meta-models", score: 48.1 },
   { name: "Qwen", anchorId: "qwen-models", score: 45.4 },
   { name: "Z.AI", anchorId: "z-ai-models", score: 44.8 },
-  { name: "StepFun", anchorId: "step-fun-models", score: 43.7 },
   { name: "Moonshot", anchorId: "moonshot-models", score: 43.6 },
   { name: "InclusionAI", anchorId: "inclusion-ai-models", score: 41.1 },
   { name: "DeepSeek", anchorId: "deepseek-models", score: 39.5 },
