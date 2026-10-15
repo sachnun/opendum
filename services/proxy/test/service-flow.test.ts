@@ -87,6 +87,9 @@ describe("ProxyService full flow", () => {
     expect(response.headers.get("content-type")).toBe("text/event-stream");
     const text = await response.text();
     expect(text).toMatch(/hello/);
+    for (let attempt = 0; attempt < 50 && db.insertUsageLog.mock.calls.length === 0; attempt += 1) {
+      await Bun.sleep(10);
+    }
     expect(db.insertUsageLog.mock.calls.length >= 1).toBe(true);
   });
 });

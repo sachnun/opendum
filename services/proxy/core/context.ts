@@ -9,6 +9,7 @@ import { db, closeDatabase } from "@opendum/database";
 import { ProxyService } from "./service.js";
 import { proxyConfig } from "../config.js";
 import { ProxyContextTag, type ProxyContext } from "./services.js";
+import { tryAsync } from "./helpers.js";
 
 export type { ProxyContext } from "./services.js";
 
@@ -23,12 +24,8 @@ async function resolveModelsDirForService(): Promise<string> {
   ];
   for (const candidate of candidates) {
     const normalized = Bun.fileURLToPath(new URL(candidate, "file:///"));
-    try {
-      const stats = await Bun.file(normalized).stat();
-      if (stats.isDirectory()) return normalized;
-    } catch {
-      continue;
-    }
+    const stats = await tryAsync(() => Bun.file(normalized).stat(), null);
+    if (stats?.isDirectory()) return normalized;
   }
   return resolveModelsDir();
 }
@@ -47,7 +44,9 @@ async function fetchThroughRedirects(
     if (response.status < 300 || response.status >= 400) return response;
     const location = response.headers.get("location");
     if (!location) return response;
-    await response.body?.cancel().catch(() => undefined);
+    await tryAsync(async () => {
+      await response.body?.cancel();
+    }, undefined);
     if (hop === MAX_REDIRECTS) throw new Error("stopped after 10 redirects");
     const next = new URL(location, current);
     if (next.protocol !== "https:") throw new Error("redirect must use https");
@@ -83,8 +82,11 @@ export const ProxyContextLayer = Layer.effect(
     );
     const guardedFetch: GuardedFetch = (url, init) => fetchThroughRedirects(guard.fetch, url, init);
     const directFetch = (url: string, init?: RequestInit): Promise<Response> =>
-      guardedFetch(url, init).catch((error: unknown) =>
-        Promise.reject(error instanceof Error ? error : new Error(String(error)))
+      Effect.runPromise(
+        Effect.tryPromise({
+          try: () => guardedFetch(url, init),
+          catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
+        })
       );
     const providers = new ProviderRegistry({
       models,

@@ -1,5 +1,6 @@
+import { Result } from "effect";
 import { anthropicNonStream, anthropicStream, passthroughNonStream, passthroughStream } from "./stream.js";
-import { cloneMap, cloneMapExcept, stringValue } from "./helpers.js";
+import { cloneMap, cloneMapExcept, parseJson, stringValue } from "./helpers.js";
 import type { EndpointAdapter, ParsedEndpointRequest, RouteError } from "./types.js";
 
 type Json = Record<string, unknown>;
@@ -588,12 +589,8 @@ function appendOpenAiToolCalls(
   for (const raw of calls) {
     const call = (raw ?? {}) as Json;
     const fn = (call.function ?? {}) as Json;
-    let input: Json = {};
-    try {
-      input = JSON.parse(stringValue(fn.arguments) || "{}") as Json;
-    } catch {
-      input = {};
-    }
+    const parsedInput = parseJson(stringValue(fn.arguments) || "{}");
+    const input = (Result.isSuccess(parsedInput) ? parsedInput.success : {}) as Json;
     content.push({ type: "tool_use", id: stringValue(call.id), name: stringValue(fn.name), input });
   }
   return { stopReason: calls.length > 0 ? "tool_use" : stopReason };

@@ -1,4 +1,4 @@
-import { Effect, Option, Schema } from "effect";
+import { Effect, Option, Result, Schema } from "effect";
 import { type H3Event } from "h3";
 import { getQuotaAccount } from "@opendum/database/queries";
 import { fetchAccountQuota, isQuotaProvider } from "@opendum/providers/quota";
@@ -6,7 +6,7 @@ import type { QuotaContext, QuotaJournal } from "@opendum/providers/quota";
 import { assertPublicHost, PrivateHostError } from "@opendum/core/egress";
 import { decrypt } from "@opendum/core/crypto";
 import type { ProxyContext } from "../core/context.js";
-import { utf8ByteLength } from "../core/helpers.js";
+import { parseJson, trySyncResult, utf8ByteLength } from "../core/helpers.js";
 import { validateInternalSignature } from "../core/internal-signature.js";
 import { jsonResponse } from "./errors.js";
 
@@ -73,14 +73,8 @@ export async function handleQuota(event: H3Event, context: ProxyContext): Promis
       if (!valid) {
         return jsonResponse({ success: false, error: "Invalid internal quota signature" }, 401);
       }
-      const parsed = yield* Effect.sync(() => {
-        try {
-          return JSON.parse(rawBody) as unknown;
-        } catch {
-          return null;
-        }
-      });
-      const decoded = Option.getOrNull(decodeQuotaInput(parsed));
+      const parsed = yield* Effect.sync(() => parseJson(rawBody));
+      const decoded = Option.getOrNull(decodeQuotaInput(Result.isSuccess(parsed) ? parsed.success : null));
       if (decoded === null) {
         return jsonResponse({ success: false, error: "Invalid quota payload" }, 400);
       }
@@ -121,20 +115,15 @@ function resolveRelayTarget(url: string, method: string): { method: string; targ
   if (!["GET", "POST", "PUT", "PATCH", "DELETE"].includes(normalizedMethod)) {
     throw new Error(`unsupported internal relay method: ${normalizedMethod}`);
   }
-  let target: URL;
-  try {
-    target = new URL(url);
-  } catch {
-    throw new Error("url is invalid");
-  }
+  if (!URL.canParse(url)) throw new Error("url is invalid");
+  const target = new URL(url);
   if (target.protocol !== "https:" || !target.hostname || target.username || target.password) {
     throw new Error("url must be an https provider URL");
   }
-  try {
-    assertPublicHost(target.hostname);
-  } catch (error) {
-    if (error instanceof PrivateHostError) throw new Error("url must not target a private network address");
-    throw error;
+  const hostCheck = trySyncResult(() => assertPublicHost(target.hostname));
+  if (Result.isFailure(hostCheck)) {
+    if (hostCheck.failure instanceof PrivateHostError) throw new Error("url must not target a private network address");
+    throw hostCheck.failure;
   }
   return { method: normalizedMethod, target: target.toString() };
 }
@@ -151,14 +140,8 @@ export async function handleRefresh(event: H3Event, context: ProxyContext): Prom
       );
       if (!valid) return relayError(401, "Invalid internal refresh signature");
 
-      const parsed = yield* Effect.sync(() => {
-        try {
-          return JSON.parse(rawBody) as unknown;
-        } catch {
-          return null;
-        }
-      });
-      const decoded = Option.getOrNull(decodeRelayInput(parsed));
+      const parsed = yield* Effect.sync(() => parseJson(rawBody));
+      const decoded = Option.getOrNull(decodeRelayInput(Result.isSuccess(parsed) ? parsed.success : null));
       if (decoded === null) {
         return relayError(400, "Invalid internal refresh payload");
       }

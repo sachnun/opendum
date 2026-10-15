@@ -98,22 +98,24 @@ export type PointReservation = {
   debitId: string;
 };
 
+export type SuccessfulRequestRecord = {
+  accountId: string;
+  provider: string;
+  model: string;
+  userId: string;
+  apiKeyId: string;
+  inputTokens: number;
+  outputTokens: number;
+  cachedTokens: number;
+  cacheWriteTokens: number;
+  durationMs: number;
+  stream: boolean;
+  requestStartMs: number;
+  upstreamFirstResponseMs: number;
+};
+
 export type StreamRecorder = {
-  recordSuccessfulRequest(params: {
-    accountId: string;
-    provider: string;
-    model: string;
-    userId: string;
-    apiKeyId: string;
-    inputTokens: number;
-    outputTokens: number;
-    cachedTokens: number;
-    cacheWriteTokens: number;
-    durationMs: number;
-    stream: boolean;
-    requestStartMs: number;
-    upstreamFirstResponseMs: number;
-  }): void;
+  recordSuccessfulRequest(params: SuccessfulRequestRecord): void;
   storeHypercreditsUsage(
     accountId: string,
     remaining: number | null,
