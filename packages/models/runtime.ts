@@ -4,6 +4,12 @@ import { Effect } from "effect";
 
 import { inferFamilyFromFolder } from "./model/families.ts";
 import { ModelParseFailure, ModelReadFailure, ModelsDirectoryFailure, asError } from "./errors.ts";
+import { compactStrings, uniqueSorted, uniqueSortedStable } from "./collections.ts";
+import { ModelSuggester } from "./suggester.ts";
+import { OpenAIModelSerializer } from "./serializer.ts";
+import { AccessPolicy } from "./access-policy.ts";
+
+export { suggestionScoreFor } from "./suggester.ts";
 
 export type ModelModalities = {
   input?: string[];
@@ -64,39 +70,11 @@ export type ModelInfo = {
   providerConfig?: Record<string, ProviderModelConfig>;
 };
 
-const SUGGESTION_THRESHOLD = 0.7;
-
 export type ModelEntry = {
   fileId: string;
   owner: string;
   info: ModelInfo;
 };
-
-type SuggestionCandidate = {
-  value: string;
-  normalized: string;
-  tokens: string[];
-};
-
-function compactStrings(values: string[] | undefined): string[] {
-  if (!values) return [];
-  return values.map((value) => value.trim()).filter((value) => value.length > 0);
-}
-
-function uniqueSorted(values: string[]): string[] {
-  return [...new Set(values.filter((value) => value.length > 0))].sort((a, b) => a.localeCompare(b));
-}
-
-function uniqueSortedStable(values: string[]): string[] {
-  const seen = new Set<string>();
-  const result: string[] = [];
-  for (const value of values) {
-    if (value.length === 0 || seen.has(value)) continue;
-    seen.add(value);
-    result.push(value);
-  }
-  return result;
-}
 
 export function normalizeProviderAlias(provider: string): string {
   return provider.trim().toLowerCase();
@@ -289,16 +267,6 @@ export function flagshipFamilyRanking(entries: ModelEntry[]): FlagshipFamily[] {
   return [...best.values()].sort((a, b) => b.score - a.score || a.family.localeCompare(b.family));
 }
 
-function isReasoning(model: string, info: ModelInfo): boolean {
-  if (info.reasoning == null) return true;
-  return info.reasoning;
-}
-
-function isVision(info: ModelInfo): boolean {
-  if (info.modalities == null) return true;
-  return (info.modalities.input ?? []).includes("image");
-}
-
 export class Registry {
   private readonly models = new Map<string, ModelInfo>();
   private readonly effective = new Map<string, ModelInfo>();
@@ -308,8 +276,9 @@ export class Registry {
   private readonly canonicalToAliases = new Map<string, string[]>();
   private readonly providerModelMapCache = new Map<string, Map<string, string>>();
   private readonly providerModelSetCache = new Map<string, Set<string>>();
-  private readonly suggestionModels: SuggestionCandidate[] = [];
-  private readonly suggestionProviders = new Map<string, SuggestionCandidate[]>();
+  private readonly suggester: ModelSuggester;
+  private readonly serializer: OpenAIModelSerializer;
+  private readonly access: AccessPolicy;
 
   private constructor(entries: ModelEntry[], options: { familyFromFolder?: boolean } = {}) {
     for (const entry of entries) {
@@ -326,7 +295,17 @@ export class Registry {
       if (info.ignored) this.ignored.add(modelId);
     }
     this.buildAliases();
-    this.buildSuggestionCandidates();
+    this.suggester = ModelSuggester.fromModels(
+      this.allModels().map((value) => ({ value, providers: (this.effective.get(value) as ModelInfo).providers }))
+    );
+    this.serializer = new OpenAIModelSerializer({
+      models: () => this.allModels(),
+      info: (model) => this.modelInfo(model),
+    });
+    this.access = new AccessPolicy({
+      info: (model) => this.modelInfo(model),
+      entries: () => this.effective,
+    });
   }
 
   static load(dir: string, options: { familyFromFolder?: boolean } = {}): Registry {
@@ -434,26 +413,6 @@ export class Registry {
     }
   }
 
-  private buildSuggestionCandidates(): void {
-    for (const model of this.allModels()) {
-      const candidate = this.newCandidate(model);
-      this.suggestionModels.push(candidate);
-      const info = this.effective.get(model) as ModelInfo;
-      for (const provider of info.providers) {
-        const list = this.suggestionProviders.get(provider) ?? [];
-        list.push(candidate);
-        this.suggestionProviders.set(provider, list);
-      }
-    }
-    for (const list of this.suggestionProviders.values()) {
-      list.sort((a, b) => a.value.localeCompare(b.value));
-    }
-  }
-
-  private newCandidate(value: string): SuggestionCandidate {
-    return makeCandidate(value);
-  }
-
   resolveAlias(model: string): string {
     const trimmed = model.trim();
     if (!trimmed) return trimmed;
@@ -491,44 +450,23 @@ export class Registry {
   }
 
   providerAccessRule(model: string, provider: string): ProviderAccessRule | null {
-    const info = this.effective.get(this.resolveAlias(model));
-    if (!info) return null;
-    const config = info.providerConfig?.[provider];
-    if (!config) return null;
-    if (config.minTier || (config.allowedTiers ?? []).length > 0) {
-      return { minTier: config.minTier, allowedTiers: [...(config.allowedTiers ?? [])] };
-    }
-    return null;
+    return this.access.providerAccessRule(model, provider);
   }
 
   providerModelConfig(model: string, provider: string): ProviderModelConfig | null {
-    const info = this.effective.get(this.resolveAlias(model));
-    if (!info) return null;
-    return info.providerConfig?.[provider] ?? null;
+    return this.access.providerModelConfig(model, provider);
   }
 
   isAuthlessProviderModel(model: string, provider: string): boolean {
-    return this.providerModelConfig(model, provider)?.authless === true;
+    return this.access.isAuthlessProviderModel(model, provider);
   }
 
   isFreeProviderModel(model: string, provider: string): boolean {
-    return this.providerModelConfig(model, provider)?.free === true;
+    return this.access.isFreeProviderModel(model, provider);
   }
 
   authlessProviderModels(): Map<string, string[]> {
-    const result = new Map<string, string[]>();
-    for (const [model, info] of this.effective) {
-      for (const provider of info.providers) {
-        if (!this.isAuthlessProviderModel(model, provider)) continue;
-        const list = result.get(provider) ?? [];
-        list.push(model);
-        result.set(provider, list);
-      }
-    }
-    for (const [provider, list] of result) {
-      result.set(provider, [...list].sort((a, b) => a.localeCompare(b)));
-    }
-    return result;
+    return this.access.authlessProviderModels();
   }
 
   providerModelMap(provider: string): Map<string, string> {
@@ -573,43 +511,7 @@ export class Registry {
     candidates: string[] | null,
     limit: number
   ): string[] {
-    const term = model.trim();
-    if (!term || limit <= 0) return [];
-    const query = this.newCandidate(term);
-
-    let useProviderPrefix = false;
-    let pool: SuggestionCandidate[] = [];
-    if (candidates === null) {
-      if (provider) {
-        const providerCandidates = this.suggestionProviders.get(provider) ?? [];
-        if (providerCandidates.length > 0) {
-          pool = providerCandidates;
-          useProviderPrefix = true;
-        }
-      }
-      if (pool.length === 0) pool = this.suggestionModels;
-    } else {
-      pool = uniqueSorted(candidates).map((value) => this.newCandidate(value));
-      useProviderPrefix = provider !== null;
-    }
-
-    const matches: Array<{ value: string; score: number }> = [];
-    for (const candidate of pool) {
-      const score = suggestionScore(query, candidate);
-      if (score >= SUGGESTION_THRESHOLD) matches.push({ value: candidate.value, score });
-    }
-    matches.sort((a, b) => (a.score === b.score ? a.value.localeCompare(b.value) : b.score - a.score));
-
-    const result: string[] = [];
-    const seen = new Set<string>();
-    for (const match of matches) {
-      const value = useProviderPrefix && provider ? `${provider}/${match.value}` : match.value;
-      if (seen.has(value)) continue;
-      seen.add(value);
-      result.push(value);
-      if (result.length >= limit) break;
-    }
-    return result;
+    return this.suggester.suggest(model, provider, candidates, limit);
   }
 
   modelInfo(model: string): ModelInfo | null {
@@ -643,144 +545,15 @@ export class Registry {
   }
 
   formatModelsForOpenAI(): Array<Record<string, unknown>> {
-    const data: Array<Record<string, unknown>> = [];
-    for (const model of this.allModels()) {
-      const info = this.effective.get(model) as ModelInfo;
-      const item: Record<string, unknown> = {
-        id: model,
-        object: "model",
-        providers: info.providers,
-      };
-      if (info.owner) item.owner = info.owner;
-      const reasoning = isReasoning(model, info);
-      item.reasoning = reasoning;
-      if (reasoning && (info.reasoning_effort ?? []).length > 0) {
-        item.reasoning_effort = info.reasoning_effort;
-      }
-      if (info.modalities != null) item.modalities = info.modalities;
-      if (
-        info.limit != null &&
-        ((info.limit.context ?? 0) > 0 || (info.limit.output ?? 0) > 0)
-      ) {
-        item.limit = info.limit;
-      }
-      data.push(item);
-    }
-    return data;
+    return this.serializer.format();
   }
 
   isReasoningModel(model: string): boolean {
-    const info = this.modelInfo(model);
-    if (!info) return false;
-    return isReasoning(model, info);
+    return this.serializer.isReasoning(model);
   }
 
   isVisionModel(model: string): boolean {
-    const info = this.modelInfo(model);
-    if (!info) return false;
-    return isVision(info);
+    return this.serializer.isVision(model);
   }
 }
 
-function makeCandidate(value: string): SuggestionCandidate {
-  const normalized = normalizeSuggestionValue(value);
-  return { value, normalized, tokens: normalized.split(/\s+/).filter((token) => token.length > 0) };
-}
-
-export function suggestionScoreFor(term: string, candidate: string): number {
-  return suggestionScore(makeCandidate(term), makeCandidate(candidate));
-}
-
-function normalizeSuggestionValue(value: string): string {
-  let out = "";
-  let lastSeparator = false;
-  for (const ch of value.trim().toLowerCase()) {
-    if (/[\p{L}\p{N}]/u.test(ch)) {
-      out += ch;
-      lastSeparator = false;
-      continue;
-    }
-    if (!lastSeparator) {
-      out += " ";
-      lastSeparator = true;
-    }
-  }
-  return out.trim();
-}
-
-function runeLength(value: string): number {
-  return Array.from(value).length;
-}
-
-function levenshteinDistance(a: string, b: string): number {
-  const left = Array.from(a);
-  const right = Array.from(b);
-  if (left.length === 0) return right.length;
-  if (right.length === 0) return left.length;
-  let previous = Array.from<number>({ length: right.length + 1 });
-  let current = Array.from<number>({ length: right.length + 1 });
-  for (let j = 0; j <= right.length; j += 1) previous[j] = j;
-  for (let i = 0; i < left.length; i += 1) {
-    current[0] = i + 1;
-    for (let j = 0; j < right.length; j += 1) {
-      const cost = left[i] === right[j] ? 0 : 1;
-      current[j + 1] = Math.min(current[j]! + 1, previous[j + 1]! + 1, previous[j]! + cost);
-    }
-    const swap = previous;
-    previous = current;
-    current = swap;
-  }
-  return previous[right.length]!;
-}
-
-function compactTokenScore(term: string, candidate: string): number {
-  if (term === candidate) return 1;
-  if (candidate.includes(term) || term.includes(candidate)) {
-    let shorter = runeLength(term);
-    let longer = runeLength(candidate);
-    if (runeLength(candidate) < shorter) {
-      shorter = runeLength(candidate);
-      longer = runeLength(term);
-    }
-    return 0.82 + 0.18 * (shorter / longer);
-  }
-  const maxLen = Math.max(runeLength(term), runeLength(candidate));
-  if (maxLen === 0) return 0;
-  const score = 1 - levenshteinDistance(term, candidate) / maxLen;
-  return score < 0 ? 0 : score;
-}
-
-function tokenSuggestionScore(termTokens: string[], candidateTokens: string[]): number {
-  if (termTokens.length === 0 || candidateTokens.length === 0) return 0;
-  let total = 0;
-  for (const token of termTokens) {
-    let best = 0;
-    for (const candidateToken of candidateTokens) {
-      const score = compactTokenScore(token, candidateToken);
-      if (score > best) best = score;
-    }
-    total += best;
-  }
-  return total / termTokens.length;
-}
-
-function suggestionScore(term: SuggestionCandidate, candidate: SuggestionCandidate): number {
-  const left = term.normalized;
-  const right = candidate.normalized;
-  if (!left || !right) return 0;
-  if (left === right) return 1;
-  if (right.includes(left) || left.includes(right)) {
-    let shorter = runeLength(left);
-    let longer = runeLength(right);
-    if (runeLength(right) < shorter) {
-      shorter = runeLength(right);
-      longer = runeLength(left);
-    }
-    return 0.8 + 0.2 * (shorter / longer);
-  }
-  const tokenScore = tokenSuggestionScore(term.tokens, candidate.tokens);
-  if (tokenScore > 0) return tokenScore;
-  const maxLen = Math.max(runeLength(left), runeLength(right));
-  if (maxLen === 0) return 0;
-  return 1 - levenshteinDistance(left, right) / maxLen;
-}
