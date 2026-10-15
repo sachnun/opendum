@@ -12,6 +12,24 @@ import { ModelFetchFailure, asError, modelFailureMessage } from "../errors.ts";
 export const MAX_FETCH_ATTEMPTS = 3;
 export const FETCH_TIMEOUT_MS = 20_000;
 export const FETCH_RETRY_BASE_DELAY_MS = 1_000;
+export const FETCH_RETRY_AFTER_CAP_MS = 30_000;
+
+const RATE_LIMIT_STATUSES = new Set([429, 503]);
+
+function retryAfterMs(response: Response): number {
+  const header = response.headers.get("retry-after");
+  if (!header) return 0;
+
+  const seconds = Number(header);
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return Math.min(seconds * 1_000, FETCH_RETRY_AFTER_CAP_MS);
+  }
+
+  const date = Date.parse(header);
+  if (Number.isNaN(date)) return 0;
+
+  return Math.min(Math.max(date - Date.now(), 0), FETCH_RETRY_AFTER_CAP_MS);
+}
 
 export function sleep(ms: number): Promise<void> {
   return Effect.runPromise(Effect.sleep(Duration.millis(ms)));
@@ -69,16 +87,26 @@ export function request<T>(
         signal: AbortSignal.timeout(timeout),
       });
       if (!response.ok) {
-        throw new Error(`Failed to fetch ${label} (${response.status} ${response.statusText})`);
+        if (RATE_LIMIT_STATUSES.has(response.status)) {
+          const wait = retryAfterMs(response);
+          if (wait > 0) await sleep(wait);
+        }
+        throw new ModelFetchFailure({
+          message: `Failed to fetch ${label} (${response.status} ${response.statusText})`,
+          label,
+          status: response.status,
+        });
       }
       return decode(response);
     },
-    catch: (cause) =>
-      new ModelFetchFailure({
+    catch: (cause) => {
+      if (cause instanceof ModelFetchFailure) return cause;
+      return new ModelFetchFailure({
         message: modelFailureMessage(cause),
         label,
         cause,
-      }),
+      });
+    },
   });
 
   return retryTransient(attempt, attempts);

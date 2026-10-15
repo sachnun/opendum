@@ -71,6 +71,40 @@ test("runFetchJson rejects on non-ok responses without retrying by default label
   ).rejects.toThrow(/Failed to fetch example \(500 Server Error\)/);
 });
 
+test("runFetchJson retries rate limited responses and reports the status", async () => {
+  let calls = 0;
+  const payload = await withFetch(
+    async () => {
+      calls += 1;
+      if (calls === 1) {
+        return new Response("slow down", {
+          status: 429,
+          statusText: "Too Many Requests",
+          headers: { "retry-after": "0" },
+        });
+      }
+      return new Response(JSON.stringify({ retried: true }), { status: 200 });
+    },
+    () => runFetchJson("https://example.test/data", { attempts: 2 }),
+  );
+  expect(calls).toBe(2);
+  expect(payload).toEqual({ retried: true });
+});
+
+test("runFetchJson exposes the status on exhausted rate limits", async () => {
+  await expect(
+    withFetch(
+      async () =>
+        new Response("slow down", {
+          status: 429,
+          statusText: "Too Many Requests",
+          headers: { "retry-after": "0" },
+        }),
+      () => runFetchJson("https://example.test/data", { attempts: 1, label: "example" }),
+    ),
+  ).rejects.toThrow(/Failed to fetch example \(429 Too Many Requests\)/);
+});
+
 test("MAX_FETCH_ATTEMPTS is a sane default", () => {
   expect(MAX_FETCH_ATTEMPTS >= 2).toBeTruthy();
 });
