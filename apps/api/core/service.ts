@@ -9,6 +9,7 @@ import {
   adaptForResponsesClient,
   compileCustomProvider,
   isCredentialRefresher,
+  randomUuidV7Hex,
   type CredentialRefresher,
   type Provider,
   type ProviderAccount,
@@ -583,6 +584,7 @@ export class ProxyService implements StreamRecorder {
       const tried: string[] = [];
       const sharedTried: string[] = [];
       const excludedProviders: string[] = [];
+      const turnId = randomUuidV7Hex();
       let useShared = false;
       const recoverableFailures: Failure[] = [];
       let lastFailure: RouteError | null = null;
@@ -672,9 +674,16 @@ export class ProxyService implements StreamRecorder {
         let upstreamFirstResponseMs = 0;
         const request = yield* Effect.tryPromise({
           try: () =>
-            this.makeProviderRequest(account as ProviderAccount, payload, parsed.stream, () => {
-              if (upstreamFirstResponseMs === 0) upstreamFirstResponseMs = Date.now();
-            }),
+            this.makeProviderRequest(
+              account as ProviderAccount,
+              payload,
+              parsed.stream,
+              () => {
+                if (upstreamFirstResponseMs === 0) upstreamFirstResponseMs = Date.now();
+              },
+              sessionId,
+              turnId
+            ),
           catch: (error) => (error instanceof Error ? error : new Error(String(error))),
         }).pipe(Effect.result);
 
@@ -827,7 +836,9 @@ export class ProxyService implements StreamRecorder {
     account: ProviderAccount,
     payload: Record<string, unknown>,
     stream: boolean,
-    onUpstreamResponseStart: () => void
+    onUpstreamResponseStart: () => void,
+    sessionId: string,
+    requestId: string
   ): Promise<Response> {
     let providerImpl = this.providers.get(account.provider);
     if (!providerImpl) {
@@ -853,6 +864,8 @@ export class ProxyService implements StreamRecorder {
       body: payload,
       stream,
       onUpstreamResponseStart,
+      sessionId,
+      requestId,
     });
     const response = !stream && this.requestTimeoutMs > 0
       ? await Effect.runPromise(

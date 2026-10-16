@@ -9,8 +9,13 @@ import { WorkbuddyProvider, workbuddyStreamToCompletion } from "./workbuddy.js";
 const account = { id: "acc-1" } as unknown as ProviderAccount;
 const FALLBACK_TTL_MS = 31536000 * 1000;
 
-const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
-const CONVERSATION_HEADERS = ["X-Conversation-ID", "X-Conversation-Request-ID", "X-Conversation-Message-ID"];
+const UUID_V7_HEX = /^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$/;
+const CONVERSATION_HEADERS = [
+  "X-Conversation-ID",
+  "X-Conversation-Request-ID",
+  "X-Conversation-Message-ID",
+  "X-Request-ID",
+];
 
 type Captured = { url: string; init?: RequestInit };
 
@@ -95,30 +100,92 @@ describe("WorkbuddyProvider.refreshCredentials", () => {
   });
 });
 
-async function chat(buddy: WorkbuddyProvider): Promise<void> {
+type ChatOptions = {
+  accountId?: string;
+  sessionId?: string;
+  requestId?: string;
+  messages?: unknown[];
+};
+
+async function chat(buddy: WorkbuddyProvider, options: ChatOptions = {}): Promise<void> {
   await Effect.runPromise(
     buddy.makeRequest({
-      account: { id: "acc-1", accountId: "user-1" } as unknown as ProviderAccount,
+      account: { id: "acc-1", accountId: options.accountId ?? "user-1" } as unknown as ProviderAccount,
       credentials: "at-1",
-      body: { model: "deepseek-v4.1-flash", messages: [{ role: "user", content: "hi" }] },
+      body: {
+        model: "deepseek-v4.1-flash",
+        messages: options.messages ?? [{ role: "user", content: "hi" }],
+      },
       stream: true,
+      sessionId: options.sessionId,
+      requestId: options.requestId,
     })
   );
 }
 
 describe("WorkbuddyProvider.makeRequest", () => {
-  it("sends a fresh conversation header trio on every chat request", async () => {
+  it("keeps the conversation id stable for a session and refreshes message ids per call", async () => {
+    const captured: Captured[] = [];
+    const fake = provider({ body: "" }, captured);
+    const turnId = "018f5c8a1e2f7abc8def0123456789ab";
+    await chat(fake, { sessionId: "session-1", requestId: turnId });
+    await chat(fake, { sessionId: "session-1", requestId: turnId });
+    const first = captured[0]?.init?.headers as Record<string, string>;
+    const second = captured[1]?.init?.headers as Record<string, string>;
+    expect(first["X-Conversation-ID"]).toMatch(UUID_V7_HEX);
+    expect(second["X-Conversation-ID"]).toBe(first["X-Conversation-ID"]);
+    expect(first["X-Conversation-Request-ID"]).toBe(turnId);
+    expect(second["X-Conversation-Request-ID"]).toBe(turnId);
+    expect(first["X-Request-ID"]).toBe(first["X-Conversation-Message-ID"]);
+    expect(first["X-Conversation-Message-ID"]).toMatch(UUID_V7_HEX);
+    for (const name of CONVERSATION_HEADERS) {
+      expect(second[name]).toMatch(UUID_V7_HEX);
+    }
+    expect(second["X-Conversation-Message-ID"]).not.toBe(first["X-Conversation-Message-ID"]);
+    expect(second["X-Request-ID"]).not.toBe(first["X-Request-ID"]);
+  });
+
+  it("derives the conversation id from the account and the first user message without a session", async () => {
     const captured: Captured[] = [];
     const fake = provider({ body: "" }, captured);
     await chat(fake);
     await chat(fake);
+    await chat(fake, { accountId: "user-2" });
     const first = captured[0]?.init?.headers as Record<string, string>;
     const second = captured[1]?.init?.headers as Record<string, string>;
-    const firstValues = CONVERSATION_HEADERS.map((name) => first[name] ?? "");
-    const secondValues = CONVERSATION_HEADERS.map((name) => second[name] ?? "");
-    for (const value of [...firstValues, ...secondValues]) expect(value).toMatch(UUID_V4);
-    expect(new Set(firstValues).size).toBe(3);
-    for (const name of CONVERSATION_HEADERS) expect(second[name]).not.toBe(first[name]);
+    const third = captured[2]?.init?.headers as Record<string, string>;
+    expect(first["X-Conversation-ID"]).toMatch(UUID_V7_HEX);
+    expect(second["X-Conversation-ID"]).toBe(first["X-Conversation-ID"]);
+    expect(third["X-Conversation-ID"]).not.toBe(first["X-Conversation-ID"]);
+    expect(second["X-Conversation-Request-ID"]).toMatch(UUID_V7_HEX);
+    expect(second["X-Conversation-Request-ID"]).not.toBe(first["X-Conversation-Request-ID"]);
+  });
+
+  it("sends the canonical workbuddy client headers", async () => {
+    const captured: Captured[] = [];
+    const fake = provider({ body: "" }, captured);
+    await chat(fake, { sessionId: "session-1" });
+    const headers = captured[0]?.init?.headers as Record<string, string>;
+    expect(headers["X-User-Id"]).toBe("user-1");
+    expect(headers["X-Domain"]).toBe(WORKBUDDY_DOMAIN);
+    expect(headers.Authorization).toBe("Bearer at-1");
+    expect(headers["X-Agent-Intent"]).toBe("craft");
+    expect(headers["X-Agent-Purpose"]).toBe("conversation");
+    expect(headers["X-Agent-Type"]).toBe("main");
+    expect(headers["X-IDE-Type"]).toBe("WorkBuddy");
+    expect(headers["X-IDE-Name"]).toBe("WorkBuddy");
+    expect(headers["X-IDE-Version"]).toBe("5.8.4");
+    expect(headers["X-Product"]).toBe("SaaS");
+    expect(headers["X-Private-Data"]).toBe("true");
+    expect(headers["x-requested-with"]).toBe("XMLHttpRequest");
+    expect(headers["x-codebuddy-request"]).toBe("1");
+    expect(headers["User-Agent"]).toBe("WorkBuddy/5.8.4 WorkBuddy/5.8.4");
+    expect(headers.Accept).toBe("text/event-stream");
+    expect(headers["Content-Type"]).toBe("application/json");
+    expect(headers.traceparent).toMatch(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/);
+    expect(headers.b3).toMatch(/^[0-9a-f]{32}-[0-9a-f]{16}-1-[0-9a-f]{16}$/);
+    expect(headers["X-B3-TraceId"]).toBe(headers["X-Trace-ID"]);
+    expect(headers["X-B3-Sampled"]).toBe("1");
   });
 
   it("keeps the conversation headers off the refresh call", async () => {

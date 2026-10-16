@@ -1,6 +1,15 @@
+import { randomBytes } from "node:crypto";
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
-import { jsonResponse, numberFromAny, parseSseDataLines, randomUuid, stringValue } from "../core/helpers.js";
+import {
+  contentToText,
+  jsonResponse,
+  numberFromAny,
+  parseSseDataLines,
+  randomUuidV7Hex,
+  seededUuidV7Hex,
+  stringValue,
+} from "../core/helpers.js";
 import { normalizeProviderFailure, transportFailure, type UpstreamTransport } from "../core/http.js";
 import { ProviderCredentialFailure } from "../core/errors.js";
 import { OAuth } from "../core/oauth.js";
@@ -23,6 +32,14 @@ const WORKBUDDY_REFRESH_SOURCE = "plugin";
 const WORKBUDDY_DEFAULT_SYSTEM = "You are a helpful assistant.";
 const WORKBUDDY_DEFAULT_MAX_TOKENS = 32768;
 const WORKBUDDY_FALLBACK_TTL_SECONDS = 31536000;
+const WORKBUDDY_IDE_TYPE = "WorkBuddy";
+const WORKBUDDY_IDE_NAME = "WorkBuddy";
+const WORKBUDDY_IDE_VERSION = "5.8.4";
+const WORKBUDDY_PRODUCT = "SaaS";
+const WORKBUDDY_AGENT_INTENT = "craft";
+const WORKBUDDY_AGENT_PURPOSE = "conversation";
+const WORKBUDDY_AGENT_TYPE = "main";
+const WORKBUDDY_USER_AGENT = `WorkBuddy/${WORKBUDDY_IDE_VERSION} WorkBuddy/${WORKBUDDY_IDE_VERSION}`;
 
 export const SUPPORTED_WORKBUDDY = new Set([
   "model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream",
@@ -35,6 +52,33 @@ type Json = Record<string, unknown>;
 function lastModelSegment(model: string): string {
   const parts = model.split("/");
   return parts[parts.length - 1];
+}
+
+function traceHeaders(): Record<string, string> {
+  const traceId = randomBytes(16).toString("hex");
+  const spanId = randomBytes(8).toString("hex");
+  const parentSpanId = randomBytes(8).toString("hex");
+  return {
+    traceparent: `00-${traceId}-${spanId}-01`,
+    b3: `${traceId}-${spanId}-1-${parentSpanId}`,
+    "X-B3-TraceId": traceId,
+    "X-B3-ParentSpanId": parentSpanId,
+    "X-B3-SpanId": spanId,
+    "X-B3-Sampled": "1",
+    "X-Trace-ID": traceId,
+  };
+}
+
+function conversationSeed(uid: string, request: ProviderRequest, messages: unknown[]): string {
+  const sessionId = stringValue(request.sessionId).trim();
+  if (sessionId) return `${uid}:${sessionId}`;
+  for (const raw of messages) {
+    const message = (raw ?? {}) as Json;
+    if (stringValue(message.role) !== "user") continue;
+    const text = contentToText(message.content).trim();
+    if (text) return `${uid}:${text}`;
+  }
+  return "";
 }
 
 function workbuddyExpiry(expiresAt: number, expiresIn: number): Date {
@@ -116,7 +160,8 @@ export class WorkbuddyProvider implements Provider, CredentialRefresher {
     let modelName = lastModelSegment(model);
     modelName = this.registry.upstream(modelName, "workbuddy") || model;
     const messages = Array.isArray(request.body.messages) ? request.body.messages : [];
-    payload.messages = ensureSystemMessage(messages);
+    const normalizedMessages = ensureSystemMessage(messages);
+    payload.messages = normalizedMessages;
     let maxTokens = numberFromAny(request.body.max_tokens);
     if (maxTokens <= 0) maxTokens = numberFromAny(request.body.max_completion_tokens);
     if (maxTokens <= 0) maxTokens = WORKBUDDY_DEFAULT_MAX_TOKENS;
@@ -124,6 +169,11 @@ export class WorkbuddyProvider implements Provider, CredentialRefresher {
     payload.max_completion_tokens = maxTokens;
     payload.model = modelName;
     payload.stream = true;
+
+    const seed = conversationSeed(uid, request, normalizedMessages);
+    const conversationId = seed ? seededUuidV7Hex(seed) : randomUuidV7Hex();
+    const conversationRequestId = stringValue(request.requestId).trim() || randomUuidV7Hex();
+    const messageId = randomUuidV7Hex();
 
     const url = `${WORKBUDDY_API_BASE}${WORKBUDDY_CHAT_PATH}`;
     const direct = this.transport.direct;
@@ -138,11 +188,24 @@ export class WorkbuddyProvider implements Provider, CredentialRefresher {
                 Authorization: `Bearer ${request.credentials.trim()}`,
                 "X-User-Id": uid,
                 "X-Domain": WORKBUDDY_DOMAIN,
-                "X-Conversation-ID": randomUuid(),
-                "X-Conversation-Request-ID": randomUuid(),
-                "X-Conversation-Message-ID": randomUuid(),
+                "X-Conversation-ID": conversationId,
+                "X-Conversation-Request-ID": conversationRequestId,
+                "X-Conversation-Message-ID": messageId,
+                "X-Request-ID": messageId,
+                "X-Agent-Intent": WORKBUDDY_AGENT_INTENT,
+                "X-Agent-Purpose": WORKBUDDY_AGENT_PURPOSE,
+                "X-Agent-Type": WORKBUDDY_AGENT_TYPE,
+                "X-IDE-Type": WORKBUDDY_IDE_TYPE,
+                "X-IDE-Name": WORKBUDDY_IDE_NAME,
+                "X-IDE-Version": WORKBUDDY_IDE_VERSION,
+                "X-Product": WORKBUDDY_PRODUCT,
+                "X-Private-Data": "true",
+                "x-requested-with": "XMLHttpRequest",
+                "x-codebuddy-request": "1",
+                "User-Agent": WORKBUDDY_USER_AGENT,
                 "Content-Type": "application/json",
                 Accept: "text/event-stream",
+                ...traceHeaders(),
               },
               body: JSON.stringify(payload),
             }),
