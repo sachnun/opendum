@@ -19,7 +19,6 @@ export const disabledModel = pgTable(
       table.userId,
       table.model,
     ),
-    index("disabled_model_userId_idx").on(table.userId),
   ],
 );
 
@@ -79,7 +78,6 @@ export const proxyApiKeyRateLimit = pgTable(
       .$onUpdate(() => new Date()),
   },
   (table) => [
-    index("proxy_api_key_rate_limit_apiKeyId_idx").on(table.apiKeyId),
     uniqueIndex("proxy_api_key_rate_limit_apiKeyId_target_targetType_idx").on(
       table.apiKeyId,
       table.target,

@@ -81,12 +81,6 @@ export const providerAccount = pgTable(
       table.provider,
       table.email,
     ),
-    index("provider_account_userId_idx").on(table.userId),
-    index("provider_account_userId_provider_isActive_idx").on(
-      table.userId,
-      table.provider,
-      table.isActive,
-    ),
     index("provider_account_userId_provider_isActive_status_idx").on(
       table.userId,
       table.provider,
@@ -133,14 +127,6 @@ export const providerAccountModelHealth = pgTable(
       table.providerAccountId,
       table.model,
     ),
-    index("provider_account_model_health_providerAccountId_idx").on(
-      table.providerAccountId,
-    ),
-    index("provider_account_model_health_providerAccountId_status_idx").on(
-      table.providerAccountId,
-      table.model,
-      table.status,
-    ),
   ],
 );
 
@@ -160,9 +146,6 @@ export const providerAccountDisabledModel = pgTable(
     uniqueIndex("provider_account_disabled_model_accountId_model_key").on(
       table.providerAccountId,
       table.model,
-    ),
-    index("provider_account_disabled_model_providerAccountId_idx").on(
-      table.providerAccountId,
     ),
   ],
 );
@@ -184,7 +167,6 @@ export const pinnedProvider = pgTable(
       table.userId,
       table.providerKey,
     ),
-    index("pinned_provider_userId_idx").on(table.userId),
   ],
 );
 

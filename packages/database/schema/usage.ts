@@ -30,11 +30,18 @@ export const userSharingSetting = pgTable("user_sharing_setting", {
     .$onUpdate(() => new Date()),
 });
 
+/**
+ * Append-only request log.
+ *
+ * `id` is deliberately not a primary key: nothing looks rows up by id, and the
+ * unique index cost 11 MB plus an index write on every insert. The covering
+ * index below serves every dashboard query as an index-only scan.
+ */
 export const usageLog = pgTable(
   "usage_log",
   {
     id: text("id")
-      .primaryKey()
+      .notNull()
       .$defaultFn(() => createId()),
     userId: text("userId")
       .notNull()
@@ -63,19 +70,16 @@ export const usageLog = pgTable(
     index("usage_log_userId_createdAt_idx").on(
       table.userId,
       table.createdAt,
-    ),
-    index("usage_log_userId_providerAccountId_createdAt_idx").on(
-      table.userId,
+      table.inputTokens,
+      table.outputTokens,
+      table.cachedTokens,
+      table.cacheWriteTokens,
+      table.statusCode,
+      table.duration,
       table.providerAccountId,
-      table.createdAt,
-    ),
-    index("usage_log_userId_proxyApiKeyId_createdAt_idx").on(
-      table.userId,
       table.proxyApiKeyId,
-      table.createdAt,
+      table.model,
     ),
-    index("usage_log_providerAccountId_idx").on(table.providerAccountId),
-    index("usage_log_createdAt_idx").on(table.createdAt),
   ],
 );
 
@@ -92,9 +96,9 @@ export const pointTransaction = pgTable(
     type: text("type").notNull(),
     balanceAfter: integer("balanceAfter").notNull(),
     idempotencyKey: text("idempotencyKey"),
-    usageLogId: text("usageLogId").references(() => usageLog.id, {
-      onDelete: "set null",
-    }),
+    // No foreign key: the column is never written and a FK here would force
+    // the dropped usage_log primary key index to stay alive.
+    usageLogId: text("usageLogId"),
     createdAt: timestamp("createdAt").notNull().defaultNow(),
   },
   (table) => [
@@ -105,6 +109,6 @@ export const pointTransaction = pgTable(
       table.userId,
       table.createdAt,
     ),
-    index("point_transaction_usageLogId_idx").on(table.usageLogId),
+
   ],
 );

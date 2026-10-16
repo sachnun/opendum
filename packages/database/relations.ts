@@ -107,7 +107,7 @@ export const proxyApiKeyRateLimitRelations = relations(
   }),
 );
 
-export const usageLogRelations = relations(usageLog, ({ one, many }) => ({
+export const usageLogRelations = relations(usageLog, ({ one }) => ({
   user: one(user, {
     fields: [usageLog.userId],
     references: [user.id],
@@ -120,7 +120,6 @@ export const usageLogRelations = relations(usageLog, ({ one, many }) => ({
     fields: [usageLog.proxyApiKeyId],
     references: [proxyApiKey.id],
   }),
-  pointTransactions: many(pointTransaction),
 }));
 
 export const pointTransactionRelations = relations(
@@ -129,10 +128,6 @@ export const pointTransactionRelations = relations(
     user: one(user, {
       fields: [pointTransaction.userId],
       references: [user.id],
-    }),
-    usageLog: one(usageLog, {
-      fields: [pointTransaction.usageLogId],
-      references: [usageLog.id],
     }),
   }),
 );

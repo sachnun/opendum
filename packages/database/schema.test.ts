@@ -53,6 +53,13 @@ const DRIZZLE_TYPE_BY_SQL_TYPE: Record<string, string> = {
   "text[]": "array",
 };
 
+const PARSER_SKIPPED_STATEMENTS = [
+  /^CREATE EXTENSION /,
+  /^CREATE STATISTICS /,
+  /^ANALYZE /,
+  /^ALTER TABLE "[^"]+" SET \(/,
+];
+
 function parseColumnList(raw: string): string[] {
   return raw
     .split(",")
@@ -182,7 +189,16 @@ function parseSql(statements: string[]): ParsedSchema {
     if (dropConstraint) {
       const table = parsed.tables.get(dropConstraint[1]);
       if (!table) throw new Error(`Unknown table in ALTER TABLE: ${dropConstraint[1]}`);
-      for (const column of table.columns.values()) column.primary = false;
+      parsed.foreignKeys.delete(dropConstraint[2]);
+      if (dropConstraint[2].endsWith("_pkey")) {
+        for (const column of table.columns.values()) column.primary = false;
+      }
+      continue;
+    }
+
+    const dropIndex = statement.match(/^DROP INDEX "([^"]+)"$/);
+    if (dropIndex) {
+      parsed.indexes.delete(dropIndex[1]);
       continue;
     }
 
@@ -205,7 +221,11 @@ function loadSql(): ParsedSchema {
       .filter(Boolean),
   );
 
-  return parseSql(statements);
+  return parseSql(
+    statements.filter(
+      (statement) => !PARSER_SKIPPED_STATEMENTS.some((pattern) => pattern.test(statement)),
+    ),
+  );
 }
 
 function normalizeDrizzleDefault(value: unknown): DefaultValue {
