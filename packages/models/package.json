@@ -10,6 +10,7 @@
     "./probes": "./model/probes.ts",
     "./registry": "./registry.ts",
     "./runtime": "./runtime.ts",
+    "./model-store": "./model-store.ts",
     "./errors": "./errors.ts"
   },
   "imports": {

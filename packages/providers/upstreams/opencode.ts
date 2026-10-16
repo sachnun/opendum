@@ -222,7 +222,7 @@ export class OpencodeProvider implements Provider {
     const body = request.body;
     let model = stringValue(body.model);
     if (model.startsWith("opencode/")) model = model.slice("opencode/".length);
-    const modelName = this.registry.upstreamModelName(model, "opencode");
+    const modelName = this.registry.upstream(model, "opencode");
     const headers = opencodeHeaders(body);
     body.stream = true;
     if (this.requiresResponsesAPI(model)) ensureResponsesFingerprintTools(body);

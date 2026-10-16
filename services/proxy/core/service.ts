@@ -1,44 +1,9 @@
 import { Effect, Metric, Result, Schedule } from "effect";
-import {
-  bumpAccountRequestCount,
-  disableFailedAccount,
-  getAccountCredentialsByID,
-  getAccountHealthState,
-  getAccountOwnerUserID,
-  getForcedAccount,
-  getModelHealth,
-  getCustomProvider,
-  listCustomProviderModels,
-  listCustomProviders,
-  insertModelHealth,
-  insertUsageLog,
-  listDisabledAccountIDs,
-  listEligibleAccounts,
-  listExpiringRefreshableAccounts,
-  listModelHealthByAccount,
-  listSharedEligibleAccounts,
-  markAccountRecoveredByRotation,
-  markAccountSuccess,
-  markUsageLimitedHealth,
-  recordAccountError,
-  recordRequestError,
-  setAccountActive,
-  setAccountCooldown,
-  setAccountHealthFailed,
-  setAccountUsageLimited,
-  updateModelHealthCounters,
-  updateModelHealthFailure,
-  updateModelHealthFailureWithStatus,
-  updateModelHealthStatus,
-  updateModelHealthSuccess,
-  updateModelHealthSuccessWithStatus,
-  updateRefreshedCredentials,
-} from "@opendum/database/queries";
 import type { Database } from "@opendum/database";
-import { decrypt, encrypt, playgroundSignature, signaturesMatch } from "@opendum/core/crypto";
+import { decrypt, encrypt } from "@opendum/core/crypto";
 import type { Registry } from "@opendum/models/runtime";
 import type { OpendumRedis } from "@opendum/core/redis";
-import { SessionAffinity, preferSticky } from "@opendum/core/redis";
+import { SessionAffinity } from "@opendum/core/redis";
 import type { AuthResult, AuthService, ModelValidationResult } from "@opendum/auth";
 import {
   adaptForResponsesClient,
@@ -50,29 +15,16 @@ import {
   type ProviderRegistry,
   type RefreshedCredentials,
 } from "@opendum/providers";
-import { cloneMap, numberAsInt, sleep } from "./helpers.js";
+import { cloneMap, numberAsInt, sleep, tryAsync, trySync, trySyncResult } from "./helpers.js";
 import {
   accountAccessDenial,
   accountNeedsCredentialRefresh,
-  cooldownRecoveryCount,
-  effectiveUnhealthyCount,
+  ignore,
   isSyntheticProviderAccountId,
-  modelHealthStatus,
-  normalizeAccessMode,
-  normalizeAccountIds,
   parseRefreshErrorStatusCode,
-  prioritizeAccounts,
-  proxyAccessRuleRestrictsTier,
-  proxyTierSatisfiesRule,
-  quotaFallbackTierLocal,
   refreshBufferFor,
-  sortAccountsByProviderPriority,
-  successRecoveryCount,
 } from "./service-helpers.js";
-import {
-  ProviderPerformance,
-  type ProviderRoutingOptions,
-} from "./provider-performance.js";
+import { ProviderPerformance } from "./provider-performance.js";
 import {
   buildAccountErrorMessage,
   codexUsageLimitDisabledUntil,
@@ -100,37 +52,37 @@ import { stripImageContent } from "./content.js";
 import {
   adjustRoamingPoints,
   creditSharingPoint,
-  refundRoamingPoint,
-  reserveRoamingPoint,
   roamingPoints,
-  settleRoamingPoint,
   type PointReservation,
 } from "./points.js";
+import { Health, MAX_ERROR_LEN } from "./health.js";
+import { Rotation } from "./rotation.js";
+import { Playground } from "./playground.js";
+import { Roaming } from "./roaming.js";
+import { Usage } from "./usage-log.js";
+import { repositories, type Repositories } from "./repositories.js";
+import type { Adapter } from "./endpoints.js";
 import type {
-  AccountRotationFailure,
-  EndpointAdapter,
+  Failure,
   ParsedEndpointRequest,
   ResponseContext,
   RouteError,
   StreamCompletion,
   StreamRecorder,
+  SuccessRecord,
   UsageCounts,
 } from "./types.js";
 import { isRouteError } from "./types.js";
 
-const FAILED_COOLDOWN_MS = 10 * 60 * 1000;
-const ACCOUNT_COOLDOWN_UNHEALTHY_THRESHOLD = 10;
-const MAX_STORED_ERROR_LEN = 10000;
 const TOKEN_REFRESH_LOCK_PREFIX = "opendum:provider-account:refresh-lock:";
 const TOKEN_REFRESH_LOCK_TTL_SECONDS = 120;
 const REFRESH_FAIL_COUNT_PREFIX = "opendum:provider-account:refresh-fail-count:";
 const REFRESH_FAIL_COUNT_TTL_SECONDS = 30 * 24 * 60 * 60;
 const REFRESH_MAX_CONSECUTIVE_FAILURES = 5;
-const HYPERCREDITS_BALANCE_PREFIX = "opendum:hypercredits:balance:";
-const HYPERCREDITS_BALANCE_TTL_SECONDS = 30 * 24 * 60 * 60;
 
 export type ProxyServiceOptions = {
   database: Database;
+  repositories?: Partial<Repositories>;
   redis: OpendumRedis;
   models: Registry;
   auth: AuthService;
@@ -152,36 +104,65 @@ type RoamingCompletionContext = {
   authResult: AuthResult;
   validation: ModelValidationResult;
   roaming: PointReservation | null;
-  rotationFailures: AccountRotationFailure[];
+  rotationFailures: Failure[];
   usage: UsageCounts;
   startMs: number;
 };
 
 export class ProxyService implements StreamRecorder {
-  private readonly database: Database;
   private readonly redis: OpendumRedis;
   private readonly models: Registry;
   private readonly auth: AuthService;
   private readonly providers: ProviderRegistry;
   private readonly secret: string;
   private readonly requestTimeoutMs: number;
-  private readonly affinity: SessionAffinity;
+  private readonly repositories: Repositories;
+  private readonly rotation: Rotation;
   private readonly performance: ProviderPerformance;
+  private readonly health: Health;
+  private readonly usage: Usage;
+  private readonly roaming: Roaming;
+  private readonly playground: Playground;
 
   constructor(options: ProxyServiceOptions) {
-    this.database = options.database;
     this.redis = options.redis;
     this.models = options.models;
     this.auth = options.auth;
     this.providers = options.providers;
     this.secret = options.betterAuthSecret;
     this.requestTimeoutMs = options.requestTimeoutMs;
-    this.affinity = new SessionAffinity(options.redis, options.providers.names());
+    this.repositories = { ...repositories(options.database), ...options.repositories };
     this.performance = new ProviderPerformance(options.redis);
+    this.health = new Health({
+      accounts: this.repositories.accounts,
+      health: this.repositories.health,
+      models: options.models,
+      redis: options.redis,
+    });
+    this.rotation = new Rotation({
+      accounts: this.repositories.accounts,
+      modelHealth: this.repositories.health,
+      customProviders: this.repositories.customProviders,
+      models: options.models,
+      providers: options.providers,
+      health: this.health,
+      performance: this.performance,
+      affinity: new SessionAffinity(options.redis, options.providers.names()),
+    });
+    this.roaming = new Roaming(this.repositories.points, options.models);
+    this.usage = new Usage({
+      usage: this.repositories.usage,
+      redis: options.redis,
+      auth: options.auth,
+      models: options.models,
+      performance: this.performance,
+      health: this.health,
+    });
+    this.playground = new Playground(options.betterAuthSecret);
   }
 
   handle(
-    cfg: EndpointAdapter,
+    cfg: Adapter,
     body: Record<string, unknown>,
     authHeader: string,
     sessionId: string,
@@ -191,7 +172,7 @@ export class ProxyService implements StreamRecorder {
   }
 
   runPipeline(
-    cfg: EndpointAdapter,
+    cfg: Adapter,
     body: Record<string, unknown>,
     authHeader: string,
     sessionId: string,
@@ -200,10 +181,10 @@ export class ProxyService implements StreamRecorder {
     const startedAt = Date.now();
     return Effect.gen({ self: this }, function* () {
       const startMs = Date.now();
-      const playground = this.validatePlaygroundAuth(request);
+      const playground = this.playground.authenticate(request);
       const authResult = playground.handled
         ? playground.result
-        : yield* Effect.promise(() => this.auth.validateAPIKey(authHeader));
+        : yield* this.auth.validateKey(authHeader);
       if (!authResult.valid) {
         return this.routeError(cfg, { status: 401, message: authResult.error, type: "authentication_error" });
       }
@@ -221,13 +202,11 @@ export class ProxyService implements StreamRecorder {
         parsedRequest.modelParam = selector.model;
       }
 
-      const validation = yield* Effect.promise(() =>
-        this.auth.validateModelForUser(authResult.userId, parsedRequest.modelParam, {
-          mode: authResult.modelAccessMode,
-          models: authResult.modelAccessList,
-          roamingEnabled: authResult.roamingEnabled,
-        })
-      );
+      const validation = yield* this.auth.validateFor(authResult.userId, parsedRequest.modelParam, {
+        mode: authResult.modelAccessMode,
+        models: authResult.modelAccessList,
+        roamingEnabled: authResult.roamingEnabled,
+      });
       if (!validation.valid) {
         return this.routeError(cfg, {
           status: 400,
@@ -317,11 +296,11 @@ export class ProxyService implements StreamRecorder {
         const result = yield* Effect.promise(() => cfg.handleStream(responseCtx, this));
         if (!responseCtx.streamHandled) {
           if (roaming) {
-            yield* Effect.promise(() =>
-              this.settleRoamingPointAsync(account.userId, roaming, validation.model, responseCtx.usage)
+            yield* ignore(() =>
+              this.roaming.settle(account.userId, roaming, validation.model, responseCtx.usage)
             );
           }
-          yield* Effect.promise(() => this.markAccountsRecoveredByRotationDeferred(rotationFailures));
+          yield* ignore(() => this.health.markRecovered(rotationFailures));
         }
         return result;
       }
@@ -344,11 +323,11 @@ export class ProxyService implements StreamRecorder {
         )
       );
       if (roaming) {
-        yield* Effect.promise(() =>
-          this.settleRoamingPointAsync(account.userId, roaming, validation.model, responseCtx.usage)
+        yield* ignore(() =>
+          this.roaming.settle(account.userId, roaming, validation.model, responseCtx.usage)
         );
       }
-      yield* Effect.promise(() => this.markAccountsRecoveredByRotationDeferred(rotationFailures));
+      yield* ignore(() => this.health.markRecovered(rotationFailures));
       return result;
     }).pipe(
       Effect.tap(() => Metric.update(proxyRequests, 1)),
@@ -361,41 +340,35 @@ export class ProxyService implements StreamRecorder {
     const { account, authResult, validation, roaming, rotationFailures, usage, startMs } = context;
     if (roaming) {
       if (reason === "success") {
-        void this.settleRoamingPointAsync(account.userId, roaming, validation.model, usage);
+        void Effect.runFork(ignore(() => this.roaming.settle(account.userId, roaming, validation.model, usage)));
       } else {
-        void this.refundRoamingPointAsync(roaming);
+        void Effect.runFork(ignore(() => this.roaming.refund(roaming)));
       }
     }
     if (reason === "error") {
       void this.recordResponseHandlerFailure(account, authResult, validation, 500, "upstream stream failed", startMs);
     }
-    if (reason !== "cancel") void this.markAccountsRecoveredByRotationDeferred(rotationFailures);
+    if (reason !== "cancel") {
+      void Effect.runFork(ignore(() => this.health.markRecovered(rotationFailures)));
+    }
   }
 
   private async handleNonStreamFailure(
-    cfg: EndpointAdapter,
+    cfg: Adapter,
     error: unknown,
     context: RoamingCompletionContext
   ): Promise<Response> {
     const { account, authResult, validation, roaming, rotationFailures, startMs } = context;
     const message = error instanceof Error ? error.message : String(error);
-    if (roaming) await this.refundRoamingPointAsync(roaming);
+    if (roaming) await Effect.runPromise(ignore(() => this.roaming.refund(roaming)));
     await this.recordResponseHandlerFailure(account, authResult, validation, 500, message, startMs);
-    void this.markAccountsRecoveredByRotationDeferred(rotationFailures);
+    void Effect.runFork(ignore(() => this.health.markRecovered(rotationFailures)));
     return this.routeError(cfg, {
       status: 500,
       message: prefixWithProvider(account.provider, message),
       type: "api_error",
       accountId: account.id,
     });
-  }
-
-  private async refundRoamingPointAsync(reservation: PointReservation): Promise<void> {
-    try {
-      await refundRoamingPoint(this.database, reservation);
-    } catch {
-      return;
-    }
   }
 
   private async recordResponseHandlerFailure(
@@ -406,36 +379,15 @@ export class ProxyService implements StreamRecorder {
     message: string,
     startMs: number
   ): Promise<void> {
-    try {
-      await this.markAccountFailed(account.id, validation.model, statusCode, message);
-      await this.logUsage(authResult, account, validation, statusCode, Date.now() - startMs);
-    } catch {
-      return;
-    }
+    await Effect.runPromise(
+      ignore(async () => {
+        await this.health.markAccountFailed(account.id, validation.model, statusCode, message);
+        await this.usage.logUsage(authResult, account, validation, statusCode, Date.now() - startMs);
+      })
+    );
   }
 
-  private async settleRoamingPointAsync(
-    ownerUserId: string,
-    roaming: PointReservation,
-    model: string,
-    usage: UsageCounts
-  ): Promise<void> {
-    try {
-      await settleRoamingPoint(this.database, this.models, ownerUserId, roaming, model, usage);
-    } catch {
-      return;
-    }
-  }
-
-  private async markAccountsRecoveredByRotationDeferred(failures: AccountRotationFailure[]): Promise<void> {
-    try {
-      await this.markAccountsRecoveredByRotation(failures);
-    } catch {
-      return;
-    }
-  }
-
-  routeError(cfg: EndpointAdapter, error: RouteError): Response {
+  routeError(cfg: Adapter, error: RouteError): Response {
     void Effect.runFork(Metric.update(proxyRequestFailures, 1));
     return routeErrorResponse(error, cfg.format);
   }
@@ -450,7 +402,7 @@ export class ProxyService implements StreamRecorder {
     const model = modelParam.slice(index + 1).trim();
     if (!prefix || !model || this.isKnownModelProviderPrefix(prefix)) return null;
     if (userId) {
-      const custom = await getCustomProvider(userId, prefix.toLowerCase(), this.database);
+      const custom = await this.repositories.customProviders.getCustomProvider(userId, prefix.toLowerCase());
       if (custom) return null;
     }
     return { accountId: prefix, model };
@@ -459,7 +411,7 @@ export class ProxyService implements StreamRecorder {
   private isKnownModelProviderPrefix(prefix: string): boolean {
     const provider = prefix.toLowerCase();
     if (this.providers.has(provider)) return true;
-    return this.models.modelsForProvider(provider).length > 0;
+    return this.models.models(provider).length > 0;
   }
 
   private async validateForcedAccount(
@@ -492,7 +444,7 @@ export class ProxyService implements StreamRecorder {
       return synthetic;
     }
 
-    const row = await getForcedAccount(id, userId, this.database);
+    const row = await this.repositories.accounts.getForcedAccount(id, userId);
     if (!row) {
       return {
         status: 400,
@@ -514,7 +466,7 @@ export class ProxyService implements StreamRecorder {
       createdAt: row.createdAt,
       isActive: row.isActive,
     };
-    const coolingDown = await this.refreshAccountHealthFromModels(account.id, new Date());
+    const coolingDown = await this.health.refresh(account.id, new Date());
     if (coolingDown) {
       return {
         status: 400,
@@ -555,49 +507,21 @@ export class ProxyService implements StreamRecorder {
     }
     if (id.startsWith("authless:")) {
       const provider = id.slice("authless:".length);
-      if (provider && this.models.isAuthlessProviderModel(model, provider)) {
+      if (provider && this.models.isAuthless(model, provider)) {
         return { id, userId, provider, isActive: true, status: "active" };
       }
     }
     return null;
   }
 
-  private async customProviderSlugsForModel(userId: string, model: string): Promise<string[]> {
-    const providers = await listCustomProviders(userId, this.database);
-    if (providers.length === 0) return [];
-    const canonical = this.models.resolveAlias(model);
-    const results = await Effect.runPromise(
-      Effect.forEach(
-        providers,
-        (custom) =>
-          Effect.promise(() => listCustomProviderModels(custom.id, this.database)).pipe(
-            Effect.map((rows) =>
-              rows.some((row) => row.aliased && this.models.resolveAlias(row.modelId) === canonical)
-                ? custom.slug
-                : null
-            )
-          ),
-        { concurrency: 4 }
-      )
-    );
-    return results.filter((slug): slug is string => slug !== null);
-  }
-
   private async isCustomAccountModel(account: ProviderAccount, model: string): Promise<boolean> {
-    const custom = await getCustomProvider(account.userId, account.provider, this.database);
+    const custom = await this.repositories.customProviders.getCustomProvider(account.userId, account.provider);
     if (!custom) return false;
-    const rows = await listCustomProviderModels(custom.id, this.database);
+    const rows = await this.repositories.customProviders.listCustomProviderModels(custom.id);
     const target = model.startsWith(`${account.provider}/`)
       ? model.slice(account.provider.length + 1)
       : model;
     return rows.some((row) => row.modelId === model || row.modelId === target);
-  }
-
-  private canAccountUseModel(account: ProviderAccount, model: string): boolean {
-    const rule = this.models.providerAccessRule(model, account.provider);
-    if (!rule || !proxyAccessRuleRestrictsTier(rule.minTier, rule.allowedTiers)) return true;
-    const tier = account.tier ?? quotaFallbackTierLocal(account);
-    return proxyTierSatisfiesRule(tier, rule.minTier, rule.allowedTiers);
   }
 
   private async validateSelectedAccountModel(
@@ -624,7 +548,7 @@ export class ProxyService implements StreamRecorder {
         code: "provider_account_provider_mismatch",
       };
     }
-    if (!this.canAccountUseModel(account, validation.model)) {
+    if (!this.rotation.canUse(account, validation.model)) {
       return {
         status: 400,
         message: `Selected provider account tier does not allow model "${validation.model}"`,
@@ -637,7 +561,7 @@ export class ProxyService implements StreamRecorder {
   }
 
   private executeWithAccountRotation(
-    cfg: EndpointAdapter,
+    cfg: Adapter,
     parsed: ParsedEndpointRequest,
     authResult: AuthResult,
     validation: ModelValidationResult,
@@ -650,7 +574,7 @@ export class ProxyService implements StreamRecorder {
         response: Response;
         requestStartMs: number;
         upstreamFirstResponseMs: number;
-        rotationFailures: AccountRotationFailure[];
+        rotationFailures: Failure[];
         roaming: PointReservation | null;
       }
     | RouteError
@@ -660,7 +584,7 @@ export class ProxyService implements StreamRecorder {
       const sharedTried: string[] = [];
       const excludedProviders: string[] = [];
       let useShared = false;
-      const recoverableFailures: AccountRotationFailure[] = [];
+      const recoverableFailures: Failure[] = [];
       let lastFailure: RouteError | null = null;
       let delayedFinalFailure: { account: ProviderAccount; statusCode: number; message: string } | null = null;
       let accountConfigured = false;
@@ -670,7 +594,7 @@ export class ProxyService implements StreamRecorder {
         let roaming: PointReservation | null = null;
         if (!account) {
           const selection = yield* Effect.promise(() =>
-            this.nextAttemptAccount(
+            this.rotation.nextAccount(
               authResult,
               validation,
               tried,
@@ -693,7 +617,7 @@ export class ProxyService implements StreamRecorder {
           if (lastFailure && delayedFinalFailure) {
             const pending = delayedFinalFailure;
             yield* Effect.promise(() =>
-              this.markAccountFailed(
+              this.health.markAccountFailed(
                 pending.account.id,
                 validation.model,
                 pending.statusCode,
@@ -721,7 +645,7 @@ export class ProxyService implements StreamRecorder {
 
         if (useShared && !forced) {
           const reserved = yield* Effect.promise(() =>
-            reserveRoamingPoint(this.database, authResult.userId, validation.model)
+            this.roaming.reserve(authResult.userId, validation.model)
           );
           if (!reserved) {
             return {
@@ -763,9 +687,11 @@ export class ProxyService implements StreamRecorder {
             this.errorContext(cfg, validation, parsed, account.provider)
           );
           const failedAt = yield* Effect.promise(() =>
-            this.markAccountFailed(account.id, validation.model, status, detailed)
+            this.health.markAccountFailed(account.id, validation.model, status, detailed)
           );
-          yield* Effect.promise(() => this.logUsage(authResult, account, validation, status, Date.now() - startMs));
+          yield* ignore(() =>
+            this.usage.logUsage(authResult, account, validation, status, Date.now() - startMs)
+          );
           lastFailure = {
             status,
             message: prefixWithProvider(account.provider, message),
@@ -773,7 +699,7 @@ export class ProxyService implements StreamRecorder {
             accountId: account.id,
           };
           yield* Metric.update(upstreamErrors, 1);
-          if (roaming) yield* Effect.promise(() => refundRoamingPoint(this.database, roaming));
+          if (roaming) yield* ignore(() => this.roaming.refund(roaming));
           if (!forced) {
             recoverableFailures.push({ accountId: account.id, failedAt });
             yield* Metric.update(accountRotations, 1);
@@ -799,11 +725,11 @@ export class ProxyService implements StreamRecorder {
             if (!forced && isAntigravityResourceExhausted(account.provider, response.status, bodyText)) {
               delayedFinalFailure = { account, statusCode: response.status, message: detailed };
               yield* Effect.promise(() =>
-                this.logAccountError(account.id, account.userId, validation.model, response.status, detailed)
+                this.health.logAccountError(account.id, account.userId, validation.model, response.status, detailed)
               );
             } else {
               failedAt = yield* Effect.promise(() =>
-                this.markAccountFailed(account.id, validation.model, response.status, detailed)
+                this.health.markAccountFailed(account.id, validation.model, response.status, detailed)
               );
               const disabledUntil = codexUsageLimitDisabledUntil(
                 account.provider,
@@ -813,17 +739,17 @@ export class ProxyService implements StreamRecorder {
               );
               if (disabledUntil) {
                 yield* Effect.promise(() =>
-                  this.markAccountUsageLimited(account.id, validation.model, disabledUntil, failedAt as Date)
+                  this.health.markAccountUsageLimited(account.id, validation.model, disabledUntil, failedAt as Date)
                 );
               }
             }
           } else {
             yield* Effect.promise(() =>
-              this.logAccountError(account.id, account.userId, validation.model, response.status, detailed)
+              this.health.logAccountError(account.id, account.userId, validation.model, response.status, detailed)
             );
           }
-          yield* Effect.promise(() =>
-            this.logUsage(authResult, account, validation, response.status, Date.now() - startMs)
+          yield* ignore(() =>
+            this.usage.logUsage(authResult, account, validation, response.status, Date.now() - startMs)
           );
           const sanitized = sanitizedProxyError(response.status, bodyText);
           lastFailure = {
@@ -834,7 +760,7 @@ export class ProxyService implements StreamRecorder {
           };
           yield* Metric.update(upstreamErrors, 1);
           yield* Metric.update(upstreamTtft, upstreamFirstResponseMs - requestStartMs);
-          if (roaming) yield* Effect.promise(() => refundRoamingPoint(this.database, roaming));
+          if (roaming) yield* ignore(() => this.roaming.refund(roaming));
           if (fallbackAcrossProviders) {
             if (!excludedProviders.includes(account.provider)) excludedProviders.push(account.provider);
             continue;
@@ -847,7 +773,7 @@ export class ProxyService implements StreamRecorder {
           return lastFailure;
         }
 
-        if (forced) void this.bumpAccountRequestCountDeferred(account.id);
+        if (forced) this.health.bumpRequest(account.id);
         return {
           account,
           response,
@@ -861,7 +787,7 @@ export class ProxyService implements StreamRecorder {
   }
 
   private errorContext(
-    cfg: EndpointAdapter,
+    cfg: Adapter,
     validation: ModelValidationResult,
     parsed: ParsedEndpointRequest,
     provider: string
@@ -875,596 +801,12 @@ export class ProxyService implements StreamRecorder {
     };
   }
 
-  private async nextAttemptAccount(
-    authResult: AuthResult,
-    validation: ModelValidationResult,
-    tried: string[],
-    sharedTried: string[],
-    excludedProviders: string[],
-    useShared: boolean,
-    sessionId: string
-  ): Promise<{ account: ProviderAccount | null; configured: boolean }> {
-    if (useShared) {
-      const result = await this.getNextSharedAccount(
-        authResult.userId,
-        validation.model,
-        validation.provider,
-        sharedTried,
-        excludedProviders
-      );
-      return { account: result.account, configured: result.configured };
-    }
-    return this.getNextAvailableAccount(
-      authResult.userId,
-      validation.model,
-      validation.provider,
-      tried,
-      excludedProviders,
-      { mode: authResult.accountAccessMode, accounts: authResult.accountAccessList },
-      sessionId
-    );
+  storeCredits(accountId: string, remaining: number | null, cost: number): void {
+    this.usage.storeCredits(accountId, remaining, cost);
   }
 
-  private async getEligibleAccounts(
-    userId: string,
-    model: string,
-    provider: string | null,
-    exclude: string[],
-    excludeProviders: string[],
-    accountAccess: { mode: string; accounts: string[] }
-  ): Promise<ProviderAccount[]> {
-    const targetProviders = provider
-      ? [provider]
-      : [...new Set([...this.models.providersForModel(model), ...(await this.customProviderSlugsForModel(userId, model))])];
-    if (targetProviders.length === 0) return [];
-
-    const rows: ProviderAccount[] = [];
-    for (const targetProvider of targetProviders) {
-      let account: ProviderAccount | null = null;
-      if (this.providers.isAuthless(targetProvider)) {
-        account = { id: targetProvider, userId: "", provider: targetProvider, isActive: true, status: "active" };
-      } else if (this.models.isAuthlessProviderModel(model, targetProvider)) {
-        account = {
-          id: `authless:${targetProvider}`,
-          userId: "",
-          provider: targetProvider,
-          isActive: true,
-          status: "active",
-        };
-      }
-      if (!account) continue;
-      if (exclude.includes(account.id)) continue;
-      if (excludeProviders.includes(account.provider)) continue;
-      if (accountAccessDenial(account.id, accountAccess)) continue;
-      rows.push(account);
-    }
-
-    const now = new Date();
-    const mode = normalizeAccessMode(accountAccess.mode);
-    const accounts = normalizeAccountIds(accountAccess.accounts);
-    const dbRows = await listEligibleAccounts(
-      {
-        userId,
-        providers: targetProviders,
-        now,
-        excludeIds: exclude,
-        excludeProviders,
-        useWhitelist: mode === "whitelist" && accounts.length > 0,
-        accountIds: accounts,
-        useBlacklist: mode === "blacklist" && accounts.length > 0,
-      },
-      this.database
-    );
-    for (const row of dbRows) {
-      rows.push({
-        id: row.id,
-        userId: row.userId,
-        provider: row.provider,
-        tier: row.tier,
-        accountId: row.accountId,
-        status: row.status,
-        disabledUntil: row.disabledUntil,
-        lastUsedAt: row.lastUsedAt,
-        createdAt: row.createdAt,
-      });
-    }
-    if (rows.length === 0) return [];
-
-    const lookupKeys = this.models.lookupKeys(model);
-    const ids = rows.map((row) => row.id);
-    const disabled = await listDisabledAccountIDs({ accountIds: ids, models: lookupKeys }, this.database);
-    const disabledSet = new Set(disabled.map((row) => row.providerAccountId));
-    const enabled = rows.filter(
-      (row) => isSyntheticProviderAccountId(row.id) || (!disabledSet.has(row.id) && this.canAccountUseModel(row, model))
-    );
-    if (provider === null) sortAccountsByProviderPriority(enabled, targetProviders);
-    return enabled;
-  }
-
-  private async getNextAvailableAccount(
-    userId: string,
-    model: string,
-    provider: string | null,
-    exclude: string[],
-    excludeProviders: string[],
-    accountAccess: { mode: string; accounts: string[] },
-    sessionId: string
-  ): Promise<{ account: ProviderAccount | null; configured: boolean }> {
-    const eligible = await this.getEligibleAccounts(userId, model, provider, exclude, excludeProviders, accountAccess);
-    if (eligible.length === 0) return { account: null, configured: false };
-    const routing = await this.performanceRouting(model, provider === null);
-    let prioritized = prioritizeAccounts(eligible, provider === null, this.models.providersForModel(model), routing);
-    const stickyId = await this.affinity.lookup(userId, sessionId);
-    if (stickyId && !isSyntheticProviderAccountId(stickyId)) {
-      prioritized = preferSticky(prioritized, (account) => account.id === stickyId);
-    }
-    const selected = await this.pickHealthyAccount(prioritized, model);
-    if (!selected) return { account: null, configured: true };
-    await this.rememberAffinityAccount(userId, sessionId, selected);
-    return { account: selected, configured: true };
-  }
-
-  private async getNextSharedAccount(
-    _userId: string,
-    model: string,
-    provider: string | null,
-    exclude: string[],
-    excludeProviders: string[]
-  ): Promise<{ account: ProviderAccount | null; configured: boolean }> {
-    const targetProviders = provider ? [provider] : this.models.providersForModel(model);
-    if (targetProviders.length === 0) return { account: null, configured: false };
-    const now = new Date();
-    const sharedRows = await listSharedEligibleAccounts(
-      { userId: _userId, providers: targetProviders, now, excludeIds: exclude, excludeProviders },
-      this.database
-    );
-    const rows: ProviderAccount[] = sharedRows.map((row) => ({
-      id: row.id,
-      userId: row.userId,
-      provider: row.provider,
-      tier: row.tier,
-      accountId: row.accountId,
-      status: row.status,
-      disabledUntil: row.disabledUntil,
-      lastUsedAt: row.lastUsedAt,
-      createdAt: row.createdAt,
-    }));
-    if (rows.length === 0) return { account: null, configured: false };
-    const lookupKeys = this.models.lookupKeys(model);
-    const ids = rows.map((row) => row.id);
-    const disabled = await listDisabledAccountIDs({ accountIds: ids, models: lookupKeys }, this.database);
-    const disabledSet = new Set(disabled.map((row) => row.providerAccountId));
-    const enabled = rows.filter((row) => !disabledSet.has(row.id) && this.canAccountUseModel(row, model));
-    if (enabled.length === 0) return { account: null, configured: true };
-    const routing = await this.performanceRouting(model, provider === null);
-    const prioritized = prioritizeAccounts(enabled, provider === null, targetProviders, routing);
-    return { account: await this.pickHealthyAccount(prioritized, model), configured: true };
-  }
-
-  private async performanceRouting(model: string, enabled: boolean): Promise<ProviderRoutingOptions | undefined> {
-    if (!enabled) return undefined;
-    const scores = await this.performance.scoresForModel(this.models.resolveAlias(model));
-    if (scores.size === 0) return undefined;
-    return this.performance.routingOptions(scores);
-  }
-
-  private async pickHealthyAccount(
-    prioritized: ProviderAccount[],
-    model: string
-  ): Promise<ProviderAccount | null> {
-    const now = new Date();
-    const lookupKeys = this.models.lookupKeys(model);
-    let degraded: ProviderAccount | null = null;
-    for (const account of prioritized) {
-      if (isSyntheticProviderAccountId(account.id)) return account;
-      const coolingDown = await this.refreshAccountHealthFromModels(account.id, now);
-      if (coolingDown) continue;
-      const health = await getModelHealth(account.id, this.models.resolveAlias(model), this.database);
-      if (health && health.status === "degraded") {
-        if (!degraded) degraded = account;
-        continue;
-      }
-      void lookupKeys;
-      void this.bumpAccountRequestCountDeferred(account.id);
-      return account;
-    }
-    if (degraded) void this.bumpAccountRequestCountDeferred(degraded.id);
-    return degraded;
-  }
-
-  private async bumpAccountRequestCountDeferred(accountId: string): Promise<void> {
-    if (isSyntheticProviderAccountId(accountId)) return;
-    try {
-      await bumpAccountRequestCount({ id: accountId, at: new Date() }, this.database);
-    } catch {
-      return;
-    }
-  }
-
-  private async refreshAccountHealthFromModels(accountId: string, now: Date): Promise<boolean> {
-    if (isSyntheticProviderAccountId(accountId)) return false;
-    const account = await getAccountHealthState(accountId, this.database);
-    if (!account) return false;
-    const rows = await listModelHealthByAccount(accountId, this.database);
-    const applyCooldownRecovery =
-      account.status === "failed" && account.disabledUntil !== null && account.disabledUntil.getTime() <= now.getTime();
-    const total = await this.normalizeModelHealthRows(rows, now, applyCooldownRecovery);
-
-    if (account.disabledUntil && account.disabledUntil.getTime() > now.getTime()) {
-      if (account.consecutiveErrors !== total) {
-        await setAccountHealthFailed(
-          { id: accountId, consecutiveErrors: total, status: "failed", at: now },
-          this.database
-        );
-      }
-      return true;
-    }
-    if (total >= ACCOUNT_COOLDOWN_UNHEALTHY_THRESHOLD) {
-      await setAccountCooldown(
-        {
-          id: accountId,
-          status: "failed",
-          at: now,
-          consecutiveErrors: total,
-          disabledUntil: new Date(now.getTime() + FAILED_COOLDOWN_MS),
-        },
-        this.database
-      );
-      return true;
-    }
-    if (
-      account.status !== "active" ||
-      (account.disabledUntil !== null && account.disabledUntil.getTime() <= now.getTime()) ||
-      account.consecutiveErrors !== total
-    ) {
-      await setAccountActive({ id: accountId, status: "active", at: now, consecutiveErrors: total }, this.database);
-    }
-    return false;
-  }
-
-  private async normalizeModelHealthRows(
-    rows: Awaited<ReturnType<typeof listModelHealthByAccount>>,
-    now: Date,
-    applyCooldownRecovery: boolean
-  ): Promise<number> {
-    let total = 0;
-    for (const row of rows) {
-      let count = effectiveUnhealthyCount(row, now);
-      if (applyCooldownRecovery) count = cooldownRecoveryCount(count);
-      const status = modelHealthStatus(count);
-      const statusChanged = status !== row.status;
-      total += count;
-      if (count === row.consecutiveErrors && !statusChanged && !applyCooldownRecovery) continue;
-      if (row.status === "failed" || statusChanged) {
-        await updateModelHealthStatus(
-          { id: row.id, consecutiveErrors: count, unhealthyCountUpdatedAt: now, status, statusChangedAt: now },
-          this.database
-        );
-        continue;
-      }
-      await updateModelHealthCounters(
-        { id: row.id, consecutiveErrors: count, unhealthyCountUpdatedAt: now },
-        this.database
-      );
-    }
-    return total;
-  }
-
-  async markAccountSuccess(accountId: string, model: string): Promise<void> {
-    if (isSyntheticProviderAccountId(accountId)) return;
-    const now = new Date();
-    await markAccountSuccess({ id: accountId, at: now }, this.database);
-    const resolved = this.models.resolveAlias(model);
-    const health = await getModelHealth(accountId, resolved, this.database);
-    if (!health) {
-      await this.refreshAccountHealthFromModels(accountId, now);
-      return;
-    }
-    const nextErrors = successRecoveryCount(health, now);
-    const nextStatus = modelHealthStatus(nextErrors);
-    if (nextStatus !== health.status) {
-      await updateModelHealthSuccessWithStatus(
-        {
-          id: health.id,
-          consecutiveErrors: nextErrors,
-          lastSuccessAt: now,
-          unhealthyCountUpdatedAt: now,
-          status: nextStatus,
-          statusChangedAt: now,
-        },
-        this.database
-      );
-    } else {
-      await updateModelHealthSuccess(
-        { id: health.id, consecutiveErrors: nextErrors, lastSuccessAt: now, unhealthyCountUpdatedAt: now },
-        this.database
-      );
-    }
-    await this.refreshAccountHealthFromModels(accountId, now);
-  }
-
-  async markAccountFailed(accountId: string, model: string, statusCode: number, message: string): Promise<Date> {
-    const now = new Date();
-    if (isSyntheticProviderAccountId(accountId)) return now;
-    const stored = message.length > MAX_STORED_ERROR_LEN ? message.slice(0, MAX_STORED_ERROR_LEN) : message;
-    await recordRequestError({ id: accountId, at: now, code: statusCode }, this.database);
-    const resolved = this.models.resolveAlias(model);
-    const health = await getModelHealth(accountId, resolved, this.database);
-    if (health) {
-      const nextErrors = effectiveUnhealthyCount(health, now) + 1;
-      const nextStatus = modelHealthStatus(nextErrors);
-      if (nextStatus !== health.status) {
-        await updateModelHealthFailureWithStatus(
-          {
-            id: health.id,
-            consecutiveErrors: nextErrors,
-            lastErrorAt: now,
-            lastErrorCode: statusCode,
-            unhealthyCountUpdatedAt: now,
-            status: nextStatus,
-            statusChangedAt: now,
-          },
-          this.database
-        );
-      } else {
-        await updateModelHealthFailure(
-          {
-            id: health.id,
-            consecutiveErrors: nextErrors,
-            lastErrorAt: now,
-            lastErrorCode: statusCode,
-            unhealthyCountUpdatedAt: now,
-          },
-          this.database
-        );
-      }
-    } else {
-      const nextErrors = 1;
-      await insertModelHealth(
-        {
-          id: crypto.randomUUID(),
-          providerAccountId: accountId,
-          model: resolved,
-          consecutiveErrors: nextErrors,
-          status: modelHealthStatus(nextErrors),
-          lastErrorAt: now,
-          lastErrorCode: statusCode,
-          unhealthyCountUpdatedAt: now,
-          createdAt: now,
-          updatedAt: now,
-        },
-        this.database
-      );
-    }
-    await this.refreshAccountHealthFromModels(accountId, now);
-    const ownerUserId = await getAccountOwnerUserID(accountId, this.database);
-    if (ownerUserId) {
-      await upsertErrorHistory(this.redis, accountId, ownerUserId, resolved, statusCode, stored, now);
-    }
-    return now;
-  }
-
-  async markAccountUsageLimited(accountId: string, model: string, disabledUntil: Date, failedAt: Date): Promise<void> {
-    if (isSyntheticProviderAccountId(accountId)) return;
-    const resolved = this.models.resolveAlias(model);
-    await markUsageLimitedHealth(
-      {
-        providerAccountId: accountId,
-        model: resolved,
-        status: "failed",
-        at: failedAt,
-        consecutiveErrors: ACCOUNT_COOLDOWN_UNHEALTHY_THRESHOLD,
-      },
-      this.database
-    );
-    await this.refreshAccountHealthFromModels(accountId, failedAt);
-    await setAccountUsageLimited(
-      { id: accountId, disabledUntil, status: "failed", at: failedAt },
-      this.database
-    );
-  }
-
-  async markAccountsRecoveredByRotation(failures: AccountRotationFailure[]): Promise<void> {
-    const latest = new Map<string, Date>();
-    for (const failure of failures) {
-      const existing = latest.get(failure.accountId);
-      if (!existing || failure.failedAt.getTime() > existing.getTime()) latest.set(failure.accountId, failure.failedAt);
-    }
-    if (latest.size === 0) return;
-    const recoveredAt = new Date();
-    for (const [accountId, failedAt] of latest) {
-      if (isSyntheticProviderAccountId(accountId)) continue;
-      await markAccountRecoveredByRotation({ id: accountId, at: recoveredAt, beforeOrAt: failedAt }, this.database);
-    }
-  }
-
-  async logAccountError(accountId: string, userId: string, model: string, statusCode: number, message: string): Promise<void> {
-    if (isSyntheticProviderAccountId(accountId)) return;
-    const stored = message.length > MAX_STORED_ERROR_LEN ? message.slice(0, MAX_STORED_ERROR_LEN) : message;
-    const resolved = this.models.resolveAlias(model);
-    await upsertErrorHistory(this.redis, accountId, userId, resolved, statusCode, stored, new Date());
-  }
-
-  private async logUsage(
-    authResult: AuthResult,
-    account: ProviderAccount,
-    validation: ModelValidationResult,
-    statusCode: number,
-    durationMs: number
-  ): Promise<void> {
-    await this.logUsageRaw({
-      userId: authResult.userId,
-      providerAccountId: account.id,
-      proxyApiKeyId: authResult.apiKeyId,
-      model: validation.model,
-      inputTokens: 0,
-      outputTokens: 0,
-      cachedTokens: 0,
-      cacheWriteTokens: 0,
-      statusCode,
-      durationMs,
-    });
-  }
-
-  async logUsageRaw(params: {
-    userId: string;
-    providerAccountId: string;
-    proxyApiKeyId: string;
-    model: string;
-    inputTokens: number;
-    outputTokens: number;
-    cachedTokens: number;
-    cacheWriteTokens: number;
-    statusCode: number;
-    durationMs: number;
-  }): Promise<void> {
-    if (!params.userId || !params.model) return;
-    const providerAccountId = params.providerAccountId && !isSyntheticProviderAccountId(params.providerAccountId)
-      ? params.providerAccountId
-      : null;
-    try {
-      await insertUsageLog(
-        {
-          id: crypto.randomUUID(),
-          userId: params.userId,
-          providerAccountId,
-          proxyApiKeyId: params.proxyApiKeyId || null,
-          model: params.model,
-          inputTokens: params.inputTokens,
-          outputTokens: params.outputTokens,
-          cachedTokens: params.cachedTokens,
-          cacheWriteTokens: params.cacheWriteTokens,
-          statusCode: params.statusCode,
-          duration: params.durationMs,
-          createdAt: new Date(),
-        },
-        this.database
-      );
-      await this.auth.bumpAnalyticsCacheVersionThrottled(params.userId);
-    } catch {
-      return;
-    }
-  }
-
-  private validatePlaygroundAuth(
-    request: Request | undefined
-  ): { handled: boolean; result: AuthResult } {
-    const emptyResult: AuthResult = {
-      valid: false,
-      userId: "",
-      apiKeyId: "",
-      modelAccessMode: "all",
-      modelAccessList: [],
-      accountAccessMode: "all",
-      accountAccessList: [],
-      roamingEnabled: false,
-      rateLimitRules: [],
-      error: "Invalid playground session",
-    };
-    if (!request) return { handled: false, result: emptyResult };
-    const userId = (request.headers.get("x-opendum-playground-user-id") ?? "").trim();
-    const timestampValue = (request.headers.get("x-opendum-playground-timestamp") ?? "").trim();
-    const signature = (request.headers.get("x-opendum-playground-signature") ?? "").trim();
-    if (!userId && !timestampValue && !signature) return { handled: false, result: emptyResult };
-    if (!userId || !timestampValue || !signature || !this.secret.trim()) {
-      return { handled: true, result: emptyResult };
-    }
-    const timestamp = Number.parseInt(timestampValue, 10);
-    if (!Number.isFinite(timestamp)) return { handled: true, result: emptyResult };
-    const requestTime = timestamp * 1000;
-    const window = 2 * 60 * 1000;
-    if (Date.now() - requestTime > window || requestTime - Date.now() > window) {
-      return { handled: true, result: emptyResult };
-    }
-    let path = "/";
-    try {
-      path = new URL(request.url).pathname;
-    } catch {
-      path = "/";
-    }
-    const expected = playgroundSignature(this.secret, userId, timestampValue, request.method, path);
-    if (!signaturesMatch(expected, signature)) return { handled: true, result: emptyResult };
-    return {
-      handled: true,
-      result: {
-        valid: true,
-        userId,
-        apiKeyId: "",
-        modelAccessMode: "all",
-        modelAccessList: [],
-        accountAccessMode: "all",
-        accountAccessList: [],
-        roamingEnabled: false,
-        rateLimitRules: [],
-        error: "",
-      },
-    };
-  }
-
-  storeHypercreditsUsage(accountId: string, remaining: number | null, cost: number): void {
-    if (!accountId) return;
-    void (async () => {
-      try {
-        const key = HYPERCREDITS_BALANCE_PREFIX + accountId;
-        if (remaining !== null && remaining > 0) {
-          await this.redis.set(key, String(remaining), { EX: HYPERCREDITS_BALANCE_TTL_SECONDS });
-          return;
-        }
-        if (cost > 0) {
-          const raw = await this.redis.get(key);
-          const current = raw === null ? Number.NaN : Number(raw);
-          if (Number.isFinite(current) && current > 0) {
-            const next = Math.max(0, current - cost);
-            await this.redis.set(key, String(next), { EX: HYPERCREDITS_BALANCE_TTL_SECONDS });
-          }
-        }
-      } catch {
-        return;
-      }
-    })();
-  }
-
-  recordSuccessfulRequest(params: {
-    accountId: string;
-    provider: string;
-    model: string;
-    userId: string;
-    apiKeyId: string;
-    inputTokens: number;
-    outputTokens: number;
-    cachedTokens: number;
-    cacheWriteTokens: number;
-    durationMs: number;
-    stream: boolean;
-    requestStartMs: number;
-    upstreamFirstResponseMs: number;
-  }): void {
-    void (async () => {
-      try {
-        await this.markAccountSuccess(params.accountId, params.model);
-        await this.performance.record({
-          provider: params.provider,
-          model: this.models.resolveAlias(params.model),
-          ttftMs: params.upstreamFirstResponseMs > params.requestStartMs ? params.upstreamFirstResponseMs - params.requestStartMs : 0,
-          outputTokens: params.outputTokens,
-          durationMs: params.durationMs,
-        });
-        await this.logUsageRaw({
-          userId: params.userId,
-          providerAccountId: params.accountId,
-          proxyApiKeyId: params.apiKeyId,
-          model: params.model,
-          inputTokens: params.inputTokens,
-          outputTokens: params.outputTokens,
-          cachedTokens: params.cachedTokens,
-          cacheWriteTokens: params.cacheWriteTokens,
-          statusCode: 200,
-          durationMs: params.durationMs,
-        });
-      } catch {
-        return;
-      }
-    })();
+  recordSuccess(params: SuccessRecord): void {
+    this.usage.recordSuccess(params);
   }
 
   async quotaCredentials(account: ProviderAccount): Promise<string> {
@@ -1475,6 +817,10 @@ export class ProxyService implements StreamRecorder {
     }
     const resolved = await this.credentialsForAccount(account, providerImpl);
     return resolved.credentials;
+  }
+
+  async quotaAccount(accountId: string, userId: string, provider: string) {
+    return this.repositories.accounts.getQuotaAccount(accountId, userId, provider);
   }
 
   private async makeProviderRequest(
@@ -1532,12 +878,8 @@ export class ProxyService implements StreamRecorder {
     providerImpl: Provider
   ): Promise<{ credentials: string; account: ProviderAccount }> {
     const requestAccount = await this.loadProviderAccountCredentials(account);
-    let credentials: string;
-    try {
-      credentials = decrypt(this.secret, requestAccount.accessToken ?? "");
-    } catch {
-      credentials = requestAccount.accessToken ?? "";
-    }
+    const rawAccessToken = requestAccount.accessToken ?? "";
+    const credentials = trySync(() => decrypt(this.secret, rawAccessToken), rawAccessToken);
     const refreshed = await this.refreshAccountCredentialsIfDue(requestAccount, providerImpl, true);
     if (refreshed.error) {
       if (requestAccount.expiresAt && requestAccount.expiresAt.getTime() < Date.now()) {
@@ -1551,7 +893,7 @@ export class ProxyService implements StreamRecorder {
 
   private async loadProviderAccountCredentials(account: ProviderAccount): Promise<ProviderAccount> {
     if (account.accessToken && account.refreshToken) return account;
-    const row = await getAccountCredentialsByID(account.id, this.database);
+    const row = await this.repositories.accounts.getAccountCredentialsByID(account.id);
     if (!row) return account;
     return {
       id: row.id,
@@ -1582,13 +924,11 @@ export class ProxyService implements StreamRecorder {
       }
       return { credentials: null, account, error: null };
     }
-    let refreshToken: string;
-    try {
-      refreshToken = decrypt(this.secret, account.refreshToken);
-    } catch {
+    const decodedRefreshToken = trySyncResult(() => decrypt(this.secret, account.refreshToken as string));
+    if (Result.isFailure(decodedRefreshToken)) {
       return { credentials: null, account, error: new Error("failed to decrypt refresh token") };
     }
-    if (!refreshToken.trim()) return { credentials: null, account, error: null };
+    if (!decodedRefreshToken.success.trim()) return { credentials: null, account, error: null };
 
     const lock = await this.acquireRefreshLock(account.id);
     if (!lock.acquired) {
@@ -1598,35 +938,42 @@ export class ProxyService implements StreamRecorder {
       }
       return { credentials: null, account, error: null };
     }
-    try {
-      const current = await this.loadProviderAccountCredentialsByID(account.id);
-      if (!accountNeedsCredentialRefresh(current, providerImpl)) {
-        try {
-          const credentials = decrypt(this.secret, current.accessToken ?? "");
-          return { credentials, account: current, error: null };
-        } catch {
-          return { credentials: null, account: current, error: null };
-        }
-      }
-      if (!current.refreshToken) return { credentials: null, account: current, error: null };
-      refreshToken = decrypt(this.secret, current.refreshToken);
-      void Effect.runFork(Metric.update(tokenRefreshes, 1));
-      const refreshed = await Effect.runPromise(refresher.refreshCredentials(refreshToken, current));
-      const updated = await this.persistRefreshedCredentials(current, refreshed);
-      await this.clearRefreshFailures(current.id);
-      return { credentials: refreshed.accessToken, account: updated, error: null };
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      void Effect.runFork(Metric.update(tokenRefreshFailures, 1));
-      await this.recordRefreshFailure(account, err);
-      return { credentials: null, account, error: err };
-    } finally {
-      await this.releaseRefreshLock(account.id, lock.value);
-    }
+    return await Effect.runPromise(
+      Effect.tryPromise({
+        try: async () => {
+          const current = await this.loadProviderAccountCredentialsByID(account.id);
+          if (!accountNeedsCredentialRefresh(current, providerImpl)) {
+            const rawAccessToken = current.accessToken ?? "";
+            return {
+              credentials: trySync<string | null>(() => decrypt(this.secret, rawAccessToken), null),
+              account: current,
+              error: null,
+            };
+          }
+          if (!current.refreshToken) return { credentials: null, account: current, error: null };
+          const rotatedToken = decrypt(this.secret, current.refreshToken);
+          void Effect.runFork(Metric.update(tokenRefreshes, 1));
+          const refreshed = await Effect.runPromise(refresher.refreshCredentials(rotatedToken, current));
+          const updated = await this.persistRefreshedCredentials(current, refreshed);
+          await this.clearRefreshFailures(current.id);
+          return { credentials: refreshed.accessToken, account: updated, error: null };
+        },
+        catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
+      }).pipe(
+        Effect.catch((error) =>
+          Effect.promise(async () => {
+            void Effect.runFork(Metric.update(tokenRefreshFailures, 1));
+            await this.recordRefreshFailure(account, error);
+            return { credentials: null, account, error };
+          })
+        ),
+        Effect.ensuring(Effect.promise(() => this.releaseRefreshLock(account.id, lock.value)))
+      )
+    );
   }
 
   private async loadProviderAccountCredentialsByID(accountId: string): Promise<ProviderAccount> {
-    const row = await getAccountCredentialsByID(accountId, this.database);
+    const row = await this.repositories.accounts.getAccountCredentialsByID(accountId);
     if (!row) throw new Error("provider account not found");
     return {
       id: row.id,
@@ -1659,7 +1006,7 @@ export class ProxyService implements StreamRecorder {
     if (refreshed.paidTier) tier = refreshed.paidTier;
     const email = refreshed.email ? refreshed.email : account.email ?? null;
     const accountId = refreshed.accountId ? refreshed.accountId : account.accountId ?? null;
-    await updateRefreshedCredentials(
+    await this.repositories.accounts.updateRefreshedCredentials(
       {
         id: account.id,
         accessToken: encryptedAccess,
@@ -1669,8 +1016,7 @@ export class ProxyService implements StreamRecorder {
         tier,
         email,
         accountId,
-      },
-      this.database
+      }
     );
     return {
       ...account,
@@ -1686,23 +1032,19 @@ export class ProxyService implements StreamRecorder {
 
   private async acquireRefreshLock(accountId: string): Promise<{ value: string; acquired: boolean }> {
     const value = crypto.randomUUID();
-    try {
+    const acquired = await tryAsync(async () => {
       const result = await this.redis.set(`${TOKEN_REFRESH_LOCK_PREFIX}${accountId}`, value, {
         NX: true,
         EX: TOKEN_REFRESH_LOCK_TTL_SECONDS,
       });
-      return { value, acquired: Boolean(result) };
-    } catch {
-      return { value, acquired: true };
-    }
+      return Boolean(result);
+    }, true);
+    return { value, acquired };
   }
 
   private async releaseRefreshLock(accountId: string, value: string): Promise<void> {
-    try {
-      await this.redis.del(`${TOKEN_REFRESH_LOCK_PREFIX}${accountId}`);
-    } catch {
-      void value;
-    }
+    void value;
+    await Effect.runPromise(ignore(() => this.redis.del(`${TOKEN_REFRESH_LOCK_PREFIX}${accountId}`)));
   }
 
   private async waitForRefreshedAccount(
@@ -1717,11 +1059,12 @@ export class ProxyService implements StreamRecorder {
         current.expiresAt.getTime() > Date.now() &&
         (!previous.expiresAt || current.expiresAt.getTime() > previous.expiresAt.getTime())
       ) {
-        try {
-          return { credentials: decrypt(this.secret, current.accessToken ?? ""), account: current, error: null };
-        } catch {
-          return { credentials: null, account: current, error: null };
-        }
+        const rawAccessToken = current.accessToken ?? "";
+        return {
+          credentials: trySync<string | null>(() => decrypt(this.secret, rawAccessToken), null),
+          account: current,
+          error: null,
+        };
       }
     }
     return { credentials: null, account: previous, error: new Error("provider account token refresh is already in progress") };
@@ -1730,41 +1073,25 @@ export class ProxyService implements StreamRecorder {
   private async recordRefreshFailure(account: ProviderAccount, error: Error): Promise<void> {
     if (!account.isActive) return;
     const now = new Date();
-    const message = error.message.length > MAX_STORED_ERROR_LEN ? error.message.slice(0, MAX_STORED_ERROR_LEN) : error.message;
+    const message = error.message.length > MAX_ERROR_LEN ? error.message.slice(0, MAX_ERROR_LEN) : error.message;
     const statusCode = parseRefreshErrorStatusCode(error);
-    let failCount = 1;
-    try {
-      failCount = await this.redis.incr(`${REFRESH_FAIL_COUNT_PREFIX}${account.id}`);
+    const failCount = await tryAsync(async () => {
+      const count = await this.redis.incr(`${REFRESH_FAIL_COUNT_PREFIX}${account.id}`);
       await this.redis.expire(`${REFRESH_FAIL_COUNT_PREFIX}${account.id}`, REFRESH_FAIL_COUNT_TTL_SECONDS);
-    } catch {
-      failCount = 1;
-    }
-    await recordAccountError({ id: account.id, at: now, code: statusCode }, this.database);
-    const ownerUserId = account.userId || (await getAccountOwnerUserID(account.id, this.database)) || "";
+      return count;
+    }, 1);
+    await this.repositories.accounts.recordAccountError({ id: account.id, at: now, code: statusCode });
+    const ownerUserId = account.userId || (await this.repositories.accounts.getAccountOwnerUserID(account.id)) || "";
     if (ownerUserId) {
       await upsertErrorHistory(this.redis, account.id, ownerUserId, null, statusCode, `Token refresh failed: ${message}`, now);
     }
     if (failCount >= REFRESH_MAX_CONSECUTIVE_FAILURES) {
-      await disableFailedAccount({ id: account.id, status: "failed", at: now }, this.database);
+      await this.repositories.accounts.disableFailedAccount({ id: account.id, status: "failed", at: now });
     }
   }
 
   private async clearRefreshFailures(accountId: string): Promise<void> {
-    try {
-      await this.redis.del(`${REFRESH_FAIL_COUNT_PREFIX}${accountId}`);
-    } catch {
-      return;
-    }
-  }
-
-  private async rememberAffinityAccount(
-    userId: string,
-    sessionId: string,
-    account: ProviderAccount
-  ): Promise<void> {
-    if (!sessionId || isSyntheticProviderAccountId(account.id)) return;
-    if (!this.affinity.enabled(account.provider)) return;
-    await this.affinity.store(userId, sessionId, account.id);
+    await Effect.runPromise(ignore(() => this.redis.del(`${REFRESH_FAIL_COUNT_PREFIX}${accountId}`)));
   }
 
   refreshTokenLoop(intervalMs: number): Effect.Effect<void, never> {
@@ -1775,15 +1102,18 @@ export class ProxyService implements StreamRecorder {
   }
 
   private async runTokenRefresh(): Promise<void> {
-    try {
-      await this.refreshExpiringTokens();
-    } catch (error) {
-      await Effect.runPromise(
-        Effect.logError("token refresh cycle failed", { cause: error }).pipe(
-          Effect.withSpan("ProxyService.tokenRefresh")
+    await Effect.runPromise(
+      Effect.tryPromise({
+        try: () => this.refreshExpiringTokens(),
+        catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
+      }).pipe(
+        Effect.catch((error) =>
+          Effect.logError("token refresh cycle failed", { cause: error }).pipe(
+            Effect.withSpan("ProxyService.tokenRefresh")
+          )
         )
-      );
-    }
+      )
+    );
   }
 
   private async refreshExpiringTokens(): Promise<void> {
@@ -1800,9 +1130,8 @@ export class ProxyService implements StreamRecorder {
             const buffer = refreshBufferFor(providerImpl);
             const accounts = yield* Effect.tryPromise({
               try: () =>
-                listExpiringRefreshableAccounts(
-                  { provider: name, now, expiresBefore: new Date(now.getTime() + buffer), batchLimit: 500 },
-                  this.database
+                this.repositories.accounts.listExpiringRefreshableAccounts(
+                  { provider: name, now, expiresBefore: new Date(now.getTime() + buffer), batchLimit: 500 }
                 ),
               catch: (error) => (error instanceof Error ? error : new Error(String(error))),
             }).pipe(Effect.result);
@@ -1843,13 +1172,9 @@ export class ProxyService implements StreamRecorder {
   }
 
   async customProviderForAccount(userId: string, provider: string): Promise<Provider | null> {
-    const {
-      getCustomProvider,
-      listCustomProviderModels,
-    } = await import("@opendum/database/queries");
-    const custom = await getCustomProvider(userId, provider, this.database);
+    const custom = await this.repositories.customProviders.getCustomProvider(userId, provider);
     if (!custom) return null;
-    const rows = await listCustomProviderModels(custom.id, this.database);
+    const rows = await this.repositories.customProviders.listCustomProviderModels(custom.id);
     return compileCustomProvider({
       provider: { slug: custom.slug, baseUrl: custom.baseUrl, extraHeaders: custom.extraHeaders ?? null },
       models: rows.map((row) => ({

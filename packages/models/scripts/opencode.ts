@@ -2,7 +2,7 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { syncProviderModels } from "#models/registry.ts";
+import { sync } from "#models/model-store.ts";
 import { runFetchText, runFetchJson } from "#models/sync/http.ts";
 import { stripParamInfoKey } from "#models/model/clean-key.ts";
 import { syncCliVersion } from "./version-sync.ts";
@@ -21,6 +21,11 @@ const OPENCODE_VERSION_TARGETS = [
     label: "opencode provider",
     path: resolve(REPO_ROOT, "packages/providers/upstreams/opencode.ts"),
     pattern: /(const USER_AGENT = "opencode\/)(\d+\.\d+\.\d+)(")/,
+  },
+  {
+    label: "opencode provider test",
+    path: resolve(REPO_ROOT, "packages/providers/upstreams/opencode.test.ts"),
+    pattern: /(toBe\("opencode\/)(\d+\.\d+\.\d+)(")/,
   },
   {
     label: "codex provider",
@@ -207,7 +212,7 @@ async function main() {
   const { freeModelIds, endpointByModelId } = await fetchOpencodeFreeModelIds();
   const modelMap = buildModelMap(freeModelIds);
   const providerConfigByModel = buildProviderConfigByModel(modelMap, endpointByModelId);
-  const result = syncProviderModels(modelsDir, "opencode", modelMap, {
+  const result = sync(modelsDir, "opencode", modelMap, {
     providerConfigByModel,
     managedProviderConfigKeys: ["responses_api", "messages_api"],
   });

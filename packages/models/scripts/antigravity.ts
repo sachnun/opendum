@@ -22,7 +22,7 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildModelIndex, persistModel, syncProviderModels } from "#models/registry.ts";
+import { buildIndex, persist, sync } from "#models/model-store.ts";
 import { runFetchText } from "#models/sync/http.ts";
 import { syncCliVersion } from "./version-sync.ts";
 
@@ -239,7 +239,7 @@ function buildAntigravityTierConfig(modelMap, documentedModelKeys, widgetEntries
 // This keeps JSON the source of truth: edit providerConfig to a file
 // to retain an antigravity binding across refresh runs.
 function mergePreservedExtras(modelMap) {
-  const index = buildModelIndex(modelsDir);
+  const index = buildIndex(modelsDir);
   const extras = [];
 
   for (const [, entry] of Object.entries(index)) {
@@ -290,7 +290,7 @@ function isGeminiImageModel(modelKey) {
 }
 
 function enrichModelMetadata(result, documentedModelKeys, aliasesByKey) {
-  const index = buildModelIndex(modelsDir);
+  const index = buildIndex(modelsDir);
   const changedKeys = new Set([...result.added, ...result.updated]);
 
   for (const modelKey of changedKeys) {
@@ -306,7 +306,7 @@ function enrichModelMetadata(result, documentedModelKeys, aliasesByKey) {
 
     const nextMeta = inferMetadata(modelKey);
     if (!nextMeta) {
-      if (changed) persistModel(entry, data);
+      if (changed) persist(entry, data);
       continue;
     }
 
@@ -333,7 +333,7 @@ function enrichModelMetadata(result, documentedModelKeys, aliasesByKey) {
     }
 
     if (changed) {
-      persistModel(entry, data);
+      persist(entry, data);
     }
   }
 }
@@ -367,7 +367,7 @@ function syncJson(modelMap, dryRun, tierConfig) {
   if (dryRun) {
     console.log("[antigravity] Dry run - no JSON files modified.");
 
-    const index = buildModelIndex(modelsDir);
+    const index = buildIndex(modelsDir);
     const wouldRemove = [];
     const wouldKeep = [];
 
@@ -430,7 +430,7 @@ function syncJson(modelMap, dryRun, tierConfig) {
     return { added: wouldAdd, removed: wouldRemove, updated: wouldUpdate };
   }
 
-  return syncProviderModels(modelsDir, PROVIDER_NAME, modelMap, {
+  return sync(modelsDir, PROVIDER_NAME, modelMap, {
     providerConfigByModel: tierConfig,
     managedProviderConfigKeys: ["allowedTiers"],
   });

@@ -1,5 +1,5 @@
-import { Cause, Effect, Exit, Stream } from "effect";
-import { numberAsInt, stringValue } from "./helpers.js";
+import { Cause, Effect, Exit, Result, Stream } from "effect";
+import { numberAsInt, parseJson, stringValue } from "./helpers.js";
 import { SseScanner } from "./sse.js";
 import { transformOpenAIToAnthropic } from "./endpoints.js";
 import { OpenAIStreamUsageTracker, usageCacheCounts, usageFromJson, usageObject } from "./usage.js";
@@ -45,9 +45,9 @@ export async function passthroughStream(ctx: ResponseContext, recorder: StreamRe
     ctx.usage.cacheWriteTokens = tracker.cacheWriteTokens;
     if (completion === "success") {
       if (ctx.provider === "hyper" && (tracker.hypercreditsRemaining !== null || tracker.hypercreditsCost > 0)) {
-        recorder.storeHypercreditsUsage(ctx.accountId, tracker.hypercreditsRemaining, tracker.hypercreditsCost);
+        recorder.storeCredits(ctx.accountId, tracker.hypercreditsRemaining, tracker.hypercreditsCost);
       }
-      recorder.recordSuccessfulRequest({
+      recorder.recordSuccess({
         accountId: ctx.accountId,
         provider: ctx.provider,
         model: ctx.model,
@@ -90,12 +90,8 @@ export async function passthroughStream(ctx: ResponseContext, recorder: StreamRe
 
 export async function passthroughNonStream(ctx: ResponseContext, recorder: StreamRecorder): Promise<Response> {
   const bodyText = await ctx.response.text();
-  let parsed: Json = {};
-  try {
-    parsed = JSON.parse(bodyText) as Json;
-  } catch {
-    parsed = {};
-  }
+  const parsedBody = parseJson(bodyText);
+  const parsed = (Result.isSuccess(parsedBody) ? parsedBody.success : {}) as Json;
   const counts = usageFromJson(parsed);
   ctx.usage.inputTokens = counts.inputTokens;
   ctx.usage.outputTokens = counts.outputTokens;
@@ -115,10 +111,10 @@ export async function passthroughNonStream(ctx: ResponseContext, recorder: Strea
         const value = Number((u.cost as Json).hypercredits);
         if (Number.isFinite(value)) cost = value;
       }
-      if (remaining !== null || cost > 0) recorder.storeHypercreditsUsage(ctx.accountId, remaining, cost);
+      if (remaining !== null || cost > 0) recorder.storeCredits(ctx.accountId, remaining, cost);
     }
   }
-  recorder.recordSuccessfulRequest({
+  recorder.recordSuccess({
     accountId: ctx.accountId,
     provider: ctx.provider,
     model: ctx.model,
@@ -144,19 +140,15 @@ export async function passthroughNonStream(ctx: ResponseContext, recorder: Strea
 
 export async function anthropicNonStream(ctx: ResponseContext, recorder: StreamRecorder): Promise<Response> {
   const bodyText = await ctx.response.text();
-  let openAi: Json = {};
-  try {
-    openAi = JSON.parse(bodyText) as Json;
-  } catch {
-    openAi = {};
-  }
+  const parsedBody = parseJson(bodyText);
+  const openAi = (Result.isSuccess(parsedBody) ? parsedBody.success : {}) as Json;
   const response = transformOpenAIToAnthropic(openAi, ctx.model);
   const counts = usageFromJson(openAi);
   ctx.usage.inputTokens = counts.inputTokens;
   ctx.usage.outputTokens = counts.outputTokens;
   ctx.usage.cachedTokens = counts.cachedTokens;
   ctx.usage.cacheWriteTokens = counts.cacheWriteTokens;
-  recorder.recordSuccessfulRequest({
+  recorder.recordSuccess({
     accountId: ctx.accountId,
     provider: ctx.provider,
     model: ctx.model,
@@ -205,12 +197,9 @@ class AnthropicStreamTracker {
   }
 
   private processEvent(data: string): void {
-    let parsed: Json;
-    try {
-      parsed = JSON.parse(data) as Json;
-    } catch {
-      return;
-    }
+    const parsedData = parseJson(data);
+    if (Result.isFailure(parsedData)) return;
+    const parsed = parsedData.success as Json;
     const usage = usageObject(parsed);
     if (usage) {
       let input = numberAsInt(usage.prompt_tokens);
@@ -480,7 +469,7 @@ export async function anthropicStream(ctx: ResponseContext, recorder: StreamReco
     ctx.usage.cacheWriteTokens = tracker.cacheWriteTokens;
     if (completion === "success") {
       tracker.finish();
-      recorder.recordSuccessfulRequest({
+      recorder.recordSuccess({
         accountId: ctx.accountId,
         provider: ctx.provider,
         model: ctx.model,

@@ -2,7 +2,9 @@ import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
 import { jsonResponse, numberFromAny, parseSseDataLines, stringValue } from "../core/helpers.js";
 import { normalizeProviderFailure, transportFailure, type UpstreamTransport } from "../core/http.js";
-import { ProviderCredentialFailure, asError } from "../core/errors.js";
+import { ProviderCredentialFailure } from "../core/errors.js";
+import { OAuth } from "../core/oauth.js";
+import { Collector } from "../transform/collector.js";
 import type {
   CredentialRefresher,
   Provider,
@@ -52,34 +54,28 @@ export class WorkbuddyProvider implements Provider, CredentialRefresher {
   readonly name = "workbuddy";
   private readonly registry: Registry;
   private readonly transport: UpstreamTransport;
+  private readonly exchange: OAuth;
 
   constructor(options: WorkbuddyOptions) {
     this.registry = options.registry;
     this.transport = options.transport;
-  }
-
-  refreshCredentials(
-    refreshToken: string,
-    _account: ProviderAccount
-  ): Effect.Effect<RefreshedCredentials, ProviderCredentialFailure> {
-    return Effect.tryPromise({
-      try: async () => {
-        const resp = await this.transport.direct(`${WORKBUDDY_API_BASE}${WORKBUDDY_REFRESH_PATH}`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-            "X-Domain": WORKBUDDY_DOMAIN,
-            "X-Refresh-Token": refreshToken.trim(),
-            "X-Auth-Refresh-Source": WORKBUDDY_REFRESH_SOURCE,
-          },
-          body: "{}",
-        });
-        const text = await resp.text();
-        if (resp.status < 200 || resp.status >= 300) {
-          throw new Error(`workbuddy token refresh failed: ${resp.status} ${text.slice(0, 1024)}`);
-        }
-        const parsed = JSON.parse(text) as {
+    this.exchange = new OAuth({
+      provider: "workbuddy",
+      tokenUrl: `${WORKBUDDY_API_BASE}${WORKBUDDY_REFRESH_PATH}`,
+      transport: options.transport,
+      request: (refreshToken) => ({
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          "X-Domain": WORKBUDDY_DOMAIN,
+          "X-Refresh-Token": refreshToken.trim(),
+          "X-Auth-Refresh-Source": WORKBUDDY_REFRESH_SOURCE,
+        },
+        body: "{}",
+      }),
+      parse: (payload, refreshToken) => {
+        const parsed = payload as {
           code?: number;
           data?: { accessToken?: string; refreshToken?: string; expiresIn?: number; expiresAt?: number };
         };
@@ -87,20 +83,20 @@ export class WorkbuddyProvider implements Provider, CredentialRefresher {
         if (parsed.code !== 0 || !accessToken) {
           throw new Error("workbuddy token refresh returned empty token");
         }
-        const nextRefresh = (parsed.data?.refreshToken ?? "").trim() || refreshToken.trim();
         return {
           accessToken,
-          refreshToken: nextRefresh,
+          refreshToken: (parsed.data?.refreshToken ?? "").trim() || refreshToken.trim(),
           expiresAt: workbuddyExpiry(parsed.data?.expiresAt ?? 0, parsed.data?.expiresIn ?? 0),
         };
       },
-      catch: (cause) =>
-        new ProviderCredentialFailure({
-          message: asError(cause).message,
-          provider: "workbuddy",
-          cause,
-        }),
     });
+  }
+
+  refreshCredentials(
+    refreshToken: string,
+    account: ProviderAccount
+  ): Effect.Effect<RefreshedCredentials, ProviderCredentialFailure> {
+    return this.exchange.exchange(refreshToken, account);
   }
 
   makeRequest(request: ProviderRequest): Effect.Effect<Response, ProviderFailure> {
@@ -118,7 +114,7 @@ export class WorkbuddyProvider implements Provider, CredentialRefresher {
     let model = stringValue(request.body.model);
     if (model.startsWith("workbuddy/")) model = model.slice("workbuddy/".length);
     let modelName = lastModelSegment(model);
-    modelName = this.registry.upstreamModelName(modelName, "workbuddy") || model;
+    modelName = this.registry.upstream(modelName, "workbuddy") || model;
     const messages = Array.isArray(request.body.messages) ? request.body.messages : [];
     payload.messages = ensureSystemMessage(messages);
     let maxTokens = numberFromAny(request.body.max_tokens);
@@ -189,71 +185,36 @@ function workbuddyDeltaText(value: unknown): string {
 }
 
 export function workbuddyStreamToCompletion(text: string, model: string): Json {
-  const events = parseSseDataLines(text);
-  let content = "";
-  const toolCalls = new Map<number, { id: string; type: string; name: string; args: string }>();
-  const toolOrder: number[] = [];
-  let finishReason = "stop";
-  let usage: Json = {};
-
-  for (const event of events) {
+  const collector = new Collector({ model, id: "chatcmpl-workbuddy" });
+  for (const event of parseSseDataLines(text)) {
     const nextUsage = event.usage;
     if (nextUsage !== null && typeof nextUsage === "object" && Object.keys(nextUsage as Json).length > 0) {
-      usage = nextUsage as Json;
+      collector.setUsage(nextUsage as Json);
     }
     const choices = Array.isArray(event.choices) ? event.choices : [];
     if (choices.length === 0) continue;
     const choice = (choices[0] ?? {}) as Json;
-    if (!choice) continue;
-    const reason = stringValue(choice.finish_reason);
-    if (reason) finishReason = reason;
+    collector.setFinish(stringValue(choice.finish_reason));
     const delta = choice.delta;
     if (delta === null || typeof delta !== "object") continue;
     const d = delta as Json;
-    content += workbuddyDeltaText(d.content);
-    if (typeof d.reasoning_content === "string") content += d.reasoning_content;
+    collector.addContent(workbuddyDeltaText(d.content));
+    if (typeof d.reasoning_content === "string") collector.addContent(d.reasoning_content);
     const fragments = Array.isArray(d.tool_calls) ? d.tool_calls : [];
     for (const raw of fragments) {
       const fragment = (raw ?? {}) as Json;
-      const index = numberFromAny(fragment.index);
-      let acc = toolCalls.get(index);
-      if (!acc) {
-        acc = { id: "", type: "", name: "", args: "" };
-        toolCalls.set(index, acc);
-        toolOrder.push(index);
-      }
-      const id = stringValue(fragment.id);
-      if (id) acc.id = id;
-      const type = stringValue(fragment.type);
-      if (type) acc.type = type;
       const fn = fragment.function;
-      if (fn !== null && typeof fn === "object" && !Array.isArray(fn)) {
-        const f = fn as Json;
-        const name = stringValue(f.name);
-        if (name) acc.name += name;
-        if (typeof f.arguments === "string") acc.args += f.arguments;
-      }
+      const hasFunction = fn !== null && typeof fn === "object" && !Array.isArray(fn);
+      const args = hasFunction ? (fn as Json).arguments : undefined;
+      collector.addToolCall({
+        key: numberFromAny(fragment.index),
+        id: stringValue(fragment.id),
+        type: stringValue(fragment.type),
+        name: hasFunction ? stringValue((fn as Json).name) : "",
+        nameMode: "append",
+        arguments: typeof args === "string" ? args : "",
+      });
     }
   }
-
-  const message: Json = { role: "assistant", content };
-  if (toolOrder.length > 0) {
-    message.tool_calls = toolOrder.map((index) => {
-      const acc = toolCalls.get(index) as { id: string; type: string; name: string; args: string };
-      return {
-        id: acc.id || `call_${index}`,
-        type: acc.type || "function",
-        function: { name: acc.name, arguments: acc.args },
-      };
-    });
-    if (finishReason === "stop") finishReason = "tool_calls";
-  }
-  return {
-    id: "chatcmpl-workbuddy",
-    object: "chat.completion",
-    created: Math.floor(Date.now() / 1000),
-    model,
-    choices: [{ index: 0, message, finish_reason: finishReason }],
-    usage,
-  };
+  return collector.toCompletion();
 }

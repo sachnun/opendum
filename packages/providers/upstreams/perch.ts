@@ -10,7 +10,9 @@ import {
   stringValue,
 } from "../core/helpers.js";
 import { normalizeProviderFailure, transportFailure, type UpstreamTransport } from "../core/http.js";
-import { ProviderCredentialFailure, asError } from "../core/errors.js";
+import { ProviderCredentialFailure } from "../core/errors.js";
+import { OAuth } from "../core/oauth.js";
+import { Collector } from "../transform/collector.js";
 import type {
   CredentialRefresher,
   Provider,
@@ -270,12 +272,12 @@ function perchEffortFromBody(body: Json): { level: string; reasoningEnabled: boo
 function perchModelAlias(registry: Registry, model: string): string {
   let value = model.trim();
   if (value.startsWith("perch/")) value = value.slice("perch/".length);
-  value = registry.upstreamModelName(value, "perch");
+  value = registry.upstream(value, "perch");
   return value || PERCH_FALLBACK_ALIAS;
 }
 
 function perchSupportedModels(registry: Registry): string {
-  return registry.modelsForProvider("perch").sort((a, b) => a.localeCompare(b)).join(", ");
+  return registry.models("perch").sort((a, b) => a.localeCompare(b)).join(", ");
 }
 
 function firstNonNil(...values: unknown[]): unknown {
@@ -329,37 +331,28 @@ export class PerchProvider implements Provider, CredentialRefresher, RefreshBuff
   readonly name = "perch";
   private readonly registry: Registry;
   private readonly transport: UpstreamTransport;
+  private readonly exchange: OAuth;
 
   constructor(options: PerchOptions) {
     this.registry = options.registry;
     this.transport = options.transport;
-  }
-
-  refreshBuffer(): number {
-    return PERCH_REFRESH_BUFFER_MS;
-  }
-
-  refreshCredentials(
-    refreshToken: string,
-    _account: ProviderAccount
-  ): Effect.Effect<RefreshedCredentials, ProviderCredentialFailure> {
-    const transport = this.transport;
-    return Effect.tryPromise({
-      try: async () => {
-        const config = await fetchPerchAuthConfig(transport);
-        const resp = await transport.direct(
-          `${config.supabaseUrl}/auth/v1/token?grant_type=refresh_token`,
-          {
-            method: "POST",
-            headers: { ...perchTokenHeaders(config), Accept: "application/json" },
-            body: JSON.stringify({ refresh_token: refreshToken.trim() }),
-          }
-        );
-        const text = await resp.text();
-        if (resp.status < 200 || resp.status >= 300) {
-          throw new Error(`perch token refresh failed: ${resp.status} ${text.slice(0, 1024)}`);
-        }
-        const token = JSON.parse(text) as {
+    this.exchange = new OAuth({
+      provider: "perch",
+      tokenUrl: async () => {
+        const config = await fetchPerchAuthConfig(this.transport);
+        return `${config.supabaseUrl}/auth/v1/token?grant_type=refresh_token`;
+      },
+      transport: options.transport,
+      request: async (refreshToken) => {
+        const config = await fetchPerchAuthConfig(this.transport);
+        return {
+          method: "POST",
+          headers: { ...perchTokenHeaders(config), Accept: "application/json" },
+          body: JSON.stringify({ refresh_token: refreshToken.trim() }),
+        };
+      },
+      parse: (payload, refreshToken) => {
+        const token = payload as {
           access_token?: string;
           refresh_token?: string;
           expires_at?: number;
@@ -373,13 +366,18 @@ export class PerchProvider implements Provider, CredentialRefresher, RefreshBuff
         const nextRefresh = (token.refresh_token ?? "").trim() || refreshToken.trim();
         return { accessToken, refreshToken: nextRefresh, expiresAt };
       },
-      catch: (cause) =>
-        new ProviderCredentialFailure({
-          message: asError(cause).message,
-          provider: "perch",
-          cause,
-        }),
     });
+  }
+
+  refreshBuffer(): number {
+    return PERCH_REFRESH_BUFFER_MS;
+  }
+
+  refreshCredentials(
+    refreshToken: string,
+    account: ProviderAccount
+  ): Effect.Effect<RefreshedCredentials, ProviderCredentialFailure> {
+    return this.exchange.exchange(refreshToken, account);
   }
 
   makeRequest(request: ProviderRequest): Effect.Effect<Response, ProviderFailure> {
@@ -712,19 +710,19 @@ function perchSseToChatStream(
   });
 }
 
-async function perchSseToChatCompletion(
+export async function perchSseToChatCompletion(
   resp: Response,
   model: string,
   includeReasoning: boolean
 ): Promise<Json> {
   const text = await resp.text();
-  let content = "";
-  let reasoning = "";
-  const toolCalls: unknown[] = [];
-  let finishReason = "stop";
-  let usage: Json | null = null;
-  const orderedTools: Array<{ id: string; name: string; args: string }> = [];
-  const byId = new Map<string, { id: string; name: string; args: string }>();
+  const collector = new Collector({
+    model,
+    includeReasoning,
+    nullContent: true,
+    normalizeArgs: (args) => args.trim() || "{}",
+    usageFallback: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+  });
 
   for (const line of text.split("\n")) {
     const trimmed = line.trim();
@@ -739,10 +737,10 @@ async function perchSseToChatCompletion(
     }
     switch (stringValue(event.type)) {
       case "reasoning_delta":
-        if (includeReasoning) reasoning += stringValue(event.text);
+        collector.addReasoning(stringValue(event.text));
         break;
       case "answer_delta":
-        content += stringValue(event.text);
+        collector.addContent(stringValue(event.text));
         break;
       case "tool_call_delta":
       case "tool_use_end": {
@@ -751,20 +749,17 @@ async function perchSseToChatCompletion(
           const call = (rawCall ?? {}) as Json;
           const id = stringValue(call.id);
           if (!id) continue;
-          let tool = byId.get(id);
-          if (!tool) {
-            tool = { id, name: stringValue(call.name), args: "" };
-            byId.set(id, tool);
-            orderedTools.push(tool);
-          } else if (stringValue(call.name) && !tool.name) {
-            tool.name = stringValue(call.name);
-          }
+          const name = stringValue(call.name);
           if (sealed) {
-            const args = perchToolSealedArguments(call);
-            if (args) tool.args = args;
+            collector.addToolCall({
+              key: id,
+              id,
+              name,
+              arguments: perchToolSealedArguments(call),
+              replaceArgs: true,
+            });
           } else {
-            const delta = stringValue(call.rawArgumentsText);
-            if (delta) tool.args += delta;
+            collector.addToolCall({ key: id, id, name, arguments: stringValue(call.rawArgumentsText) });
           }
         }
         break;
@@ -775,7 +770,8 @@ async function perchSseToChatCompletion(
         if (message || (hasOk && event.ok !== true)) {
           throw new PerchUpstreamError(message || "Perch request failed", perchQuotaError(message));
         }
-        usage = perchUsageToChatUsage(event.usage);
+        const usage = perchUsageToChatUsage(event.usage);
+        if (usage) collector.setUsage(usage);
         break;
       }
       default:
@@ -783,30 +779,7 @@ async function perchSseToChatCompletion(
     }
   }
 
-  for (const tool of orderedTools) {
-    toolCalls.push({
-      id: tool.id,
-      type: "function",
-      function: { name: tool.name, arguments: tool.args.trim() || "{}" },
-    });
-  }
-
-  const message: Json = { role: "assistant", content: null };
-  if (content) message.content = content;
-  if (includeReasoning && reasoning) message.reasoning_content = reasoning;
-  if (toolCalls.length > 0) {
-    message.tool_calls = toolCalls;
-    finishReason = "tool_calls";
-  }
-  if (!usage) usage = { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
-  return {
-    id: randomId("chatcmpl"),
-    object: "chat.completion",
-    created: Math.floor(Date.now() / 1000),
-    model,
-    choices: [{ index: 0, message, finish_reason: finishReason }],
-    usage,
-  };
+  return collector.toCompletion();
 }
 
 export function defaultPerchValue(value: unknown, fallback: string): string {

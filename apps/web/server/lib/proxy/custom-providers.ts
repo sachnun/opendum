@@ -62,9 +62,9 @@ export async function listCustomProviderModels(userId: string, options: { includ
 
   return providers.flatMap((provider) => {
     const accountIds = accountIdsBySlug.get(provider.slug) ?? [];
-    const modelsForProvider = aliasedByProviderId.get(provider.id) ?? [];
+    const models = aliasedByProviderId.get(provider.id) ?? [];
     const standaloneModels = standaloneByProviderId.get(provider.id) ?? [];
-    if (accountIds.length === 0 || (modelsForProvider.length === 0 && standaloneModels.length === 0)) return [];
-    return [{ slug: provider.slug, name: provider.name, models: modelsForProvider, standaloneModels, accountIds }];
+    if (accountIds.length === 0 || (models.length === 0 && standaloneModels.length === 0)) return [];
+    return [{ slug: provider.slug, name: provider.name, models: models, standaloneModels, accountIds }];
   });
 }

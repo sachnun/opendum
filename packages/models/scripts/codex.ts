@@ -2,7 +2,7 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildModelIndex, persistModel, syncProviderModels } from "#models/registry.ts";
+import { buildIndex, persist, sync } from "#models/model-store.ts";
 import { fetchDecoded, runFetchText, runOrThrow } from "#models/sync/http.ts";
 
 const CODEX_MODELS_URL =
@@ -137,11 +137,11 @@ function buildMetadataLookup(models) {
 }
 
 /**
- * After syncProviderModels creates bare-bones JSON files for new models,
+ * After sync creates bare-bones JSON files for new models,
  * enrich them with metadata from models.json.
  */
 function enrichNewModels(modelsDir, addedKeys, metadataLookup) {
-  const index = buildModelIndex(modelsDir);
+  const index = buildIndex(modelsDir);
 
   for (const modelKey of addedKeys) {
     const entry = Object.values(index).find((item) => item.fileId === modelKey || item.id === modelKey);
@@ -159,7 +159,7 @@ function enrichNewModels(modelsDir, addedKeys, metadataLookup) {
       data.reasoning = true;
     }
 
-    persistModel(entry, data);
+    persist(entry, data);
   }
 }
 
@@ -184,7 +184,7 @@ async function main() {
   if (providerConfigByModel.size > 0) {
     console.log(`[codex] Paid-plan models (gated by allowedTiers): ${[...providerConfigByModel.keys()].join(", ")}`);
   }
-  const result = syncProviderModels(modelsDir, "codex", modelMap, {
+  const result = sync(modelsDir, "codex", modelMap, {
     providerConfigByModel,
     managedProviderConfigKeys: ["allowedTiers"],
   });

@@ -1,13 +1,18 @@
 import { describe, expect, it, setSystemTime } from "bun:test";
+import { Effect } from "effect";
 import {
+  Quotas,
   clampFraction,
   displayNumber,
   formatFloat,
   formatTimeUntilReset,
+  isQuota,
   parseQuotaNumber,
   parseResetIso,
   quotaFallbackTier,
+  withoutToken,
 } from "./index.js";
+import type { AccountQuotaInfo, QuotaContext, QuotaFetcher } from "./index.js";
 
 describe("quota helpers", () => {
   it("clamps fractions", () => {
@@ -47,5 +52,114 @@ describe("quota helpers", () => {
   it("falls back to free tier", () => {
     expect(quotaFallbackTier({ id: "1", userId: "u", provider: "kiro", tier: "pro" })).toBe("pro");
     expect(quotaFallbackTier({ id: "1", userId: "u", provider: "kiro", tier: null })).toBe("free");
+  });
+});
+
+function context(overrides: Partial<QuotaContext> = {}): QuotaContext {
+  return {
+    fetch: async () => new Response("{}"),
+    journal: null,
+    decrypt: (value) => value,
+    getCredentials: async () => "token",
+    ...overrides,
+  };
+}
+
+function account(provider: string): { id: string; userId: string; provider: string } {
+  return { id: "account-1", userId: "user-1", provider };
+}
+
+function okResult(): AccountQuotaInfo {
+  return { status: "ok", error: "", groups: [] };
+}
+
+describe("quota registry", () => {
+  it("knows which providers have quota fetchers", () => {
+    expect(isQuota("kiro")).toBe(true);
+    expect(isQuota("openrouter")).toBe(true);
+    expect(isQuota("unknown-provider")).toBe(false);
+  });
+
+  it("reports providers that need no access token", () => {
+    const providers = withoutToken();
+    expect(providers.has("openrouter")).toBe(true);
+    expect(providers.has("zenmux")).toBe(true);
+    expect(providers.has("hyper")).toBe(true);
+    expect(providers.has("kiro")).toBe(false);
+  });
+
+  it("exposes lookup helpers on custom registries", () => {
+    const fetcher: QuotaFetcher = { provider: "custom", withoutToken: true, fetch: () => Effect.succeed(okResult()) };
+    const registry = new Quotas([fetcher]);
+    expect(registry.isSupported("custom")).toBe(true);
+    expect(registry.isSupported("kiro")).toBe(false);
+    expect([...registry.withoutToken()]).toEqual(["custom"]);
+  });
+
+  it("returns an error result for unsupported providers", async () => {
+    const registry = new Quotas([]);
+    const result = await Effect.runPromise(registry.fetch(context(), account("missing"), false));
+    expect(result.status).toBe("error");
+    expect(result.groups).toEqual([]);
+  });
+
+  it("passes an empty token to token-less fetchers", async () => {
+    const seen: { token: string | null } = { token: null };
+    const fetcher: QuotaFetcher = {
+      provider: "tokenless",
+      withoutToken: true,
+      fetch: (_ctx, _account, accessToken) => {
+        seen.token = accessToken;
+        return Effect.succeed(okResult());
+      },
+    };
+    const registry = new Quotas([fetcher]);
+    const result = await Effect.runPromise(registry.fetch(context(), account("tokenless"), false));
+    expect(result.status).toBe("ok");
+    expect(seen.token).toBe("");
+  });
+
+  it("resolves credentials for token providers", async () => {
+    const seen: { token: string | null } = { token: null };
+    const fetcher: QuotaFetcher = {
+      provider: "tokened",
+      withoutToken: false,
+      fetch: (_ctx, _account, accessToken) => {
+        seen.token = accessToken;
+        return Effect.succeed(okResult());
+      },
+    };
+    const registry = new Quotas([fetcher]);
+    const result = await Effect.runPromise(
+      registry.fetch(context({ getCredentials: async () => "secret" }), account("tokened"), false)
+    );
+    expect(result.status).toBe("ok");
+    expect(seen.token).toBe("secret");
+  });
+
+  it("reports expired credentials as an expired quota status", async () => {
+    let fetched = false;
+    const fetcher: QuotaFetcher = {
+      provider: "tokened",
+      withoutToken: false,
+      fetch: () => {
+        fetched = true;
+        return Effect.succeed(okResult());
+      },
+    };
+    const registry = new Quotas([fetcher]);
+    const result = await Effect.runPromise(
+      registry.fetch(
+        context({
+          getCredentials: async () => {
+            throw new Error("token missing");
+          },
+        }),
+        account("tokened"),
+        false
+      )
+    );
+    expect(result.status).toBe("expired");
+    expect(fetched).toBe(false);
   });
 });

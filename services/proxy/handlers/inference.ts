@@ -2,7 +2,7 @@ import { Effect, Schema } from "effect";
 import { type H3Event } from "h3";
 import type { ProxyContext } from "../core/context.js";
 import { extractSessionId } from "../core/service.js";
-import type { EndpointAdapter } from "../core/types.js";
+import type { Adapter } from "../core/endpoints.js";
 import { jsonResponse } from "./errors.js";
 
 const BodySchema = Schema.Record(Schema.String, Schema.Unknown);
@@ -29,7 +29,7 @@ const invalidBodyResponse = (): Response =>
 export async function handleInference(
   event: H3Event,
   context: ProxyContext,
-  endpoint: EndpointAdapter
+  endpoint: Adapter
 ): Promise<Response> {
   const program = Effect.gen(function* () {
     const raw = yield* Effect.tryPromise({

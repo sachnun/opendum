@@ -6,6 +6,7 @@
   "exports": {
     ".": "./index.ts",
     "./config": "./config.ts",
+    "./best-effort": "./best-effort.ts",
     "./crypto": "./crypto/index.ts",
     "./cryptojs": "./crypto/cryptojs.ts",
     "./signature": "./crypto/signature.ts",

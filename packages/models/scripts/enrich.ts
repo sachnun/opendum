@@ -18,7 +18,7 @@ import { existsSync, mkdirSync, renameSync, rmSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import { inferModelFolder } from "#models/model/families.ts";
-import { buildModelIndex, persistModel, renameModelFiles, resolveGeneratedDir } from "#models/registry.ts";
+import { buildIndex, persist, renameFiles, generatedDir } from "#models/model-store.ts";
 import { applyCanonicalMerge, planCanonicalization } from "#models/model/canonicalize.ts";
 import { modelProbes } from "#models/model/probes.ts";
 import type { ModelData } from "#models/types.ts";
@@ -157,7 +157,7 @@ function canonicalizeIds(
   stats: Stats,
   dryRun: boolean,
 ): void {
-  const index = buildModelIndex(modelsDir);
+  const index = buildIndex(modelsDir);
   const models = Object.values(index).map((entry) => ({
     id: entry.id,
     relativeId: entry.relativeId,
@@ -191,7 +191,7 @@ function canonicalizeIds(
     applyCanonicalMerge(target.data as ModelData, action);
     stats.canonicalized.push({ from: action.from, to: action.to, tier: `merge:${action.tier}` });
     if (dryRun) continue;
-    persistModel({ modelsDir, relativeId: target.relativeId }, target.data as ModelData);
+    persist({ modelsDir, relativeId: target.relativeId }, target.data as ModelData);
     rmSync(action.path, { force: true });
   }
 
@@ -203,17 +203,17 @@ function canonicalizeIds(
   }
 
   if (dryRun) return;
-  const generatedDir = resolveGeneratedDir(modelsDir);
+  const dir = generatedDir(modelsDir);
   for (const target of targets.values()) {
-    persistModel({ modelsDir, relativeId: target.relativeId }, target.data);
+    persist({ modelsDir, relativeId: target.relativeId }, target.data);
   }
   for (const [nextFileId, target] of targets) {
-    renameModelFiles({ modelsDir, generatedDir, relativeId: target.relativeId }, nextFileId);
+    renameFiles({ modelsDir, generatedDir: dir, relativeId: target.relativeId }, nextFileId);
   }
 }
 
 function relocateRootFiles(dryRun: boolean): string[] {
-  const index = buildModelIndex(modelsDir);
+  const index = buildIndex(modelsDir);
   const moved: string[] = [];
   for (const [fileId, entry] of Object.entries(index)) {
     if (dirname(entry.path) !== modelsDir) continue;
@@ -259,7 +259,7 @@ async function main(): Promise<void> {
 
   canonicalizeIds(catalogs.canonical, stats, dryRun);
 
-  const index = buildModelIndex(modelsDir);
+  const index = buildIndex(modelsDir);
 
   for (const [fileId, entry] of Object.entries(index)) {
     const data = entry.data as ModelData;
@@ -302,7 +302,7 @@ async function main(): Promise<void> {
 
     if (applyMetadata(data, patch)) {
       updated.push(id);
-      if (!dryRun) persistModel(entry, data);
+      if (!dryRun) persist(entry, data);
       if (verbose) {
         console.log(`[metadata] ${id} reasoning=${patch.reasoning} limit=${JSON.stringify(patch.limits)}`);
       }

@@ -1,4 +1,7 @@
+import { Effect } from "effect";
 import type { OpendumRedis } from "@opendum/core/redis";
+import { tryAsync } from "./helpers.js";
+import { ignore } from "./service-helpers.js";
 
 const ERROR_HISTORY_KEY_PREFIX = "opendum:provider-account:error-history";
 const ERROR_HISTORY_ENTRY_PREFIX = "opendum:provider-account:error-history-entry";
@@ -52,13 +55,8 @@ export async function upsertErrorHistory(
 ): Promise<void> {
   if (!redis) return;
   const dedupeKey = errorHistoryDedupeKey(accountId, model, statusCode, message);
-  let entryId: string | null = null;
-  try {
-    entryId = await redis.get(dedupeKey);
-  } catch {
-    entryId = null;
-  }
-  if (!entryId) entryId = crypto.randomUUID();
+  const cachedEntryId = await tryAsync(() => redis.get(dedupeKey), null);
+  const entryId = cachedEntryId ? cachedEntryId : crypto.randomUUID();
   const entry: Entry = {
     id: entryId,
     providerAccountId: accountId,
@@ -70,15 +68,15 @@ export async function upsertErrorHistory(
     dedupeKey,
   };
   const ttl = errorHistoryTtl(statusCode);
-  try {
-    await redis.set(errorHistoryEntryKey(entryId), JSON.stringify(entry), { EX: ttl });
-    await redis.set(dedupeKey, entryId, { EX: ttl });
-    await redis.zAdd(errorHistoryKey(accountId), {
-      score: createdAt.getTime(),
-      value: entryId,
-    });
-    await redis.expire(errorHistoryKey(accountId), ERROR_HISTORY_DEFAULT_TTL_SECONDS);
-  } catch {
-    return;
-  }
+  await Effect.runPromise(
+    ignore(async () => {
+      await redis.set(errorHistoryEntryKey(entryId), JSON.stringify(entry), { EX: ttl });
+      await redis.set(dedupeKey, entryId, { EX: ttl });
+      await redis.zAdd(errorHistoryKey(accountId), {
+        score: createdAt.getTime(),
+        value: entryId,
+      });
+      await redis.expire(errorHistoryKey(accountId), ERROR_HISTORY_DEFAULT_TTL_SECONDS);
+    })
+  );
 }

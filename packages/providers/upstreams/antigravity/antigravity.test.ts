@@ -42,8 +42,8 @@ function stubTransport(body: string, onBody?: (value: string) => void) {
 
 function antigravityProvider(transport: unknown): AntigravityProvider {
   const registry = {
-    providerModelConfig: () => null,
-    upstreamModelName: (model: string) => model,
+    config: () => null,
+    upstream: (model: string) => model,
   };
   return new AntigravityProvider({
     registry: registry as unknown as Registry,

@@ -1,10 +1,10 @@
 import { and, eq, inArray, isNotNull, lte, sql } from "drizzle-orm";
-import { db, type Database } from "../client.js";
+import { db, type DbExecutor } from "../client.js";
 import { providerAccount, providerAccountModelHealth } from "../schema/accounts.js";
 
 export async function bumpAccountRequestCount(
   params: { id: string; at: Date },
-  database: Database = db
+  database: DbExecutor = db
 ) {
   await database
     .update(providerAccount)
@@ -12,7 +12,7 @@ export async function bumpAccountRequestCount(
     .where(eq(providerAccount.id, params.id));
 }
 
-export async function getAccountHealthState(id: string, database: Database = db) {
+export async function getAccountHealthState(id: string, database: DbExecutor = db) {
   const [row] = await database
     .select({
       id: providerAccount.id,
@@ -28,7 +28,7 @@ export async function getAccountHealthState(id: string, database: Database = db)
 
 export async function setAccountHealthFailed(
   params: { id: string; consecutiveErrors: number; status: string; at: Date },
-  database: Database = db
+  database: DbExecutor = db
 ) {
   await database
     .update(providerAccount)
@@ -48,7 +48,7 @@ export async function setAccountCooldown(
     consecutiveErrors: number;
     disabledUntil: Date;
   },
-  database: Database = db
+  database: DbExecutor = db
 ) {
   await database
     .update(providerAccount)
@@ -63,7 +63,7 @@ export async function setAccountCooldown(
 
 export async function setAccountActive(
   params: { id: string; status: string; at: Date; consecutiveErrors: number },
-  database: Database = db
+  database: DbExecutor = db
 ) {
   await database
     .update(providerAccount)
@@ -78,7 +78,7 @@ export async function setAccountActive(
 
 export async function setAccountUsageLimited(
   params: { id: string; disabledUntil: Date; status: string; at: Date },
-  database: Database = db
+  database: DbExecutor = db
 ) {
   await database
     .update(providerAccount)
@@ -88,7 +88,7 @@ export async function setAccountUsageLimited(
 
 export async function recordRequestError(
   params: { id: string; at: Date; code: number | null },
-  database: Database = db
+  database: DbExecutor = db
 ) {
   await database
     .update(providerAccount)
@@ -102,7 +102,7 @@ export async function recordRequestError(
 
 export async function markAccountSuccess(
   params: { id: string; at: Date },
-  database: Database = db
+  database: DbExecutor = db
 ) {
   await database
     .update(providerAccount)
@@ -112,7 +112,7 @@ export async function markAccountSuccess(
 
 export async function markAccountRecoveredByRotation(
   params: { id: string; at: Date; beforeOrAt: Date },
-  database: Database = db
+  database: DbExecutor = db
 ) {
   await database
     .update(providerAccount)
@@ -139,7 +139,7 @@ export const modelHealthColumns = {
 
 export async function listModelHealthByAccounts(
   params: { accountIds: string[]; models: string[] },
-  database: Database = db
+  database: DbExecutor = db
 ) {
   if (params.accountIds.length === 0 || params.models.length === 0) return [];
   return database
@@ -153,7 +153,7 @@ export async function listModelHealthByAccounts(
     );
 }
 
-export async function listModelHealthByAccount(accountId: string, database: Database = db) {
+export async function listModelHealthByAccount(accountId: string, database: DbExecutor = db) {
   return database
     .select(modelHealthColumns)
     .from(providerAccountModelHealth)
@@ -163,7 +163,7 @@ export async function listModelHealthByAccount(accountId: string, database: Data
 export async function getModelHealth(
   accountId: string,
   model: string,
-  database: Database = db
+  database: DbExecutor = db
 ) {
   const [row] = await database
     .select(modelHealthColumns)
@@ -180,7 +180,7 @@ export async function getModelHealth(
 
 export async function updateModelHealthCounters(
   params: { id: string; consecutiveErrors: number; unhealthyCountUpdatedAt: Date },
-  database: Database = db
+  database: DbExecutor = db
 ) {
   await database
     .update(providerAccountModelHealth)
@@ -199,7 +199,7 @@ export async function updateModelHealthStatus(
     status: string;
     statusChangedAt: Date;
   },
-  database: Database = db
+  database: DbExecutor = db
 ) {
   await database
     .update(providerAccountModelHealth)
@@ -225,14 +225,14 @@ export async function insertModelHealth(
     createdAt: Date;
     updatedAt: Date;
   },
-  database: Database = db
+  database: DbExecutor = db
 ) {
   await database.insert(providerAccountModelHealth).values(params);
 }
 
 export async function markUsageLimitedHealth(
   params: { providerAccountId: string; model: string; status: string; at: Date; consecutiveErrors: number },
-  database: Database = db
+  database: DbExecutor = db
 ) {
   await database
     .update(providerAccountModelHealth)
@@ -258,7 +258,7 @@ export async function updateModelHealthSuccess(
     lastSuccessAt: Date;
     unhealthyCountUpdatedAt: Date;
   },
-  database: Database = db
+  database: DbExecutor = db
 ) {
   await database
     .update(providerAccountModelHealth)
@@ -279,7 +279,7 @@ export async function updateModelHealthSuccessWithStatus(
     status: string;
     statusChangedAt: Date;
   },
-  database: Database = db
+  database: DbExecutor = db
 ) {
   await database
     .update(providerAccountModelHealth)
@@ -301,7 +301,7 @@ export async function updateModelHealthFailure(
     lastErrorCode: number | null;
     unhealthyCountUpdatedAt: Date;
   },
-  database: Database = db
+  database: DbExecutor = db
 ) {
   await database
     .update(providerAccountModelHealth)
@@ -324,7 +324,7 @@ export async function updateModelHealthFailureWithStatus(
     status: string;
     statusChangedAt: Date;
   },
-  database: Database = db
+  database: DbExecutor = db
 ) {
   await database
     .update(providerAccountModelHealth)
@@ -348,7 +348,7 @@ export async function lockModelQuota(
     quotaLockReason: string | null;
     at: Date;
   },
-  database: Database = db
+  database: DbExecutor = db
 ) {
   await database
     .insert(providerAccountModelHealth)
@@ -375,7 +375,7 @@ export async function lockModelQuota(
 
 export async function clearModelQuotaLock(
   params: { providerAccountId: string; model: string },
-  database: Database = db
+  database: DbExecutor = db
 ) {
   await database
     .update(providerAccountModelHealth)

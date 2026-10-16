@@ -3,6 +3,7 @@ import type { Registry } from "@opendum/models/runtime";
 import type { OpendumRedis } from "@opendum/core/redis";
 import {
   cloneAnyMap,
+  defaultStringValue,
   extractInstructions,
   filterKeys,
   jsonResponse,
@@ -13,15 +14,18 @@ import {
   stringValue,
   uniqueStrings,
 } from "../core/helpers.js";
+import { Collector } from "../transform/collector.js";
 import {
   convertToolsForResponses,
   messagesToResponsesInput,
   normalizeResponsesInput,
-  responsesJsonToChatCompletion,
+  responseUsageToChatUsage,
   responsesSseToChatStream,
+  toChatCallId,
 } from "../transform/responses.js";
 import { transportFailure, type UpstreamTransport } from "../core/http.js";
-import { ProviderCredentialFailure, asError } from "../core/errors.js";
+import { ProviderCredentialFailure } from "../core/errors.js";
+import { OAuth } from "../core/oauth.js";
 import type {
   CredentialRefresher,
   Provider,
@@ -201,43 +205,31 @@ export class CodexProvider implements Provider, CredentialRefresher, RefreshBuff
   private readonly transport: UpstreamTransport;
   private readonly redis: OpendumRedis | null;
   private readonly onAccountId: ((accountId: string) => void) | undefined;
+  private readonly exchange: OAuth;
 
   constructor(options: CodexOptions) {
     this.registry = options.registry;
     this.transport = options.transport;
     this.redis = options.redis ?? null;
     this.onAccountId = options.onAccountId;
-  }
-
-  refreshBuffer(): number {
-    return CODEX_REFRESH_BUFFER_MS;
-  }
-
-  refreshCredentials(
-    refreshToken: string,
-    _account: ProviderAccount
-  ): Effect.Effect<RefreshedCredentials, ProviderCredentialFailure> {
-    const transport = this.transport;
-    return Effect.tryPromise({
-      try: async () => {
-        const form = new URLSearchParams({
+    this.exchange = new OAuth({
+      provider: "codex",
+      tokenUrl: CODEX_TOKEN_ENDPOINT,
+      transport: options.transport,
+      request: (refreshToken) => ({
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Accept: "application/json",
+        },
+        body: new URLSearchParams({
           grant_type: "refresh_token",
           refresh_token: refreshToken.trim(),
           client_id: CODEX_CLIENT_ID,
-        });
-        const resp = await transport.direct(CODEX_TOKEN_ENDPOINT, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-            Accept: "application/json",
-          },
-          body: form.toString(),
-        });
-        const text = await resp.text();
-        if (resp.status < 200 || resp.status >= 300) {
-          throw new Error(`codex token refresh failed: ${resp.status} ${text.slice(0, 1024)}`);
-        }
-        const token = JSON.parse(text) as {
+        }).toString(),
+      }),
+      parse: (payload, refreshToken) => {
+        const token = payload as {
           access_token?: string;
           refresh_token?: string;
           expires_in?: number;
@@ -260,13 +252,18 @@ export class CodexProvider implements Provider, CredentialRefresher, RefreshBuff
           accountId,
         };
       },
-      catch: (cause) =>
-        new ProviderCredentialFailure({
-          message: asError(cause).message,
-          provider: "codex",
-          cause,
-        }),
     });
+  }
+
+  refreshBuffer(): number {
+    return CODEX_REFRESH_BUFFER_MS;
+  }
+
+  refreshCredentials(
+    refreshToken: string,
+    account: ProviderAccount
+  ): Effect.Effect<RefreshedCredentials, ProviderCredentialFailure> {
+    return this.exchange.exchange(refreshToken, account);
   }
 
   makeRequest(request: ProviderRequest): Effect.Effect<Response, ProviderFailure> {
@@ -354,7 +351,7 @@ export class CodexProvider implements Provider, CredentialRefresher, RefreshBuff
 
   private isModelAllowed(model: string): boolean {
     const normalized = model.trim().toLowerCase();
-    for (const [canonical, upstream] of this.registry.providerModelMap("codex")) {
+    for (const [canonical, upstream] of this.registry.modelMap("codex")) {
       if (canonical.toLowerCase() === normalized || upstream.toLowerCase() === normalized) return true;
     }
     return false;
@@ -362,7 +359,7 @@ export class CodexProvider implements Provider, CredentialRefresher, RefreshBuff
 
   private supportedModelNames(): string[] {
     const values = new Set<string>();
-    for (const [canonical, upstream] of this.registry.providerModelMap("codex")) {
+    for (const [canonical, upstream] of this.registry.modelMap("codex")) {
       if (canonical) values.add(canonical);
       if (upstream) values.add(upstream);
     }
@@ -428,14 +425,18 @@ export class CodexProvider implements Provider, CredentialRefresher, RefreshBuff
   }
 
   private resolveModel(model: string): string {
-    return this.registry.upstreamModelName(lastModelSegment(model), "codex");
+    return this.registry.upstream(lastModelSegment(model), "codex");
   }
 }
 
 export function responsesStreamToCompletion(text: string, model: string): Json {
   const events = parseSseDataLines(text);
-  const completion: Json = { output: [], usage: {} };
-  let messageContent = "";
+  const collector = new Collector({
+    model,
+    nullContent: true,
+    normalizeArgs: (args) => defaultStringValue(args, "{}"),
+    forceFinish: true,
+  });
   const reasoningParts = new Map<string, string>();
   const reasoningOrder: string[] = [];
   const appendReasoning = (key: string, part: string): void => {
@@ -466,12 +467,13 @@ export function responsesStreamToCompletion(text: string, model: string): Json {
     if (textValue) appendReasoning("text:0", textValue);
   };
 
-  const toolCalls: Json[] = [];
   let currentTool: Json | null = null;
+  let status = "";
+  let rawUsage: unknown = {};
   for (const event of events) {
     switch (stringValue(event.type)) {
       case "response.output_text.delta":
-        messageContent += stringValue(event.delta);
+        collector.addContent(stringValue(event.delta));
         break;
       case "response.reasoning.delta":
       case "response.reasoning_text.delta":
@@ -517,7 +519,13 @@ export function responsesStreamToCompletion(text: string, model: string): Json {
         const item = (event.item ?? {}) as Json;
         if (item.type === "reasoning") addReasoningItem(item);
         if (currentTool) {
-          toolCalls.push(currentTool);
+          const callId = toChatCallId(defaultStringValue(currentTool.call_id, stringValue(currentTool.id)));
+          collector.addToolCall({
+            key: callId,
+            id: callId,
+            name: stringValue(currentTool.name),
+            arguments: stringValue(currentTool.arguments),
+          });
           currentTool = null;
         }
         break;
@@ -525,8 +533,8 @@ export function responsesStreamToCompletion(text: string, model: string): Json {
       case "response.completed":
       case "response.done": {
         const response = (event.response ?? event) as Json;
-        completion.status = response.status;
-        completion.usage = response.usage;
+        status = stringValue(response.status);
+        rawUsage = response.usage;
         break;
       }
       default:
@@ -534,16 +542,12 @@ export function responsesStreamToCompletion(text: string, model: string): Json {
     }
   }
 
-  const output: unknown[] = [];
-  if (messageContent) {
-    output.push({ type: "message", content: [{ type: "output_text", text: messageContent }] });
-  }
   const reasoningText = reasoningOrder
     .map((key) => reasoningParts.get(key) ?? "")
     .filter((value) => value)
     .join("\n\n");
-  if (reasoningText) output.push({ type: "reasoning", text: reasoningText });
-  output.push(...toolCalls);
-  completion.output = output;
-  return responsesJsonToChatCompletion(completion, model);
+  collector.addReasoning(reasoningText);
+  collector.setFinish(status === "incomplete" ? "length" : "stop");
+  collector.setUsage(responseUsageToChatUsage(rawUsage));
+  return collector.toCompletion();
 }

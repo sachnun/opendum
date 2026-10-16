@@ -241,7 +241,7 @@ export class OpenAICompatibleProvider implements Provider, ResponsesNativeProvid
 
   private resolveModel(model: string): string {
     if (this.upstreamName) return this.upstreamName(model);
-    return this.registry ? this.registry.upstreamModelName(model, this.name) : model;
+    return this.registry ? this.registry.upstream(model, this.name) : model;
   }
 
   private requiresResponsesAPI(model: string): boolean {
@@ -259,6 +259,6 @@ export class OpenAICompatibleProvider implements Provider, ResponsesNativeProvid
 
   private authlessModel(model: string): boolean {
     if (this.isAuthless) return this.isAuthless(model);
-    return this.registry ? this.registry.isAuthlessProviderModel(model, this.name) : false;
+    return this.registry ? this.registry.isAuthless(model, this.name) : false;
   }
 }

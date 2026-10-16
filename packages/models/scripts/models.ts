@@ -4,7 +4,7 @@ import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildModelIndex, pruneDeadModelEntries } from "#models/registry.ts";
+import { buildIndex, prune } from "#models/model-store.ts";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const modelsDir = resolve(scriptDir, "../data");
@@ -19,7 +19,7 @@ function refreshScripts(): string[] {
     .filter(
       (name) =>
         TAIL_SCRIPTS.includes(name) ||
-        readFileSync(join(scriptDir, name), "utf-8").includes("syncProviderModels("),
+        readFileSync(join(scriptDir, name), "utf-8").includes("sync("),
     )
     .sort((left, right) => {
       const rank = Number(TAIL_SCRIPTS.includes(left)) - Number(TAIL_SCRIPTS.includes(right));
@@ -29,7 +29,7 @@ function refreshScripts(): string[] {
 
 function refreshedProviders(): string[] {
   const providers = new Set<string>();
-  for (const entry of Object.values(buildModelIndex(modelsDir))) {
+  for (const entry of Object.values(buildIndex(modelsDir))) {
     for (const provider of entry.data.providers ?? []) providers.add(provider);
   }
   return [...providers].sort();
@@ -60,7 +60,7 @@ function runScript(scriptName: string): Promise<void> {
 }
 
 function snapshotProviderModels(before: string[]) {
-  const index = buildModelIndex(modelsDir);
+  const index = buildIndex(modelsDir);
   const snapshot = new Map<string, Set<string>>();
 
   for (const provider of before) {
@@ -126,7 +126,7 @@ async function main(): Promise<void> {
     process.exitCode = 1;
   }
 
-  const pruned = pruneDeadModelEntries(modelsDir);
+  const pruned = prune(modelsDir);
   if (pruned.length > 0) {
     console.log(`[models] pruned ${pruned.length} dead entries: ${pruned.join(", ")}`);
   }

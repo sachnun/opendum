@@ -24,8 +24,8 @@ function capture(model: string, body: Record<string, unknown>, streaming = true)
     });
   };
   const registry = {
-    upstreamModelName: (name: string) => name,
-    providerModelConfig: () => null,
+    upstream: (name: string) => name,
+    config: () => null,
   } as unknown as Registry;
   const transport: UpstreamTransport = { direct, egress: null, egressReady: () => false };
   const provider = new OpencodeProvider({ registry, transport, fallback: null });
@@ -90,7 +90,7 @@ describe("opencode free tier request contract", () => {
     expect(captured.headers["X-Opencode-Session-Id"]).toBe(session);
     expect(Number.parseInt(session.slice(13, 16), 16)).toBeGreaterThanOrEqual(0xfc0);
     expect(captured.headers["X-Opencode-Request"]).toMatch(REQUEST_PATTERN);
-    expect(captured.headers["User-Agent"]).toBe("opencode/1.19.0");
+    expect(captured.headers["User-Agent"]).toBe("opencode/1.19.1");
   });
 
   it("derives a deterministic session from a client seed", async () => {

@@ -1,6 +1,7 @@
+import { Result } from "effect";
 import { anthropicNonStream, anthropicStream, passthroughNonStream, passthroughStream } from "./stream.js";
-import { cloneMap, cloneMapExcept, stringValue } from "./helpers.js";
-import type { EndpointAdapter, ParsedEndpointRequest, RouteError } from "./types.js";
+import { cloneMap, cloneMapExcept, parseJson, stringValue } from "./helpers.js";
+import type { ErrorFormat, ParsedEndpointRequest, ResponseContext, RouteError, StreamRecorder } from "./types.js";
 
 type Json = Record<string, unknown>;
 
@@ -47,98 +48,158 @@ function reasoningRequested(body: Json): boolean {
   return body.thinking_budget !== undefined && body.thinking_budget !== null;
 }
 
-export function chatCompletionsConfig(): EndpointAdapter {
-  return {
-    endpoint: "chat_completions",
-    format: "openai",
-    rateLimitStatusCode: 429,
-    noAccountsStatusCode: 503,
-    parse: parseChatCompletions,
-    build: buildChatCompletions,
-    handleStream: passthroughStream,
-    handleNonStream: passthroughNonStream,
-  };
-}
+/**
+ * Shared skeleton for the three HTTP endpoints: `parse` extracts the required
+ * model and delegates the rest to `toParsed`; `build` delegates the payload
+ * shape to `toPayload` and appends the session hint.
+ */
+export abstract class Adapter {
+  abstract readonly endpoint: string;
+  abstract readonly format: ErrorFormat;
+  abstract readonly rateLimitStatusCode: number;
+  abstract readonly noAccountsStatusCode: number;
 
-function parseChatCompletions(body: Json): ParsedEndpointRequest | RouteError {
-  const parsedModel = parseRequiredModel(body);
-  if (!("model" in parsedModel)) return parsedModel;
-  if (!Array.isArray(body.messages)) {
-    return { status: 400, message: "messages array is required", type: "invalid_request_error" };
+  abstract handleStream(ctx: ResponseContext, recorder: StreamRecorder): Promise<Response>;
+  abstract handleNonStream(ctx: ResponseContext, recorder: StreamRecorder): Promise<Response>;
+
+  parse(body: Json): ParsedEndpointRequest | RouteError {
+    const parsedModel = parseRequiredModel(body);
+    if (!("model" in parsedModel)) return parsedModel;
+    return this.toParsed(body, parsedModel.model);
   }
-  const stream = parseStreamParam(body);
-  const params = cloneMapExcept(body, "model", "messages", "stream");
+
+  build(parsed: ParsedEndpointRequest, model: string, stream: boolean, sessionId: string): Json {
+    const payload = this.toPayload(parsed, model, stream);
+    addSessionId(payload, sessionId);
+    return payload;
+  }
+
+  protected abstract toParsed(body: Json, model: string): ParsedEndpointRequest | RouteError;
+
+  protected abstract toPayload(parsed: ParsedEndpointRequest, model: string, stream: boolean): Json;
+}
+
+export class Chat extends Adapter {
+  readonly endpoint = "chat_completions";
+  readonly format: ErrorFormat = "openai";
+  readonly rateLimitStatusCode = 429;
+  readonly noAccountsStatusCode = 503;
+  readonly handleStream = passthroughStream;
+  readonly handleNonStream = passthroughNonStream;
+
+  protected toParsed(body: Json, model: string): ParsedEndpointRequest | RouteError {
+    if (!Array.isArray(body.messages)) {
+      return { status: 400, message: "messages array is required", type: "invalid_request_error" };
+    }
+    const stream = parseStreamParam(body);
+    const params = cloneMapExcept(body, "model", "messages", "stream");
+    return {
+      modelParam: model,
+      stream,
+      forcedAccountId: null,
+      reasoningRequested: reasoningRequested(body),
+      messagesForError: body.messages,
+      paramsForError: buildParamsForError(params, stream),
+      routeData: { messages: body.messages, params },
+    };
+  }
+
+  protected toPayload(parsed: ParsedEndpointRequest, model: string, stream: boolean): Json {
+    const params = (parsed.routeData.params ?? {}) as Json;
+    const body: Json = cloneMap(params);
+    body.model = model;
+    body.messages = parsed.routeData.messages;
+    body.stream = stream;
+    body._includeReasoning = parsed.reasoningRequested;
+    return body;
+  }
+}
+
+export class Messages extends Adapter {
+  readonly endpoint = "messages";
+  readonly format: ErrorFormat = "anthropic";
+  readonly rateLimitStatusCode = 529;
+  readonly noAccountsStatusCode = 529;
+  readonly handleStream = anthropicStream;
+  readonly handleNonStream = anthropicNonStream;
+
+  protected toParsed(body: Json, model: string): ParsedEndpointRequest | RouteError {
+    const stream = parseStreamParam(body);
+    const paramsForError = cloneMapExcept(body, "model", "messages", "stream");
+    paramsForError.stream = stream;
+    return {
+      modelParam: model,
+      stream,
+      forcedAccountId: null,
+      reasoningRequested: false,
+      messagesForError: body.messages,
+      paramsForError,
+      routeData: { body },
+    };
+  }
+
+  protected toPayload(parsed: ParsedEndpointRequest, model: string, stream: boolean): Json {
+    const body = (parsed.routeData.body ?? {}) as Json;
+    const payload = transformAnthropicToOpenAI(body);
+    payload.model = model;
+    payload.stream = stream;
+    return payload;
+  }
+}
+
+export class Responses extends Adapter {
+  readonly endpoint = "responses";
+  readonly format: ErrorFormat = "openai";
+  readonly rateLimitStatusCode = 429;
+  readonly noAccountsStatusCode = 503;
+  readonly handleStream = passthroughStream;
+  readonly handleNonStream = passthroughNonStream;
+
+  protected toParsed(body: Json, model: string): ParsedEndpointRequest | RouteError {
+    if (!Array.isArray(body.input)) {
+      return { status: 400, message: "input array is required", type: "invalid_request_error" };
+    }
+    const stream = parseStreamParam(body);
+    const instructions = stringValue(body.instructions);
+    const messages = convertResponsesInputToMessages(body.input, instructions);
+    const params = cloneMapExcept(body, "model", "input", "instructions", "stream");
+    if (params.max_output_tokens !== undefined) {
+      params.max_tokens = params.max_output_tokens;
+      delete params.max_output_tokens;
+    }
+    const paramsForError = buildParamsForError(params, stream);
+    if (instructions) paramsForError.instructions = instructions;
+    return {
+      modelParam: model,
+      stream,
+      forcedAccountId: null,
+      reasoningRequested: reasoningRequested(params),
+      messagesForError: messages,
+      paramsForError,
+      routeData: { messages, responsesInput: body.input, instructions, params },
+    };
+  }
+
+  protected toPayload(parsed: ParsedEndpointRequest, model: string, stream: boolean): Json {
+    const params = (parsed.routeData.params ?? {}) as Json;
+    const body: Json = cloneMap(params);
+    body.model = model;
+    body.messages = parsed.routeData.messages;
+    if (Array.isArray(body.tools)) body.tools = responsesToolsToChat(body.tools);
+    body.stream = stream;
+    body._includeReasoning = parsed.reasoningRequested;
+    body._responsesInput = parsed.routeData.responsesInput;
+    const instructions = parsed.routeData.instructions;
+    if (typeof instructions === "string" && instructions) body.instructions = instructions;
+    return body;
+  }
+}
+
+export function adapters(): Record<string, Adapter> {
   return {
-    modelParam: parsedModel.model,
-    stream,
-    forcedAccountId: null,
-    reasoningRequested: reasoningRequested(body),
-    messagesForError: body.messages,
-    paramsForError: buildParamsForError(params, stream),
-    routeData: { messages: body.messages, params },
-  };
-}
-
-function buildChatCompletions(parsed: ParsedEndpointRequest, model: string, stream: boolean, sessionId: string): Json {
-  const params = (parsed.routeData.params ?? {}) as Json;
-  const body: Json = cloneMap(params);
-  body.model = model;
-  body.messages = parsed.routeData.messages;
-  body.stream = stream;
-  body._includeReasoning = parsed.reasoningRequested;
-  addSessionId(body, sessionId);
-  return body;
-}
-
-export function messagesConfig(): EndpointAdapter {
-  return {
-    endpoint: "messages",
-    format: "anthropic",
-    rateLimitStatusCode: 529,
-    noAccountsStatusCode: 529,
-    parse: parseMessages,
-    build: buildMessages,
-    handleStream: anthropicStream,
-    handleNonStream: anthropicNonStream,
-  };
-}
-
-function parseMessages(body: Json): ParsedEndpointRequest | RouteError {
-  const parsedModel = parseRequiredModel(body);
-  if (!("model" in parsedModel)) return parsedModel;
-  const stream = parseStreamParam(body);
-  const paramsForError = cloneMapExcept(body, "model", "messages", "stream");
-  paramsForError.stream = stream;
-  return {
-    modelParam: parsedModel.model,
-    stream,
-    forcedAccountId: null,
-    reasoningRequested: false,
-    messagesForError: body.messages,
-    paramsForError,
-    routeData: { body },
-  };
-}
-
-function buildMessages(parsed: ParsedEndpointRequest, model: string, stream: boolean, sessionId: string): Json {
-  const body = (parsed.routeData.body ?? {}) as Json;
-  const payload = transformAnthropicToOpenAI(body);
-  payload.model = model;
-  payload.stream = stream;
-  addSessionId(payload, sessionId);
-  return payload;
-}
-
-export function responsesConfig(): EndpointAdapter {
-  return {
-    endpoint: "responses",
-    format: "openai",
-    rateLimitStatusCode: 429,
-    noAccountsStatusCode: 503,
-    parse: parseResponses,
-    build: buildResponses,
-    handleStream: passthroughStream,
-    handleNonStream: passthroughNonStream,
+    chat_completions: new Chat(),
+    messages: new Messages(),
+    responses: new Responses(),
   };
 }
 
@@ -191,48 +252,6 @@ function responsesContentToChat(content: unknown): unknown {
     out.push(copyPart);
   }
   return out;
-}
-
-function parseResponses(body: Json): ParsedEndpointRequest | RouteError {
-  const parsedModel = parseRequiredModel(body);
-  if (!("model" in parsedModel)) return parsedModel;
-  if (!Array.isArray(body.input)) {
-    return { status: 400, message: "input array is required", type: "invalid_request_error" };
-  }
-  const stream = parseStreamParam(body);
-  const instructions = stringValue(body.instructions);
-  const messages = convertResponsesInputToMessages(body.input, instructions);
-  const params = cloneMapExcept(body, "model", "input", "instructions", "stream");
-  if (params.max_output_tokens !== undefined) {
-    params.max_tokens = params.max_output_tokens;
-    delete params.max_output_tokens;
-  }
-  const paramsForError = buildParamsForError(params, stream);
-  if (instructions) paramsForError.instructions = instructions;
-  return {
-    modelParam: parsedModel.model,
-    stream,
-    forcedAccountId: null,
-    reasoningRequested: reasoningRequested(params),
-    messagesForError: messages,
-    paramsForError,
-    routeData: { messages, responsesInput: body.input, instructions, params },
-  };
-}
-
-function buildResponses(parsed: ParsedEndpointRequest, model: string, stream: boolean, sessionId: string): Json {
-  const params = (parsed.routeData.params ?? {}) as Json;
-  const body: Json = cloneMap(params);
-  body.model = model;
-  body.messages = parsed.routeData.messages;
-  if (Array.isArray(body.tools)) body.tools = responsesToolsToChat(body.tools);
-  body.stream = stream;
-  body._includeReasoning = parsed.reasoningRequested;
-  body._responsesInput = parsed.routeData.responsesInput;
-  const instructions = parsed.routeData.instructions;
-  if (typeof instructions === "string" && instructions) body.instructions = instructions;
-  addSessionId(body, sessionId);
-  return body;
 }
 
 function convertResponsesInputToMessages(input: unknown[], instructions: string): unknown[] {
@@ -588,12 +607,8 @@ function appendOpenAiToolCalls(
   for (const raw of calls) {
     const call = (raw ?? {}) as Json;
     const fn = (call.function ?? {}) as Json;
-    let input: Json = {};
-    try {
-      input = JSON.parse(stringValue(fn.arguments) || "{}") as Json;
-    } catch {
-      input = {};
-    }
+    const parsedInput = parseJson(stringValue(fn.arguments) || "{}");
+    const input = (Result.isSuccess(parsedInput) ? parsedInput.success : {}) as Json;
     content.push({ type: "tool_use", id: stringValue(call.id), name: stringValue(fn.name), input });
   }
   return { stopReason: calls.length > 0 ? "tool_use" : stopReason };

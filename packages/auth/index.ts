@@ -1,9 +1,5 @@
-export {
-  AuthService,
-  isAuthlessProvider,
-  isAuthlessProviderAccountId,
-  parseModelParam,
-} from "./service.js";
+export { AuthService, isAuthless, isAuthlessId } from "./service.js";
+export { parseModel } from "./normalize.js";
 export {
   emptyAuthResult,
   emptyAvailability,
@@ -17,12 +13,6 @@ export type {
   RateLimitRule,
 } from "./types.js";
 export { createCustomStore } from "./store/custom.js";
-export {
-  AuthServiceLayer,
-  AuthServiceTag,
-  validateAPIKey,
-  validateModelForUser,
-} from "./layer.js";
 export type {
   CustomProviderModelRecord,
   CustomProviderReader,

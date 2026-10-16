@@ -1,5 +1,7 @@
-import { Cache, Duration, Effect } from "effect";
+import { Cache, Duration, Effect, Result } from "effect";
 import type { OpendumRedis } from "@opendum/core/redis";
+import { parseJson, tryAsync } from "./helpers.js";
+import { ignore } from "./service-helpers.js";
 
 export type ProviderPerformanceConfig = {
   sampleTtlSeconds: number;
@@ -78,20 +80,20 @@ export function scoreProviderMetrics(metrics: ProviderMetrics, config: ProviderP
 
 export function parseMetrics(raw: string | null | undefined): ProviderMetrics | null {
   if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as Partial<ProviderMetrics>;
-    const ttftMs = typeof parsed.ttftMs === "number" && Number.isFinite(parsed.ttftMs) ? Math.max(0, parsed.ttftMs) : 0;
-    const tokensPerSecond =
-      typeof parsed.tokensPerSecond === "number" && Number.isFinite(parsed.tokensPerSecond)
-        ? Math.max(0, parsed.tokensPerSecond)
-        : 0;
-    const samples = typeof parsed.samples === "number" && Number.isFinite(parsed.samples) ? Math.max(0, parsed.samples) : 0;
-    const updatedAt = typeof parsed.updatedAt === "number" && Number.isFinite(parsed.updatedAt) ? parsed.updatedAt : 0;
-    if (ttftMs <= 0 && tokensPerSecond <= 0) return null;
-    return { ttftMs, tokensPerSecond, samples, updatedAt };
-  } catch {
-    return null;
-  }
+  const parsedJson = parseJson(raw);
+  if (Result.isFailure(parsedJson)) return null;
+  const parsedValue = parsedJson.success;
+  if (parsedValue === null || typeof parsedValue !== "object") return null;
+  const parsed = parsedValue as Partial<ProviderMetrics>;
+  const ttftMs = typeof parsed.ttftMs === "number" && Number.isFinite(parsed.ttftMs) ? Math.max(0, parsed.ttftMs) : 0;
+  const tokensPerSecond =
+    typeof parsed.tokensPerSecond === "number" && Number.isFinite(parsed.tokensPerSecond)
+      ? Math.max(0, parsed.tokensPerSecond)
+      : 0;
+  const samples = typeof parsed.samples === "number" && Number.isFinite(parsed.samples) ? Math.max(0, parsed.samples) : 0;
+  const updatedAt = typeof parsed.updatedAt === "number" && Number.isFinite(parsed.updatedAt) ? parsed.updatedAt : 0;
+  if (ttftMs <= 0 && tokensPerSecond <= 0) return null;
+  return { ttftMs, tokensPerSecond, samples, updatedAt };
 }
 
 export function blendMetrics(previous: ProviderMetrics | null, sample: { ttftMs: number; tokensPerSecond: number }, alpha: number): ProviderMetrics {
@@ -148,15 +150,15 @@ export class ProviderPerformance {
     const tokensPerSecond = sampleTokensPerSecond(ttftMs, sample.durationMs, sample.outputTokens);
     if (ttftMs <= 0 && tokensPerSecond <= 0) return;
     const key = providerPerformanceKey(sample.model);
-    try {
-      const previous = parseMetrics(await this.redis.hGet(key, sample.provider));
-      const next = blendMetrics(previous, { ttftMs, tokensPerSecond }, this.config.ewmaAlpha);
-      await this.redis.hSet(key, sample.provider, JSON.stringify(next));
-      await this.redis.expire(key, this.config.sampleTtlSeconds);
-      await Effect.runPromise(Cache.invalidate(this.getScoresCache(), key));
-    } catch {
-      return;
-    }
+    await Effect.runPromise(
+      ignore(async () => {
+        const previous = parseMetrics(await this.redis.hGet(key, sample.provider));
+        const next = blendMetrics(previous, { ttftMs, tokensPerSecond }, this.config.ewmaAlpha);
+        await this.redis.hSet(key, sample.provider, JSON.stringify(next));
+        await this.redis.expire(key, this.config.sampleTtlSeconds);
+        await Effect.runPromise(Cache.invalidate(this.getScoresCache(), key));
+      })
+    );
   }
 
   async scoresForModel(model: string): Promise<Map<string, ProviderScore>> {
@@ -166,21 +168,18 @@ export class ProviderPerformance {
 
   private async loadScores(key: string): Promise<Map<string, ProviderScore>> {
     const scores = new Map<string, ProviderScore>();
-    try {
-      const entries = await this.redis.hGetAll(key);
-      for (const [provider, raw] of Object.entries(entries)) {
-        const metrics = parseMetrics(raw);
-        if (!metrics) continue;
-        scores.set(provider, {
-          provider,
-          score: scoreProviderMetrics(metrics, this.config),
-          ttftMs: metrics.ttftMs,
-          tokensPerSecond: metrics.tokensPerSecond,
-          samples: metrics.samples,
-        });
-      }
-    } catch {
-      return scores;
+    const entries = await tryAsync(() => this.redis.hGetAll(key), null);
+    if (!entries) return scores;
+    for (const [provider, raw] of Object.entries(entries)) {
+      const metrics = parseMetrics(raw);
+      if (!metrics) continue;
+      scores.set(provider, {
+        provider,
+        score: scoreProviderMetrics(metrics, this.config),
+        ttftMs: metrics.ttftMs,
+        tokensPerSecond: metrics.tokensPerSecond,
+        samples: metrics.samples,
+      });
     }
     return scores;
   }

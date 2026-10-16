@@ -66,7 +66,7 @@ const FILL_FIELDS = [
   "scores",
 ] as const;
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
+function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
@@ -81,7 +81,7 @@ function unionInto(target: Record<string, unknown>, source: Record<string, unkno
       target[key] = [...new Set([...current, ...value])];
       continue;
     }
-    if (isPlainObject(current) && isPlainObject(value)) unionInto(current, value);
+    if (isObject(current) && isObject(value)) unionInto(current, value);
   }
 }
 
@@ -98,7 +98,7 @@ function fillMissing(target: ModelData, source: ModelData): void {
       targetRecord[field] = structuredClone(incoming);
       continue;
     }
-    if (isPlainObject(current) && isPlainObject(incoming)) {
+    if (isObject(current) && isObject(incoming)) {
       unionInto(current, incoming);
       continue;
     }

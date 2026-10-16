@@ -1,5 +1,5 @@
-import { Schema } from "effect";
-import { stringValue } from "./helpers.js";
+import { Result, Schema } from "effect";
+import { parseJson, stringValue, trySync } from "./helpers.js";
 import type { ErrorFormat, RouteError } from "./types.js";
 
 const OptionalString = Schema.optional(Schema.NullOr(Schema.String));
@@ -231,12 +231,10 @@ export function providerErrorType(status: number): string {
 export function extractProviderErrorDetail(body: string): string {
   const trimmed = body.trim();
   if (!trimmed) return "";
-  try {
-    const value = JSON.parse(trimmed) as unknown;
-    const message = findMessage(value, 0);
+  const parsed = parseJson(trimmed);
+  if (Result.isSuccess(parsed)) {
+    const message = findMessage(parsed.success, 0);
     if (message) return normalizeClientError(message);
-  } catch {
-    return normalizeClientError(trimmed);
   }
   return normalizeClientError(trimmed);
 }
@@ -244,12 +242,10 @@ export function extractProviderErrorDetail(body: string): string {
 function findMessage(value: unknown, depth: number): string {
   if (depth > 6 || value === null || value === undefined) return "";
   if (typeof value === "string") {
-    try {
-      const nested = JSON.parse(value) as unknown;
-      const message = findMessage(nested, depth + 1);
+    const nested = parseJson(value);
+    if (Result.isSuccess(nested)) {
+      const message = findMessage(nested.success, depth + 1);
       if (message) return message;
-    } catch {
-      return value;
     }
     return value;
   }
@@ -278,14 +274,13 @@ export function shouldRotate(status: number): boolean {
 
 export function isAntigravityResourceExhausted(provider: string, status: number, body: string): boolean {
   if (provider !== "antigravity" || status !== 429) return false;
-  try {
-    const payload = JSON.parse(body.trim()) as Record<string, unknown>;
-    const error = payload.error;
-    if (error === null || typeof error !== "object" || Array.isArray(error)) return false;
-    return stringValue((error as Record<string, unknown>).status).toLowerCase() === "resource_exhausted";
-  } catch {
-    return false;
-  }
+  const parsed = parseJson(body.trim());
+  if (Result.isFailure(parsed)) return false;
+  const payloadValue = parsed.success;
+  if (payloadValue === null || typeof payloadValue !== "object" || Array.isArray(payloadValue)) return false;
+  const error = (payloadValue as Record<string, unknown>).error;
+  if (error === null || typeof error !== "object" || Array.isArray(error)) return false;
+  return stringValue((error as Record<string, unknown>).status).toLowerCase() === "resource_exhausted";
 }
 
 export function codexUsageLimitDisabledUntil(
@@ -295,23 +290,22 @@ export function codexUsageLimitDisabledUntil(
   now: Date
 ): Date | null {
   if (provider !== "codex" || status !== 429) return null;
-  try {
-    const payload = JSON.parse(body.trim()) as Record<string, unknown>;
-    const error = payload.error;
-    if (error === null || typeof error !== "object" || Array.isArray(error)) return null;
-    const record = error as Record<string, unknown>;
-    if (stringValue(record.type).trim() !== "usage_limit_reached") return null;
-    const resetsAt = int64Value(record.resets_at);
-    if (resetsAt !== null) {
-      const until = new Date(resetsAt * 1000);
-      if (until.getTime() > now.getTime()) return until;
-    }
-    const resetsIn = int64Value(record.resets_in_seconds);
-    if (resetsIn !== null && resetsIn > 0) return new Date(now.getTime() + resetsIn * 1000);
-    return null;
-  } catch {
-    return null;
+  const parsed = parseJson(body.trim());
+  if (Result.isFailure(parsed)) return null;
+  const payloadValue = parsed.success;
+  if (payloadValue === null || typeof payloadValue !== "object" || Array.isArray(payloadValue)) return null;
+  const error = (payloadValue as Record<string, unknown>).error;
+  if (error === null || typeof error !== "object" || Array.isArray(error)) return null;
+  const record = error as Record<string, unknown>;
+  if (stringValue(record.type).trim() !== "usage_limit_reached") return null;
+  const resetsAt = int64Value(record.resets_at);
+  if (resetsAt !== null) {
+    const until = new Date(resetsAt * 1000);
+    if (until.getTime() > now.getTime()) return until;
   }
+  const resetsIn = int64Value(record.resets_in_seconds);
+  if (resetsIn !== null && resetsIn > 0) return new Date(now.getTime() + resetsIn * 1000);
+  return null;
 }
 
 function int64Value(value: unknown): number | null {
@@ -370,12 +364,10 @@ export function buildAccountErrorMessage(errorMessage: string, context: AccountE
     truncatedError = `${truncatedError.slice(0, ACCOUNT_ERROR_RAW_LIMIT)}...[truncated, ${errorMessage.length} chars total]`;
   }
 
-  let serializedParameters = "{}";
-  try {
-    serializedParameters = JSON.stringify(sanitizeParametersForError(context.parameters), null, 2);
-  } catch {
-    serializedParameters = '"[unserializable parameters]"';
-  }
+  const serializedParameters = trySync(
+    () => JSON.stringify(sanitizeParametersForError(context.parameters), null, 2) ?? '"[unserializable parameters]"',
+    '"[unserializable parameters]"'
+  );
 
   const lines = [`Error: ${truncatedError}`];
   if (context.provider) lines.push(`Provider: ${context.provider}`);
@@ -465,11 +457,10 @@ function summarizeMessagesForError(messages: unknown): string {
       type: `truncated_${messages.length - ACCOUNT_ERROR_MESSAGE_LIMIT}_more_items`,
     });
   }
-  try {
-    return JSON.stringify(entries, null, 2);
-  } catch {
-    return "[unserializable message summary]";
-  }
+  return trySync(
+    () => JSON.stringify(entries, null, 2) ?? "[unserializable message summary]",
+    "[unserializable message summary]"
+  );
 }
 
 function typeNameForError(value: unknown): string {
@@ -481,9 +472,5 @@ function typeNameForError(value: unknown): string {
 }
 
 function statusText(status: number): string {
-  try {
-    return new Response(null, { status }).statusText || "";
-  } catch {
-    return "";
-  }
+  return trySync(() => new Response(null, { status }).statusText || "", "");
 }

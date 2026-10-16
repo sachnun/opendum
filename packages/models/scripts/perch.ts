@@ -2,7 +2,7 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildModelIndex, syncProviderModels } from "#models/registry.ts";
+import { buildIndex, sync } from "#models/model-store.ts";
 import { runFetchText, runFetchJson } from "#models/sync/http.ts";
 import { normalizeKey, normalizeName } from "#models/model/similarity.ts";
 import { syncCliVersion } from "./version-sync.ts";
@@ -122,7 +122,7 @@ function buildLookup(modelsDir) {
     map.set(key, entry);
   };
 
-  for (const entry of Object.values(buildModelIndex(modelsDir))) {
+  for (const entry of Object.values(buildIndex(modelsDir))) {
     const keys = [entry.fileId, entry.id, ...(entry.data.aliases || []), perchUpstream(entry)];
     for (const key of keys) {
       if (typeof key !== "string" || !key.trim()) continue;
@@ -177,7 +177,7 @@ async function main() {
     console.warn(`[perch] Skipped Starter model(s) absent from the registry: ${unresolved.join(", ")}`);
   }
 
-  const result = syncProviderModels(modelsDir, PROVIDER_NAME, modelMap);
+  const result = sync(modelsDir, PROVIDER_NAME, modelMap);
 
   if (result.added.length === 0 && result.removed.length === 0 && result.updated.length === 0) {
     console.log(`Perch Starter models are already up to date (${modelMap.size} models).`);

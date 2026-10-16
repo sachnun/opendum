@@ -2,24 +2,22 @@ import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
 import { jsonResponse, randomId, stringValue } from "../../core/helpers.js";
 import { normalizeProviderFailure, transportFailure, type UpstreamTransport } from "../../core/http.js";
-import { ProviderCredentialFailure, asError } from "../../core/errors.js";
+import { ProviderCredentialFailure } from "../../core/errors.js";
+import { OAuth } from "../../core/oauth.js";
 import { KIRO_REFRESH_ENDPOINT } from "../../endpoints.js";
 import {
-  KiroParserState,
-  KiroThinkingSplitter,
+  Parser,
   buildKiroRequest,
   convertKiroEventsToCompletion,
   kiroApiUrlForAccount,
   kiroErrorMessage,
   kiroNumberAsFloat,
   kiroReasoningContent,
-  kiroThinkingRequested,
   kiroUsage,
   kiroUsageFromContext,
   lastModelSegment,
   normalizeKiroTier,
   parseKiroBracketToolCalls,
-  parseKiroJsonEvents,
   type Json,
 } from "./transform.js";
 import type {
@@ -41,10 +39,30 @@ export class KiroProvider implements Provider, CredentialRefresher, RefreshBuffe
   readonly name = "kiro";
   private readonly registry: Registry;
   private readonly transport: UpstreamTransport;
+  private readonly exchange: OAuth;
 
   constructor(options: KiroOptions) {
     this.registry = options.registry;
     this.transport = options.transport;
+    this.exchange = new OAuth({
+      provider: "kiro",
+      tokenUrl: KIRO_REFRESH_ENDPOINT,
+      transport: options.transport,
+      request: (refreshToken) => ({
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json", "User-Agent": "KiroIDE" },
+        body: JSON.stringify({ refreshToken: refreshToken.trim() }),
+      }),
+      parse: async (payload, refreshToken) => {
+        const token = payload as { accessToken?: string; refreshToken?: string; expiresIn?: number };
+        const accessToken = (token.accessToken ?? "").trim();
+        if (!accessToken) throw new Error("kiro token refresh returned empty access token");
+        const nextRefresh = token.refreshToken || refreshToken;
+        const expiresIn = token.expiresIn && token.expiresIn > 0 ? token.expiresIn : 3600;
+        const tier = await this.fetchSubscriptionTier(accessToken);
+        return { accessToken, refreshToken: nextRefresh, expiresAt: new Date(Date.now() + expiresIn * 1000), tier };
+      },
+    });
   }
 
   refreshBuffer(): number {
@@ -53,35 +71,9 @@ export class KiroProvider implements Provider, CredentialRefresher, RefreshBuffe
 
   refreshCredentials(
     refreshToken: string,
-    _account: ProviderAccount
+    account: ProviderAccount
   ): Effect.Effect<RefreshedCredentials, ProviderCredentialFailure> {
-    const transport = this.transport;
-    return Effect.tryPromise({
-      try: async () => {
-        const resp = await transport.direct(KIRO_REFRESH_ENDPOINT, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Accept: "application/json", "User-Agent": "KiroIDE" },
-          body: JSON.stringify({ refreshToken: refreshToken.trim() }),
-        });
-        const text = await resp.text();
-        if (resp.status < 200 || resp.status >= 300) {
-          throw new Error(`kiro token refresh failed: ${resp.status} ${text.slice(0, 1024)}`);
-        }
-        const token = JSON.parse(text) as { accessToken?: string; refreshToken?: string; expiresIn?: number };
-        const accessToken = (token.accessToken ?? "").trim();
-        if (!accessToken) throw new Error("kiro token refresh returned empty access token");
-        const nextRefresh = token.refreshToken || refreshToken;
-        const expiresIn = token.expiresIn && token.expiresIn > 0 ? token.expiresIn : 3600;
-        const tier = await this.fetchSubscriptionTier(accessToken);
-        return { accessToken, refreshToken: nextRefresh, expiresAt: new Date(Date.now() + expiresIn * 1000), tier };
-      },
-      catch: (cause) =>
-        new ProviderCredentialFailure({
-          message: asError(cause).message,
-          provider: "kiro",
-          cause,
-        }),
-    });
+    return this.exchange.exchange(refreshToken, account);
   }
 
   private async fetchSubscriptionTier(accessToken: string): Promise<string> {
@@ -111,7 +103,6 @@ export class KiroProvider implements Provider, CredentialRefresher, RefreshBuffe
   makeRequest(request: ProviderRequest): Effect.Effect<Response, ProviderFailure> {
     const body = request.body;
     const modelName = lastModelSegment(stringValue(body.model));
-    const thinkingEnabled = kiroThinkingRequested(this.registry, body);
     const payload = buildKiroRequest(this.registry, body);
     const accountId = request.account.accountId?.trim();
     if (accountId) payload.profileArn = accountId;
@@ -149,7 +140,7 @@ export class KiroProvider implements Provider, CredentialRefresher, RefreshBuffe
         }
 
         if (request.stream) {
-          return new Response(kiroSseStream(resp.body, modelName, thinkingEnabled), {
+          return new Response(kiroSseStream(resp.body, modelName), {
             status: 200,
             headers: {
               "Content-Type": "text/event-stream",
@@ -159,20 +150,15 @@ export class KiroProvider implements Provider, CredentialRefresher, RefreshBuffe
           });
         }
         const rawText = yield* Effect.promise(() => resp.text());
-        const events = parseKiroJsonEvents(rawText, new KiroParserState());
-        return jsonResponse(200, convertKiroEventsToCompletion(events, modelName, thinkingEnabled));
+        const events = new Parser().feed(rawText);
+        return jsonResponse(200, convertKiroEventsToCompletion(events, modelName));
       })
     );
   }
 }
 
-async function* transformKiroSse(
-  source: ReadableStream<Uint8Array>,
-  model: string,
-  parseThinking: boolean
-): AsyncGenerator<string> {
-  const state = new KiroParserState();
-  const splitter = new KiroThinkingSplitter(parseThinking);
+async function* transformKiroSse(source: ReadableStream<Uint8Array>, model: string): AsyncGenerator<string> {
+  const parser = new Parser();
   const completionId = randomId("chatcmpl");
   let sentRole = false;
   let toolCallCount = 0;
@@ -233,7 +219,7 @@ async function* transformKiroSse(
     }
     if (typeof event.content === "string" && event.followupPrompt === undefined) {
       totalContent += event.content;
-      let [contentDelta, reasoningDelta] = splitter.process(event.content, false);
+      let [contentDelta, reasoningDelta] = parser.processContent(event.content, false);
       if (hasNativeReasoning && reasoningDelta) reasoningDelta = "";
       emitContent(contentDelta, reasoningDelta);
       void contentDelta;
@@ -277,19 +263,19 @@ async function* transformKiroSse(
       const { done, value } = await reader.read();
       if (done) break;
       const text = decoder.decode(value, { stream: true });
-      for (const event of parseKiroJsonEvents(text, state)) processEvent(event);
+      for (const event of parser.feed(text)) processEvent(event);
       for (const chunk of pending.splice(0)) yield chunk;
     }
     const tail = decoder.decode();
     if (tail) {
-      for (const event of parseKiroJsonEvents(tail, state)) processEvent(event);
+      for (const event of parser.feed(tail)) processEvent(event);
     }
-    for (const event of parseKiroJsonEvents("", state)) processEvent(event);
+    for (const event of parser.finish()) processEvent(event);
   } finally {
     reader.releaseLock();
   }
 
-  let [flushContent, flushReasoning] = splitter.flush();
+  let [flushContent, flushReasoning] = parser.flushContent();
   if (hasNativeReasoning) flushReasoning = "";
   emitContent(flushContent, flushReasoning);
   for (const call of parseKiroBracketToolCalls(totalContent)) {
@@ -315,13 +301,9 @@ async function* transformKiroSse(
   void flushReasoning;
 }
 
-function kiroSseStream(
-  source: ReadableStream<Uint8Array>,
-  model: string,
-  parseThinking: boolean
-): ReadableStream<Uint8Array> {
+function kiroSseStream(source: ReadableStream<Uint8Array>, model: string): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
-  const iterator = transformKiroSse(source, model, parseThinking)[Symbol.asyncIterator]();
+  const iterator = transformKiroSse(source, model)[Symbol.asyncIterator]();
   return new ReadableStream<Uint8Array>({
     async pull(controller) {
       const { done, value } = await iterator.next();
@@ -337,4 +319,4 @@ function kiroSseStream(
   });
 }
 
-export { normalizeKiroTier, parseKiroJsonEvents, convertKiroEventsToCompletion };
+export { Parser, normalizeKiroTier, convertKiroEventsToCompletion };

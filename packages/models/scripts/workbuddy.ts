@@ -6,7 +6,7 @@ import { homedir, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { buildModelIndex, persistModel, syncProviderModels } from "#models/registry.ts";
+import { buildIndex, persist, sync } from "#models/model-store.ts";
 import { runFetchJson } from "#models/sync/http.ts";
 
 const PROVIDER_NAME = "workbuddy";
@@ -119,7 +119,7 @@ function buildModelMap(catalog) {
 }
 
 function enrichNewModels(modelsDir, addedKeys, modelMap, metadataLookup) {
-  const index = buildModelIndex(modelsDir);
+  const index = buildIndex(modelsDir);
 
   for (const modelKey of addedKeys) {
     const entry = Object.values(index).find((item) => item.fileId === modelKey || item.id === modelKey);
@@ -133,12 +133,12 @@ function enrichNewModels(modelsDir, addedKeys, modelMap, metadataLookup) {
     const data = entry.data;
     data.reasoning = meta.reasoning;
 
-    persistModel(entry, data);
+    persist(entry, data);
   }
 }
 
 function enforceHouseIgnored(modelsDir) {
-  const index = buildModelIndex(modelsDir);
+  const index = buildIndex(modelsDir);
   const changed = [];
   for (const entry of Object.values(index)) {
     const modelKey = entry.id || entry.fileId;
@@ -147,7 +147,7 @@ function enforceHouseIgnored(modelsDir) {
     const providers = entry.data.providers || [];
     if (providers.length > 0 && !providers.every((provider) => provider === PROVIDER_NAME)) continue;
     entry.data.ignored = true;
-    persistModel(entry, entry.data);
+    persist(entry, entry.data);
     changed.push(modelKey);
   }
   return changed;
@@ -159,7 +159,7 @@ async function main() {
 
   const catalog = await fetchWorkbuddyCatalog();
   const { modelMap, metadataLookup } = buildModelMap(catalog);
-  const result = syncProviderModels(modelsDir, PROVIDER_NAME, modelMap);
+  const result = sync(modelsDir, PROVIDER_NAME, modelMap);
   const ignored = enforceHouseIgnored(modelsDir);
 
   if (result.added.length > 0) {

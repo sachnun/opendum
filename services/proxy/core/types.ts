@@ -50,23 +50,7 @@ export type ResponseContext = {
   onStreamComplete?: (reason: StreamCompletion) => void;
 };
 
-export type EndpointAdapter = {
-  endpoint: string;
-  format: ErrorFormat;
-  rateLimitStatusCode: number;
-  noAccountsStatusCode: number;
-  parse: (body: Record<string, unknown>) => ParsedEndpointRequest | RouteError;
-  build: (
-    parsed: ParsedEndpointRequest,
-    model: string,
-    stream: boolean,
-    sessionId: string
-  ) => Record<string, unknown>;
-  handleStream: (ctx: ResponseContext, recorder: StreamRecorder) => Promise<Response>;
-  handleNonStream: (ctx: ResponseContext, recorder: StreamRecorder) => Promise<Response>;
-};
-
-export type AccountRotationFailure = {
+export type Failure = {
   accountId: string;
   failedAt: Date;
 };
@@ -87,7 +71,7 @@ export type AttemptResult = {
   response: Response;
   requestStartMs: number;
   upstreamFirstResponseMs: number;
-  rotationFailures: AccountRotationFailure[];
+  rotationFailures: Failure[];
   roaming: PointReservation | null;
 };
 
@@ -98,23 +82,25 @@ export type PointReservation = {
   debitId: string;
 };
 
+export type SuccessRecord = {
+  accountId: string;
+  provider: string;
+  model: string;
+  userId: string;
+  apiKeyId: string;
+  inputTokens: number;
+  outputTokens: number;
+  cachedTokens: number;
+  cacheWriteTokens: number;
+  durationMs: number;
+  stream: boolean;
+  requestStartMs: number;
+  upstreamFirstResponseMs: number;
+};
+
 export type StreamRecorder = {
-  recordSuccessfulRequest(params: {
-    accountId: string;
-    provider: string;
-    model: string;
-    userId: string;
-    apiKeyId: string;
-    inputTokens: number;
-    outputTokens: number;
-    cachedTokens: number;
-    cacheWriteTokens: number;
-    durationMs: number;
-    stream: boolean;
-    requestStartMs: number;
-    upstreamFirstResponseMs: number;
-  }): void;
-  storeHypercreditsUsage(
+  recordSuccess(params: SuccessRecord): void;
+  storeCredits(
     accountId: string,
     remaining: number | null,
     cost: number

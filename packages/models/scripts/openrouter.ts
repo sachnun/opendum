@@ -2,7 +2,7 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildModelIdMap, syncProviderModels } from "#models/registry.ts";
+import { idMap, sync } from "#models/model-store.ts";
 import { fetchDecoded, runOrThrow } from "#models/sync/http.ts";
 import { stripParamInfoKey } from "#models/model/clean-key.ts";
 
@@ -72,7 +72,7 @@ function isFreeChatModel(model) {
 }
 
 function buildModelMap(modelIds) {
-  return buildModelIdMap(modelIds, toModelKey);
+  return idMap(modelIds, toModelKey);
 }
 
 async function fetchOpenRouterFreeModelIds() {
@@ -104,7 +104,7 @@ async function main() {
   const modelIds = await fetchOpenRouterFreeModelIds();
   const modelMap = buildModelMap(modelIds);
 
-  const result = syncProviderModels(modelsDir, "openrouter", modelMap);
+  const result = sync(modelsDir, "openrouter", modelMap);
 
   if (result.added.length === 0 && result.removed.length === 0 && result.updated.length === 0) {
     console.log(`OpenRouter free models are already up to date (${modelMap.size} models).`);

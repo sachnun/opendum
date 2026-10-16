@@ -9,7 +9,8 @@
     ".": "./index.ts",
     "./schema": "./schema/index.ts",
     "./relations": "./relations.ts",
-    "./queries": "./queries/index.ts"
+    "./queries": "./queries/index.ts",
+    "./repositories": "./repositories/index.ts"
   },
   "scripts": {
     "db:push": "drizzle-kit push",

@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 
 import { db, disabledModel, providerAccount, providerAccountDisabledModel } from "@opendum/database";
-import { getAccountModelAvailability, isModelUsableByAccounts } from "~~/server/lib/proxy/auth";
+import { getAccountModelAvailability, usable } from "~~/server/lib/proxy/auth";
 import { getAuthlessProviderAccounts } from "~~/server/lib/proxy/authless-providers";
 import { MODEL_REGISTRY, getAllModels, getModelFamily, getProvidersForModel, resolveModelAlias } from "~~/server/lib/proxy/models";
 import { compareModelEntries } from "~~/lib/model-sort";
@@ -67,7 +67,7 @@ export async function getPlaygroundOptions(userId: string, proxyUrl?: string) {
 
     const models = [
       ...getAllModels()
-        .filter((model) => !disabledModelSet.has(model) && isModelUsableByAccounts(model, availability))
+        .filter((model) => !disabledModelSet.has(model) && usable(model, availability))
         .map((model) => {
           const providerConfigs = MODEL_REGISTRY[model]?.providerConfig ?? {};
           const topPDeprecatedProviders = Object.entries(providerConfigs)

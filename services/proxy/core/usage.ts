@@ -1,4 +1,5 @@
-import { numberAsFloat, numberAsInt } from "./helpers.js";
+import { Result } from "effect";
+import { numberAsFloat, numberAsInt, parseJson } from "./helpers.js";
 import { SseScanner } from "./sse.js";
 import type { UsageCounts } from "./types.js";
 
@@ -65,12 +66,9 @@ export class OpenAIStreamUsageTracker {
   }
 
   private processEvent(data: string): void {
-    let parsed: Json;
-    try {
-      parsed = JSON.parse(data) as Json;
-    } catch {
-      return;
-    }
+    const parsedData = parseJson(data);
+    if (Result.isFailure(parsedData)) return;
+    const parsed = parsedData.success as Json;
     const usage = usageObject(parsed);
     if (!usage) return;
     let input = numberAsInt(usage.prompt_tokens);

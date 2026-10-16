@@ -61,10 +61,10 @@ function recorder(): { recorder: StreamRecorder; recorded: Array<{ inputTokens: 
     recorded,
     hypercredits,
     recorder: {
-      recordSuccessfulRequest(params) {
+      recordSuccess(params) {
         recorded.push({ inputTokens: params.inputTokens, outputTokens: params.outputTokens, stream: params.stream });
       },
-      storeHypercreditsUsage(accountId, remaining, cost) {
+      storeCredits(accountId, remaining, cost) {
         hypercredits.push({ accountId, remaining, cost });
       },
     },

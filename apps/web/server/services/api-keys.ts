@@ -51,7 +51,7 @@ interface ApiKeyReadOptions {
   expireActiveKeys?: boolean;
 }
 
-function normalizeModelList(models: string[]): string[] {
+function modelList(models: string[]): string[] {
   return Array.from(new Set(models.map((model) => resolveModelAlias(model.trim())).filter((model) => model.length > 0))).sort(compareKnownModelIds);
 }
 
@@ -290,7 +290,7 @@ export async function updateApiKeyRoaming(userId: string, input: UpdateApiKeyRoa
 
 export async function updateApiKeyModelAccess(userId: string, input: UpdateApiKeyModelAccessInput) {
   return withOwnedApiKey(userId, input.id, "Failed to update API key model access", async (apiKey) => {
-    const normalizedModels = input.mode === "all" ? [] : normalizeModelList(input.models);
+    const normalizedModels = input.mode === "all" ? [] : modelList(input.models);
     if (input.mode !== "all" && normalizedModels.length === 0) return { success: false, error: "Select at least one model" } as const;
     const customModelIds = await ownedCustomModelIds(userId);
     const invalidModel = normalizedModels.find((model) => !isKnownModelAccessId(model) && !customModelIds.has(model));

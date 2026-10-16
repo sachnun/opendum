@@ -7,7 +7,7 @@ function configValue(
   provider: string,
   key: string
 ): unknown {
-  const cfg = registry.providerModelConfig(model, provider);
+  const cfg = registry.config(model, provider);
   if (!cfg) return undefined;
   if (key in cfg) return cfg[key];
   const custom = cfg.custom;
@@ -35,7 +35,7 @@ export function providerConfigString(
 }
 
 export function providerConfig(registry: Registry, model: string, provider: string): ProviderModelConfig | null {
-  return registry.providerModelConfig(model, provider);
+  return registry.config(model, provider);
 }
 
 export function providerMaxOutputTokens(
@@ -43,6 +43,6 @@ export function providerMaxOutputTokens(
   model: string,
   provider: string
 ): number {
-  const cfg = registry.providerModelConfig(model, provider);
+  const cfg = registry.config(model, provider);
   return cfg?.maxOutputTokens ?? 0;
 }

@@ -7,6 +7,13 @@ export const fullSchema = { ...schema, ...relations };
 
 export type Database = NodePgDatabase<typeof fullSchema> & { $client: Pool };
 
+/**
+ * Query-capable database handle. Satisfied by both the pooled `Database` and
+ * the transaction handles passed to `Database.transaction` callbacks, so
+ * queries and repositories can run inside a transaction without casts.
+ */
+export type DbExecutor = Pick<Database, "select" | "insert" | "update" | "delete" | "transaction">;
+
 const globalForDb = globalThis as unknown as {
   db: Database | undefined;
 };
@@ -58,8 +65,4 @@ export async function closeDatabase(): Promise<void> {
   if (!current) return;
   globalForDb.db = undefined;
   await current.$client.end();
-}
-
-if (process.env.NODE_ENV !== "production") {
-  globalForDb.db ??= getDb();
 }

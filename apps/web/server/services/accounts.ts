@@ -9,7 +9,7 @@ import { customProviderModels } from "./custom-providers";
 import { trackProviderEmail } from "./points";
 import { buildAccountStats, buildEmptyProviderStats, getProviderSummaryStats, type ProviderAccountIndicator } from "./account-stats";
 import {
-  ACCOUNT_COOLDOWN_UNHEALTHY_THRESHOLD,
+  UNHEALTHY_THRESHOLD,
   type AccountHealthAggregate,
   type AccountModelHealthSummaryRow,
   type AccountOverviewSummary,
@@ -315,7 +315,7 @@ export async function getAccountsByProviderDetailed(userId: string, input: z.inf
     const detailedAccounts = accounts.map((account) => {
       const health = healthByAccountId[account.id];
       const unhealthyCount = health?.unhealthyCount ?? account.consecutiveErrors;
-      const status = accountHasActiveCooldown(account, now) || unhealthyCount >= ACCOUNT_COOLDOWN_UNHEALTHY_THRESHOLD ? "failed" : "active";
+      const status = accountHasActiveCooldown(account, now) || unhealthyCount >= UNHEALTHY_THRESHOLD ? "failed" : "active";
 
       return {
         ...withEffectiveActive(account, now),
@@ -474,7 +474,7 @@ async function accelerateAccountCooldownForManualEnable(accountId: string, now =
       await tx.update(providerAccountModelHealth).set(patch).where(eq(providerAccountModelHealth.id, row.id));
     }
 
-    const stillCoolingDown = total >= ACCOUNT_COOLDOWN_UNHEALTHY_THRESHOLD;
+    const stillCoolingDown = total >= UNHEALTHY_THRESHOLD;
     await tx
       .update(providerAccount)
       .set({

@@ -13,10 +13,10 @@ export type GuardedFetchOptions = {
   connectTimeout?: number;
 };
 
-export type GuardedFetch = (url: string, init?: RequestInit) => Promise<Response>;
+export type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
 
-export type GuardedFetcher = {
-  fetch: GuardedFetch;
+export type FetchHandle = {
+  fetch: Fetch;
   close(): Promise<void>;
 };
 
@@ -53,7 +53,7 @@ function guardedLookup(hostname: string, options: unknown, callback: LookupCallb
   });
 }
 
-export function createGuardedFetch(options: GuardedFetchOptions = {}): GuardedFetcher {
+export function createGuardedFetch(options: GuardedFetchOptions = {}): FetchHandle {
   const connectTimeout = options.connectTimeout ?? DEFAULT_CONNECT_TIMEOUT_MS;
   const connectWithLookup = buildConnector({
     lookup: guardedLookup as never,
@@ -71,7 +71,7 @@ export function createGuardedFetch(options: GuardedFetchOptions = {}): GuardedFe
     connect: connection,
     headersTimeout: options.headersTimeout,
   });
-  const fetchFn: GuardedFetch = (url, init) =>
+  const fetchFn: Fetch = (url, init) =>
     undiciFetch(url, {
       ...(init as UndiciRequestInit),
       dispatcher: agent,

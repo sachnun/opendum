@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { db, customProvider, customProviderModel, providerAccount } from "@opendum/database";
 import { stripParamInfoKey } from "@opendum/models/clean-key";
-import { buildModelIdMap } from "@opendum/models/registry";
+import { idMap } from "@opendum/models/model-store";
 import { decrypt, encrypt, hashString } from "~~/server/lib/encryption";
 import { fetchInternalProvider, InternalRelayNotConfiguredError } from "~~/server/lib/proxy/internal-relay";
 import { PROVIDER_ACCOUNT_KEYS } from "./account-providers";
@@ -315,11 +315,11 @@ function toModelKey(upstream: string): string {
 
 /**
  * Clean an upstream model list into public model ids and keep their kebab/raw
- * aliases. `buildModelIdMap` owns collision handling (newest date variant wins
+ * aliases. `idMap` owns collision handling (newest date variant wins
  * the base key, older ones get a `-<date>` key), matching `@opendum/models`.
  */
 function cleanCustomModels(upstreamIds: string[]): Array<{ modelId: string; upstream: string }> {
-  return [...buildModelIdMap(upstreamIds, toModelKey)].map(([modelId, upstream]) => ({ modelId, upstream }));
+  return [...idMap(upstreamIds, toModelKey)].map(([modelId, upstream]) => ({ modelId, upstream }));
 }
 
 export async function connectCustomProviderAccount(userId: string, slug: string, apiKey: string, name?: string): Promise<ActionResult<{ isUpdate: boolean }>> {

@@ -1,4 +1,5 @@
 import type { Provider, ProviderAccount } from "@opendum/providers";
+import { tierFor } from "./tiers.js";
 import { stringValue } from "./helpers.js";
 import type { ProviderRoutingOptions, ProviderScore } from "./provider-performance.js";
 
@@ -11,7 +12,9 @@ export function isSyntheticProviderAccountId(accountId: string): boolean {
   return accountId === "opencode" || accountId.startsWith(AUTHLESS_ACCOUNT_PREFIX);
 }
 
-export function normalizeAccessMode(mode: string): string {
+export { ignore } from "@opendum/core/best-effort";
+
+export function accessMode(mode: string): string {
   return mode === "whitelist" || mode === "blacklist" ? mode : "all";
 }
 
@@ -23,7 +26,7 @@ export function accountAccessDenial(
   accountId: string,
   access: { mode: string; accounts: string[] }
 ): { message: string; code: string } | null {
-  const mode = normalizeAccessMode(access.mode);
+  const mode = accessMode(access.mode);
   const set = new Set(normalizeAccountIds(access.accounts));
   if (mode === "whitelist" && !set.has(accountId)) {
     return { message: "Selected provider account is not allowed for this API key.", code: "provider_account_not_whitelisted" };
@@ -213,22 +216,7 @@ export function paidFirst(accounts: ProviderAccount[]): ProviderAccount[] {
 }
 
 export function isPaidAccountTier(provider: string, tier: string | null): boolean {
-  if (!tier) return false;
-  const value = tier.trim().toLowerCase();
-  switch (provider) {
-    case "antigravity":
-      return value === "paid" || value === "standard-tier" || value.startsWith("g1-");
-    case "kiro":
-      return value === "pro" || value === "pro+" || value === "pro-plus" || value === "power";
-    default:
-      break;
-  }
-  const paid = new Set([
-    "paid", "standard-tier", "plus", "pro", "pro-plus", "pro+", "prolite", "power", "team", "go",
-    "self_serve_business_usage_based", "business", "enterprise_cbp_usage_based", "enterprise", "edu",
-    "education", "hc",
-  ]);
-  return paid.has(value);
+  return tierFor(provider).isPaid(tier);
 }
 
 export function nullableTimeBefore(a: Date | null | undefined, b: Date | null | undefined): boolean {

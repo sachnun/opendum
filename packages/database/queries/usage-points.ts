@@ -1,6 +1,6 @@
 import { and, eq, gte, sql } from "drizzle-orm";
 import { createId } from "@paralleldrive/cuid2";
-import { db, type Database } from "../client.js";
+import { db, type DbExecutor } from "../client.js";
 import { pointTransaction, usageLog, userPointBalance } from "../schema/usage.js";
 
 export type InsertUsageLogParams = {
@@ -18,7 +18,7 @@ export type InsertUsageLogParams = {
   createdAt: Date;
 };
 
-export async function insertUsageLog(params: InsertUsageLogParams, database: Database = db) {
+export async function insertUsageLog(params: InsertUsageLogParams, database: DbExecutor = db) {
   await database.insert(usageLog).values({
     id: params.id ?? createId(),
     userId: params.userId,
@@ -37,7 +37,7 @@ export async function insertUsageLog(params: InsertUsageLogParams, database: Dat
 
 export async function debitPointBalance(
   params: { userId: string; amount: number; at: Date },
-  database: Database = db
+  database: DbExecutor = db
 ) {
   const [row] = await database
     .update(userPointBalance)
@@ -49,7 +49,7 @@ export async function debitPointBalance(
 
 export async function debitPointBalanceAllowNegative(
   params: { userId: string; amount: number; at: Date },
-  database: Database = db
+  database: DbExecutor = db
 ) {
   const [row] = await database
     .update(userPointBalance)
@@ -61,7 +61,7 @@ export async function debitPointBalanceAllowNegative(
 
 export async function creditPointBalance(
   params: { userId: string; amount: number; at: Date },
-  database: Database = db
+  database: DbExecutor = db
 ) {
   const [row] = await database
     .update(userPointBalance)
@@ -84,7 +84,7 @@ export type InsertPointTransactionParams = {
 
 export async function insertPointTransaction(
   params: InsertPointTransactionParams,
-  database: Database = db
+  database: DbExecutor = db
 ) {
   await database.insert(pointTransaction).values({
     id: params.id ?? createId(),
@@ -100,7 +100,7 @@ export async function insertPointTransaction(
 
 export async function insertPointTransactionOnConflictDoNothing(
   params: InsertPointTransactionParams,
-  database: Database = db
+  database: DbExecutor = db
 ) {
   const result = await database
     .insert(pointTransaction)
@@ -120,7 +120,7 @@ export async function insertPointTransactionOnConflictDoNothing(
 
 export async function updatePointTransactionBalance(
   params: { id: string; balanceAfter: number },
-  database: Database = db
+  database: DbExecutor = db
 ) {
   await database
     .update(pointTransaction)
@@ -130,7 +130,7 @@ export async function updatePointTransactionBalance(
 
 export async function insertPointBalanceOnConflictDoNothing(
   params: { userId: string; balance: number; createdAt: Date; updatedAt: Date },
-  database: Database = db
+  database: DbExecutor = db
 ) {
   const result = await database
     .insert(userPointBalance)

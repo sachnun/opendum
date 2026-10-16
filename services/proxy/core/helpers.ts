@@ -1,3 +1,27 @@
+import { Effect, Result } from "effect";
+
+/** Runs a synchronous value producer, capturing a thrown cause as `Result.failure`. */
+export function trySyncResult<T>(fn: () => T): Result.Result<T, unknown> {
+  return Effect.runSync(Effect.result(Effect.try({ try: fn, catch: (cause) => cause })));
+}
+
+/** Runs a synchronous value producer, returning `fallback` when it throws. */
+export function trySync<T>(fn: () => T, fallback: T): T {
+  const result = trySyncResult(fn);
+  return Result.isSuccess(result) ? result.success : fallback;
+}
+
+/** Runs an asynchronous value producer, returning `fallback` when it rejects. */
+export async function tryAsync<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
+  const result = await Effect.runPromise(Effect.result(Effect.tryPromise({ try: fn, catch: (cause) => cause })));
+  return Result.isSuccess(result) ? result.success : fallback;
+}
+
+/** `JSON.parse` with parse failures captured as `Result.failure`. */
+export function parseJson(text: string): Result.Result<unknown, unknown> {
+  return trySyncResult(() => JSON.parse(text) as unknown);
+}
+
 export function stringValue(value: unknown): string {
   return typeof value === "string" ? value : "";
 }

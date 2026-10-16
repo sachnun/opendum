@@ -2,7 +2,7 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildModelIdMap, syncProviderModels } from "#models/registry.ts";
+import { idMap, sync } from "#models/model-store.ts";
 import { fetchDecoded, runOrThrow } from "#models/sync/http.ts";
 import { stripParamInfoKey } from "#models/model/clean-key.ts";
 
@@ -39,7 +39,7 @@ function isEligibleModel(model) {
 }
 
 function buildModelMap(models) {
-  return buildModelIdMap(models.map((model) => model.id.trim()), toModelKey);
+  return idMap(models.map((model) => model.id.trim()), toModelKey);
 }
 
 async function fetchKiloCodeModels() {
@@ -69,7 +69,7 @@ async function main() {
     [...modelMap.keys()].map((modelKey) => [modelKey, { authless: true, free: true }])
   );
 
-  const result = syncProviderModels(modelsDir, "kilo_code", modelMap, {
+  const result = sync(modelsDir, "kilo_code", modelMap, {
     providerConfigByModel,
     managedProviderConfigKeys: ["authless", "free"],
   });

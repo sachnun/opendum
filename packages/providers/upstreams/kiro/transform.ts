@@ -10,6 +10,7 @@ import {
 } from "../../core/helpers.js";
 import type { ProviderAccount } from "../../types.js";
 import { KIRO_REGION } from "../../endpoints.js";
+import { Collector } from "../../transform/collector.js";
 
 export const KIRO_API_BASE_URL = "https://q.%s.amazonaws.com/generateAssistantResponse";
 export const KIRO_THINKING_START = "<thinking>";
@@ -169,11 +170,7 @@ export function kiroErrorMessage(event: Json): string {
   return defaultStringValue(event.error, stringValue(event.Error));
 }
 
-export class KiroParserState {
-  buffer = "";
-}
-
-export function nextKiroJsonStart(buffer: string, offset: number): number {
+function nextKiroJsonStart(buffer: string, offset: number): number {
   const patterns = [
     '{"assistantResponseEvent":', '{"toolUseEvent":', '{"reasoningContentEvent":',
     '{"metadataEvent":', '{"messageMetadataEvent":', '{"tokenUsage":', '{"usage":',
@@ -189,7 +186,7 @@ export function nextKiroJsonStart(buffer: string, offset: number): number {
   return best;
 }
 
-export function keepKiroParserTail(value: string): string {
+function keepKiroParserTail(value: string): string {
   return value.length <= 64 ? value : value.slice(value.length - 64);
 }
 
@@ -222,134 +219,135 @@ export function isKiroResponseEvent(parsed: Json): boolean {
   return false;
 }
 
-export function parseKiroJsonEvents(source: string, state: KiroParserState): Json[] {
-  state.buffer += source;
-  const events: Json[] = [];
-  let cursor = 0;
-  while (cursor < state.buffer.length) {
-    const start = nextKiroJsonStart(state.buffer, cursor);
-    if (start === -1) {
-      state.buffer = keepKiroParserTail(state.buffer.slice(cursor));
-      return events;
-    }
-    let depth = 0;
-    let inString = false;
-    let escaped = false;
-    let end = -1;
-    for (let i = start; i < state.buffer.length; i += 1) {
-      const ch = state.buffer[i];
-      if (escaped) {
-        escaped = false;
-        continue;
-      }
-      if (ch === "\\") {
-        escaped = true;
-        continue;
-      }
-      if (ch === '"') {
-        inString = !inString;
-        continue;
-      }
-      if (inString) continue;
-      if (ch === "{") depth += 1;
-      else if (ch === "}") {
-        depth -= 1;
-        if (depth === 0) {
-          end = i;
-          break;
-        }
-      }
-    }
-    if (end === -1) {
-      state.buffer = state.buffer.slice(start);
-      return events;
-    }
-    const candidate = state.buffer.slice(start, end + 1);
-    cursor = end + 1;
-    try {
-      const parsed = JSON.parse(candidate) as Json;
-      for (const event of normalizeKiroResponseEvents(parsed)) {
-        if (isKiroResponseEvent(event)) events.push(event);
-      }
-    } catch {
-      continue;
-    }
-  }
-  state.buffer = "";
-  return events;
-}
-
-export class KiroThinkingSplitter {
-  private buffer = "";
+export class Parser {
+  private eventBuffer = "";
+  private contentBuffer = "";
   private inThinking = false;
   private thinkingExtracted = false;
   private activeEndTag = "";
 
-  constructor(enabled: boolean) {
-    void enabled;
+  feed(source: string): Json[] {
+    this.eventBuffer += source;
+    const events: Json[] = [];
+    let cursor = 0;
+    while (cursor < this.eventBuffer.length) {
+      const start = nextKiroJsonStart(this.eventBuffer, cursor);
+      if (start === -1) {
+        this.eventBuffer = keepKiroParserTail(this.eventBuffer.slice(cursor));
+        return events;
+      }
+      let depth = 0;
+      let inString = false;
+      let escaped = false;
+      let end = -1;
+      for (let i = start; i < this.eventBuffer.length; i += 1) {
+        const ch = this.eventBuffer[i];
+        if (escaped) {
+          escaped = false;
+          continue;
+        }
+        if (ch === "\\") {
+          escaped = true;
+          continue;
+        }
+        if (ch === '"') {
+          inString = !inString;
+          continue;
+        }
+        if (inString) continue;
+        if (ch === "{") depth += 1;
+        else if (ch === "}") {
+          depth -= 1;
+          if (depth === 0) {
+            end = i;
+            break;
+          }
+        }
+      }
+      if (end === -1) {
+        this.eventBuffer = this.eventBuffer.slice(start);
+        return events;
+      }
+      const candidate = this.eventBuffer.slice(start, end + 1);
+      cursor = end + 1;
+      try {
+        const parsed = JSON.parse(candidate) as Json;
+        for (const event of normalizeKiroResponseEvents(parsed)) {
+          if (isKiroResponseEvent(event)) events.push(event);
+        }
+      } catch {
+        continue;
+      }
+    }
+    this.eventBuffer = "";
+    return events;
   }
 
-  process(delta: string, final: boolean): [string, string] {
-    this.buffer += delta;
+  finish(): Json[] {
+    return this.feed("");
+  }
+
+  processContent(delta: string, final = false): [string, string] {
+    this.contentBuffer += delta;
     let content = "";
     let reasoning = "";
-    while (this.buffer !== "") {
+    while (this.contentBuffer !== "") {
       if (!this.inThinking && !this.thinkingExtracted) {
-        const { start, tag } = findKiroThinkingStartTag(this.buffer);
+        const { start, tag } = findKiroThinkingStartTag(this.contentBuffer);
         if (start >= 0 && tag) {
-          content += this.buffer.slice(0, start);
-          this.buffer = this.buffer.slice(start + tag.start.length);
+          content += this.contentBuffer.slice(0, start);
+          this.contentBuffer = this.contentBuffer.slice(start + tag.start.length);
           this.inThinking = true;
           this.activeEndTag = tag.end;
           continue;
         }
         if (final) {
-          content += this.buffer;
-          this.buffer = "";
+          content += this.contentBuffer;
+          this.contentBuffer = "";
           break;
         }
-        const safeLen = safeKiroUtf8PrefixLen(this.buffer, Math.max(0, this.buffer.length - maxKiroThinkingStartLen()));
+        const safeLen = safeKiroUtf8PrefixLen(this.contentBuffer, Math.max(0, this.contentBuffer.length - maxKiroThinkingStartLen()));
         if (safeLen > 0) {
-          content += this.buffer.slice(0, safeLen);
-          this.buffer = this.buffer.slice(safeLen);
+          content += this.contentBuffer.slice(0, safeLen);
+          this.contentBuffer = this.contentBuffer.slice(safeLen);
         }
         break;
       }
       if (this.inThinking) {
         const endTag = this.activeEndTag || KIRO_THINKING_END;
-        const end = findKiroRealTag(this.buffer, endTag);
+        const end = findKiroRealTag(this.contentBuffer, endTag);
         if (end >= 0) {
-          reasoning += this.buffer.slice(0, end);
-          this.buffer = this.buffer.slice(end + endTag.length);
+          reasoning += this.contentBuffer.slice(0, end);
+          this.contentBuffer = this.contentBuffer.slice(end + endTag.length);
           this.inThinking = false;
           this.thinkingExtracted = true;
-          if (this.buffer.startsWith("\n\n")) this.buffer = this.buffer.slice(2);
+          if (this.contentBuffer.startsWith("\n\n")) this.contentBuffer = this.contentBuffer.slice(2);
           continue;
         }
         if (final) {
-          reasoning += this.buffer;
-          this.buffer = "";
+          reasoning += this.contentBuffer;
+          this.contentBuffer = "";
           break;
         }
-        const safeLen = safeKiroUtf8PrefixLen(this.buffer, Math.max(0, this.buffer.length - endTag.length));
+        const safeLen = safeKiroUtf8PrefixLen(this.contentBuffer, Math.max(0, this.contentBuffer.length - endTag.length));
         if (safeLen > 0) {
-          reasoning += this.buffer.slice(0, safeLen);
-          this.buffer = this.buffer.slice(safeLen);
+          reasoning += this.contentBuffer.slice(0, safeLen);
+          this.contentBuffer = this.contentBuffer.slice(safeLen);
         }
         break;
       }
-      content += this.buffer;
-      this.buffer = "";
+      content += this.contentBuffer;
+      this.contentBuffer = "";
     }
     return [content, reasoning];
   }
 
-  flush(): [string, string] {
-    return this.process("", true);
+  flushContent(): [string, string] {
+    return this.processContent("", true);
   }
 }
 
-export function safeKiroUtf8PrefixLen(value: string, maxLen: number): number {
+function safeKiroUtf8PrefixLen(value: string, maxLen: number): number {
   if (maxLen <= 0) return 0;
   if (maxLen >= value.length) return value.length;
   let len = maxLen;
@@ -357,7 +355,7 @@ export function safeKiroUtf8PrefixLen(value: string, maxLen: number): number {
   return len;
 }
 
-export function findKiroThinkingStartTag(buffer: string): { start: number; tag: { start: string; end: string } | null } {
+function findKiroThinkingStartTag(buffer: string): { start: number; tag: { start: string; end: string } | null } {
   let best = -1;
   let bestTag: { start: string; end: string } | null = null;
   for (const tag of KIRO_THINKING_TAGS) {
@@ -370,7 +368,7 @@ export function findKiroThinkingStartTag(buffer: string): { start: number; tag: 
   return { start: best, tag: bestTag };
 }
 
-export function maxKiroThinkingStartLen(): number {
+function maxKiroThinkingStartLen(): number {
   let maxLen = 0;
   for (const tag of KIRO_THINKING_TAGS) {
     if (tag.start.length > maxLen) maxLen = tag.start.length;
@@ -378,7 +376,7 @@ export function maxKiroThinkingStartLen(): number {
   return maxLen;
 }
 
-export function findKiroRealTag(buffer: string, tag: string): number {
+function findKiroRealTag(buffer: string, tag: string): number {
   let pos = 0;
   let inCodeBlock = false;
   while (pos < buffer.length) {
@@ -1061,24 +1059,24 @@ export function buildKiroRequest(registry: Registry, body: Json): Json {
 
 export function normalizeKiroModel(registry: Registry, model: string): string {
   const raw = lastModelSegment(model);
-  if (registry.isSupportedByProvider(raw, "kiro")) return registry.upstreamModelName(raw, "kiro");
+  if (registry.isSupportedByProvider(raw, "kiro")) return registry.upstream(raw, "kiro");
   if (raw.endsWith("-thinking")) {
     const base = raw.slice(0, -"-thinking".length);
-    if (registry.isSupportedByProvider(base, "kiro")) return registry.upstreamModelName(base, "kiro");
+    if (registry.isSupportedByProvider(base, "kiro")) return registry.upstream(base, "kiro");
   }
-  return registry.upstreamModelName(raw, "kiro");
+  return registry.upstream(raw, "kiro");
 }
 
-export function convertKiroEventsToCompletion(events: Json[], model: string, parseThinking: boolean): Json {
+export function convertKiroEventsToCompletion(events: Json[], model: string): Json {
   let content = "";
   let reasoning = "";
   let outputText = "";
   let activeToolId = "";
   let contextUsagePercentage = 0;
   let explicitUsage: Json | null = null;
-  const splitter = new KiroThinkingSplitter(parseThinking);
+  const parser = new Parser();
   let hasNativeReasoning = false;
-  const toolById = new Map<string, { index: number; name: string; args: string }>();
+  const toolById = new Map<string, { name: string; args: string }>();
 
   for (const event of events) {
     if (event.contextUsagePercentage !== undefined) contextUsagePercentage = kiroNumberAsFloat(event.contextUsagePercentage);
@@ -1092,7 +1090,7 @@ export function convertKiroEventsToCompletion(events: Json[], model: string, par
       outputText += reasoningDelta;
     }
     if (typeof event.content === "string" && event.followupPrompt === undefined) {
-      const [textDelta, reasoningPart] = splitter.process(event.content, false);
+      const [textDelta, reasoningPart] = parser.processContent(event.content, false);
       content += textDelta;
       if (!hasNativeReasoning) reasoning += reasoningPart;
       outputText += textDelta + reasoningPart;
@@ -1102,10 +1100,10 @@ export function convertKiroEventsToCompletion(events: Json[], model: string, par
     if (name && toolUseId) {
       activeToolId = toolUseId;
       if (!toolById.has(toolUseId)) {
-        toolById.set(toolUseId, { index: toolById.size, name, args: "" });
+        toolById.set(toolUseId, { name, args: "" });
       }
       const input = stringValue(event.input);
-      if (input) (toolById.get(toolUseId) as { args: string }).args += input;
+      if (input) (toolById.get(toolUseId) as { name: string; args: string }).args += input;
     }
     const input = stringValue(event.input);
     if (input && !stringValue(event.name) && activeToolId) {
@@ -1115,44 +1113,34 @@ export function convertKiroEventsToCompletion(events: Json[], model: string, par
     if (event.stop === true) activeToolId = "";
   }
 
-  const [flushText, flushReasoning] = splitter.flush();
+  const [flushText, flushReasoning] = parser.flushContent();
   content += flushText;
   if (!hasNativeReasoning) reasoning += flushReasoning;
   outputText += flushText + flushReasoning;
 
-  const toolCalls: Array<Json | null> = Array.from({ length: toolById.size }, () => null);
+  const collector = new Collector({
+    model,
+    nullContent: true,
+    normalizeArgs: (args) => defaultEmpty(args, "{}"),
+  });
   for (const [id, call] of toolById) {
-    toolCalls[call.index] = {
-      id,
-      type: "function",
-      function: { name: call.name, arguments: defaultEmpty(call.args, "{}") },
-    };
+    collector.addToolCall({ key: id, id, name: call.name, arguments: call.args });
   }
   const bracketCalls = parseKiroBracketToolCalls(content);
   if (bracketCalls.length > 0) {
     content = cleanKiroBracketToolCalls(content, bracketCalls);
     for (const call of bracketCalls) {
-      toolCalls.push({
+      collector.addToolCall({
+        key: call.id,
         id: call.id,
-        type: "function",
-        function: { name: call.name, arguments: call.arguments },
+        name: call.name,
+        arguments: call.arguments,
       });
     }
   }
-
-  const message: Json = { role: "assistant", content: null };
-  if (content) message.content = content;
-  if (reasoning) message.reasoning_content = reasoning;
-  if (toolCalls.length > 0) message.tool_calls = toolCalls;
-  const finish = toolCalls.length > 0 ? "tool_calls" : "stop";
-  const usage = explicitUsage ?? kiroUsageFromContext(model, contextUsagePercentage, outputText);
-  return {
-    id: randomId("chatcmpl"),
-    object: "chat.completion",
-    created: Math.floor(Date.now() / 1000),
-    model,
-    choices: [{ index: 0, message, finish_reason: finish }],
-    usage,
-  };
+  collector.addContent(content);
+  collector.addReasoning(reasoning);
+  collector.setUsage(explicitUsage ?? kiroUsageFromContext(model, contextUsagePercentage, outputText));
+  return collector.toCompletion();
 }
 

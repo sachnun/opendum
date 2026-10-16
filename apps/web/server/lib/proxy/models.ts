@@ -11,20 +11,20 @@ export const IGNORED_MODELS = new Set(registry.ignoredModels());
 export type { ModelInfo, ProviderAccessRule };
 
 export function getProviderModelMap(provider: string): Record<string, string> {
-  return Object.fromEntries(registry.providerModelMap(provider));
+  return Object.fromEntries(registry.modelMap(provider));
 }
 
 export function getProviderModelSet(provider: string): Set<string> {
-  return registry.providerModelSet(provider);
+  return registry.modelSet(provider);
 }
 
 export function getProviderAccessRule(model: string, provider: string): ProviderAccessRule | null {
-  return registry.providerAccessRule(model, provider);
+  return registry.rule(model, provider);
 }
 
 export function getAuthlessProviderModels(): Record<string, string[]> {
   const result: Record<string, string[]> = {};
-  for (const [provider, models] of registry.authlessProviderModels()) {
+  for (const [provider, models] of registry.authlessModels()) {
     result[provider] = [...models].sort((a, b) =>
       compareModelEntries(
         { id: a, family: MODEL_REGISTRY[a]?.family },
@@ -44,7 +44,7 @@ export function getModelLookupKeys(model: string): string[] {
 }
 
 export function getProvidersForModel(model: string): string[] {
-  return registry.providersForModel(model);
+  return registry.providers(model);
 }
 
 export function isModelSupported(model: string): boolean {

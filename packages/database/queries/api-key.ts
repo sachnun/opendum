@@ -1,8 +1,8 @@
 import { eq } from "drizzle-orm";
-import { db, type Database } from "../client.js";
+import { db, type DbExecutor } from "../client.js";
 import { proxyApiKey, proxyApiKeyRateLimit } from "../schema/keys.js";
 
-export async function getAPIKeyByHash(keyHash: string, database: Database = db) {
+export async function getAPIKeyByHash(keyHash: string, database: DbExecutor = db) {
   const [row] = await database
     .select({
       id: proxyApiKey.id,
@@ -22,7 +22,7 @@ export async function getAPIKeyByHash(keyHash: string, database: Database = db) 
   return row ?? null;
 }
 
-export async function getAPIKeyFreshnessByID(id: string, database: Database = db) {
+export async function getAPIKeyFreshnessByID(id: string, database: DbExecutor = db) {
   const [row] = await database
     .select({
       id: proxyApiKey.id,
@@ -36,7 +36,7 @@ export async function getAPIKeyFreshnessByID(id: string, database: Database = db
   return row ?? null;
 }
 
-export async function listAPIKeyRateLimits(apiKeyId: string, database: Database = db) {
+export async function listAPIKeyRateLimits(apiKeyId: string, database: DbExecutor = db) {
   return database
     .select({
       target: proxyApiKeyRateLimit.target,
@@ -49,10 +49,10 @@ export async function listAPIKeyRateLimits(apiKeyId: string, database: Database 
     .where(eq(proxyApiKeyRateLimit.apiKeyId, apiKeyId));
 }
 
-export async function touchAPIKeyLastUsed(id: string, database: Database = db) {
+export async function touchAPIKeyLastUsed(id: string, database: DbExecutor = db) {
   await database.update(proxyApiKey).set({ lastUsedAt: new Date() }).where(eq(proxyApiKey.id, id));
 }
 
-export async function deactivateAPIKey(id: string, database: Database = db) {
+export async function deactivateAPIKey(id: string, database: DbExecutor = db) {
   await database.update(proxyApiKey).set({ isActive: false }).where(eq(proxyApiKey.id, id));
 }
