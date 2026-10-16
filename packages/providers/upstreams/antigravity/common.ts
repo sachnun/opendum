@@ -1,6 +1,4 @@
-import { randomBytes } from "node:crypto";
-
-import { stringValue } from "../../core/helpers.js";
+import { randomUuid, stringValue } from "../../core/helpers.js";
 
 export type Json = Record<string, unknown>;
 
@@ -20,13 +18,7 @@ export function mapSlice(value: unknown): Json[] {
   );
 }
 
-export function randomUuid(): string {
-  const buf = randomBytes(16);
-  buf[6] = (buf[6] & 0x0f) | 0x40;
-  buf[8] = (buf[8] & 0x3f) | 0x80;
-  const hex = buf.toString("hex");
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-}
+export { randomUuid };
 
 export function randomHyphenId(prefix: string): string {
   return `${prefix}-${randomUuid()}`;

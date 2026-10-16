@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
-import { jsonResponse, numberFromAny, parseSseDataLines, stringValue } from "../core/helpers.js";
+import { jsonResponse, numberFromAny, parseSseDataLines, randomUuid, stringValue } from "../core/helpers.js";
 import { normalizeProviderFailure, transportFailure, type UpstreamTransport } from "../core/http.js";
 import { ProviderCredentialFailure } from "../core/errors.js";
 import { OAuth } from "../core/oauth.js";
@@ -138,6 +138,9 @@ export class WorkbuddyProvider implements Provider, CredentialRefresher {
                 Authorization: `Bearer ${request.credentials.trim()}`,
                 "X-User-Id": uid,
                 "X-Domain": WORKBUDDY_DOMAIN,
+                "X-Conversation-ID": randomUuid(),
+                "X-Conversation-Request-ID": randomUuid(),
+                "X-Conversation-Message-ID": randomUuid(),
                 "Content-Type": "application/json",
                 Accept: "text/event-stream",
               },

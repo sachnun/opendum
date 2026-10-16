@@ -9,6 +9,9 @@ import { WorkbuddyProvider, workbuddyStreamToCompletion } from "./workbuddy.js";
 const account = { id: "acc-1" } as unknown as ProviderAccount;
 const FALLBACK_TTL_MS = 31536000 * 1000;
 
+const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const CONVERSATION_HEADERS = ["X-Conversation-ID", "X-Conversation-Request-ID", "X-Conversation-Message-ID"];
+
 type Captured = { url: string; init?: RequestInit };
 
 function provider(response: { status?: number; body: string }, captured?: Captured[]): WorkbuddyProvider {
@@ -89,6 +92,42 @@ describe("WorkbuddyProvider.refreshCredentials", () => {
     const emptyToken = await refresh(provider({ body: JSON.stringify({ code: 0, data: { accessToken: "  " } }) }));
     expect(emptyToken.ok).toBe(false);
     if (!emptyToken.ok) expect(emptyToken.error.message).toBe("workbuddy token refresh returned empty token");
+  });
+});
+
+async function chat(buddy: WorkbuddyProvider): Promise<void> {
+  await Effect.runPromise(
+    buddy.makeRequest({
+      account: { id: "acc-1", accountId: "user-1" } as unknown as ProviderAccount,
+      credentials: "at-1",
+      body: { model: "deepseek-v4.1-flash", messages: [{ role: "user", content: "hi" }] },
+      stream: true,
+    })
+  );
+}
+
+describe("WorkbuddyProvider.makeRequest", () => {
+  it("sends a fresh conversation header trio on every chat request", async () => {
+    const captured: Captured[] = [];
+    const fake = provider({ body: "" }, captured);
+    await chat(fake);
+    await chat(fake);
+    const first = captured[0]?.init?.headers as Record<string, string>;
+    const second = captured[1]?.init?.headers as Record<string, string>;
+    const firstValues = CONVERSATION_HEADERS.map((name) => first[name] ?? "");
+    const secondValues = CONVERSATION_HEADERS.map((name) => second[name] ?? "");
+    for (const value of [...firstValues, ...secondValues]) expect(value).toMatch(UUID_V4);
+    expect(new Set(firstValues).size).toBe(3);
+    for (const name of CONVERSATION_HEADERS) expect(second[name]).not.toBe(first[name]);
+  });
+
+  it("keeps the conversation headers off the refresh call", async () => {
+    const captured: Captured[] = [];
+    const fake = provider({ body: JSON.stringify({ code: 0, data: { accessToken: "at" } }) }, captured);
+    const result = await refresh(fake);
+    expect(result.ok).toBe(true);
+    const headers = captured[0]?.init?.headers as Record<string, string>;
+    for (const name of CONVERSATION_HEADERS) expect(headers[name]).toBeUndefined();
   });
 });
 
