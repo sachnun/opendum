@@ -1,12 +1,12 @@
 import { oc } from "@orpc/contract";
 import { z } from "zod";
 
+import { emptyInputSchema } from "./common.js";
 import { DEVICE_PROVIDER_KEYS, OAUTH_PROVIDER_KEYS, QUOTA_PROVIDER_KEYS } from "../provider-accounts.js";
 
 const PROVIDER_KEY_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/;
 const MAX_QUOTA_BATCH_ACCOUNTS = 100;
 
-const emptyInputSchema = z.object({});
 const accountIdSchema = z.string().trim().min(1);
 const providerInputSchema = z.object({ provider: z.string().trim().toLowerCase().regex(PROVIDER_KEY_PATTERN, "Invalid provider") });
 const providerDetailInputSchema = providerInputSchema.extend({ cursor: z.string().min(1).optional() });
@@ -68,22 +68,22 @@ export const accountsContract = {
   overview: oc.input(accountOverviewInputSchema),
   ping: oc.input(emptyInputSchema),
   provider: oc.input(providerInputSchema),
-  providerDetail: oc.input(providerDetailInputSchema),
+  detail: oc.input(providerDetailInputSchema),
   stats: oc.input(accountStatsInputSchema),
   create: oc.input(createAccountInputSchema),
   update: oc.input(updateAccountInputSchema),
-  remove: oc.input(deleteAccountInputSchema),
-  pinned: oc.input(togglePinnedProviderInputSchema),
-  setModelEnabled: oc.input(setAccountModelEnabledInputSchema),
-  errorHistory: oc.input(errorHistoryInputSchema),
-  errorHistories: oc.input(errorHistoryBatchInputSchema),
-  resolveErrors: oc.input(resolveErrorsInputSchema),
+  delete: oc.input(deleteAccountInputSchema),
+  pin: oc.input(togglePinnedProviderInputSchema),
+  enable: oc.input(setAccountModelEnabledInputSchema),
+  error: oc.input(errorHistoryInputSchema),
+  errors: oc.input(errorHistoryBatchInputSchema),
+  resolve: oc.input(resolveErrorsInputSchema),
   session: oc.input(accountSessionInputSchema),
-  authUrl: oc.input(getAuthUrlInputSchema),
-  exchangeOAuth: oc.input(exchangeOAuthInputSchema),
-  initiateDeviceAuth: oc.input(initiateDeviceAuthInputSchema),
-  pollDeviceAuth: oc.input(pollDeviceAuthInputSchema),
-  connectCodexSession: oc.input(connectCodexSessionInputSchema),
+  auth: oc.input(getAuthUrlInputSchema),
+  exchange: oc.input(exchangeOAuthInputSchema),
+  initiate: oc.input(initiateDeviceAuthInputSchema),
+  poll: oc.input(pollDeviceAuthInputSchema),
+  codex: oc.input(connectCodexSessionInputSchema),
   quota: oc.input(accountQuotaInputSchema),
   quotas: oc.input(accountQuotaBatchInputSchema),
 };

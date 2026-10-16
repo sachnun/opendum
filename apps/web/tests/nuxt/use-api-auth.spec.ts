@@ -34,7 +34,7 @@ function createClient() {
 
 async function callMe(client: ReturnType<typeof createClient>) {
   try {
-    await client.me.get({});
+    await client.session.get({});
   } catch {
     // The mocked body is not a valid oRPC envelope; only the requests matter here.
   }

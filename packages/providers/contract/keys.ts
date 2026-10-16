@@ -1,9 +1,10 @@
 import { oc } from "@orpc/contract";
 import { z } from "zod";
 
+import { emptyInputSchema } from "./common.js";
+
 const MAX_API_KEY_ACCESS_ENTRIES = 500;
 const MAX_API_KEY_RATE_LIMIT_RULES = 500;
-const emptyInputSchema = z.object({});
 const apiKeyIdSchema = z.string().trim().min(1);
 
 const apiKeyIdInputSchema = z.object({ id: apiKeyIdSchema });
@@ -23,17 +24,17 @@ const updateApiKeyModelAccessInputSchema = z.object({ id: apiKeyIdSchema, mode: 
 const updateApiKeyAccountAccessInputSchema = z.object({ id: apiKeyIdSchema, mode: apiKeyAccessModeSchema, accounts: z.array(z.string().trim().min(1)).max(MAX_API_KEY_ACCESS_ENTRIES) });
 const updateApiKeyRateLimitsInputSchema = z.object({ id: apiKeyIdSchema, rules: z.array(rateLimitRuleSchema).max(MAX_API_KEY_RATE_LIMIT_RULES) });
 
-export const apiKeysContract = {
+export const keysContract = {
   list: oc.input(emptyInputSchema),
   options: oc.input(emptyInputSchema),
   create: oc.input(createApiKeyInputSchema),
-  remove: oc.input(apiKeyIdInputSchema),
-  name: oc.input(updateApiKeyNameInputSchema),
-  expiration: oc.input(updateApiKeyExpirationInputSchema),
+  delete: oc.input(apiKeyIdInputSchema),
+  rename: oc.input(updateApiKeyNameInputSchema),
+  expire: oc.input(updateApiKeyExpirationInputSchema),
   roaming: oc.input(updateApiKeyRoamingInputSchema),
-  modelAccess: oc.input(updateApiKeyModelAccessInputSchema),
-  accountAccess: oc.input(updateApiKeyAccountAccessInputSchema),
-  rateLimits: oc.input(updateApiKeyRateLimitsInputSchema),
+  models: oc.input(updateApiKeyModelAccessInputSchema),
+  accounts: oc.input(updateApiKeyAccountAccessInputSchema),
+  limits: oc.input(updateApiKeyRateLimitsInputSchema),
   reveal: oc.input(apiKeyIdInputSchema),
   toggle: oc.input(apiKeyIdInputSchema),
 };

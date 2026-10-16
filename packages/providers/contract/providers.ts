@@ -1,8 +1,9 @@
 import { oc } from "@orpc/contract";
 import { z } from "zod";
 
+import { emptyInputSchema } from "./common.js";
+
 const SLUG_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/;
-const emptyInputSchema = z.object({});
 
 const customModelInputSchema = z.object({
   modelId: z.string().trim().min(1).max(120),
@@ -54,16 +55,16 @@ const deleteCustomModelSchema = z.object({
 });
 const syncCustomModelsSchema = z.object({ slug: z.string().trim().toLowerCase().regex(SLUG_PATTERN, "Invalid slug"), token: z.string().trim().optional() });
 
-export const customProvidersContract = {
+export const providersContract = {
   list: oc.input(emptyInputSchema),
   create: oc.input(createCustomProviderSchema),
   update: oc.input(updateCustomProviderSchema),
-  remove: oc.input(deleteCustomProviderSchema),
+  delete: oc.input(deleteCustomProviderSchema),
   connect: oc.input(connectCustomProviderAccountSchema),
-  syncModels: oc.input(syncCustomModelsSchema),
-  previewModels: oc.input(previewCustomModelsSchema),
-  upsertModels: oc.input(upsertCustomModelsSchema),
-  deleteModel: oc.input(deleteCustomModelSchema),
+  sync: oc.input(syncCustomModelsSchema),
+  preview: oc.input(previewCustomModelsSchema),
+  models: oc.input(upsertCustomModelsSchema),
+  model: oc.input(deleteCustomModelSchema),
 };
 
 export type CreateCustomProviderInput = z.infer<typeof createCustomProviderSchema>;

@@ -49,9 +49,9 @@ export const router = authed.router({
     list: authed.models.list.handler(({ context, input }) => models.listModels(context.requestContext.userId, input ?? {})),
     search: authed.models.search.handler(({ context }) => models.searchModels(context.requestContext.userId)),
     catalog: authed.models.catalog.handler(() => models.listKnownModels()),
-    familyCounts: authed.models.familyCounts.handler(() => models.getModelFamilyCounts()),
+    families: authed.models.families.handler(() => models.getModelFamilyCounts()),
     stats: authed.models.stats.handler(({ context, input }) => models.getModelStats(context.requestContext.userId, input)),
-    setEnabled: writable.models.setEnabled.handler(({ context, input }) =>
+    enable: writable.models.enable.handler(({ context, input }) =>
       Effect.runPromise(
         Effect.gen(function* () {
           const result = yield* Effect.promise(() => models.setModelEnabled(context.requestContext.userId, input));
@@ -66,9 +66,10 @@ export const router = authed.router({
       subscribeUserEvents(context.requestContext.userId, input.topics, signal)
     ),
   },
-  ops: {
-    accountQuota: maintainerOnly.ops.accountQuota.handler(async ({ input }) => ops.runOpsAccountQuota(await getProxyContext(), input)),
-    relay: maintainerOnly.ops.relay.handler(async ({ input }) => ops.runOpsRelay(await getProxyContext(), input)),
+  admin: {
+    quota: maintainerOnly.admin.quota.handler(async ({ input }) => ops.runOpsAccountQuota(await getProxyContext(), input)),
+    relay: maintainerOnly.admin.relay.handler(async ({ input }) => ops.runOpsRelay(await getProxyContext(), input)),
+    users: maintainerOnly.admin.users.handler(({ context, input }) => maintainer.searchAuditUsers(context.requestContext.actor.id, input)),
   },
   accounts: {
     list: authed.accounts.list.handler(({ context }) => accounts.listAccounts(context.requestContext.userId)),
@@ -79,7 +80,7 @@ export const router = authed.router({
       accounts.getAccountPing(context.requestContext.userId, { autoPin: !context.requestContext.isAuditMode })
     ),
     provider: authed.accounts.provider.handler(({ context, input }) => accounts.listAccountsByProvider(context.requestContext.userId, input)),
-    providerDetail: authed.accounts.providerDetail.handler(({ context, input }) =>
+    detail: authed.accounts.detail.handler(({ context, input }) =>
       accounts.getAccountsByProviderDetailed(context.requestContext.userId, input)
     ),
     stats: authed.accounts.stats.handler(({ context, input }) =>
@@ -87,29 +88,29 @@ export const router = authed.router({
     ),
     create: writable.accounts.create.handler(({ context, input }) => accounts.createAccount(context.requestContext.userId, input)),
     update: writable.accounts.update.handler(({ context, input }) => accounts.updateAccount(context.requestContext.userId, input)),
-    remove: writable.accounts.remove.handler(({ context, input }) => accounts.deleteAccount(context.requestContext.userId, input)),
-    pinned: writable.accounts.pinned.handler(({ context, input }) => accounts.togglePinnedProvider(context.requestContext.userId, input)),
-    setModelEnabled: writable.accounts.setModelEnabled.handler(({ context, input }) =>
+    delete: writable.accounts.delete.handler(({ context, input }) => accounts.deleteAccount(context.requestContext.userId, input)),
+    pin: writable.accounts.pin.handler(({ context, input }) => accounts.togglePinnedProvider(context.requestContext.userId, input)),
+    enable: writable.accounts.enable.handler(({ context, input }) =>
       accounts.setAccountModelEnabled(context.requestContext.userId, input)
     ),
-    errorHistory: authed.accounts.errorHistory.handler(({ context, input }) => accounts.getAccountErrorHistory(context.requestContext.userId, input)),
-    errorHistories: authed.accounts.errorHistories.handler(({ context, input }) =>
+    error: authed.accounts.error.handler(({ context, input }) => accounts.getAccountErrorHistory(context.requestContext.userId, input)),
+    errors: authed.accounts.errors.handler(({ context, input }) =>
       accounts.getAccountErrorHistories(context.requestContext.userId, input)
     ),
-    resolveErrors: authed.accounts.resolveErrors.handler(({ context, input }) => accounts.resolveAccountErrors(context.requestContext.userId, input)),
+    resolve: authed.accounts.resolve.handler(({ context, input }) => accounts.resolveAccountErrors(context.requestContext.userId, input)),
     session: writable.accounts.session.handler(({ context, input }) => {
       if (process.env.NODE_ENV === "production" && !context.requestContext.isMaintainer) {
         throw new ORPCError("NOT_FOUND", { message: "Not Found" });
       }
       return accounts.getAccountSession(context.requestContext.userId, input);
     }),
-    authUrl: writable.accounts.authUrl.handler(({ input }) => accountAuth.getAccountAuthUrl(input)),
-    exchangeOAuth: writable.accounts.exchangeOAuth.handler(({ context, input }) =>
+    auth: writable.accounts.auth.handler(({ input }) => accountAuth.getAccountAuthUrl(input)),
+    exchange: writable.accounts.exchange.handler(({ context, input }) =>
       accountAuth.exchangeOAuthAccount(context.requestContext.userId, input)
     ),
-    initiateDeviceAuth: writable.accounts.initiateDeviceAuth.handler(({ input }) => accountAuth.initiateDeviceAuth(input)),
-    pollDeviceAuth: writable.accounts.pollDeviceAuth.handler(({ context, input }) => accountAuth.pollDeviceAuth(context.requestContext.userId, input)),
-    connectCodexSession: writable.accounts.connectCodexSession.handler(({ context, input }) =>
+    initiate: writable.accounts.initiate.handler(({ input }) => accountAuth.initiateDeviceAuth(input)),
+    poll: writable.accounts.poll.handler(({ context, input }) => accountAuth.pollDeviceAuth(context.requestContext.userId, input)),
+    codex: writable.accounts.codex.handler(({ context, input }) =>
       accountAuth.connectCodexSessionAccount(context.requestContext.userId, input)
     ),
     quota: authed.accounts.quota.handler(({ context, input }) =>
@@ -119,38 +120,38 @@ export const router = authed.router({
       accountQuota.getAccountQuotas(context.requestContext.userId, { ...input, forceRefresh: input.forceRefresh ?? false })
     ),
   },
-  apiKeys: {
-    list: authed.apiKeys.list.handler(({ context }) =>
+  keys: {
+    list: authed.keys.list.handler(({ context }) =>
       apiKeys.listApiKeys(context.requestContext.userId, { expireActiveKeys: !context.requestContext.isAuditMode })
     ),
-    options: authed.apiKeys.options.handler(({ context }) => apiKeys.getApiKeyOptions(context.requestContext.userId)),
-    create: writable.apiKeys.create.handler(({ context, input }) => apiKeys.createApiKey(context.requestContext.userId, input)),
-    remove: writable.apiKeys.remove.handler(({ context, input }) => apiKeys.deleteApiKey(context.requestContext.userId, input.id)),
-    name: writable.apiKeys.name.handler(({ context, input }) => apiKeys.updateApiKeyName(context.requestContext.userId, input)),
-    expiration: writable.apiKeys.expiration.handler(({ context, input }) => apiKeys.updateApiKeyExpiration(context.requestContext.userId, input)),
-    roaming: writable.apiKeys.roaming.handler(({ context, input }) => apiKeys.updateApiKeyRoaming(context.requestContext.userId, input)),
-    modelAccess: writable.apiKeys.modelAccess.handler(({ context, input }) => apiKeys.updateApiKeyModelAccess(context.requestContext.userId, input)),
-    accountAccess: writable.apiKeys.accountAccess.handler(({ context, input }) => apiKeys.updateApiKeyAccountAccess(context.requestContext.userId, input)),
-    rateLimits: writable.apiKeys.rateLimits.handler(({ context, input }) => apiKeys.updateApiKeyRateLimits(context.requestContext.userId, input)),
-    reveal: writable.apiKeys.reveal.handler(({ context, input }) => apiKeys.revealApiKey(context.requestContext.userId, input.id)),
-    toggle: writable.apiKeys.toggle.handler(({ context, input }) => apiKeys.toggleApiKey(context.requestContext.userId, input.id)),
+    options: authed.keys.options.handler(({ context }) => apiKeys.getApiKeyOptions(context.requestContext.userId)),
+    create: writable.keys.create.handler(({ context, input }) => apiKeys.createApiKey(context.requestContext.userId, input)),
+    delete: writable.keys.delete.handler(({ context, input }) => apiKeys.deleteApiKey(context.requestContext.userId, input.id)),
+    rename: writable.keys.rename.handler(({ context, input }) => apiKeys.updateApiKeyName(context.requestContext.userId, input)),
+    expire: writable.keys.expire.handler(({ context, input }) => apiKeys.updateApiKeyExpiration(context.requestContext.userId, input)),
+    roaming: writable.keys.roaming.handler(({ context, input }) => apiKeys.updateApiKeyRoaming(context.requestContext.userId, input)),
+    models: writable.keys.models.handler(({ context, input }) => apiKeys.updateApiKeyModelAccess(context.requestContext.userId, input)),
+    accounts: writable.keys.accounts.handler(({ context, input }) => apiKeys.updateApiKeyAccountAccess(context.requestContext.userId, input)),
+    limits: writable.keys.limits.handler(({ context, input }) => apiKeys.updateApiKeyRateLimits(context.requestContext.userId, input)),
+    reveal: writable.keys.reveal.handler(({ context, input }) => apiKeys.revealApiKey(context.requestContext.userId, input.id)),
+    toggle: writable.keys.toggle.handler(({ context, input }) => apiKeys.toggleApiKey(context.requestContext.userId, input.id)),
   },
-  customProviders: {
-    list: authed.customProviders.list.handler(({ context }) => customProviders.listCustomProviders(context.requestContext.userId)),
-    create: writable.customProviders.create.handler(({ context, input }) => customProviders.createCustomProvider(context.requestContext.userId, input)),
-    update: writable.customProviders.update.handler(({ context, input }) => customProviders.updateCustomProvider(context.requestContext.userId, input)),
-    remove: writable.customProviders.remove.handler(({ context, input }) => customProviders.deleteCustomProvider(context.requestContext.userId, input.slug)),
-    connect: writable.customProviders.connect.handler(({ context, input }) =>
+  providers: {
+    list: authed.providers.list.handler(({ context }) => customProviders.listCustomProviders(context.requestContext.userId)),
+    create: writable.providers.create.handler(({ context, input }) => customProviders.createCustomProvider(context.requestContext.userId, input)),
+    update: writable.providers.update.handler(({ context, input }) => customProviders.updateCustomProvider(context.requestContext.userId, input)),
+    delete: writable.providers.delete.handler(({ context, input }) => customProviders.deleteCustomProvider(context.requestContext.userId, input.slug)),
+    connect: writable.providers.connect.handler(({ context, input }) =>
       customProviders.connectCustomProviderAccount(context.requestContext.userId, input.slug, input.token, input.name)
     ),
-    syncModels: writable.customProviders.syncModels.handler(({ context, input }) =>
+    sync: writable.providers.sync.handler(({ context, input }) =>
       customProviders.syncCustomModels(context.requestContext.userId, input.slug, input.token)
     ),
-    previewModels: writable.customProviders.previewModels.handler(({ input }) => customProviders.previewCustomModels(input)),
-    upsertModels: writable.customProviders.upsertModels.handler(({ context, input }) =>
+    preview: writable.providers.preview.handler(({ input }) => customProviders.previewCustomModels(input)),
+    models: writable.providers.models.handler(({ context, input }) =>
       customProviders.upsertCustomModels(context.requestContext.userId, input.slug, input.models)
     ),
-    deleteModel: writable.customProviders.deleteModel.handler(({ context, input }) =>
+    model: writable.providers.model.handler(({ context, input }) =>
       customProviders.deleteCustomModel(context.requestContext.userId, input.slug, input.modelId)
     ),
   },
@@ -160,8 +161,8 @@ export const router = authed.router({
     overview: authed.analytics.overview.handler(({ context }) => analytics.getAnalyticsOverview(context.requestContext.userId)),
     usage: authed.analytics.usage.handler(({ context, input }) => analytics.getUsageRows(context.requestContext.userId, input)),
   },
-  me: {
-    get: authed.me.get.handler(async ({ context }) => {
+  session: {
+    get: authed.session.get.handler(async ({ context }) => {
       const requestContext = context.requestContext;
       const [pointStatus, sharingEnabled] = await Promise.all([
         getUserPointStatus(requestContext.userId),
@@ -179,7 +180,7 @@ export const router = authed.router({
     }),
   },
   points: {
-    status: authed.points.status.handler(async ({ context }) => {
+    get: authed.points.get.handler(async ({ context }) => {
       const requestContext = context.requestContext;
       try {
         await claimDailyAccessPoints(requestContext.actor.id);
@@ -192,7 +193,7 @@ export const router = authed.router({
   },
   sharing: {
     get: authed.sharing.get.handler(({ context }) => getUserSharingEnabled(context.requestContext.userId)),
-    set: writable.sharing.set.handler(({ context, input }) => setUserSharingEnabled(context.requestContext.userId, input.enabled)),
+    update: writable.sharing.update.handler(({ context, input }) => setUserSharingEnabled(context.requestContext.userId, input.enabled)),
   },
   playground: {
     options: authed.playground.options.handler(({ context }) =>
@@ -214,12 +215,5 @@ export const router = authed.router({
         },
       };
     }),
-  },
-  maintainer: {
-    users: {
-      search: maintainerOnly.maintainer.users.search.handler(({ context, input }) =>
-        maintainer.searchAuditUsers(context.requestContext.actor.id, input)
-      ),
-    },
   },
 });

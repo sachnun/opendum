@@ -64,8 +64,8 @@ export const modelsContract = {
   search: oc.output(z.array(modelSearchItemSchema)),
   catalog: oc.output(modelCatalogSchema),
   stats: oc.input(modelStatsInputSchema).output(modelStatsDataSchema),
-  familyCounts: oc.output(modelFamilyCountsSchema),
-  setEnabled: oc.input(setModelEnabledInputSchema).output(setModelEnabledResultSchema),
+  families: oc.output(modelFamilyCountsSchema),
+  enable: oc.input(setModelEnabledInputSchema).output(setModelEnabledResultSchema),
 };
 
 export type ModelListItem = z.infer<typeof modelListItemSchema>;
