@@ -4,7 +4,8 @@
     "hyper",
     "perch",
     "nvidia_nim",
-    "workbuddy"
+    "workbuddy",
+    "opencode"
   ],
   "reasoning": true,
   "reasoning_effort": [
@@ -28,9 +29,9 @@
     "output": 131072
   },
   "cost": {
-    "input": 0.75,
+    "input": 0.10845,
     "output": 2.5,
-    "cacheRead": 0.15
+    "cacheRead": 0.05625
   },
   "scores": {
     "artificialAnalysis": {
@@ -46,6 +47,11 @@
     "nvidia_nim": {
       "upstream": "z-ai/glm-5.3-flash",
       "contextWindow": 1048576,
+      "maxOutputTokens": 131072
+    },
+    "opencode": {
+      "upstream": "glm-5.3-flash-free",
+      "contextWindow": 1000000,
       "maxOutputTokens": 131072
     },
     "perch": {

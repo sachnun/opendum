@@ -1,0 +1,37 @@
+{
+  "providers": [
+    "opencode"
+  ],
+  "reasoning": true,
+  "reasoning_effort": [
+    "low",
+    "medium",
+    "high",
+    "xhigh",
+    "max"
+  ],
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 262144,
+    "output": 65536
+  },
+  "cost": {
+    "input": 0,
+    "output": 0,
+    "cacheRead": 0
+  },
+  "providerConfig": {
+    "opencode": {
+      "upstream": "ll-alpha-free",
+      "contextWindow": 262144,
+      "maxOutputTokens": 65536
+    }
+  }
+}
