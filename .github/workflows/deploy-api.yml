@@ -96,14 +96,6 @@ jobs:
           cache-from: type=gha,scope=api
           cache-to: type=gha,mode=max,scope=api
 
-      - name: Prune stale image versions
-        uses: actions/delete-package-versions@v5
-        with:
-          package-name: opendum
-          package-type: container
-          delete-only-untagged-versions: "true"
-          min-versions-to-keep: 2
-
       - name: Install Koyeb CLI
         run: |
           curl -fsSL https://raw.githubusercontent.com/koyeb/koyeb-cli/master/install.sh | sh
@@ -164,3 +156,12 @@ jobs:
             fi
           fi
           retry 5 15 koyeb services create "$KOYEB_SERVICE" --app "$KOYEB_APP" "${ORG[@]}" "${COMMON_ARGS[@]}" "${SCALE_ARGS[@]}" --wait --wait-timeout 10m
+
+      - name: Prune stale image versions
+        continue-on-error: true
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: opendum
+          package-type: container
+          delete-only-untagged-versions: "true"
+          min-versions-to-keep: 2
