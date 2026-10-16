@@ -9,6 +9,26 @@
         "oxlint": "^1.88.0",
       },
     },
+    "apps/api": {
+      "name": "@opendum/api",
+      "version": "0.1.0",
+      "dependencies": {
+        "@opendum/auth": "workspace:*",
+        "@opendum/core": "workspace:*",
+        "@opendum/database": "workspace:*",
+        "@opendum/models": "workspace:*",
+        "@opendum/providers": "workspace:*",
+        "effect": "4.0.4",
+        "h3": "^2.0.1",
+        "zod": "^4.4.3",
+      },
+      "devDependencies": {
+        "@types/bun": "^1.4.3",
+        "@types/node": "^26.1.1",
+        "nitro": "3.0.260903-beta",
+        "typescript": "^6.0.3",
+      },
+    },
     "apps/web": {
       "name": "@opendum/web",
       "dependencies": {
@@ -125,26 +145,6 @@
         "@types/bun": "^1.4.3",
         "@types/node": "^26.1.1",
         "tsx": "^4.23.13",
-        "typescript": "^6.0.3",
-      },
-    },
-    "services/proxy": {
-      "name": "@opendum/proxy",
-      "version": "0.1.0",
-      "dependencies": {
-        "@opendum/auth": "workspace:*",
-        "@opendum/core": "workspace:*",
-        "@opendum/database": "workspace:*",
-        "@opendum/models": "workspace:*",
-        "@opendum/providers": "workspace:*",
-        "effect": "4.0.4",
-        "h3": "^2.0.1",
-        "zod": "^4.4.3",
-      },
-      "devDependencies": {
-        "@types/bun": "^1.4.3",
-        "@types/node": "^26.1.1",
-        "nitro": "3.0.260903-beta",
         "typescript": "^6.0.3",
       },
     },
@@ -343,6 +343,8 @@
 
     "@one-ini/wasm": ["@one-ini/wasm@0.2.1", "", {}, "sha512-TUqERXGNTifZ9y2g3wPxQrw3HpHv/02DsW3D90T9x0hhonrL1ZqpSmNrU2XkoIq0fP1N6gZfVQzy2Fw1ZvGBNg=="],
 
+    "@opendum/api": ["@opendum/api@workspace:apps/api"],
+
     "@opendum/auth": ["@opendum/auth@workspace:packages/auth"],
 
     "@opendum/core": ["@opendum/core@workspace:packages/core"],
@@ -352,8 +354,6 @@
     "@opendum/models": ["@opendum/models@workspace:packages/models"],
 
     "@opendum/providers": ["@opendum/providers@workspace:packages/providers"],
-
-    "@opendum/proxy": ["@opendum/proxy@workspace:services/proxy"],
 
     "@opendum/web": ["@opendum/web@workspace:apps/web"],
 

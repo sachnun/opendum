@@ -1,6 +1,6 @@
 .git
 .github
 node_modules
-apps
+apps/web
 *.log
 *.tsbuildinfo

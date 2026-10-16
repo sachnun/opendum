@@ -10,7 +10,7 @@ let runtime: Runtime | undefined;
 
 function buildRuntime(): Runtime {
   loadEnvFile(".env");
-  loadEnvFile("services/proxy/.env");
+  loadEnvFile("apps/api/.env");
   return ManagedRuntime.make(ProxyContextLayer.pipe(Layer.provideMerge(LoggerLayer)), {
     memoMap: Layer.makeMemoMapUnsafe(),
   });

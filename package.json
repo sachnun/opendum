@@ -2,8 +2,8 @@
   "name": "opendum",
   "private": true,
   "scripts": {
-    "dev": "(bun run --filter @opendum/web dev & bun run --filter @opendum/proxy dev)",
-    "build": "bun run --filter @opendum/web build && bun run --filter @opendum/proxy check",
+    "dev": "(bun run --filter @opendum/web dev & bun run --filter @opendum/api dev)",
+    "build": "bun run --filter @opendum/web build && bun run --filter @opendum/api check",
     "lint": "oxlint .",
     "db:push": "bun run --filter @opendum/database db:push",
     "db:generate": "bun run --filter @opendum/database db:generate",
@@ -21,7 +21,6 @@
   ],
   "workspaces": [
     "apps/*",
-    "services/*",
     "packages/*"
   ],
   "overrides": {

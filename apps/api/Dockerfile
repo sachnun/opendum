@@ -2,7 +2,7 @@ FROM oven/bun:1-alpine
 
 WORKDIR /app
 
-COPY services/proxy/.output ./.output
+COPY apps/api/.output ./.output
 COPY packages/models/data ./packages/models/data
 COPY packages/models/generated ./packages/models/generated
 

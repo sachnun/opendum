@@ -1,12 +1,12 @@
-name: Deploy Proxy
+name: Deploy API
 
 on:
   push:
     branches:
       - main
     paths:
-      - .github/workflows/deploy-proxy.yml
-      - services/proxy/**
+      - .github/workflows/deploy-api.yml
+      - apps/api/**
       - packages/**
   workflow_run:
     workflows:
@@ -19,7 +19,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: koyeb-proxy-${{ github.ref }}
+  group: koyeb-api-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -29,7 +29,7 @@ env:
 jobs:
   deploy:
     if: github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
-    name: Proxy Koyeb
+    name: API Koyeb
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:
@@ -52,10 +52,10 @@ jobs:
         uses: oven-sh/setup-bun@v2
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile --filter @opendum/proxy
+        run: bun install --frozen-lockfile --filter @opendum/api
 
-      - name: Test proxy
-        working-directory: services/proxy
+      - name: Test api
+        working-directory: apps/api
         run: bun test
 
       - name: Validate Koyeb configuration
@@ -66,31 +66,31 @@ jobs:
           test -n "$KOYEB_REGION"
           test -n "$KOYEB_INSTANCE_TYPE"
           test -n "$KOYEB_ORG_ID"
-          test -f services/proxy/Dockerfile
+          test -f apps/api/Dockerfile
 
-      - name: Bundle proxy
-        run: bun run --filter @opendum/proxy build
+      - name: Bundle api
+        run: bun run --filter @opendum/api build
 
       - name: Build and push image
         run: |
           set -euo pipefail
-          IMAGE="$IMAGE_REGISTRY/opendum-proxy-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}:$IMAGE_TTL"
-          docker build -f services/proxy/Dockerfile -t "$IMAGE" .
+          IMAGE="$IMAGE_REGISTRY/opendum-api-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}:$IMAGE_TTL"
+          docker build -f apps/api/Dockerfile -t "$IMAGE" .
           docker push "$IMAGE"
-          echo "PROXY_IMAGE=$IMAGE" >> "$GITHUB_ENV"
+          echo "API_IMAGE=$IMAGE" >> "$GITHUB_ENV"
 
       - name: Install Koyeb CLI
         run: |
           curl -fsSL https://raw.githubusercontent.com/koyeb/koyeb-cli/master/install.sh | sh
           echo "$HOME/.koyeb/bin" >> "$GITHUB_PATH"
 
-      - name: Deploy proxy to Koyeb
+      - name: Deploy api to Koyeb
         run: |
           set -euo pipefail
           export KOYEB_TOKEN
           ORG=(--organization "$KOYEB_ORG_ID")
           COMMON_ARGS=(
-            --docker "$PROXY_IMAGE"
+            --docker "$API_IMAGE"
             --type web
             --instance-type "$KOYEB_INSTANCE_TYPE"
             --regions "$KOYEB_REGION"
