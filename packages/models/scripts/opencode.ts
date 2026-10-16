@@ -23,6 +23,11 @@ const OPENCODE_VERSION_TARGETS = [
     pattern: /(const USER_AGENT = "opencode\/)(\d+\.\d+\.\d+)(")/,
   },
   {
+    label: "opencode provider test",
+    path: resolve(REPO_ROOT, "packages/providers/upstreams/opencode.test.ts"),
+    pattern: /(toBe\("opencode\/)(\d+\.\d+\.\d+)(")/,
+  },
+  {
     label: "codex provider",
     path: resolve(REPO_ROOT, "packages/providers/upstreams/codex.ts"),
     pattern: /(User-Agent": `opencode\/)(\d+\.\d+\.\d+)( \()/,
