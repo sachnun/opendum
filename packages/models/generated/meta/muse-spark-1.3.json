@@ -1,7 +1,6 @@
 {
   "id": "muse-spark-1.3",
   "providers": [
-    "opencode",
     "cline",
     "zenmux"
   ],
@@ -22,9 +21,7 @@
   ],
   "modalities": {
     "input": [
-      "audio",
       "image",
-      "pdf",
       "text",
       "video"
     ],
@@ -50,11 +47,6 @@
   "providerConfig": {
     "cline": {
       "upstream": "cline-free/muse-spark-1.3-contributor",
-      "contextWindow": 1048576,
-      "maxOutputTokens": 131072
-    },
-    "opencode": {
-      "upstream": "muse-spark-1.3-contributor-free",
       "contextWindow": 1048576,
       "maxOutputTokens": 131072
     },
