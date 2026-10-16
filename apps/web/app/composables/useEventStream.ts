@@ -1,30 +1,33 @@
-import type { LiveTopic, ServerEvent } from "@opendum/providers/contract";
+import type { AccountsData, LiveTopic, ModelsData, ServerEvent, UsageData } from "@opendum/providers/contract";
 import { consumeEventIterator } from "@orpc/client";
+import { Duration, Effect, Match, Schedule } from "effect";
 
 import { resolveApiUrl } from "../../lib/api-url";
 import { createApiClient } from "../../lib/orpc";
-import { liveEventVersionKey } from "./useLiveEvent";
+import { liveEventKey } from "./useLiveEvent";
 
 const SUBSCRIBED_TOPICS: LiveTopic[] = ["points", "accounts", "models", "usage"];
-const RECONNECT_BASE_MS = 1_000;
-const RECONNECT_MAX_MS = 30_000;
 const STREAM_IDLE_TIMEOUT_MS = 45_000;
 const STREAM_WATCHDOG_MS = 15_000;
+const RECONNECT_SCHEDULE = Schedule.min([
+  Schedule.exponential(Duration.seconds(1)),
+  Schedule.spaced(Duration.seconds(30)),
+]).pipe(Schedule.jittered);
 
 export interface EventStreamHandlers {
   onPoints?: (balance: number) => void;
-  onAccounts?: () => void;
-  onModels?: () => void;
-  onUsage?: () => void;
-  onResync?: () => void;
+  onAccounts?: (data: AccountsData) => void;
+  onModels?: (data: ModelsData) => void;
+  onUsage?: (data: UsageData) => void;
 }
 
 export function useEventStream(handlers: EventStreamHandlers = {}) {
   const config = useRuntimeConfig();
   const auth = useAuth();
   const connected = useState<boolean>("web-events-connected", () => false);
-  const versions = {} as Record<LiveTopic, { value: number }>;
-  for (const topic of SUBSCRIBED_TOPICS) versions[topic] = useState<number>(liveEventVersionKey(topic), () => 0);
+  const accounts = useState<AccountsData | null>(liveEventKey("accounts"), () => null);
+  const models = useState<ModelsData | null>(liveEventKey("models"), () => null);
+  const usage = useState<UsageData | null>(liveEventKey("usage"), () => null);
 
   const refreshAuth = async () => {
     if (await auth.refreshAccessToken()) return true;
@@ -38,32 +41,52 @@ export function useEventStream(handlers: EventStreamHandlers = {}) {
   let cancel: (() => Promise<void>) | undefined;
   let release: (() => void) | undefined;
   let stopped = false;
-  let firstConnect = true;
-  let attempt = 0;
   let lastEventAt = Date.now();
   let watchdog: ReturnType<typeof setInterval> | null = null;
 
-  function bump(topic: LiveTopic) {
-    versions[topic].value += 1;
+  function applyEvent(event: ServerEvent): void {
+    Match.value(event).pipe(
+      Match.when({ type: "ping" }, () => undefined),
+      Match.when({ type: "update", topic: "points" }, (value) => {
+        handlers.onPoints?.(value.data.balance);
+      }),
+      Match.when({ type: "update", topic: "accounts" }, (value) => {
+        accounts.value = value.data;
+        handlers.onAccounts?.(value.data);
+      }),
+      Match.when({ type: "update", topic: "models" }, (value) => {
+        models.value = value.data;
+        handlers.onModels?.(value.data);
+      }),
+      Match.when({ type: "update", topic: "usage" }, (value) => {
+        usage.value = value.data;
+        handlers.onUsage?.(value.data);
+      }),
+      Match.exhaustive,
+    );
   }
 
-  function resync() {
-    handlers.onResync?.();
-    for (const topic of SUBSCRIBED_TOPICS) bump(topic);
+  function handleEvent(event: ServerEvent) {
+    lastEventAt = Date.now();
+    applyEvent(event);
   }
 
   function handleVisibilityChange() {
     if (document.hidden) return;
-    resync();
+    restart();
+  }
+
+  function restart(): void {
+    const staleRelease = release;
+    void cancel?.();
+    staleRelease?.();
   }
 
   function startWatchdog() {
     if (watchdog) return;
     watchdog = setInterval(() => {
       if (Date.now() - lastEventAt <= STREAM_IDLE_TIMEOUT_MS) return;
-      const staleRelease = release;
-      void cancel?.();
-      staleRelease?.();
+      restart();
     }, STREAM_WATCHDOG_MS);
   }
 
@@ -73,63 +96,41 @@ export function useEventStream(handlers: EventStreamHandlers = {}) {
     watchdog = null;
   }
 
-  function handleEvent(event: ServerEvent) {
+  async function runStream(): Promise<void> {
     lastEventAt = Date.now();
-    attempt = 0;
+    const client = createApiClient({ baseUrl, refresh: refreshAuth });
+    const iterator = client.events.subscribe({ topics: SUBSCRIBED_TOPICS });
 
-    if (event.type === "update" && event.topic === "points") {
-      bump("points");
-      handlers.onPoints?.(event.data.balance);
-      return;
-    }
+    await new Promise<void>((resolve) => {
+      release = resolve;
+      cancel = consumeEventIterator(iterator, {
+        onEvent: handleEvent,
+        onError: () => resolve(),
+        onSuccess: () => resolve(),
+        onFinish: () => {
+          connected.value = false;
+          resolve();
+        },
+      });
 
-    if (event.type !== "tick") return;
+      connected.value = true;
+      startWatchdog();
+    });
 
-    bump(event.topic);
-    if (event.topic === "accounts") handlers.onAccounts?.();
-    else if (event.topic === "models") handlers.onModels?.();
-    else handlers.onUsage?.();
+    release = undefined;
+    connected.value = false;
+    stopWatchdog();
   }
 
   async function connect() {
-    while (!stopped) {
-      try {
-        const client = createApiClient({ baseUrl, refresh: refreshAuth });
-        const iterator = client.events.subscribe({ topics: SUBSCRIBED_TOPICS });
+    const resilient = Effect.tryPromise({ try: () => runStream(), catch: (cause) => cause }).pipe(
+      Effect.catch((cause) => Effect.sync(() => {
+        console.error("Web event stream failed:", cause);
+      })),
+      Effect.repeat({ schedule: RECONNECT_SCHEDULE, while: () => !stopped }),
+    );
 
-        await new Promise<void>((resolve) => {
-          release = resolve;
-          cancel = consumeEventIterator(iterator, {
-            onEvent: handleEvent,
-            onError: () => resolve(),
-            onSuccess: () => resolve(),
-            onFinish: () => {
-              connected.value = false;
-              resolve();
-            },
-          });
-
-          connected.value = true;
-          startWatchdog();
-          if (firstConnect) {
-            firstConnect = false;
-            return;
-          }
-
-          resync();
-        });
-      } catch {
-        connected.value = false;
-      }
-
-      release = undefined;
-      connected.value = false;
-      stopWatchdog();
-      if (stopped) return;
-
-      attempt += 1;
-      await new Promise((resolve) => setTimeout(resolve, Math.min(RECONNECT_MAX_MS, RECONNECT_BASE_MS * 2 ** attempt)));
-    }
+    await Effect.runPromise(resilient);
   }
 
   onMounted(() => {
@@ -145,5 +146,5 @@ export function useEventStream(handlers: EventStreamHandlers = {}) {
     void cancel?.();
   });
 
-  return { connected };
+  return { connected, accounts, models, usage };
 }

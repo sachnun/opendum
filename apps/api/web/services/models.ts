@@ -1,5 +1,4 @@
 import { and, eq, inArray } from "drizzle-orm";
-import { createHash } from "node:crypto";
 import { Effect } from "effect";
 
 import type { ModelListItem, ModelSearchItem, ModelStatsData, ModelStatsInput, SetModelEnabledInput, SetModelEnabledResult } from "@opendum/providers/contract";
@@ -8,10 +7,6 @@ import { getModelStatsByModel } from "#web/lib/model-stats.js";
 import { getAccountModelAvailability, invalidateDisabledModelsCache, usable, type AccountModelAvailability } from "#web/lib/proxy/auth.js";
 import { MODEL_REGISTRY, getAllModels, getModelFamily, getModelLookupKeys, getProvidersForModel, isModelSupported, resolveModelAlias } from "#web/lib/proxy/models.js";
 import { compareModelEntries } from "@opendum/models/sort";
-
-function hashModelStatsValue(value: unknown) {
-  return createHash("sha256").update(JSON.stringify(value)).digest("base64url").slice(0, 16);
-}
 
 function withModelErrors<A>(message: string, run: () => Promise<A>): Promise<A> {
   return Effect.runPromise(
@@ -149,17 +144,9 @@ export async function getModelStats(userId: string, input: ModelStatsInput): Pro
         .filter((model) => model && isModelSupported(model) && availableModelSet.has(model))
     ));
 
-    if (requestedModels.length === 0) return { delta: true, cursors: {} };
+    if (requestedModels.length === 0) return {};
 
-    const stats = await getModelStatsByModel(userId, requestedModels);
-    const cursors = Object.fromEntries(Object.entries(stats).map(([model, value]) => [model, hashModelStatsValue(value)]));
-    const changedStats = Object.fromEntries(Object.entries(stats).filter(([model, value]) => input.cursors?.[model] !== hashModelStatsValue(value)));
-
-    return {
-      delta: true,
-      cursors,
-      ...(Object.keys(changedStats).length > 0 ? { stats: changedStats } : {}),
-    };
+    return await getModelStatsByModel(userId, requestedModels);
   } catch (error) {
     console.error("Failed to load model stats:", error);
     throw new Error("Failed to load model stats", { cause: error });

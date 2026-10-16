@@ -38,11 +38,7 @@ export const modelListItemSchema = z.object({
 
 export const modelSearchItemSchema = modelListItemSchema.omit({ name: true, family: true, stats: true });
 
-export const modelStatsDataSchema = z.object({
-  delta: z.literal(true),
-  cursors: z.record(z.string(), z.string()),
-  stats: z.record(z.string(), modelStatsSchema).optional(),
-});
+export const modelStatsDataSchema = z.record(z.string(), modelStatsSchema);
 
 export const modelFamilyCountsSchema = z.record(z.string(), z.number());
 export const modelCatalogSchema = z.array(z.string());
@@ -55,7 +51,6 @@ export const setModelEnabledResultSchema = z.discriminatedUnion("success", [
 export const listModelsInputSchema = z.object({ includeStats: z.boolean().optional() });
 export const modelStatsInputSchema = z.object({
   models: z.array(z.string()),
-  cursors: z.record(z.string(), z.string()).optional(),
 });
 export const setModelEnabledInputSchema = z.object({ modelId: z.string(), enabled: z.boolean() });
 

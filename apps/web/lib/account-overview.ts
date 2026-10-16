@@ -4,7 +4,7 @@ import type {
   ProviderAccountIndicator,
   ProviderAccountIndicators,
 } from "./navigation";
-import type { AccountOverviewData, AccountOverviewDeltaData, AccountOverviewResponse, AccountPingData } from "./api-types";
+import type { AccountOverviewData, AccountPingData } from "./api-types";
 import { MODEL_FAMILY_NAV_ITEMS, categorizeModelFamily } from "@opendum/models/ranking";
 import { PROVIDER_ACCOUNT_DEFINITIONS } from "@opendum/providers/provider-accounts";
 
@@ -58,10 +58,6 @@ export function toShellAccountSummary(summary: AccountOverviewData | AccountPing
     pinnedProviders: summary.pinnedProviders,
     hasConnectedAccounts,
   };
-}
-
-export function isAccountOverviewDelta(summary: AccountOverviewResponse): summary is AccountOverviewDeltaData {
-  return "delta" in summary && summary.delta === true;
 }
 
 export function normalizeModelFamilyCounts(counts: Record<string, number>) {

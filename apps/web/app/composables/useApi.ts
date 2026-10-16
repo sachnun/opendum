@@ -1,6 +1,5 @@
 import type {
   AccountOverviewData,
-  AccountOverviewResponse,
   AccountPingData,
   AccountStatsData,
   ActionResult,
@@ -26,7 +25,6 @@ import type {
   PlaygroundOptions,
   PlaygroundProxyAuth,
   ProviderDetailData,
-  ProviderDetailResponse,
   ProviderAccountUpdateData,
 } from "../../lib/api-types";
 import type { DeviceProviderKey, OAuthProviderKey } from "@opendum/providers/provider-accounts";
@@ -61,10 +59,8 @@ export function useApi() {
       list: () => rpc.accounts.list({}),
       byProvider: (query: { provider: string }) => rpc.accounts.provider(query),
       byProviderDetailed: (query: { provider: string }) => rpc.accounts.detail(query) as Promise<ProviderDetailData>,
-      byProviderDetailedDelta: (query: { provider: string; cursor: string }) => rpc.accounts.detail(query) as Promise<ProviderDetailResponse>,
-      stats: (query: { accountIds: string[]; cursors?: Record<string, string> }) => rpc.accounts.stats(query) as Promise<AccountStatsData>,
+      stats: (query: { accountIds: string[] }) => rpc.accounts.stats(query) as Promise<AccountStatsData>,
       overview: () => rpc.accounts.overview({}) as Promise<AccountOverviewData>,
-      overviewDelta: (query: { cursor: string }) => rpc.accounts.overview(query) as Promise<AccountOverviewResponse>,
       ping: () => rpc.accounts.ping({}) as Promise<AccountPingData>,
       create: (body: { provider: string; name?: string; token: string; cfAccountId?: string; platformKey?: string }) => rpc.accounts.create(body) as Promise<ActionResult<{ email: string; isUpdate: boolean }>>,
       update: (body: { id: string; name?: string; isActive?: boolean; disabledUntil?: string | Date | null }) => rpc.accounts.update(body) as Promise<ActionResult<ProviderAccountUpdateData>>,
@@ -122,7 +118,7 @@ export function useApi() {
       list: (query?: { includeStats?: boolean }) => rpc.models.list({ includeStats: query?.includeStats }),
       search: () => rpc.models.search(),
       catalog: () => rpc.models.catalog(),
-      stats: (query: { models: string[]; cursors?: Record<string, string> }) => rpc.models.stats(query),
+      stats: (query: { models: string[] }) => rpc.models.stats(query),
       familyCounts: () => rpc.models.families(),
       setEnabled: (body: { modelId: string; enabled: boolean }) => rpc.models.enable(body),
     },

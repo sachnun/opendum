@@ -3,13 +3,13 @@ import {
   emptyShellAccountSummary,
   emptyModelFamilyCounts,
   toShellAccountSummary,
-  isAccountOverviewDelta,
   normalizeModelFamilyCounts,
   type ShellAccountSummary,
 } from "~~/lib/account-overview";
 
+import type { AccountsData, ModelsData, UsageData } from "@opendum/providers/contract";
 import type { NavItem, NavSubItem, ProviderAccountIndicator } from "../../lib/navigation";
-import type { AccountOverviewData, AccountOverviewResponse, MeData, PointStatusData } from "../../lib/api-types";
+import type { AccountOverviewData, MeData } from "../../lib/api-types";
 import { isSwitchSubItem, primaryNavigation, subItemHref } from "../../lib/navigation";
 import { buildProviderHrefMap, getProviderAccountPath, PROVIDER_ACCOUNT_DEFINITIONS } from "@opendum/providers/provider-accounts";
 import { avatarUrl } from "../../lib/utils";
@@ -38,8 +38,6 @@ const sharingUpdating = ref(false);
 const disableSharingDialogOpen = ref(false);
 const supportItemOpen = reactive<Record<string, boolean>>({ Tools: false });
 const pointMenuOpen = ref(false);
-const { isDesktopViewport } = useDesktopViewport();
-
 const cachedPinnedProviders = useState<string[] | null>(stateKeys.pinnedProviders, () => null);
 
 const supportNavigation = computed<NavItem[]>(() => [
@@ -60,29 +58,11 @@ const PROVIDER_STATUS_ORDER = { error: 0, warning: 1, normal: 2 } as const;
 
 const api = useApi();
 const invalidation = useInvalidate();
-function refreshModelsOnce() {
-  return invalidation.refreshData([dataKeys.models, dataKeys.modelSearch, dataKeys.modelCatalog, dataKeys.shellModelFamilyCounts]);
-}
-
-useEventStream({
+const { models: liveModels } = useEventStream({
   onPoints: applyPointsBalance,
-  onAccounts: () => {
-    if (document.hidden) return;
-    void refreshAccountSummaryOnce();
-  },
-  onModels: () => {
-    if (document.hidden) return;
-    void refreshModelsOnce();
-  },
-  onUsage: () => {
-    if (document.hidden) return;
-    void refreshAccountSummaryOnce();
-  },
-  onResync: () => {
-    void refreshAccountSummaryOnce();
-    void refreshPointStatusOnce();
-    void refreshModelsOnce();
-  },
+  onAccounts: applyAccountsSnapshot,
+  onModels: applyModelsSnapshot,
+  onUsage: applyUsageSnapshot,
 });
 const { prefetch } = usePrefetch();
 const { data: customProvidersData } = useCachedData(dataKeys.customProviders, () => api.customProviders.list());
@@ -135,43 +115,36 @@ watch(me, (value) => {
 
 
 
-function applyAccountOverviewResponse(summary: AccountOverviewResponse): AccountOverviewData {
-  if (!isAccountOverviewDelta(summary)) {
-    accountsOverviewData.value = summary;
-    return summary;
-  }
+function applyAccountOverview(summary: AccountOverviewData): void {
+  accountsOverviewData.value = summary;
+}
 
-  const current = accountsOverviewData.value;
-  if (!current) {
-    throw new Error("Cannot apply account overview delta without a snapshot");
-  }
+function applyAccountsSnapshot(data: AccountsData): void {
+  applyAccountOverview(data.overview);
+}
 
-  const next: AccountOverviewData = {
-    summaries: summary.summaries ? ({ ...current.summaries, ...summary.summaries } as AccountOverviewData["summaries"]) : current.summaries,
-    pinnedProviders: summary.pinnedProviders ?? current.pinnedProviders,
-    cursor: summary.cursor,
-  };
-  accountsOverviewData.value = next;
-  return next;
+function applyUsageSnapshot(data: UsageData): void {
+  applyAccountOverview(data.overview);
+  invalidation.patchApiKeyRoamingPoints(data.roamingPointsByApiKeyId);
+}
+
+function applyModelsSnapshot(data: ModelsData): void {
+  invalidation.patchModels(data.list);
 }
 
 const isProviderOverviewRoute = computed(() => route.path === accountsNavigationHref);
 
-const { data: accountSummaryData, refresh: refreshAccountSummary } = useCachedData(dataKeys.shellAccounts, async (): Promise<ShellAccountSummary> => {
-  const useOverview = isProviderOverviewRoute.value;
-  if (useOverview) {
+const { data: accountSummaryData } = useCachedData(dataKeys.shellAccounts, async (): Promise<ShellAccountSummary> => {
+  if (isProviderOverviewRoute.value) {
     const snapshot = accountsOverviewData.value;
-    if (!snapshot) return emptyShellAccountSummary;
-
-    const summary = applyAccountOverviewResponse(snapshot.cursor ? await api.accounts.overviewDelta({ cursor: snapshot.cursor }) : snapshot);
-    return toShellAccountSummary(summary);
+    return snapshot ? toShellAccountSummary(snapshot) : emptyShellAccountSummary;
   }
 
   return toShellAccountSummary(await api.accounts.ping());
 });
 
 watch(accountsOverviewData, (snapshot) => {
-  if (!snapshot || !isProviderOverviewRoute.value) return;
+  if (!snapshot) return;
 
   accountSummaryData.value = toShellAccountSummary(snapshot);
 }, { immediate: true });
@@ -184,7 +157,6 @@ const accountIndicators = computed(
 const pinnedProviders = computed(() => accountSummaryData.value?.pinnedProviders ?? cachedPinnedProviders.value ?? emptyShellAccountSummary.pinnedProviders);
 const hasLoadedAccountSummary = computed(() => Boolean(accountSummaryData.value));
 const hasResolvedPinnedProviders = computed(() => hasLoadedAccountSummary.value || cachedPinnedProviders.value !== null);
-const shouldRefreshAccountSummary = computed(() => isDesktopViewport.value || mobileOpen.value);
 
 watch(accountSummaryData, (value) => {
   if (value) cachedPinnedProviders.value = value.pinnedProviders;
@@ -218,10 +190,9 @@ const { data: defaultModelFamilyCounts } = useCachedData(dataKeys.shellModelFami
 
 const modelFamilyCounts = computed(() => defaultModelFamilyCounts.value ?? emptyModelFamilyCounts);
 
-let accountSummaryRefreshInFlight: Promise<void> | null = null;
-let accountSummaryRefreshQueued = false;
-let pointStatusRefreshInFlight: Promise<void> | null = null;
-let pointStatusRefreshQueued = false;
+watch(liveModels, (data) => {
+  if (data) defaultModelFamilyCounts.value = normalizeModelFamilyCounts(data.familyCounts);
+}, { immediate: true });
 
 const pinnedProviderHrefs = computed(() => {
   const hrefs = new Set<string>();
@@ -362,61 +333,6 @@ const subNavigationAnchorIds = computed(() => primaryNavigation.flatMap((item) =
 
 const { mainContent, activeAnchorId, handleNavClick } = useAnchorNavigation({ anchorIds: subNavigationAnchorIds, onNavigate: closeMobileSidebar });
 
-async function refreshAccountSummaryOnce() {
-  if (!shouldRefreshAccountSummary.value) return;
-
-  if (accountSummaryRefreshInFlight) {
-    accountSummaryRefreshQueued = true;
-    return;
-  }
-
-  accountSummaryRefreshInFlight = refreshAccountSummary().then(() => undefined);
-  try {
-    await accountSummaryRefreshInFlight;
-  } finally {
-    accountSummaryRefreshInFlight = null;
-    const shouldRefreshAgain = accountSummaryRefreshQueued && shouldRefreshAccountSummary.value;
-    accountSummaryRefreshQueued = false;
-
-    if (shouldRefreshAgain) {
-      void refreshAccountSummaryOnce();
-    }
-  }
-}
-
-function applyPointStatus(status: PointStatusData) {
-  if (me.value) {
-    me.value = {
-      ...me.value,
-      points: { balance: status.balance },
-    };
-  }
-
-  invalidation.patchApiKeyRoamingPoints(status.roamingPointsByApiKeyId);
-}
-
-async function refreshPointStatusOnce() {
-  if (pointStatusRefreshInFlight) {
-    pointStatusRefreshQueued = true;
-    return;
-  }
-
-  pointStatusRefreshInFlight = api.points.status().then(applyPointStatus);
-  try {
-    await pointStatusRefreshInFlight;
-  } catch (error) {
-    console.error("Failed to refresh points:", error);
-  } finally {
-    pointStatusRefreshInFlight = null;
-    const shouldRefreshAgain = pointStatusRefreshQueued;
-    pointStatusRefreshQueued = false;
-
-    if (shouldRefreshAgain) {
-      void refreshPointStatusOnce();
-    }
-  }
-}
-
 function applyPointsBalance(balance: number) {
   if (!me.value) return;
 
@@ -437,12 +353,6 @@ function schedulePrefetch() {
 
 onMounted(() => {
   schedulePrefetch();
-
-  watch(shouldRefreshAccountSummary, (shouldRefresh) => {
-    if (!shouldRefresh) return;
-
-    if (!isDesktopViewport.value) void refreshAccountSummaryOnce();
-  }, { immediate: true });
 });
 
 onBeforeUnmount(() => {

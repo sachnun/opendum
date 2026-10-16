@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto";
-
 import { db, pinnedProvider, providerAccountModelHealth } from "@opendum/database";
 import { getRedisClient } from "#web/lib/redis.js";
 import { getModelFamily, getProviderAccessRule, getProviderModelSet } from "#web/lib/proxy/models.js";
@@ -16,8 +14,6 @@ export { UNHEALTHY_THRESHOLD };
 const COOLDOWN_RECOVERY_RATIO = 0.30;
 const ERROR_HISTORY_KEY_PREFIX = "opendum:provider-account:error-history";
 const ERROR_HISTORY_ENTRY_KEY_PREFIX = "opendum:provider-account:error-history-entry";
-const ACCOUNT_OVERVIEW_CURSOR_VERSION = 2;
-const PROVIDER_DETAIL_CURSOR_VERSION = 2;
 
 type RedisErrorHistoryEntry = {
   id: string;
@@ -69,22 +65,6 @@ export interface AccountReadOptions {
 
 export type AccountOverviewSummary = { connected: number; active: number; indicator: ProviderAccountIndicator; stats: ProviderStats };
 export type AccountStatsResult = Awaited<ReturnType<typeof import("./account-stats.js").buildAccountStats>>;
-
-export type AccountOverviewCursor = {
-  pinned: string;
-  summaries: string;
-};
-
-export type ProviderDetailCursor = {
-  v: typeof PROVIDER_DETAIL_CURSOR_VERSION;
-  accounts: Record<string, string>;
-  supportedModels: string;
-  freeSupportedModels: string;
-  supportedModelsByAccountId: Record<string, string>;
-  disabledModelsByAccountId: Record<string, string>;
-  modelHealthByAccountId: Record<string, string>;
-  pinnedProviders: string;
-};
 
 export function accountIsEffectivelyActive(account: { isActive: boolean; disabledUntil: Date | string | null }, now = new Date()): boolean {
   if (!account.isActive) return false;
@@ -336,65 +316,6 @@ export function buildAccountHealthByAccountId(healthRows: AccountModelHealthSumm
     acc[row.providerAccountId] = current;
     return acc;
   }, {});
-}
-
-export function hashAccountOverviewValue(value: unknown) {
-  return createHash("sha256").update(JSON.stringify(value)).digest("base64url").slice(0, 16);
-}
-
-export function encodeAccountOverviewCursor(pinnedProviders: string[], summaries: Record<string, AccountOverviewSummary>) {
-  return [ACCOUNT_OVERVIEW_CURSOR_VERSION, hashAccountOverviewValue(pinnedProviders), hashAccountOverviewValue(summaries)].join(".");
-}
-
-export function decodeAccountOverviewCursor(cursor: string | undefined): AccountOverviewCursor | null {
-  if (!cursor) return null;
-
-  const [version, pinned, summaries, extra] = cursor.split(".");
-  if (version !== String(ACCOUNT_OVERVIEW_CURSOR_VERSION) || !pinned || !summaries || extra) return null;
-
-  return { pinned, summaries };
-}
-
-export function encodeProviderDetailCursor(detail: { accounts: Array<{ id: string }>; supportedModels: string[]; freeSupportedModels: string[]; supportedModelsByAccountId: Record<string, string[]>; disabledModelsByAccountId: Record<string, string[]>; modelHealthByAccountId: Record<string, unknown>; pinnedProviders: string[] }) {
-  const cursor: ProviderDetailCursor = {
-    v: PROVIDER_DETAIL_CURSOR_VERSION,
-    accounts: Object.fromEntries(detail.accounts.map((account) => [account.id, hashAccountOverviewValue(account)])),
-    supportedModels: hashAccountOverviewValue(detail.supportedModels),
-    freeSupportedModels: hashAccountOverviewValue(detail.freeSupportedModels),
-    supportedModelsByAccountId: Object.fromEntries(Object.entries(detail.supportedModelsByAccountId).map(([accountId, models]) => [accountId, hashAccountOverviewValue(models)])),
-    disabledModelsByAccountId: Object.fromEntries(Object.entries(detail.disabledModelsByAccountId).map(([accountId, models]) => [accountId, hashAccountOverviewValue(models)])),
-    modelHealthByAccountId: Object.fromEntries(Object.entries(detail.modelHealthByAccountId).map(([accountId, health]) => [accountId, hashAccountOverviewValue(health)])),
-    pinnedProviders: hashAccountOverviewValue(detail.pinnedProviders),
-  };
-
-  return Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");
-}
-
-export function decodeProviderDetailCursor(cursor: string | undefined): ProviderDetailCursor | null {
-  if (!cursor) return null;
-
-  try {
-    const parsed = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as Partial<ProviderDetailCursor>;
-    if (parsed.v !== PROVIDER_DETAIL_CURSOR_VERSION || !parsed.accounts || typeof parsed.accounts !== "object") return null;
-    if (typeof parsed.supportedModels !== "string" || typeof parsed.freeSupportedModels !== "string" || !parsed.supportedModelsByAccountId || typeof parsed.supportedModelsByAccountId !== "object") return null;
-    if (!parsed.disabledModelsByAccountId || typeof parsed.disabledModelsByAccountId !== "object") return null;
-    if (!parsed.modelHealthByAccountId || typeof parsed.modelHealthByAccountId !== "object" || typeof parsed.pinnedProviders !== "string") return null;
-
-    return parsed as ProviderDetailCursor;
-  } catch {
-    return null;
-  }
-}
-
-export function buildStatsDelta(stats: AccountStatsResult, cursors?: Record<string, string>) {
-  const nextCursors = Object.fromEntries(Object.entries(stats).map(([id, value]) => [id, hashAccountOverviewValue(value)]));
-  const changedStats = Object.fromEntries(Object.entries(stats).filter(([id, value]) => cursors?.[id] !== hashAccountOverviewValue(value)));
-
-  return {
-    delta: true,
-    cursors: nextCursors,
-    ...(Object.keys(changedStats).length > 0 ? { stats: changedStats } : {}),
-  };
 }
 
 export function buildAccountPingSummaries(accounts: AccountSummarySourceRow[], healthByAccountId: Record<string, AccountHealthAggregate> = {}, now = new Date()) {

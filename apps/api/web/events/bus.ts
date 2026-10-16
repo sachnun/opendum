@@ -1,20 +1,37 @@
-import type { LiveTopic, ServerEvent } from "@opendum/providers/contract";
+import type { AccountsData, LiveTopic, ModelsData, ServerEvent, UsageData } from "@opendum/providers/contract";
 import { EventPublisher } from "@orpc/server";
+import { Effect, Match } from "effect";
 
 import { proxyEvents } from "../../core/events.js";
 
 const POINTS_DEBOUNCE_MS = 1_500;
+const SNAPSHOT_DEBOUNCE_MS = 400;
 const USAGE_THROTTLE_MS = 10_000;
 const HEARTBEAT_MS = 20_000;
+
+export interface EventSnapshots {
+  accounts: AccountsData;
+  models: ModelsData;
+  usage: UsageData;
+}
+
+export type SnapshotBuilder = (userId: string, topics: LiveTopic[]) => Promise<Partial<EventSnapshots>>;
 
 const publisher = new EventPublisher<Record<string, ServerEvent>>({ maxBufferedEvents: 32 });
 
 const activeUserIds = new Set<string>();
 const pointsBalances = new Map<string, number>();
 const pointsTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const snapshotTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const usagePublishedAt = new Map<string, number>();
 const usagePendingUserIds = new Set<string>();
 const usageTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+let buildSnapshots: SnapshotBuilder = async () => ({});
+
+export function configureEventSnapshots(builder: SnapshotBuilder): void {
+  buildSnapshots = builder;
+}
 
 function now(): string {
   return new Date().toISOString();
@@ -24,20 +41,57 @@ export function publishToUser(userId: string, event: ServerEvent): void {
   publisher.publish(userId, event);
 }
 
+function toUpdateEvent(topic: LiveTopic, snapshots: Partial<EventSnapshots>): ServerEvent | null {
+  return Match.value(topic).pipe(
+    Match.when("accounts", () => (snapshots.accounts ? { type: "update" as const, topic: "accounts" as const, at: now(), data: snapshots.accounts } : null)),
+    Match.when("models", () => (snapshots.models ? { type: "update" as const, topic: "models" as const, at: now(), data: snapshots.models } : null)),
+    Match.when("usage", () => (snapshots.usage ? { type: "update" as const, topic: "usage" as const, at: now(), data: snapshots.usage } : null)),
+    Match.orElse(() => null),
+  );
+}
+
+function publishTopic(userId: string, topic: LiveTopic): void {
+  if (!activeUserIds.has(userId)) return;
+
+  void Effect.runPromise(
+    Effect.tryPromise(() => buildSnapshots(userId, [topic])).pipe(
+      Effect.map((snapshots) => toUpdateEvent(topic, snapshots)),
+      Effect.tap((event) => Effect.sync(() => {
+        if (event) publishToUser(userId, event);
+      })),
+      Effect.catch((cause) => Effect.logError(`Failed to publish ${topic} event for ${userId}`, cause)),
+    )
+  );
+}
+
 export function publishModelsChanged(userId: string): void {
-  publishToUser(userId, { type: "tick", topic: "models", at: now() });
+  scheduleTopic(userId, "models");
 }
 
 export function publishAccountsChanged(userId: string): void {
-  publishToUser(userId, { type: "tick", topic: "accounts", at: now() });
+  scheduleTopic(userId, "accounts");
+}
+
+function scheduleTopic(userId: string, topic: LiveTopic): void {
+  if (!activeUserIds.has(userId)) return;
+
+  const key = `${userId}:${topic}`;
+  if (snapshotTimers.has(key)) return;
+
+  const timer = setTimeout(() => {
+    snapshotTimers.delete(key);
+    publishTopic(userId, topic);
+  }, SNAPSHOT_DEBOUNCE_MS);
+
+  timer.unref?.();
+  snapshotTimers.set(key, timer);
 }
 
 function flushUsageChanged(userId: string): void {
   usageTimers.delete(userId);
   usagePendingUserIds.delete(userId);
   usagePublishedAt.set(userId, Date.now());
-  if (!activeUserIds.has(userId)) return;
-  publishToUser(userId, { type: "tick", topic: "usage", at: now() });
+  publishTopic(userId, "usage");
 }
 
 export function publishUsageChanged(userId: string): void {
@@ -78,11 +132,21 @@ export function publishPointsBalance(userId: string, balance: number): void {
   pointsTimers.set(userId, timer);
 }
 
+async function* initialEvents(userId: string, topics: LiveTopic[]): AsyncGenerator<ServerEvent, void> {
+  const snapshots = await buildSnapshots(userId, topics);
+  for (const topic of topics) {
+    const event = toUpdateEvent(topic, snapshots);
+    if (event) yield event;
+  }
+}
+
 export async function* subscribeUserEvents(userId: string, topics: LiveTopic[], signal?: AbortSignal): AsyncGenerator<ServerEvent, void> {
   const wanted = new Set<LiveTopic>(topics);
   activeUserIds.add(userId);
 
   try {
+    yield* initialEvents(userId, topics);
+
     for await (const event of publisher.subscribe(userId, { signal })) {
       if (event.type === "ping" || wanted.has(event.topic)) yield event;
     }
@@ -94,6 +158,13 @@ export async function* subscribeUserEvents(userId: string, topics: LiveTopic[], 
     if (timer) {
       clearTimeout(timer);
       usageTimers.delete(userId);
+    }
+    for (const topic of ["accounts", "models"] as const) {
+      const key = `${userId}:${topic}`;
+      const snapshotTimer = snapshotTimers.get(key);
+      if (!snapshotTimer) continue;
+      clearTimeout(snapshotTimer);
+      snapshotTimers.delete(key);
     }
   }
 }

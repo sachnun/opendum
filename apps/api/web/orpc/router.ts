@@ -6,6 +6,7 @@ import { Effect } from "effect";
 
 import { getProxyContext } from "../../context.js";
 import { publishModelsChanged, subscribeUserEvents } from "#web/events/bus.js";
+import "#web/events/snapshots.js";
 import { requestOriginFromHeaders } from "#web/lib/request-origin.js";
 import * as accountAuth from "#web/services/account-auth.js";
 import * as accountQuota from "#web/services/account-quota.js";
@@ -73,8 +74,8 @@ export const router = authed.router({
   },
   accounts: {
     list: authed.accounts.list.handler(({ context }) => accounts.listAccounts(context.requestContext.userId)),
-    overview: authed.accounts.overview.handler(({ context, input }) =>
-      accounts.getAccountOverview(context.requestContext.userId, { autoPin: !context.requestContext.isAuditMode, cursor: input.cursor })
+    overview: authed.accounts.overview.handler(({ context }) =>
+      accounts.getAccountOverview(context.requestContext.userId, { autoPin: !context.requestContext.isAuditMode })
     ),
     ping: authed.accounts.ping.handler(({ context }) =>
       accounts.getAccountPing(context.requestContext.userId, { autoPin: !context.requestContext.isAuditMode })
@@ -84,7 +85,7 @@ export const router = authed.router({
       accounts.getAccountsByProviderDetailed(context.requestContext.userId, input)
     ),
     stats: authed.accounts.stats.handler(({ context, input }) =>
-      accounts.getAccountStats(context.requestContext.userId, { accountIds: input.accountIds, cursors: input.cursors })
+      accounts.getAccountStats(context.requestContext.userId, { accountIds: input.accountIds })
     ),
     create: writable.accounts.create.handler(({ context, input }) => accounts.createAccount(context.requestContext.userId, input)),
     update: writable.accounts.update.handler(({ context, input }) => accounts.updateAccount(context.requestContext.userId, input)),

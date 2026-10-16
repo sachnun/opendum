@@ -3,6 +3,7 @@ import { MODEL_FAMILY_SORT_ORDER, getModelFamilyAnchorId } from "@opendum/models
 import { compareModelEntries } from "@opendum/models/sort";
 import { buildDayKeys, buildEmptyModelStats, buildHourKeys, MODEL_DURATION_LOOKBACK_HOURS, MODEL_STATS_DAYS, type ModelStats } from "@opendum/models/stats";
 import { costEntries, formatCostPoints, type ModelCost } from "../../lib/model-cost";
+import type { UsageData } from "@opendum/providers/contract";
 import { getProviderLabel } from "@opendum/providers/provider-accounts";
 
 definePageMeta({ middleware: "auth", layout: "web" });
@@ -30,7 +31,6 @@ function isActiveModel(model: ModelListItem) {
 const customModelIds = computed(() => new Set(models.value.filter((model) => model.custom).map((model) => model.id)));
 const emptyModelStats = buildEmptyModelStats(buildDayKeys(MODEL_STATS_DAYS), buildHourKeys(MODEL_DURATION_LOOKBACK_HOURS));
 const modelStatsById = shallowReactive<Record<string, ModelStats>>({});
-const modelStatsCursorById = shallowReactive<Record<string, string>>({});
 const pendingModelId = ref<string | null>(null);
 const copiedModelId = ref<string | null>(null);
 const modelsRoot = ref<HTMLElement | null>(null);
@@ -174,14 +174,8 @@ async function loadModelStats(modelIds: string[], options: { force?: boolean } =
   for (const modelId of requestedModelIds) loadingModelStatsIds.add(modelId);
 
   try {
-    const response = await api.models.stats({
-      models: requestedModelIds,
-      cursors: Object.fromEntries(requestedModelIds.map((modelId) => [modelId, modelStatsCursorById[modelId] ?? ""])),
-    });
-    for (const [modelId, cursor] of Object.entries(response.cursors)) modelStatsCursorById[modelId] = cursor;
-    if (response.stats) {
-      for (const [modelId, stats] of Object.entries(response.stats)) modelStatsById[modelId] = stats;
-    }
+    const response = await api.models.stats({ models: requestedModelIds });
+    for (const [modelId, stats] of Object.entries(response)) modelStatsById[modelId] = stats;
   } catch (error) {
     console.error("Failed to load model stats:", error);
   } finally {
@@ -202,22 +196,17 @@ function observeModelCards() {
   }
 }
 
-function refreshVisibleModelStats() {
-  if (document.hidden) return;
-  queueModelStatsLoad(Array.from(intersectingModelIds), { force: true });
+function applyUsageSnapshot(data: UsageData) {
+  for (const [modelId, stats] of Object.entries(data.modelStats)) modelStatsById[modelId] = stats;
 }
 
-useLiveEvent("usage", refreshVisibleModelStats);
+useLiveEvent("usage", applyUsageSnapshot);
 
 function pruneModelStats() {
   const availableModelIds = new Set(models.value.filter((model) => model.available !== false).map((model) => model.id));
 
   for (const modelId of Object.keys(modelStatsById)) {
     if (!availableModelIds.has(modelId)) Reflect.deleteProperty(modelStatsById, modelId);
-  }
-
-  for (const modelId of Object.keys(modelStatsCursorById)) {
-    if (!availableModelIds.has(modelId)) Reflect.deleteProperty(modelStatsCursorById, modelId);
   }
 
   for (const modelId of forceQueuedModelStatsIds) {

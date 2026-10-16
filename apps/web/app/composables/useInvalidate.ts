@@ -129,6 +129,11 @@ function patchModelEnabled(modelId: string, enabled: boolean) {
   patchNuxtData<ModelSearchItem[]>(dataKeys.modelSearch, (value) => value.map((model) => (model.id === modelId ? { ...model, isEnabled: enabled } : model)));
 }
 
+function patchModels(list: ModelListItem[]) {
+  patchNuxtData<ModelListItem[]>(dataKeys.models, () => list);
+  patchNuxtData<ModelSearchItem[]>(dataKeys.modelSearch, () => list.map(({ id, providers, reasoning, modalities, cost, isEnabled, available, custom }) => ({ id, providers, reasoning, modalities, cost, isEnabled, available, custom })));
+}
+
 function invalidateAccountCollection(provider: string) {
   return refreshData([
     dataKeys.shellAccounts,
@@ -192,6 +197,7 @@ export function useInvalidate() {
     patchApiKeyRoamingPoints,
     patchDisabledModels,
     patchModelEnabled,
+    patchModels,
     patchPinnedProvider,
     patchProviderAccount,
     refreshData,

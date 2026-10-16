@@ -113,17 +113,7 @@ export interface ProviderAccountModelHealthItem {
 export interface AccountOverviewData {
   summaries: Record<string, { connected: number; active: number; indicator: "normal" | "warning" | "error"; stats: ProviderStats }>;
   pinnedProviders: string[];
-  cursor?: string;
 }
-
-export interface AccountOverviewDeltaData {
-  delta: true;
-  cursor: string;
-  summaries?: Partial<AccountOverviewData["summaries"]>;
-  pinnedProviders?: string[];
-}
-
-export type AccountOverviewResponse = AccountOverviewData | AccountOverviewDeltaData;
 
 export interface AccountPingData {
   summaries: Partial<Record<string, { active: number; indicator: "normal" | "warning" | "error" }>>;
@@ -131,11 +121,7 @@ export interface AccountPingData {
   hasConnectedAccounts: boolean;
 }
 
-export interface AccountStatsData {
-  delta: true;
-  cursors: Record<string, string>;
-  stats?: Record<string, ProviderStats>;
-}
+export type AccountStatsData = Record<string, ProviderStats>;
 
 export interface ProviderDetailData {
   accounts: ProviderAccountDetailItem[];
@@ -145,26 +131,7 @@ export interface ProviderDetailData {
   disabledModelsByAccountId: Record<string, string[]>;
   modelHealthByAccountId: Record<string, Record<string, ProviderAccountModelHealthItem>>;
   pinnedProviders: string[];
-  cursor?: string;
 }
-
-export interface ProviderDetailDeltaData {
-  delta: true;
-  cursor: string;
-  accounts?: ProviderAccountDetailItem[];
-  deletedAccountIds?: string[];
-  supportedModels?: string[];
-  freeSupportedModels?: string[];
-  supportedModelsByAccountId?: Record<string, string[]>;
-  clearedSupportedModelsByAccountId?: string[];
-  disabledModelsByAccountId?: Record<string, string[]>;
-  clearedDisabledModelsByAccountId?: string[];
-  modelHealthByAccountId?: Record<string, Record<string, ProviderAccountModelHealthItem>>;
-  clearedModelHealthByAccountId?: string[];
-  pinnedProviders?: string[];
-}
-
-export type ProviderDetailResponse = ProviderDetailData | ProviderDetailDeltaData;
 
 export interface QuotaGroupDisplay {
   name: string;

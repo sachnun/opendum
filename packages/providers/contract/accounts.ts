@@ -9,11 +9,10 @@ const MAX_QUOTA_BATCH_ACCOUNTS = 100;
 
 const accountIdSchema = z.string().trim().min(1);
 const providerInputSchema = z.object({ provider: z.string().trim().toLowerCase().regex(PROVIDER_KEY_PATTERN, "Invalid provider") });
-const providerDetailInputSchema = providerInputSchema.extend({ cursor: z.string().min(1).optional() });
-const accountOverviewInputSchema = z.object({ cursor: z.string().min(1).optional() });
+const providerDetailInputSchema = providerInputSchema;
+const accountOverviewInputSchema = z.object({});
 const accountStatsInputSchema = z.object({
   accountIds: z.array(accountIdSchema).max(50),
-  cursors: z.record(z.string(), z.string()).optional(),
 });
 const createAccountInputSchema = z.object({
   provider: z.string(),

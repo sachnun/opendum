@@ -8,7 +8,7 @@ import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { isKnownProvider, PROVIDER_ACCOUNT_KEYS } from "./account-providers.js";
 import { customProviderModels } from "./custom-providers.js";
 import { trackProviderEmail } from "./points.js";
-import { buildAccountStats, buildEmptyProviderStats, getProviderSummaryStats, type ProviderAccountIndicator } from "./account-stats.js";
+import { buildAccountStats, buildEmptyProviderStats, getProviderSummaryStats, type ProviderAccountIndicator, type ProviderStats } from "./account-stats.js";
 import {
   UNHEALTHY_THRESHOLD,
   type AccountHealthAggregate,
@@ -19,18 +19,12 @@ import {
   accountTierCanAccessModel,
   buildAccountHealthByAccountId,
   buildAccountPingSummaries,
-  buildStatsDelta,
-  decodeAccountOverviewCursor,
-  decodeProviderDetailCursor,
   deleteRedisErrorHistory,
-  encodeAccountOverviewCursor,
-  encodeProviderDetailCursor,
   getAccountSummaryHealthRows,
   getCooldownRecoveryAccountIds,
   getPinnedProviderKeys,
   getProviderModelsForAccountTier,
   hasActionableHealthWarning,
-  hashAccountOverviewValue,
   providerModelIsAccessibleByAccounts,
   readRedisErrorHistories,
   readRedisErrorHistory,
@@ -53,9 +47,7 @@ type AccountModelHealthRecoveryRow = AccountModelHealthSummaryRow & {
   createdAt: Date | string | null;
 };
 
-interface AccountOverviewReadOptions extends AccountReadOptions {
-  cursor?: string;
-}
+interface AccountOverviewReadOptions extends AccountReadOptions {}
 
 const PROVIDER_KEY_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/;
 const providerAccountListColumns = {
@@ -145,22 +137,8 @@ export async function getAccountOverview(userId: string, options: AccountOvervie
         },
       ])
     ) as Record<string, AccountOverviewSummary>;
-    const cursor = encodeAccountOverviewCursor(pinnedProviders, summaries);
-    const previousCursor = decodeAccountOverviewCursor(options.cursor);
 
-    if (previousCursor) {
-      const summariesChanged = previousCursor.summaries !== hashAccountOverviewValue(summaries);
-      const pinnedChanged = previousCursor.pinned !== hashAccountOverviewValue(pinnedProviders);
-
-      return {
-        delta: true,
-        cursor,
-        ...(summariesChanged ? { summaries } : {}),
-        ...(pinnedChanged ? { pinnedProviders } : {}),
-      };
-    }
-
-    return { summaries, pinnedProviders, cursor };
+    return { summaries, pinnedProviders };
   } catch (error) {
     console.error("Failed to load account summaries:", error);
     throw new Error("Failed to load account summaries", { cause: error });
@@ -307,7 +285,7 @@ export async function getAccountsByProviderDetailed(userId: string, input: Provi
       };
     });
 
-    const detail = {
+    return {
       accounts: detailedAccounts,
       supportedModels,
       freeSupportedModels,
@@ -316,45 +294,13 @@ export async function getAccountsByProviderDetailed(userId: string, input: Provi
       modelHealthByAccountId,
       pinnedProviders,
     };
-    const cursor = encodeProviderDetailCursor(detail);
-    const previousCursor = decodeProviderDetailCursor(input.cursor);
-
-    if (previousCursor) {
-      const changedAccounts = detail.accounts.filter((account) => previousCursor.accounts[account.id] !== hashAccountOverviewValue(account));
-      const currentAccountIds = new Set(detail.accounts.map((account) => account.id));
-      const deletedAccountIds = Object.keys(previousCursor.accounts).filter((accountId) => !currentAccountIds.has(accountId));
-      const changedSupportedModels = Object.fromEntries(Object.entries(detail.supportedModelsByAccountId).filter(([accountId, models]) => previousCursor.supportedModelsByAccountId[accountId] !== hashAccountOverviewValue(models)));
-      const clearedSupportedModelsByAccountId = Object.keys(previousCursor.supportedModelsByAccountId).filter((accountId) => !(accountId in detail.supportedModelsByAccountId));
-      const changedDisabledModels = Object.fromEntries(Object.entries(detail.disabledModelsByAccountId).filter(([accountId, models]) => previousCursor.disabledModelsByAccountId[accountId] !== hashAccountOverviewValue(models)));
-      const clearedDisabledModelsByAccountId = Object.keys(previousCursor.disabledModelsByAccountId).filter((accountId) => !(accountId in detail.disabledModelsByAccountId));
-      const changedModelHealth = Object.fromEntries(Object.entries(detail.modelHealthByAccountId).filter(([accountId, health]) => previousCursor.modelHealthByAccountId[accountId] !== hashAccountOverviewValue(health)));
-      const clearedModelHealthByAccountId = Object.keys(previousCursor.modelHealthByAccountId).filter((accountId) => !(accountId in detail.modelHealthByAccountId));
-
-      return {
-        delta: true,
-        cursor,
-        ...(changedAccounts.length > 0 ? { accounts: changedAccounts } : {}),
-        ...(deletedAccountIds.length > 0 ? { deletedAccountIds } : {}),
-        ...(previousCursor.supportedModels !== hashAccountOverviewValue(detail.supportedModels) ? { supportedModels: detail.supportedModels } : {}),
-        ...(previousCursor.freeSupportedModels !== hashAccountOverviewValue(detail.freeSupportedModels) ? { freeSupportedModels: detail.freeSupportedModels } : {}),
-        ...(Object.keys(changedSupportedModels).length > 0 ? { supportedModelsByAccountId: changedSupportedModels } : {}),
-        ...(clearedSupportedModelsByAccountId.length > 0 ? { clearedSupportedModelsByAccountId } : {}),
-        ...(Object.keys(changedDisabledModels).length > 0 ? { disabledModelsByAccountId: changedDisabledModels } : {}),
-        ...(clearedDisabledModelsByAccountId.length > 0 ? { clearedDisabledModelsByAccountId } : {}),
-        ...(Object.keys(changedModelHealth).length > 0 ? { modelHealthByAccountId: changedModelHealth } : {}),
-        ...(clearedModelHealthByAccountId.length > 0 ? { clearedModelHealthByAccountId } : {}),
-        ...(previousCursor.pinnedProviders !== hashAccountOverviewValue(detail.pinnedProviders) ? { pinnedProviders: detail.pinnedProviders } : {}),
-      };
-    }
-
-    return { ...detail, cursor };
   } catch (error) {
     console.error("Failed to load provider account detail:", error);
     throw new Error("Failed to load provider account detail", { cause: error });
   }
 }
 
-export async function getAccountStats(userId: string, input: AccountStatsInput) {
+export async function getAccountStats(userId: string, input: AccountStatsInput): Promise<Record<string, ProviderStats>> {
   try {
     const accountIds = Array.from(new Set(input.accountIds));
     if (accountIds.length === 0) return {};
@@ -364,7 +310,7 @@ export async function getAccountStats(userId: string, input: AccountStatsInput) 
       .from(providerAccount)
       .where(and(eq(providerAccount.userId, userId), inArray(providerAccount.id, accountIds)));
     const ownedAccountIds = ownedAccounts.map((account) => account.id);
-    return buildStatsDelta(await buildAccountStats(userId, ownedAccountIds), input.cursors);
+    return buildAccountStats(userId, ownedAccountIds);
   } catch (error) {
     console.error("Failed to load account stats:", error);
     throw new Error("Failed to load account stats", { cause: error });

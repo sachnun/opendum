@@ -1,11 +1,26 @@
-import type { LiveTopic } from "@opendum/providers/contract";
+import type { AccountsData, LiveTopic, ModelsData, UsageData } from "@opendum/providers/contract";
 
-export function liveEventVersionKey(topic: LiveTopic): string {
-  return `web-live-${topic}-version`;
+export interface LiveTopicPayloads {
+  points: { balance: number };
+  accounts: AccountsData;
+  models: ModelsData;
+  usage: UsageData;
 }
 
-export function useLiveEvent(topic: LiveTopic, handler: () => void): void {
-  const version = useState<number>(liveEventVersionKey(topic), () => 0);
+export type LiveTopicPayload<Topic extends LiveTopic> = LiveTopicPayloads[Topic];
 
-  watch(version, () => handler());
+export function liveEventKey(topic: LiveTopic): string {
+  return `web-live-${topic}`;
+}
+
+export function useLiveTopic<Topic extends LiveTopic>(topic: Topic) {
+  return useState<LiveTopicPayload<Topic> | null>(liveEventKey(topic), () => null);
+}
+
+export function useLiveEvent<Topic extends LiveTopic>(topic: Topic, handler: (data: LiveTopicPayload<Topic>) => void): void {
+  const payload = useLiveTopic(topic);
+
+  watch(payload, (value) => {
+    if (value) handler(value);
+  }, { immediate: true });
 }
