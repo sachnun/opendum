@@ -2,7 +2,7 @@ import { randomId } from "../core/helpers.js";
 
 type Json = Record<string, unknown>;
 
-export type SseToolCallDelta = {
+export type ToolCallDelta = {
   /** Groups fragments that belong to the same tool call. */
   key: number | string;
   id?: string;
@@ -15,7 +15,7 @@ export type SseToolCallDelta = {
   replaceArguments?: boolean;
 };
 
-export type SseCompletionCollectorOptions = {
+export type Options = {
   model: string;
   /** Completion id, defaults to a random `chatcmpl` id. */
   id?: string;
@@ -33,7 +33,7 @@ export type SseCompletionCollectorOptions = {
   usageFallback?: Json;
 };
 
-type AccumulatedToolCall = {
+type ToolCall = {
   id: string;
   type: string;
   name: string;
@@ -45,14 +45,14 @@ type AccumulatedToolCall = {
  * Providers feed whatever their stream yields (text, reasoning text,
  * tool-call fragments) and read the synthesized completion at the end.
  */
-export class SseCompletionCollector {
+export class Collector {
   private content = "";
   private reasoning = "";
   private finishReason = "stop";
   private usage: Json | null = null;
-  private readonly toolCalls = new Map<number | string, AccumulatedToolCall>();
+  private readonly toolCalls = new Map<number | string, ToolCall>();
 
-  constructor(private readonly options: SseCompletionCollectorOptions) {}
+  constructor(private readonly options: Options) {}
 
   addContent(text: string): void {
     this.content += text;
@@ -62,7 +62,7 @@ export class SseCompletionCollector {
     this.reasoning += text;
   }
 
-  addToolCall(delta: SseToolCallDelta): void {
+  addToolCall(delta: ToolCallDelta): void {
     let call = this.toolCalls.get(delta.key);
     if (!call) {
       call = { id: "", type: "", name: "", arguments: "" };

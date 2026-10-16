@@ -14,7 +14,7 @@ export async function handleModels(event: H3Event, context: ProxyContext): Promi
       const apiKeyModelSet = new Set<string>();
 
       if (authHeader) {
-        const result = yield* context.auth.validateAPIKey(authHeader);
+        const result = yield* context.auth.validateKey(authHeader);
         if (!result.valid) {
           return jsonResponse(
             { error: { message: result.error, type: "authentication_error", param: null, code: null } },
@@ -34,8 +34,8 @@ export async function handleModels(event: H3Event, context: ProxyContext): Promi
         return jsonResponse({ object: "list", data: allModels });
       }
 
-      const disabledSet = yield* context.auth.disabledModelSetForUser(userId);
-      const availability = yield* context.auth.getAccountModelAvailabilityWithSharing(userId, roamingEnabled);
+      const disabledSet = yield* context.auth.disabledModels(userId);
+      const availability = yield* context.auth.availability(userId, roamingEnabled);
 
       const enabled: Array<Record<string, unknown>> = [];
       for (const item of allModels) {
@@ -43,8 +43,8 @@ export async function handleModels(event: H3Event, context: ProxyContext): Promi
         const canonical = context.models.resolveAlias(id);
         if (disabledSet.has(canonical)) continue;
         const usable =
-          context.auth.isModelUsableByAccounts(canonical, availability) ||
-          (roamingEnabled && context.auth.isModelUsableBySharedAccounts(canonical, availability));
+          context.auth.usable(canonical, availability) ||
+          (roamingEnabled && context.auth.usableShared(canonical, availability));
         if (!usable) continue;
         const providers = Array.isArray(item.providers) ? (item.providers as string[]) : [];
         if (apiKeyModelAccessMode === "whitelist") {
@@ -65,7 +65,7 @@ export async function handleModels(event: H3Event, context: ProxyContext): Promi
         enabled.push(item);
       }
 
-      const customModels = yield* context.auth.listUserCustomModels(userId);
+      const customModels = yield* context.auth.list(userId);
       for (const item of customModels) {
         const id = typeof item.id === "string" ? item.id : "";
         const canonical = context.models.resolveAlias(id);

@@ -4,7 +4,7 @@ import type { ProviderRoutingOptions } from "./provider-performance.js";
 import { isSyntheticProviderAccountId, prioritizeAccounts } from "./service-helpers.js";
 
 /** Inputs shared by the routing strategies for one account-selection pass. */
-export type RoutingContext = {
+export type Context = {
   /** True when no explicit provider was requested, so providers compete. */
   crossProvider: boolean;
   /** Provider priority order derived from the model registry. */
@@ -14,8 +14,8 @@ export type RoutingContext = {
 };
 
 /** Orders candidates that already passed the eligibility filters. */
-export interface RoutingStrategy {
-  order(candidates: ProviderAccount[], context: RoutingContext): ProviderAccount[];
+export interface Strategy {
+  order(candidates: ProviderAccount[], context: Context): ProviderAccount[];
 }
 
 /**
@@ -23,14 +23,14 @@ export interface RoutingStrategy {
  * accounts first inside each group; EWMA scores decide which provider takes
  * the head slot when `routingOptions` is present.
  */
-export class PriorityOrderStrategy implements RoutingStrategy {
-  order(candidates: ProviderAccount[], context: RoutingContext): ProviderAccount[] {
+export class Priority implements Strategy {
+  order(candidates: ProviderAccount[], context: Context): ProviderAccount[] {
     return prioritizeAccounts(candidates, context.crossProvider, context.providerPriority, context.routingOptions);
   }
 }
 
 /** Moves the session-affine account back to the front when it is still a candidate. */
-export class StickySessionStrategy implements RoutingStrategy {
+export class Sticky implements Strategy {
   private readonly stickyAccountId: string | null;
 
   constructor(stickyAccountId: string | null) {
@@ -45,7 +45,7 @@ export class StickySessionStrategy implements RoutingStrategy {
 }
 
 /** Runs each strategy in order, feeding the previous result into the next. */
-export function composeRoutingStrategies(...strategies: RoutingStrategy[]): RoutingStrategy {
+export function compose(...strategies: Strategy[]): Strategy {
   return {
     order: (candidates, context) =>
       strategies.reduce((ordered, strategy) => strategy.order(ordered, context), candidates),

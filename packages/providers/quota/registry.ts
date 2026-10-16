@@ -60,7 +60,7 @@ const FETCHERS: QuotaFetcher[] = [
  * flow: credential failures are represented as an `expired` quota result
  * rather than a failure so callers can render a re-authenticate prompt.
  */
-export class QuotaRegistry {
+export class Quotas {
   private readonly fetchers: Map<string, QuotaFetcher>;
 
   constructor(fetchers: QuotaFetcher[] = FETCHERS) {
@@ -71,7 +71,7 @@ export class QuotaRegistry {
     return this.fetchers.has(provider);
   }
 
-  providersWithoutToken(): Set<string> {
+  withoutToken(): Set<string> {
     const providers = new Set<string>();
     for (const fetcher of this.fetchers.values()) {
       if (fetcher.withoutToken) providers.add(fetcher.provider);
@@ -106,17 +106,17 @@ export class QuotaRegistry {
   }
 }
 
-const defaultRegistry = new QuotaRegistry();
+const defaultRegistry = new Quotas();
 
-export function isQuotaProvider(provider: string): boolean {
+export function isQuota(provider: string): boolean {
   return defaultRegistry.isSupported(provider);
 }
 
-export function quotaProvidersWithoutToken(): Set<string> {
-  return defaultRegistry.providersWithoutToken();
+export function withoutToken(): Set<string> {
+  return defaultRegistry.withoutToken();
 }
 
-export function fetchAccountQuota(
+export function fetchQuota(
   ctx: QuotaContext,
   account: QuotaAccount,
   forceRefresh: boolean

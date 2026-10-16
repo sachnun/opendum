@@ -47,7 +47,7 @@ export type AccountModelAvailability = {
   disabledCountByProviderModel: Map<string, number>;
   activeAccountIdsByProvider: Map<string, string[]>;
   accountTierById: Map<string, string>;
-  authlessProviderModels: Map<string, Set<string>>;
+  authlessModels: Map<string, Set<string>>;
   customProviderModels: Map<string, Set<string>>;
   customProviderStandaloneModels: Map<string, string[]>;
   sharedAccountCountByProvider: Map<string, number>;
@@ -77,7 +77,7 @@ export function emptyAvailability(): AccountModelAvailability {
     disabledCountByProviderModel: new Map(),
     activeAccountIdsByProvider: new Map(),
     accountTierById: new Map(),
-    authlessProviderModels: new Map(),
+    authlessModels: new Map(),
     customProviderModels: new Map(),
     customProviderStandaloneModels: new Map(),
     sharedAccountCountByProvider: new Map(),

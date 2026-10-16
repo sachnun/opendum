@@ -13,10 +13,10 @@ export type GuardedFetchOptions = {
   connectTimeout?: number;
 };
 
-export type GuardedFetch = (url: string, init?: RequestInit) => Promise<Response>;
+export type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
 
 export type GuardedFetchHandle = {
-  fetch: GuardedFetch;
+  fetch: Fetch;
   close(): Promise<void>;
 };
 
@@ -71,7 +71,7 @@ export function createGuardedFetch(options: GuardedFetchOptions = {}): GuardedFe
     connect: connection,
     headersTimeout: options.headersTimeout,
   });
-  const fetchFn: GuardedFetch = (url, init) =>
+  const fetchFn: Fetch = (url, init) =>
     undiciFetch(url, {
       ...(init as UndiciRequestInit),
       dispatcher: agent,

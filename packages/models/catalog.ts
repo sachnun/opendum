@@ -2,15 +2,15 @@ import { compactStrings, uniqueSorted } from "./collections.ts";
 import { inferFamilyFromFolder } from "./model/families.ts";
 import type { ModelEntry, ModelInfo } from "./registry.ts";
 
-export class ModelCatalog {
+export class Catalog {
   private readonly models = new Map<string, ModelInfo>();
   private readonly effective = new Map<string, ModelInfo>();
   private readonly ignoredIds = new Set<string>();
 
   private constructor() {}
 
-  static fromEntries(entries: ModelEntry[], options: { familyFromFolder?: boolean } = {}): ModelCatalog {
-    const catalog = new ModelCatalog();
+  static fromEntries(entries: ModelEntry[], options: { familyFromFolder?: boolean } = {}): Catalog {
+    const catalog = new Catalog();
     for (const entry of entries) {
       const info: ModelInfo = { ...entry.info };
       info.id = (info.id ?? "").trim();

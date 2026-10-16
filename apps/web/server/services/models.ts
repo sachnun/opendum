@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { db, disabledModel } from "@opendum/database";
 import { getModelStatsByModel } from "~~/server/lib/model-stats";
-import { getAccountModelAvailability, invalidateDisabledModelsCache, isModelUsableByAccounts, type AccountModelAvailability } from "~~/server/lib/proxy/auth";
+import { getAccountModelAvailability, invalidateDisabledModelsCache, usable, type AccountModelAvailability } from "~~/server/lib/proxy/auth";
 import { MODEL_REGISTRY, getAllModels, getModelFamily, getModelLookupKeys, getProvidersForModel, isModelSupported, resolveModelAlias } from "~~/server/lib/proxy/models";
 import { compareModelEntries } from "~~/lib/model-sort";
 
@@ -35,7 +35,7 @@ async function getAvailableModelsForUser(userId: string) {
       return isModelSupported(canonical) ? canonical : model;
     })),
     models: getAllModels()
-      .filter((model) => isModelUsableByAccounts(model, availability))
+      .filter((model) => usable(model, availability))
       .sort((a, b) => compareModelEntries({ id: a, family: getModelFamily(a) }, { id: b, family: getModelFamily(b) })),
   };
 }

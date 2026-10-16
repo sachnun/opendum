@@ -146,11 +146,11 @@ export class ProviderRegistry {
 
   isAuthless(name: string): boolean {
     const provider = this.providers.get(name);
-    return Boolean(provider && isAuthlessProvider(provider) && provider.authless());
+    return Boolean(provider && isAuthless(provider) && provider.authless());
   }
 }
 
-export function isAuthlessProvider(provider: Provider): provider is Provider & AuthlessProvider {
+export function isAuthless(provider: Provider): provider is Provider & AuthlessProvider {
   return typeof (provider as Partial<AuthlessProvider>).authless === "function";
 }
 

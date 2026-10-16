@@ -20,7 +20,7 @@ export {
   parseResetIso,
 } from "./helpers.js";
 export { encodeQuery, getQuotaJson, putQuotaCache } from "./cache.js";
-export { QuotaRegistry, fetchAccountQuota, isQuotaProvider, quotaProvidersWithoutToken } from "./registry.js";
+export { Quotas, fetchQuota, isQuota, withoutToken } from "./registry.js";
 export { quotaFallbackTier } from "./fetchers/shared.js";
 export { QuotaFetchFailure, QuotaJournalFailure } from "../core/errors.js";
 export type { QuotaFailure } from "../core/errors.js";

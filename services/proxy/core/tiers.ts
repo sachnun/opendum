@@ -2,7 +2,7 @@
  * Per-provider paid-tier classification used for routing priority.
  * Adding a provider means adding one policy entry instead of editing a switch.
  */
-export interface AccountTierPolicy {
+export interface TierPolicy {
   /** True when the tier counts as a paid plan for routing priority. */
   isPaid(tier: string | null): boolean;
 }
@@ -11,14 +11,14 @@ function normalizedTier(tier: string | null): string {
   return tier ? tier.trim().toLowerCase() : "";
 }
 
-export class AntigravityTierPolicy implements AccountTierPolicy {
+export class AntigravityTier implements TierPolicy {
   isPaid(tier: string | null): boolean {
     const value = normalizedTier(tier);
     return value === "paid" || value === "standard-tier" || value.startsWith("g1-");
   }
 }
 
-export class KiroTierPolicy implements AccountTierPolicy {
+export class KiroTier implements TierPolicy {
   isPaid(tier: string | null): boolean {
     const value = normalizedTier(tier);
     return value === "pro" || value === "pro+" || value === "pro-plus" || value === "power";
@@ -31,19 +31,19 @@ const GENERIC_PAID_TIERS = new Set([
   "education", "hc",
 ]);
 
-export class GenericTierPolicy implements AccountTierPolicy {
+export class GenericTier implements TierPolicy {
   isPaid(tier: string | null): boolean {
     return GENERIC_PAID_TIERS.has(normalizedTier(tier));
   }
 }
 
-export const GENERIC_TIER_POLICY: AccountTierPolicy = new GenericTierPolicy();
+export const GENERIC_TIER: TierPolicy = new GenericTier();
 
-const TIER_POLICIES: Record<string, AccountTierPolicy> = {
-  antigravity: new AntigravityTierPolicy(),
-  kiro: new KiroTierPolicy(),
+const TIERS: Record<string, TierPolicy> = {
+  antigravity: new AntigravityTier(),
+  kiro: new KiroTier(),
 };
 
-export function tierPolicyFor(provider: string): AccountTierPolicy {
-  return TIER_POLICIES[provider] ?? GENERIC_TIER_POLICY;
+export function tierFor(provider: string): TierPolicy {
+  return TIERS[provider] ?? GENERIC_TIER;
 }

@@ -1,7 +1,7 @@
 import { Effect } from "effect";
 import type { OpendumRedis } from "@opendum/core/redis";
 import { tryAsync } from "./helpers.js";
-import { ignoringErrors } from "./service-helpers.js";
+import { ignore } from "./service-helpers.js";
 
 const ERROR_HISTORY_KEY_PREFIX = "opendum:provider-account:error-history";
 const ERROR_HISTORY_ENTRY_PREFIX = "opendum:provider-account:error-history-entry";
@@ -69,7 +69,7 @@ export async function upsertErrorHistory(
   };
   const ttl = errorHistoryTtl(statusCode);
   await Effect.runPromise(
-    ignoringErrors(async () => {
+    ignore(async () => {
       await redis.set(errorHistoryEntryKey(entryId), JSON.stringify(entry), { EX: ttl });
       await redis.set(dedupeKey, entryId, { EX: ttl });
       await redis.zAdd(errorHistoryKey(accountId), {

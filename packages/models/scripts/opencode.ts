@@ -2,7 +2,7 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { syncProviderModels } from "#models/model-store.ts";
+import { sync } from "#models/model-store.ts";
 import { runFetchText, runFetchJson } from "#models/sync/http.ts";
 import { stripParamInfoKey } from "#models/model/clean-key.ts";
 import { syncCliVersion } from "./version-sync.ts";
@@ -207,7 +207,7 @@ async function main() {
   const { freeModelIds, endpointByModelId } = await fetchOpencodeFreeModelIds();
   const modelMap = buildModelMap(freeModelIds);
   const providerConfigByModel = buildProviderConfigByModel(modelMap, endpointByModelId);
-  const result = syncProviderModels(modelsDir, "opencode", modelMap, {
+  const result = sync(modelsDir, "opencode", modelMap, {
     providerConfigByModel,
     managedProviderConfigKeys: ["responses_api", "messages_api"],
   });

@@ -1,29 +1,29 @@
 import { uniqueSorted } from "./collections.ts";
 
-const SUGGESTION_THRESHOLD = 0.7;
+const THRESHOLD = 0.7;
 
-export type SuggestionCandidate = {
+export type Candidate = {
   value: string;
   normalized: string;
   tokens: string[];
 };
 
-export type SuggestionModelEntry = {
+export type Suggestion = {
   value: string;
   providers: readonly string[];
 };
 
-export class ModelSuggester {
+export class Suggester {
   private constructor(
-    private readonly models: SuggestionCandidate[],
-    private readonly providers: Map<string, SuggestionCandidate[]>
+    private readonly models: Candidate[],
+    private readonly providers: Map<string, Candidate[]>
   ) {}
 
-  static fromModels(entries: readonly SuggestionModelEntry[]): ModelSuggester {
-    const models: SuggestionCandidate[] = [];
-    const providers = new Map<string, SuggestionCandidate[]>();
+  static fromModels(entries: readonly Suggestion[]): Suggester {
+    const models: Candidate[] = [];
+    const providers = new Map<string, Candidate[]>();
     for (const entry of entries) {
-      const candidate = makeCandidate(entry.value);
+      const candidate = toCandidate(entry.value);
       models.push(candidate);
       for (const provider of entry.providers) {
         const list = providers.get(provider) ?? [];
@@ -34,16 +34,16 @@ export class ModelSuggester {
     for (const list of providers.values()) {
       list.sort((a, b) => a.value.localeCompare(b.value));
     }
-    return new ModelSuggester(models, providers);
+    return new Suggester(models, providers);
   }
 
   suggest(model: string, provider: string | null, candidates: string[] | null, limit: number): string[] {
     const term = model.trim();
     if (!term || limit <= 0) return [];
-    const query = makeCandidate(term);
+    const query = toCandidate(term);
 
     let useProviderPrefix = false;
-    let pool: SuggestionCandidate[] = [];
+    let pool: Candidate[] = [];
     if (candidates === null) {
       if (provider) {
         const providerCandidates = this.providers.get(provider) ?? [];
@@ -54,14 +54,14 @@ export class ModelSuggester {
       }
       if (pool.length === 0) pool = this.models;
     } else {
-      pool = uniqueSorted(candidates).map((value) => makeCandidate(value));
+      pool = uniqueSorted(candidates).map((value) => toCandidate(value));
       useProviderPrefix = provider !== null;
     }
 
     const matches: Array<{ value: string; score: number }> = [];
     for (const candidate of pool) {
-      const score = suggestionScore(query, candidate);
-      if (score >= SUGGESTION_THRESHOLD) matches.push({ value: candidate.value, score });
+      const rating = score(query, candidate);
+      if (rating >= THRESHOLD) matches.push({ value: candidate.value, score: rating });
     }
     matches.sort((a, b) => (a.score === b.score ? a.value.localeCompare(b.value) : b.score - a.score));
 
@@ -78,16 +78,16 @@ export class ModelSuggester {
   }
 }
 
-export function suggestionScoreFor(term: string, candidate: string): number {
-  return suggestionScore(makeCandidate(term), makeCandidate(candidate));
+export function scoreFor(term: string, candidate: string): number {
+  return score(toCandidate(term), toCandidate(candidate));
 }
 
-function makeCandidate(value: string): SuggestionCandidate {
-  const normalized = normalizeSuggestionValue(value);
+function toCandidate(value: string): Candidate {
+  const normalized = normalizeValue(value);
   return { value, normalized, tokens: normalized.split(/\s+/).filter((token) => token.length > 0) };
 }
 
-function normalizeSuggestionValue(value: string): string {
+function normalizeValue(value: string): string {
   let out = "";
   let lastSeparator = false;
   for (const ch of value.trim().toLowerCase()) {
@@ -108,7 +108,7 @@ function runeLength(value: string): number {
   return Array.from(value).length;
 }
 
-function levenshteinDistance(a: string, b: string): number {
+function distance(a: string, b: string): number {
   const left = Array.from(a);
   const right = Array.from(b);
   if (left.length === 0) return right.length;
@@ -129,7 +129,7 @@ function levenshteinDistance(a: string, b: string): number {
   return previous[right.length]!;
 }
 
-function compactTokenScore(term: string, candidate: string): number {
+function compactScore(term: string, candidate: string): number {
   if (term === candidate) return 1;
   if (candidate.includes(term) || term.includes(candidate)) {
     let shorter = runeLength(term);
@@ -142,17 +142,17 @@ function compactTokenScore(term: string, candidate: string): number {
   }
   const maxLen = Math.max(runeLength(term), runeLength(candidate));
   if (maxLen === 0) return 0;
-  const score = 1 - levenshteinDistance(term, candidate) / maxLen;
+  const score = 1 - distance(term, candidate) / maxLen;
   return score < 0 ? 0 : score;
 }
 
-function tokenSuggestionScore(termTokens: string[], candidateTokens: string[]): number {
+function tokenScore(termTokens: string[], candidateTokens: string[]): number {
   if (termTokens.length === 0 || candidateTokens.length === 0) return 0;
   let total = 0;
   for (const token of termTokens) {
     let best = 0;
     for (const candidateToken of candidateTokens) {
-      const score = compactTokenScore(token, candidateToken);
+      const score = compactScore(token, candidateToken);
       if (score > best) best = score;
     }
     total += best;
@@ -160,7 +160,7 @@ function tokenSuggestionScore(termTokens: string[], candidateTokens: string[]): 
   return total / termTokens.length;
 }
 
-function suggestionScore(term: SuggestionCandidate, candidate: SuggestionCandidate): number {
+function score(term: Candidate, candidate: Candidate): number {
   const left = term.normalized;
   const right = candidate.normalized;
   if (!left || !right) return 0;
@@ -174,9 +174,9 @@ function suggestionScore(term: SuggestionCandidate, candidate: SuggestionCandida
     }
     return 0.8 + 0.2 * (shorter / longer);
   }
-  const tokenScore = tokenSuggestionScore(term.tokens, candidate.tokens);
-  if (tokenScore > 0) return tokenScore;
+  const overlap = tokenScore(term.tokens, candidate.tokens);
+  if (overlap > 0) return overlap;
   const maxLen = Math.max(runeLength(left), runeLength(right));
   if (maxLen === 0) return 0;
-  return 1 - levenshteinDistance(left, right) / maxLen;
+  return 1 - distance(left, right) / maxLen;
 }

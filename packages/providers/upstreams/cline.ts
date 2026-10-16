@@ -3,7 +3,7 @@ import type { Registry } from "@opendum/models/runtime";
 import { stringValue } from "../core/helpers.js";
 import { postJSONWithHeaders, type UpstreamTransport } from "../core/http.js";
 import { ProviderCredentialFailure } from "../core/errors.js";
-import { OAuthTokenExchange } from "../core/oauth-token-exchange.js";
+import { OAuth } from "../core/oauth.js";
 import type {
   CredentialRefresher,
   Provider,
@@ -43,12 +43,12 @@ export class ClineProvider implements Provider, CredentialRefresher, RefreshBuff
   readonly name = "cline";
   private readonly registry: Registry;
   private readonly transport: UpstreamTransport;
-  private readonly exchange: OAuthTokenExchange;
+  private readonly exchange: OAuth;
 
   constructor(options: ClineOptions) {
     this.registry = options.registry;
     this.transport = options.transport;
-    this.exchange = new OAuthTokenExchange({
+    this.exchange = new OAuth({
       provider: "cline",
       tokenUrl: `${CLINE_API_BASE}${CLINE_REFRESH_PATH}`,
       transport: options.transport,
@@ -90,7 +90,7 @@ export class ClineProvider implements Provider, CredentialRefresher, RefreshBuff
     }
     let model = stringValue(request.body.model);
     if (model.startsWith("cline/")) model = model.slice("cline/".length);
-    payload.model = this.registry.upstreamModelName(model, "cline");
+    payload.model = this.registry.upstream(model, "cline");
     payload.stream = request.stream;
     return postJSONWithHeaders(
       "cline",

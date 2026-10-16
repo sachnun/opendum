@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { KiroStreamParser, convertKiroEventsToCompletion } from "./transform.js";
+import { Parser, convertKiroEventsToCompletion } from "./transform.js";
 
 type Json = Record<string, unknown>;
 
@@ -64,9 +64,9 @@ describe("convertKiroEventsToCompletion", () => {
   });
 });
 
-describe("KiroStreamParser", () => {
+describe("Parser", () => {
   it("frames json events across chunk boundaries", () => {
-    const parser = new KiroStreamParser();
+    const parser = new Parser();
     expect(parser.feed('{"con')).toEqual([]);
     expect(parser.feed('tent":"hel')).toEqual([]);
     expect(parser.feed('lo"}')).toEqual([{ content: "hello" }]);
@@ -77,20 +77,20 @@ describe("KiroStreamParser", () => {
   });
 
   it("keeps an unterminated json tail without emitting on finish", () => {
-    const parser = new KiroStreamParser();
+    const parser = new Parser();
     expect(parser.feed('{"content":"unterminated')).toEqual([]);
     expect(parser.finish()).toEqual([]);
   });
 
   it("extracts thinking across chunks and holds back a partial tag", () => {
-    const parser = new KiroStreamParser();
+    const parser = new Parser();
     expect(parser.processContent("hi <thin")).toEqual(["", ""]);
     expect(parser.processContent("king>because</thinking> ok")).toEqual(["hi  ok", "because"]);
     expect(parser.flushContent()).toEqual(["", ""]);
   });
 
   it("holds back a tail while waiting for a possible tag start", () => {
-    const parser = new KiroStreamParser();
+    const parser = new Parser();
     expect(parser.processContent("0123456789abc")).toEqual(["01", ""]);
     expect(parser.flushContent()).toEqual(["23456789abc", ""]);
   });

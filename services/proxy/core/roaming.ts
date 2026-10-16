@@ -12,9 +12,9 @@ import type { UsageCounts } from "./types.js";
  * Owns the roaming-points lifecycle (reserve → settle/refund). Reserve
  * surfaces its result (null means insufficient points); settle and refund
  * propagate failures so callers decide how to react (ProxyService wraps
- * best-effort settlement in `ignoringErrors`).
+ * best-effort settlement in `ignore`).
  */
-export class RoamingPointService {
+export class Roaming {
   constructor(
     private readonly points: PointPort,
     private readonly models: Registry

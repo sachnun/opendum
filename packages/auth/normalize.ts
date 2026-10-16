@@ -1,20 +1,20 @@
 import type { Registry } from "@opendum/models/runtime";
 
-export function parseModelParam(modelParam: string): [string | null, string] {
+export function parseModel(modelParam: string): [string | null, string] {
   const index = modelParam.indexOf("/");
   if (index < 0) return [null, modelParam];
-  return [normalizeProviderAlias(modelParam.slice(0, index)), modelParam.slice(index + 1)];
+  return [providerAlias(modelParam.slice(0, index)), modelParam.slice(index + 1)];
 }
 
-export function normalizeAccessMode(mode: string): string {
+export function accessMode(mode: string): string {
   return mode === "whitelist" || mode === "blacklist" ? mode : "all";
 }
 
-export function normalizeAccountList(values: string[]): string[] {
+export function accountList(values: string[]): string[] {
   return uniqueSorted(values.map((value) => value.trim()).filter((value) => value.length > 0));
 }
 
-export function normalizeModelList(registry: Registry, values: string[]): string[] {
+export function modelList(registry: Registry, values: string[]): string[] {
   const result: string[] = [];
   for (const value of values) {
     const trimmed = value.trim();
@@ -25,7 +25,7 @@ export function normalizeModelList(registry: Registry, values: string[]): string
   return uniqueSorted(result);
 }
 
-export function normalizeAccessList(registry: Registry, values: string[]): string[] {
+export function accessList(registry: Registry, values: string[]): string[] {
   const result: string[] = [];
   for (const value of values) {
     let trimmed = value.trim();
@@ -36,7 +36,7 @@ export function normalizeAccessList(registry: Registry, values: string[]): strin
   return uniqueSorted(result);
 }
 
-export function normalizeDisabledModelList(registry: Registry, values: string[]): string[] {
+export function disabledList(registry: Registry, values: string[]): string[] {
   const result: string[] = [];
   for (const value of values) {
     const trimmed = value.trim();
@@ -47,12 +47,12 @@ export function normalizeDisabledModelList(registry: Registry, values: string[])
   return uniqueSorted(result);
 }
 
-export function isModelListed(modelSet: Set<string>, model: string, provider: string | null): boolean {
+export function listed(modelSet: Set<string>, model: string, provider: string | null): boolean {
   if (modelSet.has(model)) return true;
   return provider !== null && modelSet.has(`${provider}/${model}`);
 }
 
-function normalizeProviderAlias(provider: string): string {
+function providerAlias(provider: string): string {
   return provider.trim().toLowerCase();
 }
 

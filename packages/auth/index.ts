@@ -1,5 +1,5 @@
-export { AuthService, isAuthlessProvider, isAuthlessProviderAccountId } from "./service.js";
-export { parseModelParam } from "./normalize.js";
+export { AuthService, isAuthless, isAuthlessId } from "./service.js";
+export { parseModel } from "./normalize.js";
 export {
   emptyAuthResult,
   emptyAvailability,

@@ -1,15 +1,15 @@
 import { describe, expect, it } from "bun:test";
 import type { ModelInfo } from "./registry.ts";
-import { OpenAIModelSerializer } from "./serializer.ts";
+import { Serializer } from "./serializer.ts";
 
-function serializerOf(models: Record<string, ModelInfo>): OpenAIModelSerializer {
-  return new OpenAIModelSerializer({
+function serializerOf(models: Record<string, ModelInfo>): Serializer {
+  return new Serializer({
     models: () => Object.keys(models).sort((a, b) => a.localeCompare(b)),
     info: (model) => models[model] ?? null,
   });
 }
 
-describe("OpenAIModelSerializer", () => {
+describe("Serializer", () => {
   it("formats models for the OpenAI models endpoint", () => {
     const serializer = serializerOf({
       "gpt-4o": {

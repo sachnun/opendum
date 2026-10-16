@@ -45,9 +45,9 @@ export async function passthroughStream(ctx: ResponseContext, recorder: StreamRe
     ctx.usage.cacheWriteTokens = tracker.cacheWriteTokens;
     if (completion === "success") {
       if (ctx.provider === "hyper" && (tracker.hypercreditsRemaining !== null || tracker.hypercreditsCost > 0)) {
-        recorder.storeHypercreditsUsage(ctx.accountId, tracker.hypercreditsRemaining, tracker.hypercreditsCost);
+        recorder.storeCredits(ctx.accountId, tracker.hypercreditsRemaining, tracker.hypercreditsCost);
       }
-      recorder.recordSuccessfulRequest({
+      recorder.recordSuccess({
         accountId: ctx.accountId,
         provider: ctx.provider,
         model: ctx.model,
@@ -111,10 +111,10 @@ export async function passthroughNonStream(ctx: ResponseContext, recorder: Strea
         const value = Number((u.cost as Json).hypercredits);
         if (Number.isFinite(value)) cost = value;
       }
-      if (remaining !== null || cost > 0) recorder.storeHypercreditsUsage(ctx.accountId, remaining, cost);
+      if (remaining !== null || cost > 0) recorder.storeCredits(ctx.accountId, remaining, cost);
     }
   }
-  recorder.recordSuccessfulRequest({
+  recorder.recordSuccess({
     accountId: ctx.accountId,
     provider: ctx.provider,
     model: ctx.model,
@@ -148,7 +148,7 @@ export async function anthropicNonStream(ctx: ResponseContext, recorder: StreamR
   ctx.usage.outputTokens = counts.outputTokens;
   ctx.usage.cachedTokens = counts.cachedTokens;
   ctx.usage.cacheWriteTokens = counts.cacheWriteTokens;
-  recorder.recordSuccessfulRequest({
+  recorder.recordSuccess({
     accountId: ctx.accountId,
     provider: ctx.provider,
     model: ctx.model,
@@ -469,7 +469,7 @@ export async function anthropicStream(ctx: ResponseContext, recorder: StreamReco
     ctx.usage.cacheWriteTokens = tracker.cacheWriteTokens;
     if (completion === "success") {
       tracker.finish();
-      recorder.recordSuccessfulRequest({
+      recorder.recordSuccess({
         accountId: ctx.accountId,
         provider: ctx.provider,
         model: ctx.model,

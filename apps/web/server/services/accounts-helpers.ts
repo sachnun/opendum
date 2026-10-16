@@ -11,8 +11,8 @@ import { INDICATOR_WEIGHT, type ProviderAccountIndicator, type ProviderStats } f
 const AUTO_PIN_SENTINEL = "_auto_pinned";
 const UNHEALTHY_IDLE_DECAY_MS = 10 * 60 * 1000;
 const MODEL_DEGRADED_THRESHOLD = 2;
-const ACCOUNT_COOLDOWN_UNHEALTHY_THRESHOLD = 10;
-export { ACCOUNT_COOLDOWN_UNHEALTHY_THRESHOLD };
+const UNHEALTHY_THRESHOLD = 10;
+export { UNHEALTHY_THRESHOLD };
 const COOLDOWN_RECOVERY_RATIO = 0.30;
 const ERROR_HISTORY_KEY_PREFIX = "opendum:provider-account:error-history";
 const ERROR_HISTORY_ENTRY_KEY_PREFIX = "opendum:provider-account:error-history-entry";
@@ -419,7 +419,7 @@ export function buildAccountPingSummaries(accounts: AccountSummarySourceRow[], h
     const health = healthByAccountId[account.id];
     const unhealthyCount = health?.unhealthyCount ?? account.consecutiveErrors;
     const warningCount = health?.warningCount ?? account.consecutiveErrors;
-    const indicator = account.status === "failed" || unhealthyCount >= ACCOUNT_COOLDOWN_UNHEALTHY_THRESHOLD
+    const indicator = account.status === "failed" || unhealthyCount >= UNHEALTHY_THRESHOLD
       ? "error"
       : warningCount > 0
         ? "warning"

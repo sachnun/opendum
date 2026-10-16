@@ -1,9 +1,9 @@
-export const AUTHLESS_PROVIDER_NAMES = ["opencode"];
+export const AUTHLESS = ["opencode"];
 
-export function isAuthlessProvider(provider: string): boolean {
-  return AUTHLESS_PROVIDER_NAMES.includes(provider);
+export function isAuthless(provider: string): boolean {
+  return AUTHLESS.includes(provider);
 }
 
-export function isAuthlessProviderAccountId(accountId: string): boolean {
-  return AUTHLESS_PROVIDER_NAMES.includes(accountId) || accountId.startsWith("authless:");
+export function isAuthlessId(accountId: string): boolean {
+  return AUTHLESS.includes(accountId) || accountId.startsWith("authless:");
 }

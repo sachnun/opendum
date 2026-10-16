@@ -2,7 +2,7 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildModelIndex, persistModel, syncProviderModels } from "#models/model-store.ts";
+import { buildIndex, persist, sync } from "#models/model-store.ts";
 import { runFetchJson } from "#models/sync/http.ts";
 import { stripParamInfoKey } from "#models/model/clean-key.ts";
 
@@ -64,7 +64,7 @@ function buildMetadataLookup(models) {
 }
 
 function enrichNewModels(modelsDir, addedKeys, modelMap, metadataLookup) {
-  const index = buildModelIndex(modelsDir);
+  const index = buildIndex(modelsDir);
 
   for (const modelKey of addedKeys) {
     const entry = Object.values(index).find((item) => item.fileId === modelKey || item.id === modelKey);
@@ -83,7 +83,7 @@ function enrichNewModels(modelsDir, addedKeys, modelMap, metadataLookup) {
       data.reasoning = true;
     }
 
-    persistModel(entry, data);
+    persist(entry, data);
   }
 }
 
@@ -116,7 +116,7 @@ async function main() {
   const modelMap = buildModelMap(models);
   const metadataLookup = buildMetadataLookup(models);
 
-  const result = syncProviderModels(modelsDir, PROVIDER_NAME, modelMap);
+  const result = sync(modelsDir, PROVIDER_NAME, modelMap);
 
   if (result.added.length > 0) {
     enrichNewModels(modelsDir, result.added, modelMap, metadataLookup);

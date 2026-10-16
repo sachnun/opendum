@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { Effect } from "effect";
 import type { ProviderAccount } from "../types.js";
 import type { UpstreamTransport } from "./http.js";
-import { OAuthTokenExchange, type OAuthTokenExchangeSpec } from "./oauth-token-exchange.js";
+import { OAuth, type Spec } from "./oauth.js";
 
 const account = { id: "acc-1" } as unknown as ProviderAccount;
 
@@ -19,7 +19,7 @@ function transport(options: { status?: number; body?: string; captured?: Capture
   };
 }
 
-function spec(overrides: Partial<OAuthTokenExchangeSpec> = {}): OAuthTokenExchangeSpec {
+function spec(overrides: Partial<Spec> = {}): Spec {
   return {
     provider: "demo",
     tokenUrl: "https://demo.test/token",
@@ -38,7 +38,7 @@ function spec(overrides: Partial<OAuthTokenExchangeSpec> = {}): OAuthTokenExchan
   };
 }
 
-async function attempt(exchange: OAuthTokenExchange, refreshToken = "rt") {
+async function attempt(exchange: OAuth, refreshToken = "rt") {
   return Effect.runPromise(
     exchange.exchange(refreshToken, account).pipe(
       Effect.map((credentials) => ({ ok: true as const, credentials })),
@@ -47,10 +47,10 @@ async function attempt(exchange: OAuthTokenExchange, refreshToken = "rt") {
   );
 }
 
-describe("OAuthTokenExchange", () => {
+describe("OAuth", () => {
   it("posts the refresh request and returns parsed credentials", async () => {
     const captured: Captured[] = [];
-    const exchange = new OAuthTokenExchange(
+    const exchange = new OAuth(
       spec({ transport: transport({ body: JSON.stringify({ access_token: "at-1" }), captured }) })
     );
     const result = await attempt(exchange, "  rt-1  ");
@@ -62,7 +62,7 @@ describe("OAuthTokenExchange", () => {
   });
 
   it("turns non-2xx responses into credential failures with the provider label", async () => {
-    const exchange = new OAuthTokenExchange(spec({ transport: transport({ status: 401, body: "denied" }) }));
+    const exchange = new OAuth(spec({ transport: transport({ status: 401, body: "denied" }) }));
     const result = await attempt(exchange);
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -73,14 +73,14 @@ describe("OAuthTokenExchange", () => {
   });
 
   it("wraps JSON decode errors in the failure channel", async () => {
-    const exchange = new OAuthTokenExchange(spec({ transport: transport({ body: "<html>nope</html>" }) }));
+    const exchange = new OAuth(spec({ transport: transport({ body: "<html>nope</html>" }) }));
     const result = await attempt(exchange);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.cause).toBeInstanceOf(SyntaxError);
   });
 
   it("awaits async parse hooks", async () => {
-    const exchange = new OAuthTokenExchange(
+    const exchange = new OAuth(
       spec({
         transport: transport({ body: JSON.stringify({ access_token: "at-1" }) }),
         parse: async () => ({ accessToken: "async-at", refreshToken: "rt-2", expiresAt: new Date(123) }),
@@ -96,7 +96,7 @@ describe("OAuthTokenExchange", () => {
 
   it("resolves the url and request asynchronously", async () => {
     const captured: Captured[] = [];
-    const exchange = new OAuthTokenExchange(
+    const exchange = new OAuth(
       spec({
         tokenUrl: async () => "https://demo.test/slow-token",
         request: async (refreshToken) => ({ method: "POST", body: `body:${refreshToken}` }),
@@ -110,7 +110,7 @@ describe("OAuthTokenExchange", () => {
   });
 
   it("propagates guard errors thrown by parse", async () => {
-    const exchange = new OAuthTokenExchange(spec({ transport: transport({ body: JSON.stringify({}) }) }));
+    const exchange = new OAuth(spec({ transport: transport({ body: JSON.stringify({}) }) }));
     const result = await attempt(exchange);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.message).toBe("demo token refresh returned empty access token");

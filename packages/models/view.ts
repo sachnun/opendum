@@ -1,24 +1,24 @@
 import { uniqueSorted } from "./collections.ts";
 import type { ModelInfo } from "./registry.ts";
 
-export type ProviderModelSource = {
+export type Source = {
   canonical(model: string): string;
   info(model: string): ModelInfo | null;
   entries(): Iterable<[string, ModelInfo]>;
 };
 
-export class ProviderModelView {
+export class View {
   private readonly modelMapCache = new Map<string, Map<string, string>>();
   private readonly modelSetCache = new Map<string, Set<string>>();
 
-  constructor(private readonly source: ProviderModelSource) {}
+  constructor(private readonly source: Source) {}
 
-  providersForModel(model: string): string[] {
+  providers(model: string): string[] {
     const info = this.source.info(this.source.canonical(model));
     return info ? [...info.providers] : [];
   }
 
-  upstreamModelName(model: string, provider: string): string {
+  upstream(model: string, provider: string): string {
     const canonical = this.source.canonical(model);
     const info = this.source.info(canonical);
     if (!info) return canonical;
@@ -26,7 +26,7 @@ export class ProviderModelView {
     return upstream && upstream.length > 0 ? upstream : canonical;
   }
 
-  providerModelMap(provider: string): Map<string, string> {
+  modelMap(provider: string): Map<string, string> {
     const cached = this.modelMapCache.get(provider);
     if (cached) return cached;
     const result = new Map<string, string>();
@@ -39,15 +39,15 @@ export class ProviderModelView {
     return result;
   }
 
-  providerModelSet(provider: string): Set<string> {
+  modelSet(provider: string): Set<string> {
     const cached = this.modelSetCache.get(provider);
     if (cached) return cached;
-    const set = new Set(this.providerModelMap(provider).keys());
+    const set = new Set(this.modelMap(provider).keys());
     this.modelSetCache.set(provider, set);
     return set;
   }
 
-  modelsForProvider(provider: string): string[] {
+  models(provider: string): string[] {
     const values: string[] = [];
     for (const [model, info] of this.source.entries()) {
       if (info.providers.includes(provider)) values.push(model);

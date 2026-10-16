@@ -14,7 +14,7 @@ import {
   stringValue,
   uniqueStrings,
 } from "../core/helpers.js";
-import { SseCompletionCollector } from "../transform/collector.js";
+import { Collector } from "../transform/collector.js";
 import {
   convertToolsForResponses,
   messagesToResponsesInput,
@@ -25,7 +25,7 @@ import {
 } from "../transform/responses.js";
 import { transportFailure, type UpstreamTransport } from "../core/http.js";
 import { ProviderCredentialFailure } from "../core/errors.js";
-import { OAuthTokenExchange } from "../core/oauth-token-exchange.js";
+import { OAuth } from "../core/oauth.js";
 import type {
   CredentialRefresher,
   Provider,
@@ -205,14 +205,14 @@ export class CodexProvider implements Provider, CredentialRefresher, RefreshBuff
   private readonly transport: UpstreamTransport;
   private readonly redis: OpendumRedis | null;
   private readonly onAccountId: ((accountId: string) => void) | undefined;
-  private readonly exchange: OAuthTokenExchange;
+  private readonly exchange: OAuth;
 
   constructor(options: CodexOptions) {
     this.registry = options.registry;
     this.transport = options.transport;
     this.redis = options.redis ?? null;
     this.onAccountId = options.onAccountId;
-    this.exchange = new OAuthTokenExchange({
+    this.exchange = new OAuth({
       provider: "codex",
       tokenUrl: CODEX_TOKEN_ENDPOINT,
       transport: options.transport,
@@ -351,7 +351,7 @@ export class CodexProvider implements Provider, CredentialRefresher, RefreshBuff
 
   private isModelAllowed(model: string): boolean {
     const normalized = model.trim().toLowerCase();
-    for (const [canonical, upstream] of this.registry.providerModelMap("codex")) {
+    for (const [canonical, upstream] of this.registry.modelMap("codex")) {
       if (canonical.toLowerCase() === normalized || upstream.toLowerCase() === normalized) return true;
     }
     return false;
@@ -359,7 +359,7 @@ export class CodexProvider implements Provider, CredentialRefresher, RefreshBuff
 
   private supportedModelNames(): string[] {
     const values = new Set<string>();
-    for (const [canonical, upstream] of this.registry.providerModelMap("codex")) {
+    for (const [canonical, upstream] of this.registry.modelMap("codex")) {
       if (canonical) values.add(canonical);
       if (upstream) values.add(upstream);
     }
@@ -425,13 +425,13 @@ export class CodexProvider implements Provider, CredentialRefresher, RefreshBuff
   }
 
   private resolveModel(model: string): string {
-    return this.registry.upstreamModelName(lastModelSegment(model), "codex");
+    return this.registry.upstream(lastModelSegment(model), "codex");
   }
 }
 
 export function responsesStreamToCompletion(text: string, model: string): Json {
   const events = parseSseDataLines(text);
-  const collector = new SseCompletionCollector({
+  const collector = new Collector({
     model,
     nullableContent: true,
     normalizeToolArguments: (args) => defaultStringValue(args, "{}"),

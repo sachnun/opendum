@@ -18,7 +18,7 @@ import {
  * Delegates to the query layer with the database bound, so callers depend on
  * this port instead of the raw query functions.
  */
-export class ProviderAccountRepository {
+export class Accounts {
   constructor(private readonly database: DbExecutor) {}
 
   listEligibleAccounts(params: Parameters<typeof listEligibleAccounts>[0]) {

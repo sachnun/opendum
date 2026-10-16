@@ -501,10 +501,10 @@ function buildProviderPresets(modelOptions: ModelOption[], accounts: ProviderAcc
   }
 
   return Array.from(accountsByProvider.entries()).flatMap(([provider, providerAccountsForProvider]) => {
-    const modelsForProvider = modelOptions.filter((model) => model.providers.includes(provider) && providerAccountsForProvider.some((account) => accountSupportsModel(account, model)));
-    const presetPanels = modelsForProvider.map((model) => ({ modelId: model.id, provider, accountId: null }));
+    const models = modelOptions.filter((model) => model.providers.includes(provider) && providerAccountsForProvider.some((account) => accountSupportsModel(account, model)));
+    const presetPanels = models.map((model) => ({ modelId: model.id, provider, accountId: null }));
 
-    return presetPanels.length > 0 ? [{ provider, accounts: providerAccountsForProvider, models: modelsForProvider, panels: presetPanels }] : [];
+    return presetPanels.length > 0 ? [{ provider, accounts: providerAccountsForProvider, models: models, panels: presetPanels }] : [];
   });
 }
 

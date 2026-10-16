@@ -1,13 +1,13 @@
 import type { Registry } from "@opendum/models/runtime";
 import { invalid, valid } from "./model-results.js";
-import { parseModelParam } from "./normalize.js";
+import { parseModel } from "./normalize.js";
 import type { AccountModelAvailability, ModelValidationResult } from "./types.js";
 
-export class AccessPolicy {
+export class Policy {
   constructor(private readonly registry: Registry) {}
 
   validateModel(modelParam: string): ModelValidationResult {
-    const [provider, rawModel] = parseModelParam(modelParam);
+    const [provider, rawModel] = parseModel(modelParam);
     const model = this.registry.resolveAlias(rawModel);
     if (provider === "codex" && !this.isCodexChatGPTModel(model)) {
       const supported = this.codexChatGPTModels().join(", ");
@@ -20,10 +20,10 @@ export class AccessPolicy {
       );
     }
     if (!this.registry.isSupported(model)) {
-      return this.invalidModelResult(provider, rawModel, modelParam, null);
+      return this.invalidResult(provider, rawModel, modelParam, null);
     }
     if (provider && !this.registry.isSupportedByProvider(model, provider)) {
-      const supported = this.registry.providersForModel(model).join(", ");
+      const supported = this.registry.providers(model).join(", ");
       return invalid(
         provider,
         model,
@@ -35,21 +35,21 @@ export class AccessPolicy {
     return valid(provider, model);
   }
 
-  isModelUsableByAccounts(model: string, availability: AccountModelAvailability): boolean {
+  usable(model: string, availability: AccountModelAvailability): boolean {
     const canonical = this.registry.resolveAlias(model);
-    for (const provider of this.registry.providersForModel(canonical)) {
+    for (const provider of this.registry.providers(canonical)) {
       let total = availability.accountCountByProvider.get(provider) ?? 0;
       if (total === 0) continue;
-      const authlessModels = availability.authlessProviderModels.get(provider);
+      const authlessModels = availability.authlessModels.get(provider);
       if (authlessModels && !authlessModels.has(canonical)) {
         if (total === 1) continue;
         total -= 1;
       }
-      const rule = this.registry.providerAccessRule(canonical, provider);
-      if (rule && accessRuleRestrictsTier(rule.minTier, rule.allowedTiers)) {
+      const rule = this.registry.rule(canonical, provider);
+      if (rule && restricts(rule.minTier, rule.allowedTiers)) {
         const accountIds = availability.activeAccountIdsByProvider.get(provider) ?? [];
         const eligible = accountIds.some((accountId) =>
-          tierSatisfiesRule(
+          tierSatisfies(
             availability.accountTierById.get(accountId) ?? "",
             rule.minTier,
             rule.allowedTiers
@@ -67,16 +67,16 @@ export class AccessPolicy {
     return false;
   }
 
-  isModelUsableBySharedAccounts(model: string, availability: AccountModelAvailability): boolean {
+  usableShared(model: string, availability: AccountModelAvailability): boolean {
     const canonical = this.registry.resolveAlias(model);
-    for (const provider of this.registry.providersForModel(canonical)) {
+    for (const provider of this.registry.providers(canonical)) {
       const total = availability.sharedAccountCountByProvider.get(provider) ?? 0;
       if (total === 0) continue;
-      const rule = this.registry.providerAccessRule(canonical, provider);
-      if (rule && accessRuleRestrictsTier(rule.minTier, rule.allowedTiers)) {
+      const rule = this.registry.rule(canonical, provider);
+      if (rule && restricts(rule.minTier, rule.allowedTiers)) {
         const tiers = availability.sharedAccountTiersByProvider.get(provider) ?? [];
         const eligible = tiers.some((tier) =>
-          tierSatisfiesRule(tier, rule.minTier, rule.allowedTiers)
+          tierSatisfies(tier, rule.minTier, rule.allowedTiers)
         );
         if (!eligible) continue;
       }
@@ -86,7 +86,7 @@ export class AccessPolicy {
     return false;
   }
 
-  invalidModelResult(
+  invalidResult(
     provider: string | null,
     model: string,
     modelParam: string,
@@ -102,7 +102,7 @@ export class AccessPolicy {
 
   private isCodexChatGPTModel(model: string): boolean {
     const normalized = model.trim().toLowerCase();
-    for (const [canonical, upstream] of this.registry.providerModelMap("codex")) {
+    for (const [canonical, upstream] of this.registry.modelMap("codex")) {
       if (canonical.toLowerCase() === normalized || upstream.toLowerCase() === normalized) return true;
     }
     return false;
@@ -110,7 +110,7 @@ export class AccessPolicy {
 
   private codexChatGPTModels(): string[] {
     const values = new Set<string>();
-    for (const [canonical, upstream] of this.registry.providerModelMap("codex")) {
+    for (const [canonical, upstream] of this.registry.modelMap("codex")) {
       if (canonical) values.add(canonical);
       if (upstream) values.add(upstream);
     }
@@ -118,7 +118,7 @@ export class AccessPolicy {
   }
 }
 
-function normalizeTierAlias(tier: string): string {
+function tierAlias(tier: string): string {
   const normalized = tier.trim().toLowerCase().replace(/_/g, "-");
   if (normalized === "pro-plus" || normalized === "proplus") return "pro+";
   if (normalized === "free-tier") return "free";
@@ -133,25 +133,25 @@ function normalizeTierAlias(tier: string): string {
   return normalized;
 }
 
-function tierSatisfiesRule(
+function tierSatisfies(
   accountTier: string,
   minTier: string | undefined,
   allowedTiers: string[] | undefined
 ): boolean {
-  const normalizedAccountTier = normalizeTierAlias(accountTier);
+  const normalizedAccountTier = tierAlias(accountTier);
   if (allowedTiers && allowedTiers.length > 0) {
-    return allowedTiers.some((tier) => normalizeTierAlias(tier) === normalizedAccountTier);
+    return allowedTiers.some((tier) => tierAlias(tier) === normalizedAccountTier);
   }
   const required = (minTier ?? "").trim().toLowerCase();
   if (!required || required === "free") return true;
-  return normalizedAccountTier === normalizeTierAlias(required);
+  return normalizedAccountTier === tierAlias(required);
 }
 
-function accessRuleRestrictsTier(
+function restricts(
   minTier: string | undefined,
   allowedTiers: string[] | undefined
 ): boolean {
   if (allowedTiers && allowedTiers.length > 0) return true;
-  const required = normalizeTierAlias(minTier ?? "");
+  const required = tierAlias(minTier ?? "");
   return required !== "" && required !== "free";
 }

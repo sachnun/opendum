@@ -4,15 +4,15 @@ import { Effect } from "effect";
 
 import { inferFamilyFromFolder } from "./model/families.ts";
 import { ModelParseFailure, ModelReadFailure, ModelsDirectoryFailure, asError } from "./errors.ts";
-import { ModelCatalog } from "./catalog.ts";
-import { AliasIndex } from "./alias-index.ts";
-import { ProviderModelView } from "./provider-model-view.ts";
-import { ModelSuggester } from "./suggester.ts";
-import { OpenAIModelSerializer } from "./serializer.ts";
-import { AccessPolicy } from "./access-policy.ts";
+import { Catalog } from "./catalog.ts";
+import { Aliases } from "./aliases.ts";
+import { View } from "./view.ts";
+import { Suggester } from "./suggester.ts";
+import { Serializer } from "./serializer.ts";
+import { Policy } from "./policy.ts";
 
-export { suggestionScoreFor } from "./suggester.ts";
-export { legacyNvidiaAlias } from "./alias-index.ts";
+export { scoreFor } from "./suggester.ts";
+export { nvidiaAlias } from "./aliases.ts";
 
 export type ModelModalities = {
   input?: string[];
@@ -79,11 +79,11 @@ export type ModelEntry = {
   info: ModelInfo;
 };
 
-export function normalizeProviderAlias(provider: string): string {
+export function providerAlias(provider: string): string {
   return provider.trim().toLowerCase();
 }
 
-function resolveGeneratedDir(dir: string): string {
+function generatedDir(dir: string): string {
   const configured = process.env.MODELS_GENERATED_DIR?.trim();
   if (configured) return configured;
   return join(dirname(dir), "generated");
@@ -218,7 +218,7 @@ function collectModelEntries(authoredDir: string, generatedDir: string): ModelEn
 }
 
 export function loadModelEntries(dir: string): ModelEntry[] {
-  return collectModelEntries(dir, resolveGeneratedDir(dir));
+  return collectModelEntries(dir, generatedDir(dir));
 }
 
 /**
@@ -265,32 +265,32 @@ export function flagshipFamilyRanking(entries: ModelEntry[]): FlagshipFamily[] {
 }
 
 export class Registry {
-  private readonly catalog: ModelCatalog;
-  private readonly aliases: AliasIndex;
-  private readonly providerView: ProviderModelView;
-  private readonly suggester: ModelSuggester;
-  private readonly serializer: OpenAIModelSerializer;
-  private readonly access: AccessPolicy;
+  private readonly catalog: Catalog;
+  private readonly aliases: Aliases;
+  private readonly providerView: View;
+  private readonly suggester: Suggester;
+  private readonly serializer: Serializer;
+  private readonly access: Policy;
 
   private constructor(entries: ModelEntry[], options: { familyFromFolder?: boolean } = {}) {
-    this.catalog = ModelCatalog.fromEntries(entries, options);
-    this.aliases = AliasIndex.build({
+    this.catalog = Catalog.fromEntries(entries, options);
+    this.aliases = Aliases.build({
       canonicalIds: () => this.catalog.canonicalIds(),
       info: (model) => this.catalog.info(model),
     });
-    this.providerView = new ProviderModelView({
+    this.providerView = new View({
       canonical: (model) => this.aliases.resolve(model),
       info: (model) => this.catalog.info(model),
       entries: () => this.catalog.entries(),
     });
-    this.suggester = ModelSuggester.fromModels(
+    this.suggester = Suggester.fromModels(
       this.catalog.all().map((value) => ({ value, providers: (this.catalog.info(value) as ModelInfo).providers }))
     );
-    this.serializer = new OpenAIModelSerializer({
+    this.serializer = new Serializer({
       models: () => this.allModels(),
       info: (model) => this.modelInfo(model),
     });
-    this.access = new AccessPolicy({
+    this.access = new Policy({
       info: (model) => this.modelInfo(model),
       entries: () => this.catalog.entries(),
     });
@@ -312,56 +312,56 @@ export class Registry {
     return this.aliases.keys(model);
   }
 
-  providersForModel(model: string): string[] {
-    return this.providerView.providersForModel(model);
+  providers(model: string): string[] {
+    return this.providerView.providers(model);
   }
 
   isSupported(model: string): boolean {
-    return this.providersForModel(model).length > 0;
+    return this.providers(model).length > 0;
   }
 
   isSupportedByProvider(model: string, provider: string): boolean {
-    return this.providersForModel(model).includes(provider);
+    return this.providers(model).includes(provider);
   }
 
-  upstreamModelName(model: string, provider: string): string {
-    return this.providerView.upstreamModelName(model, provider);
+  upstream(model: string, provider: string): string {
+    return this.providerView.upstream(model, provider);
   }
 
-  providerAccessRule(model: string, provider: string): ProviderAccessRule | null {
-    return this.access.providerAccessRule(model, provider);
+  rule(model: string, provider: string): ProviderAccessRule | null {
+    return this.access.rule(model, provider);
   }
 
-  providerModelConfig(model: string, provider: string): ProviderModelConfig | null {
-    return this.access.providerModelConfig(model, provider);
+  config(model: string, provider: string): ProviderModelConfig | null {
+    return this.access.config(model, provider);
   }
 
-  isAuthlessProviderModel(model: string, provider: string): boolean {
-    return this.access.isAuthlessProviderModel(model, provider);
+  isAuthless(model: string, provider: string): boolean {
+    return this.access.isAuthless(model, provider);
   }
 
-  isFreeProviderModel(model: string, provider: string): boolean {
-    return this.access.isFreeProviderModel(model, provider);
+  isFree(model: string, provider: string): boolean {
+    return this.access.isFree(model, provider);
   }
 
-  authlessProviderModels(): Map<string, string[]> {
-    return this.access.authlessProviderModels();
+  authlessModels(): Map<string, string[]> {
+    return this.access.authlessModels();
   }
 
-  providerModelMap(provider: string): Map<string, string> {
-    return this.providerView.providerModelMap(provider);
+  modelMap(provider: string): Map<string, string> {
+    return this.providerView.modelMap(provider);
   }
 
-  providerModelSet(provider: string): Set<string> {
-    return this.providerView.providerModelSet(provider);
+  modelSet(provider: string): Set<string> {
+    return this.providerView.modelSet(provider);
   }
 
   allModels(): string[] {
     return this.catalog.all();
   }
 
-  modelsForProvider(provider: string): string[] {
-    return this.providerView.modelsForProvider(provider);
+  models(provider: string): string[] {
+    return this.providerView.models(provider);
   }
 
   suggestedModels(

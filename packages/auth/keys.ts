@@ -7,38 +7,38 @@ import {
   listAPIKeyRateLimits,
 } from "@opendum/database/queries";
 import {
-  type APIKeyCache,
-  type CachedAPIKeyValidation,
-  INVALID_CACHE_TTL_SECONDS,
-  VALID_CACHE_TTL_SECONDS,
-} from "./api-key-cache.js";
-import { normalizeAccessList, normalizeAccessMode, normalizeAccountList } from "./normalize.js";
+  type Cache,
+  type Cached,
+  INVALID_TTL,
+  VALID_TTL,
+} from "./cache.js";
+import { accessList, accessMode, accountList } from "./normalize.js";
 import { type AuthResult, type RateLimitRule, emptyAuthResult } from "./types.js";
 
-export type APIKeyQueries = {
+export type Queries = {
   getAPIKeyByHash: typeof getAPIKeyByHash;
   deactivateAPIKey: typeof deactivateAPIKey;
   listAPIKeyRateLimits: typeof listAPIKeyRateLimits;
 };
 
-const defaultQueries: APIKeyQueries = {
+const defaultQueries: Queries = {
   getAPIKeyByHash,
   deactivateAPIKey,
   listAPIKeyRateLimits,
 };
 
-export type APIKeyValidatorOptions = {
+export type Options = {
   registry: Registry;
-  keyCache: APIKeyCache;
-  queries?: APIKeyQueries;
+  keyCache: Cache;
+  queries?: Queries;
 };
 
-export class APIKeyValidator {
+export class Keys {
   private readonly registry: Registry;
-  private readonly keyCache: APIKeyCache;
-  private readonly queries: APIKeyQueries;
+  private readonly keyCache: Cache;
+  private readonly queries: Queries;
 
-  constructor(options: APIKeyValidatorOptions) {
+  constructor(options: Options) {
     this.registry = options.registry;
     this.keyCache = options.keyCache;
     this.queries = options.queries ?? defaultQueries;
@@ -72,7 +72,7 @@ export class APIKeyValidator {
         yield* this.keyCache.set(
           keyHash,
           { valid: false, error: "Invalid API key" },
-          INVALID_CACHE_TTL_SECONDS
+          INVALID_TTL
         );
         return emptyAuthResult("Invalid API key");
       }
@@ -81,7 +81,7 @@ export class APIKeyValidator {
         yield* this.keyCache.set(
           keyHash,
           { valid: false, apiKeyId: apiKey.id, error: "API key has been revoked" },
-          INVALID_CACHE_TTL_SECONDS
+          INVALID_TTL
         );
         return emptyAuthResult("API key has been revoked");
       }
@@ -91,19 +91,19 @@ export class APIKeyValidator {
         yield* this.keyCache.set(
           keyHash,
           { valid: false, apiKeyId: apiKey.id, error: "API key has expired" },
-          INVALID_CACHE_TTL_SECONDS
+          INVALID_TTL
         );
         return emptyAuthResult("API key has expired");
       }
 
       const rules = yield* this.rateLimitRules(apiKey.id);
-      const modelMode = normalizeAccessMode(apiKey.modelAccessMode);
-      const modelList = normalizeAccessList(this.registry, apiKey.modelAccessList);
-      const accountMode = normalizeAccessMode(apiKey.accountAccessMode);
-      const accountList = normalizeAccountList(apiKey.accountAccessList);
+      const modelMode = accessMode(apiKey.modelAccessMode);
+      const modelList = accessList(this.registry, apiKey.modelAccessList);
+      const accountMode = accessMode(apiKey.accountAccessMode);
+      const accounts = accountList(apiKey.accountAccessList);
 
       let expiresAtMs: number | undefined;
-      let cacheTtl = VALID_CACHE_TTL_SECONDS;
+      let cacheTtl = VALID_TTL;
       if (apiKey.expiresAt) {
         expiresAtMs = apiKey.expiresAt.getTime();
         const untilExpiry = (apiKey.expiresAt.getTime() - Date.now()) / 1000;
@@ -111,14 +111,14 @@ export class APIKeyValidator {
         if (cacheTtl < 1) cacheTtl = 1;
       }
 
-      const value: CachedAPIKeyValidation = {
+      const value: Cached = {
         valid: true,
         userId: apiKey.userId,
         apiKeyId: apiKey.id,
         modelAccessMode: modelMode,
         modelAccessList: modelList,
         accountAccessMode: accountMode,
-        accountAccessList: accountList,
+        accountAccessList: accounts,
         roamingEnabled: apiKey.roamingEnabled,
         expiresAtMs,
         rateLimitRules: rules,
@@ -147,15 +147,15 @@ export class APIKeyValidator {
     );
   }
 
-  private resultFromCache(cached: CachedAPIKeyValidation): AuthResult {
+  private resultFromCache(cached: Cached): AuthResult {
     return {
       valid: true,
       userId: cached.userId ?? "",
       apiKeyId: cached.apiKeyId ?? "",
-      modelAccessMode: normalizeAccessMode(cached.modelAccessMode ?? ""),
-      modelAccessList: normalizeAccessList(this.registry, cached.modelAccessList ?? []),
-      accountAccessMode: normalizeAccessMode(cached.accountAccessMode ?? ""),
-      accountAccessList: normalizeAccountList(cached.accountAccessList ?? []),
+      modelAccessMode: accessMode(cached.modelAccessMode ?? ""),
+      modelAccessList: accessList(this.registry, cached.modelAccessList ?? []),
+      accountAccessMode: accessMode(cached.accountAccessMode ?? ""),
+      accountAccessList: accountList(cached.accountAccessList ?? []),
       roamingEnabled: Boolean(cached.roamingEnabled),
       rateLimitRules: cached.rateLimitRules ?? [],
       error: "",

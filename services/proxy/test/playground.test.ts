@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { playgroundSignature } from "@opendum/core/crypto";
-import { PlaygroundAuthenticator } from "../core/playground-auth.js";
+import { Playground } from "../core/playground.js";
 
 const SECRET = "playground-secret";
 const REQUEST_PATH = "/v1/chat/completions";
@@ -31,8 +31,8 @@ function signedRequest(
   return new Request(url, { method, headers });
 }
 
-describe("PlaygroundAuthenticator", () => {
-  const authenticator = new PlaygroundAuthenticator(SECRET);
+describe("Playground", () => {
+  const authenticator = new Playground(SECRET);
 
   it("falls through when the request has no playground headers", () => {
     const outcome = authenticator.authenticate(new Request(REQUEST_URL, { method: "POST" }));
@@ -103,7 +103,7 @@ describe("PlaygroundAuthenticator", () => {
   });
 
   it("rejects requests when no secret is configured", () => {
-    const anonymous = new PlaygroundAuthenticator("");
+    const anonymous = new Playground("");
     const outcome = anonymous.authenticate(signedRequest({ secret: "" }));
     expect(outcome.handled).toBe(true);
     expect(outcome.result.valid).toBe(false);

@@ -4,4 +4,4 @@ export * from "./helpers.js";
 export * from "./fallback.js";
 export * from "./images.js";
 export * from "./model-config.js";
-export * from "./oauth-token-exchange.js";
+export * from "./oauth.js";

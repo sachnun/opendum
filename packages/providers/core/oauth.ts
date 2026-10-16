@@ -4,7 +4,7 @@ import { ProviderCredentialFailure, asError } from "./errors.js";
 import type { UpstreamTransport } from "./http.js";
 
 /** Per-provider differences of a token refresh POST. */
-export type OAuthTokenExchangeSpec = {
+export type Spec = {
   /** Provider id attached to credential failures. */
   provider: string;
   /** Token endpoint; a function resolves it lazily when config discovery is async. */
@@ -24,10 +24,10 @@ export type OAuthTokenExchangeSpec = {
  * Shared skeleton of a token refresh: POST the endpoint, reject non-2xx
  * responses, decode JSON, and report every failure as ProviderCredentialFailure.
  */
-export class OAuthTokenExchange {
-  private readonly spec: OAuthTokenExchangeSpec;
+export class OAuth {
+  private readonly spec: Spec;
 
-  constructor(spec: OAuthTokenExchangeSpec) {
+  constructor(spec: Spec) {
     this.spec = spec;
   }
 

@@ -19,7 +19,7 @@ import { cloneMap, numberAsInt, sleep, tryAsync, trySync, trySyncResult } from "
 import {
   accountAccessDenial,
   accountNeedsCredentialRefresh,
-  ignoringErrors,
+  ignore,
   isSyntheticProviderAccountId,
   parseRefreshErrorStatusCode,
   refreshBufferFor,
@@ -55,21 +55,21 @@ import {
   roamingPoints,
   type PointReservation,
 } from "./points.js";
-import { AccountHealthService, MAX_STORED_ERROR_LEN } from "./account-health.js";
-import { AccountRotationService } from "./account-rotation.js";
-import { PlaygroundAuthenticator } from "./playground-auth.js";
-import { RoamingPointService } from "./roaming-points.js";
-import { UsageRecorder } from "./usage-recorder.js";
-import { createProxyRepositories, type ProxyRepositories } from "./repositories.js";
+import { Health, MAX_ERROR_LEN } from "./health.js";
+import { Rotation } from "./rotation.js";
+import { Playground } from "./playground.js";
+import { Roaming } from "./roaming.js";
+import { Usage } from "./usage-log.js";
+import { repositories, type Repositories } from "./repositories.js";
 import type { EndpointAdapter } from "./endpoints.js";
 import type {
-  AccountRotationFailure,
+  Failure,
   ParsedEndpointRequest,
   ResponseContext,
   RouteError,
   StreamCompletion,
   StreamRecorder,
-  SuccessfulRequestRecord,
+  SuccessRecord,
   UsageCounts,
 } from "./types.js";
 import { isRouteError } from "./types.js";
@@ -82,7 +82,7 @@ const REFRESH_MAX_CONSECUTIVE_FAILURES = 5;
 
 export type ProxyServiceOptions = {
   database: Database;
-  repositories?: Partial<ProxyRepositories>;
+  repositories?: Partial<Repositories>;
   redis: OpendumRedis;
   models: Registry;
   auth: AuthService;
@@ -104,7 +104,7 @@ type RoamingCompletionContext = {
   authResult: AuthResult;
   validation: ModelValidationResult;
   roaming: PointReservation | null;
-  rotationFailures: AccountRotationFailure[];
+  rotationFailures: Failure[];
   usage: UsageCounts;
   startMs: number;
 };
@@ -116,13 +116,13 @@ export class ProxyService implements StreamRecorder {
   private readonly providers: ProviderRegistry;
   private readonly secret: string;
   private readonly requestTimeoutMs: number;
-  private readonly repositories: ProxyRepositories;
-  private readonly rotation: AccountRotationService;
+  private readonly repositories: Repositories;
+  private readonly rotation: Rotation;
   private readonly performance: ProviderPerformance;
-  private readonly health: AccountHealthService;
-  private readonly usage: UsageRecorder;
-  private readonly roaming: RoamingPointService;
-  private readonly playground: PlaygroundAuthenticator;
+  private readonly health: Health;
+  private readonly usage: Usage;
+  private readonly roaming: Roaming;
+  private readonly playground: Playground;
 
   constructor(options: ProxyServiceOptions) {
     this.redis = options.redis;
@@ -131,15 +131,15 @@ export class ProxyService implements StreamRecorder {
     this.providers = options.providers;
     this.secret = options.betterAuthSecret;
     this.requestTimeoutMs = options.requestTimeoutMs;
-    this.repositories = { ...createProxyRepositories(options.database), ...options.repositories };
+    this.repositories = { ...repositories(options.database), ...options.repositories };
     this.performance = new ProviderPerformance(options.redis);
-    this.health = new AccountHealthService({
+    this.health = new Health({
       accounts: this.repositories.accounts,
       health: this.repositories.health,
       models: options.models,
       redis: options.redis,
     });
-    this.rotation = new AccountRotationService({
+    this.rotation = new Rotation({
       accounts: this.repositories.accounts,
       modelHealth: this.repositories.health,
       customProviders: this.repositories.customProviders,
@@ -149,8 +149,8 @@ export class ProxyService implements StreamRecorder {
       performance: this.performance,
       affinity: new SessionAffinity(options.redis, options.providers.names()),
     });
-    this.roaming = new RoamingPointService(this.repositories.points, options.models);
-    this.usage = new UsageRecorder({
+    this.roaming = new Roaming(this.repositories.points, options.models);
+    this.usage = new Usage({
       usage: this.repositories.usage,
       redis: options.redis,
       auth: options.auth,
@@ -158,7 +158,7 @@ export class ProxyService implements StreamRecorder {
       performance: this.performance,
       health: this.health,
     });
-    this.playground = new PlaygroundAuthenticator(options.betterAuthSecret);
+    this.playground = new Playground(options.betterAuthSecret);
   }
 
   handle(
@@ -184,7 +184,7 @@ export class ProxyService implements StreamRecorder {
       const playground = this.playground.authenticate(request);
       const authResult = playground.handled
         ? playground.result
-        : yield* this.auth.validateAPIKey(authHeader);
+        : yield* this.auth.validateKey(authHeader);
       if (!authResult.valid) {
         return this.routeError(cfg, { status: 401, message: authResult.error, type: "authentication_error" });
       }
@@ -202,7 +202,7 @@ export class ProxyService implements StreamRecorder {
         parsedRequest.modelParam = selector.model;
       }
 
-      const validation = yield* this.auth.validateModelForUser(authResult.userId, parsedRequest.modelParam, {
+      const validation = yield* this.auth.validateForUser(authResult.userId, parsedRequest.modelParam, {
         mode: authResult.modelAccessMode,
         models: authResult.modelAccessList,
         roamingEnabled: authResult.roamingEnabled,
@@ -296,11 +296,11 @@ export class ProxyService implements StreamRecorder {
         const result = yield* Effect.promise(() => cfg.handleStream(responseCtx, this));
         if (!responseCtx.streamHandled) {
           if (roaming) {
-            yield* ignoringErrors(() =>
+            yield* ignore(() =>
               this.roaming.settle(account.userId, roaming, validation.model, responseCtx.usage)
             );
           }
-          yield* ignoringErrors(() => this.health.markAccountsRecoveredByRotation(rotationFailures));
+          yield* ignore(() => this.health.markRecovered(rotationFailures));
         }
         return result;
       }
@@ -323,11 +323,11 @@ export class ProxyService implements StreamRecorder {
         )
       );
       if (roaming) {
-        yield* ignoringErrors(() =>
+        yield* ignore(() =>
           this.roaming.settle(account.userId, roaming, validation.model, responseCtx.usage)
         );
       }
-      yield* ignoringErrors(() => this.health.markAccountsRecoveredByRotation(rotationFailures));
+      yield* ignore(() => this.health.markRecovered(rotationFailures));
       return result;
     }).pipe(
       Effect.tap(() => Metric.update(proxyRequests, 1)),
@@ -340,16 +340,16 @@ export class ProxyService implements StreamRecorder {
     const { account, authResult, validation, roaming, rotationFailures, usage, startMs } = context;
     if (roaming) {
       if (reason === "success") {
-        void Effect.runFork(ignoringErrors(() => this.roaming.settle(account.userId, roaming, validation.model, usage)));
+        void Effect.runFork(ignore(() => this.roaming.settle(account.userId, roaming, validation.model, usage)));
       } else {
-        void Effect.runFork(ignoringErrors(() => this.roaming.refund(roaming)));
+        void Effect.runFork(ignore(() => this.roaming.refund(roaming)));
       }
     }
     if (reason === "error") {
       void this.recordResponseHandlerFailure(account, authResult, validation, 500, "upstream stream failed", startMs);
     }
     if (reason !== "cancel") {
-      void Effect.runFork(ignoringErrors(() => this.health.markAccountsRecoveredByRotation(rotationFailures)));
+      void Effect.runFork(ignore(() => this.health.markRecovered(rotationFailures)));
     }
   }
 
@@ -360,9 +360,9 @@ export class ProxyService implements StreamRecorder {
   ): Promise<Response> {
     const { account, authResult, validation, roaming, rotationFailures, startMs } = context;
     const message = error instanceof Error ? error.message : String(error);
-    if (roaming) await Effect.runPromise(ignoringErrors(() => this.roaming.refund(roaming)));
+    if (roaming) await Effect.runPromise(ignore(() => this.roaming.refund(roaming)));
     await this.recordResponseHandlerFailure(account, authResult, validation, 500, message, startMs);
-    void Effect.runFork(ignoringErrors(() => this.health.markAccountsRecoveredByRotation(rotationFailures)));
+    void Effect.runFork(ignore(() => this.health.markRecovered(rotationFailures)));
     return this.routeError(cfg, {
       status: 500,
       message: prefixWithProvider(account.provider, message),
@@ -380,7 +380,7 @@ export class ProxyService implements StreamRecorder {
     startMs: number
   ): Promise<void> {
     await Effect.runPromise(
-      ignoringErrors(async () => {
+      ignore(async () => {
         await this.health.markAccountFailed(account.id, validation.model, statusCode, message);
         await this.usage.logUsage(authResult, account, validation, statusCode, Date.now() - startMs);
       })
@@ -411,7 +411,7 @@ export class ProxyService implements StreamRecorder {
   private isKnownModelProviderPrefix(prefix: string): boolean {
     const provider = prefix.toLowerCase();
     if (this.providers.has(provider)) return true;
-    return this.models.modelsForProvider(provider).length > 0;
+    return this.models.models(provider).length > 0;
   }
 
   private async validateForcedAccount(
@@ -466,7 +466,7 @@ export class ProxyService implements StreamRecorder {
       createdAt: row.createdAt,
       isActive: row.isActive,
     };
-    const coolingDown = await this.health.refreshAccountHealthFromModels(account.id, new Date());
+    const coolingDown = await this.health.refresh(account.id, new Date());
     if (coolingDown) {
       return {
         status: 400,
@@ -507,7 +507,7 @@ export class ProxyService implements StreamRecorder {
     }
     if (id.startsWith("authless:")) {
       const provider = id.slice("authless:".length);
-      if (provider && this.models.isAuthlessProviderModel(model, provider)) {
+      if (provider && this.models.isAuthless(model, provider)) {
         return { id, userId, provider, isActive: true, status: "active" };
       }
     }
@@ -548,7 +548,7 @@ export class ProxyService implements StreamRecorder {
         code: "provider_account_provider_mismatch",
       };
     }
-    if (!this.rotation.canAccountUseModel(account, validation.model)) {
+    if (!this.rotation.canUse(account, validation.model)) {
       return {
         status: 400,
         message: `Selected provider account tier does not allow model "${validation.model}"`,
@@ -574,7 +574,7 @@ export class ProxyService implements StreamRecorder {
         response: Response;
         requestStartMs: number;
         upstreamFirstResponseMs: number;
-        rotationFailures: AccountRotationFailure[];
+        rotationFailures: Failure[];
         roaming: PointReservation | null;
       }
     | RouteError
@@ -584,7 +584,7 @@ export class ProxyService implements StreamRecorder {
       const sharedTried: string[] = [];
       const excludedProviders: string[] = [];
       let useShared = false;
-      const recoverableFailures: AccountRotationFailure[] = [];
+      const recoverableFailures: Failure[] = [];
       let lastFailure: RouteError | null = null;
       let delayedFinalFailure: { account: ProviderAccount; statusCode: number; message: string } | null = null;
       let accountConfigured = false;
@@ -594,7 +594,7 @@ export class ProxyService implements StreamRecorder {
         let roaming: PointReservation | null = null;
         if (!account) {
           const selection = yield* Effect.promise(() =>
-            this.rotation.nextAttemptAccount(
+            this.rotation.nextAccount(
               authResult,
               validation,
               tried,
@@ -689,7 +689,7 @@ export class ProxyService implements StreamRecorder {
           const failedAt = yield* Effect.promise(() =>
             this.health.markAccountFailed(account.id, validation.model, status, detailed)
           );
-          yield* ignoringErrors(() =>
+          yield* ignore(() =>
             this.usage.logUsage(authResult, account, validation, status, Date.now() - startMs)
           );
           lastFailure = {
@@ -699,7 +699,7 @@ export class ProxyService implements StreamRecorder {
             accountId: account.id,
           };
           yield* Metric.update(upstreamErrors, 1);
-          if (roaming) yield* ignoringErrors(() => this.roaming.refund(roaming));
+          if (roaming) yield* ignore(() => this.roaming.refund(roaming));
           if (!forced) {
             recoverableFailures.push({ accountId: account.id, failedAt });
             yield* Metric.update(accountRotations, 1);
@@ -748,7 +748,7 @@ export class ProxyService implements StreamRecorder {
               this.health.logAccountError(account.id, account.userId, validation.model, response.status, detailed)
             );
           }
-          yield* ignoringErrors(() =>
+          yield* ignore(() =>
             this.usage.logUsage(authResult, account, validation, response.status, Date.now() - startMs)
           );
           const sanitized = sanitizedProxyError(response.status, bodyText);
@@ -760,7 +760,7 @@ export class ProxyService implements StreamRecorder {
           };
           yield* Metric.update(upstreamErrors, 1);
           yield* Metric.update(upstreamTtft, upstreamFirstResponseMs - requestStartMs);
-          if (roaming) yield* ignoringErrors(() => this.roaming.refund(roaming));
+          if (roaming) yield* ignore(() => this.roaming.refund(roaming));
           if (fallbackAcrossProviders) {
             if (!excludedProviders.includes(account.provider)) excludedProviders.push(account.provider);
             continue;
@@ -801,12 +801,12 @@ export class ProxyService implements StreamRecorder {
     };
   }
 
-  storeHypercreditsUsage(accountId: string, remaining: number | null, cost: number): void {
-    this.usage.storeHypercreditsUsage(accountId, remaining, cost);
+  storeCredits(accountId: string, remaining: number | null, cost: number): void {
+    this.usage.storeCredits(accountId, remaining, cost);
   }
 
-  recordSuccessfulRequest(params: SuccessfulRequestRecord): void {
-    this.usage.recordSuccessfulRequest(params);
+  recordSuccess(params: SuccessRecord): void {
+    this.usage.recordSuccess(params);
   }
 
   async quotaCredentials(account: ProviderAccount): Promise<string> {
@@ -1044,7 +1044,7 @@ export class ProxyService implements StreamRecorder {
 
   private async releaseRefreshLock(accountId: string, value: string): Promise<void> {
     void value;
-    await Effect.runPromise(ignoringErrors(() => this.redis.del(`${TOKEN_REFRESH_LOCK_PREFIX}${accountId}`)));
+    await Effect.runPromise(ignore(() => this.redis.del(`${TOKEN_REFRESH_LOCK_PREFIX}${accountId}`)));
   }
 
   private async waitForRefreshedAccount(
@@ -1073,7 +1073,7 @@ export class ProxyService implements StreamRecorder {
   private async recordRefreshFailure(account: ProviderAccount, error: Error): Promise<void> {
     if (!account.isActive) return;
     const now = new Date();
-    const message = error.message.length > MAX_STORED_ERROR_LEN ? error.message.slice(0, MAX_STORED_ERROR_LEN) : error.message;
+    const message = error.message.length > MAX_ERROR_LEN ? error.message.slice(0, MAX_ERROR_LEN) : error.message;
     const statusCode = parseRefreshErrorStatusCode(error);
     const failCount = await tryAsync(async () => {
       const count = await this.redis.incr(`${REFRESH_FAIL_COUNT_PREFIX}${account.id}`);
@@ -1091,7 +1091,7 @@ export class ProxyService implements StreamRecorder {
   }
 
   private async clearRefreshFailures(accountId: string): Promise<void> {
-    await Effect.runPromise(ignoringErrors(() => this.redis.del(`${REFRESH_FAIL_COUNT_PREFIX}${accountId}`)));
+    await Effect.runPromise(ignore(() => this.redis.del(`${REFRESH_FAIL_COUNT_PREFIX}${accountId}`)));
   }
 
   refreshTokenLoop(intervalMs: number): Effect.Effect<void, never> {

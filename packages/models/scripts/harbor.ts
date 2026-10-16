@@ -2,7 +2,7 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildModelIdMap, syncProviderModels } from "#models/model-store.ts";
+import { idMap, sync } from "#models/model-store.ts";
 import { runFetchText } from "#models/sync/http.ts";
 
 const PROVIDER_NAME = "harbor";
@@ -64,7 +64,7 @@ function toModelKey(modelId) {
 }
 
 function buildModelMap(modelIds) {
-  return buildModelIdMap(modelIds, toModelKey);
+  return idMap(modelIds, toModelKey);
 }
 
 async function fetchHarborFreeModelIds() {
@@ -87,7 +87,7 @@ async function main() {
   const modelIds = await fetchHarborFreeModelIds();
   const modelMap = buildModelMap(modelIds);
 
-  const result = syncProviderModels(modelsDir, PROVIDER_NAME, modelMap);
+  const result = sync(modelsDir, PROVIDER_NAME, modelMap);
 
   if (result.added.length === 0 && result.removed.length === 0 && result.updated.length === 0) {
     console.log(`Harbor free models are already up to date (${modelMap.size} models).`);

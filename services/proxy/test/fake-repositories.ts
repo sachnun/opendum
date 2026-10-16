@@ -1,84 +1,84 @@
 import { mock, type Mock } from "bun:test";
 import type {
-  CustomProviderPort,
-  ModelHealthPort,
+  CustomPort,
+  HealthPort,
   PointPort,
-  ProviderAccountPort,
+  AccountPort,
   UsagePort,
 } from "../core/repositories.js";
 
 /** Turns a port into its mock shape, preserving each method signature. */
-type Fakes<T> = {
+type Stub<T> = {
   [K in keyof T]: T[K] extends (...args: infer A) => infer R ? Mock<(...args: A) => R> : never;
 };
 
 /** Default implementation for lookups that find nothing. */
 const absent = async () => null as never;
 
-export type FakeRepositories = {
-  accounts: Fakes<ProviderAccountPort>;
-  health: Fakes<ModelHealthPort>;
-  customProviders: Fakes<CustomProviderPort>;
-  usage: Fakes<UsagePort>;
-  points: Omit<Fakes<PointPort>, "transaction"> & { transaction: PointPort["transaction"] };
+export type Fakes = {
+  accounts: Stub<AccountPort>;
+  health: Stub<HealthPort>;
+  customProviders: Stub<CustomPort>;
+  usage: Stub<UsagePort>;
+  points: Omit<Stub<PointPort>, "transaction"> & { transaction: PointPort["transaction"] };
 };
 
-function fakeAccounts(): Fakes<ProviderAccountPort> {
+function accounts(): Stub<AccountPort> {
   return {
-    listEligibleAccounts: mock<ProviderAccountPort["listEligibleAccounts"]>(async () => []),
-    listSharedEligibleAccounts: mock<ProviderAccountPort["listSharedEligibleAccounts"]>(async () => []),
-    listDisabledAccountIDs: mock<ProviderAccountPort["listDisabledAccountIDs"]>(async () => []),
-    listExpiringRefreshableAccounts: mock<ProviderAccountPort["listExpiringRefreshableAccounts"]>(async () => []),
-    getForcedAccount: mock<ProviderAccountPort["getForcedAccount"]>(absent),
-    getQuotaAccount: mock<ProviderAccountPort["getQuotaAccount"]>(absent),
-    getAccountCredentialsByID: mock<ProviderAccountPort["getAccountCredentialsByID"]>(absent),
-    getAccountOwnerUserID: mock<ProviderAccountPort["getAccountOwnerUserID"]>(absent),
-    updateRefreshedCredentials: mock<ProviderAccountPort["updateRefreshedCredentials"]>(async () => undefined),
-    recordAccountError: mock<ProviderAccountPort["recordAccountError"]>(async () => undefined),
-    disableFailedAccount: mock<ProviderAccountPort["disableFailedAccount"]>(async () => 0),
+    listEligibleAccounts: mock<AccountPort["listEligibleAccounts"]>(async () => []),
+    listSharedEligibleAccounts: mock<AccountPort["listSharedEligibleAccounts"]>(async () => []),
+    listDisabledAccountIDs: mock<AccountPort["listDisabledAccountIDs"]>(async () => []),
+    listExpiringRefreshableAccounts: mock<AccountPort["listExpiringRefreshableAccounts"]>(async () => []),
+    getForcedAccount: mock<AccountPort["getForcedAccount"]>(absent),
+    getQuotaAccount: mock<AccountPort["getQuotaAccount"]>(absent),
+    getAccountCredentialsByID: mock<AccountPort["getAccountCredentialsByID"]>(absent),
+    getAccountOwnerUserID: mock<AccountPort["getAccountOwnerUserID"]>(absent),
+    updateRefreshedCredentials: mock<AccountPort["updateRefreshedCredentials"]>(async () => undefined),
+    recordAccountError: mock<AccountPort["recordAccountError"]>(async () => undefined),
+    disableFailedAccount: mock<AccountPort["disableFailedAccount"]>(async () => 0),
   };
 }
 
-function fakeHealth(): Fakes<ModelHealthPort> {
+function health(): Stub<HealthPort> {
   return {
-    bumpAccountRequestCount: mock<ModelHealthPort["bumpAccountRequestCount"]>(async () => undefined),
-    getAccountHealthState: mock<ModelHealthPort["getAccountHealthState"]>(absent),
-    setAccountHealthFailed: mock<ModelHealthPort["setAccountHealthFailed"]>(async () => undefined),
-    setAccountCooldown: mock<ModelHealthPort["setAccountCooldown"]>(async () => undefined),
-    setAccountActive: mock<ModelHealthPort["setAccountActive"]>(async () => undefined),
-    setAccountUsageLimited: mock<ModelHealthPort["setAccountUsageLimited"]>(async () => undefined),
-    recordRequestError: mock<ModelHealthPort["recordRequestError"]>(async () => undefined),
-    markAccountSuccess: mock<ModelHealthPort["markAccountSuccess"]>(async () => undefined),
-    markAccountRecoveredByRotation: mock<ModelHealthPort["markAccountRecoveredByRotation"]>(async () => undefined),
-    listModelHealthByAccount: mock<ModelHealthPort["listModelHealthByAccount"]>(async () => []),
-    getModelHealth: mock<ModelHealthPort["getModelHealth"]>(absent),
-    updateModelHealthCounters: mock<ModelHealthPort["updateModelHealthCounters"]>(async () => undefined),
-    updateModelHealthStatus: mock<ModelHealthPort["updateModelHealthStatus"]>(async () => undefined),
-    insertModelHealth: mock<ModelHealthPort["insertModelHealth"]>(async () => undefined),
-    markUsageLimitedHealth: mock<ModelHealthPort["markUsageLimitedHealth"]>(async () => undefined),
-    updateModelHealthSuccess: mock<ModelHealthPort["updateModelHealthSuccess"]>(async () => undefined),
-    updateModelHealthSuccessWithStatus: mock<ModelHealthPort["updateModelHealthSuccessWithStatus"]>(async () => undefined),
-    updateModelHealthFailure: mock<ModelHealthPort["updateModelHealthFailure"]>(async () => undefined),
-    updateModelHealthFailureWithStatus: mock<ModelHealthPort["updateModelHealthFailureWithStatus"]>(async () => undefined),
+    bumpAccountRequestCount: mock<HealthPort["bumpAccountRequestCount"]>(async () => undefined),
+    getAccountHealthState: mock<HealthPort["getAccountHealthState"]>(absent),
+    setAccountHealthFailed: mock<HealthPort["setAccountHealthFailed"]>(async () => undefined),
+    setAccountCooldown: mock<HealthPort["setAccountCooldown"]>(async () => undefined),
+    setAccountActive: mock<HealthPort["setAccountActive"]>(async () => undefined),
+    setAccountUsageLimited: mock<HealthPort["setAccountUsageLimited"]>(async () => undefined),
+    recordRequestError: mock<HealthPort["recordRequestError"]>(async () => undefined),
+    markAccountSuccess: mock<HealthPort["markAccountSuccess"]>(async () => undefined),
+    markAccountRecoveredByRotation: mock<HealthPort["markAccountRecoveredByRotation"]>(async () => undefined),
+    listModelHealthByAccount: mock<HealthPort["listModelHealthByAccount"]>(async () => []),
+    getModelHealth: mock<HealthPort["getModelHealth"]>(absent),
+    updateModelHealthCounters: mock<HealthPort["updateModelHealthCounters"]>(async () => undefined),
+    updateModelHealthStatus: mock<HealthPort["updateModelHealthStatus"]>(async () => undefined),
+    insertModelHealth: mock<HealthPort["insertModelHealth"]>(async () => undefined),
+    markUsageLimitedHealth: mock<HealthPort["markUsageLimitedHealth"]>(async () => undefined),
+    updateModelHealthSuccess: mock<HealthPort["updateModelHealthSuccess"]>(async () => undefined),
+    updateModelHealthSuccessWithStatus: mock<HealthPort["updateModelHealthSuccessWithStatus"]>(async () => undefined),
+    updateModelHealthFailure: mock<HealthPort["updateModelHealthFailure"]>(async () => undefined),
+    updateModelHealthFailureWithStatus: mock<HealthPort["updateModelHealthFailureWithStatus"]>(async () => undefined),
   };
 }
 
-function fakeCustomProviders(): Fakes<CustomProviderPort> {
+function customProviders(): Stub<CustomPort> {
   return {
-    listCustomProviders: mock<CustomProviderPort["listCustomProviders"]>(async () => []),
-    getCustomProvider: mock<CustomProviderPort["getCustomProvider"]>(absent),
-    listCustomProviderModels: mock<CustomProviderPort["listCustomProviderModels"]>(async () => []),
+    listCustomProviders: mock<CustomPort["listCustomProviders"]>(async () => []),
+    getCustomProvider: mock<CustomPort["getCustomProvider"]>(absent),
+    listCustomProviderModels: mock<CustomPort["listCustomProviderModels"]>(async () => []),
   };
 }
 
-function fakeUsage(): Fakes<UsagePort> {
+function usage(): Stub<UsagePort> {
   return {
     insertUsageLog: mock<UsagePort["insertUsageLog"]>(async () => undefined),
   };
 }
 
-function fakePoints(): FakeRepositories["points"] {
-  const points: FakeRepositories["points"] = {
+function points(): Fakes["points"] {
+  const points: Fakes["points"] = {
     creditPointBalance: mock<PointPort["creditPointBalance"]>(async () => 10),
     debitPointBalance: mock<PointPort["debitPointBalance"]>(async () => 10),
     debitPointBalanceAllowNegative: mock<PointPort["debitPointBalanceAllowNegative"]>(async () => 10),
@@ -92,12 +92,12 @@ function fakePoints(): FakeRepositories["points"] {
 }
 
 /** In-memory doubles for the proxy's database ports, with call recording. */
-export function createFakeRepositories(): FakeRepositories {
+export function fakes(): Fakes {
   return {
-    accounts: fakeAccounts(),
-    health: fakeHealth(),
-    customProviders: fakeCustomProviders(),
-    usage: fakeUsage(),
-    points: fakePoints(),
+    accounts: accounts(),
+    health: health(),
+    customProviders: customProviders(),
+    usage: usage(),
+    points: points(),
   };
 }

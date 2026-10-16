@@ -4,15 +4,15 @@ import type { AuthResult, AuthService, ModelValidationResult } from "@opendum/au
 import type { OpendumRedis } from "@opendum/core/redis";
 import type { Registry } from "@opendum/models/runtime";
 import type { ProviderAccount } from "@opendum/providers";
-import type { AccountHealthService } from "./account-health.js";
+import type { Health } from "./health.js";
 import type { ProviderPerformance } from "./provider-performance.js";
-import { ignoringErrors, isSyntheticProviderAccountId } from "./service-helpers.js";
-import type { StreamRecorder, SuccessfulRequestRecord } from "./types.js";
+import { ignore, isSyntheticProviderAccountId } from "./service-helpers.js";
+import type { StreamRecorder, SuccessRecord } from "./types.js";
 
-const HYPERCREDITS_BALANCE_PREFIX = "opendum:hypercredits:balance:";
-const HYPERCREDITS_BALANCE_TTL_SECONDS = 30 * 24 * 60 * 60;
+const BALANCE_PREFIX = "opendum:hypercredits:balance:";
+const BALANCE_TTL = 30 * 24 * 60 * 60;
 
-export type UsageLogRecord = {
+export type UsageLog = {
   userId: string;
   providerAccountId: string;
   proxyApiKeyId: string;
@@ -25,13 +25,13 @@ export type UsageLogRecord = {
   durationMs: number;
 };
 
-export type UsageRecorderOptions = {
+export type Options = {
   usage: UsagePort;
   redis: OpendumRedis;
   auth: AuthService;
   models: Registry;
   performance: ProviderPerformance;
-  health: AccountHealthService;
+  health: Health;
 };
 
 /**
@@ -39,15 +39,15 @@ export type UsageRecorderOptions = {
  * health and provider performance, failures only write usage logs. Also owns
  * the Hypercredits balance snapshot kept in Redis.
  */
-export class UsageRecorder implements StreamRecorder {
+export class Usage implements StreamRecorder {
   private readonly usage: UsagePort;
   private readonly redis: OpendumRedis;
   private readonly auth: AuthService;
   private readonly models: Registry;
   private readonly performance: ProviderPerformance;
-  private readonly health: AccountHealthService;
+  private readonly health: Health;
 
-  constructor(options: UsageRecorderOptions) {
+  constructor(options: Options) {
     this.usage = options.usage;
     this.redis = options.redis;
     this.auth = options.auth;
@@ -56,13 +56,13 @@ export class UsageRecorder implements StreamRecorder {
     this.health = options.health;
   }
 
-  storeHypercreditsUsage(accountId: string, remaining: number | null, cost: number): void {
+  storeCredits(accountId: string, remaining: number | null, cost: number): void {
     if (!accountId) return;
     void Effect.runFork(
-      ignoringErrors(async () => {
-        const key = HYPERCREDITS_BALANCE_PREFIX + accountId;
+      ignore(async () => {
+        const key = BALANCE_PREFIX + accountId;
         if (remaining !== null && remaining > 0) {
-          await this.redis.set(key, String(remaining), { EX: HYPERCREDITS_BALANCE_TTL_SECONDS });
+          await this.redis.set(key, String(remaining), { EX: BALANCE_TTL });
           return;
         }
         if (cost > 0) {
@@ -70,16 +70,16 @@ export class UsageRecorder implements StreamRecorder {
           const current = raw === null ? Number.NaN : Number(raw);
           if (Number.isFinite(current) && current > 0) {
             const next = Math.max(0, current - cost);
-            await this.redis.set(key, String(next), { EX: HYPERCREDITS_BALANCE_TTL_SECONDS });
+            await this.redis.set(key, String(next), { EX: BALANCE_TTL });
           }
         }
       })
     );
   }
 
-  recordSuccessfulRequest(params: SuccessfulRequestRecord): void {
+  recordSuccess(params: SuccessRecord): void {
     void Effect.runFork(
-      ignoringErrors(async () => {
+      ignore(async () => {
         await this.health.markAccountSuccess(params.accountId, params.model);
         await this.performance.record({
           provider: params.provider,
@@ -88,7 +88,7 @@ export class UsageRecorder implements StreamRecorder {
           outputTokens: params.outputTokens,
           durationMs: params.durationMs,
         });
-        await this.logUsageRaw({
+        await this.logRaw({
           userId: params.userId,
           providerAccountId: params.accountId,
           proxyApiKeyId: params.apiKeyId,
@@ -111,7 +111,7 @@ export class UsageRecorder implements StreamRecorder {
     statusCode: number,
     durationMs: number
   ): Promise<void> {
-    await this.logUsageRaw({
+    await this.logRaw({
       userId: authResult.userId,
       providerAccountId: account.id,
       proxyApiKeyId: authResult.apiKeyId,
@@ -125,7 +125,7 @@ export class UsageRecorder implements StreamRecorder {
     });
   }
 
-  async logUsageRaw(params: UsageLogRecord): Promise<void> {
+  async logRaw(params: UsageLog): Promise<void> {
     if (!params.userId || !params.model) return;
     const providerAccountId = params.providerAccountId && !isSyntheticProviderAccountId(params.providerAccountId)
       ? params.providerAccountId
@@ -144,6 +144,6 @@ export class UsageRecorder implements StreamRecorder {
       duration: params.durationMs,
       createdAt: new Date(),
     });
-    await Effect.runPromise(this.auth.bumpAnalyticsCacheVersionThrottled(params.userId));
+    await Effect.runPromise(this.auth.bumpVersion(params.userId));
   }
 }

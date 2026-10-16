@@ -20,7 +20,7 @@ function provider(response: { status?: number; body: string }, captured?: Captur
     return new Response(response.body, { status: response.status ?? 200 });
   };
   const transport: UpstreamTransport = { direct, egress: null, egressReady: () => false };
-  const registry = { upstreamModelName: (name: string) => name } as unknown as Registry;
+  const registry = { upstream: (name: string) => name } as unknown as Registry;
   return new CodexProvider({ registry, transport });
 }
 

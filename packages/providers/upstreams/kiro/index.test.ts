@@ -19,7 +19,7 @@ function provider(routes: { refresh: Route; usage?: Route }, captured?: Captured
     return new Response(route?.body ?? "{}", { status: route?.status ?? 200 });
   };
   const transport: UpstreamTransport = { direct, egress: null, egressReady: () => false };
-  const registry = { upstreamModelName: (name: string) => name } as unknown as Registry;
+  const registry = { upstream: (name: string) => name } as unknown as Registry;
   return new KiroProvider({ registry, transport });
 }
 

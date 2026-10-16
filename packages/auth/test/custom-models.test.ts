@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
-import { CustomModelService } from "../custom-model-service.js";
+import { CustomModels } from "../custom-models.js";
 import type { CustomProviderModelRecord, CustomProviderReader } from "../store/custom.js";
 
 function modelRecord(overrides: Partial<CustomProviderModelRecord> & { modelId: string }): CustomProviderModelRecord {
@@ -39,7 +39,7 @@ function readerOf(
 function serviceOf(
   reader: CustomProviderReader,
   options: { aliases?: Record<string, string>; supported?: string[]; vision?: Record<string, boolean> } = {}
-): CustomModelService {
+): CustomModels {
   const aliases = options.aliases ?? {};
   const supported = new Set(options.supported ?? []);
   const vision = options.vision ?? {};
@@ -49,17 +49,17 @@ function serviceOf(
     modelInfo: (model: string) =>
       vision[model] === undefined ? null : { modalities: { input: vision[model] ? ["image"] : ["text"] } },
   } as unknown as Registry;
-  return new CustomModelService(registry, reader);
+  return new CustomModels(registry, reader);
 }
 
-describe("CustomModelService", () => {
+describe("CustomModels", () => {
   it("resolves a listed custom model with alias and vision", async () => {
     const service = serviceOf(
       readerOf([{ id: "p1", slug: "mine", models: [modelRecord({ modelId: "fast", upstream: "vendor/fast", aliased: true })] }]),
       { aliases: { fast: "canonical-fast" }, supported: ["canonical-fast"], vision: { "vendor/fast": true } }
     );
 
-    const result = await Effect.runPromise(service.customModelResult("u1", "mine", "fast"));
+    const result = await Effect.runPromise(service.result("u1", "mine", "fast"));
 
     expect(result).toMatchObject({
       valid: true,
@@ -73,7 +73,7 @@ describe("CustomModelService", () => {
   it("returns null for unknown providers", async () => {
     const service = serviceOf(readerOf([]));
 
-    const result = await Effect.runPromise(service.customModelResult("u1", "missing", "fast"));
+    const result = await Effect.runPromise(service.result("u1", "missing", "fast"));
 
     expect(result).toBeNull();
   });
@@ -83,7 +83,7 @@ describe("CustomModelService", () => {
       readerOf([{ id: "p1", slug: "mine", models: [modelRecord({ modelId: "other" })] }])
     );
 
-    const result = await Effect.runPromise(service.customModelResult("u1", "mine", "fast"));
+    const result = await Effect.runPromise(service.result("u1", "mine", "fast"));
 
     expect(result).toMatchObject({ valid: false, code: "invalid_model" });
     expect(result?.error).toContain('not registered under your custom provider "mine"');
@@ -105,7 +105,7 @@ describe("CustomModelService", () => {
       { aliases: { fast: "canonical-fast" }, supported: ["canonical-fast"] }
     );
 
-    const sets = await Effect.runPromise(service.customProviderModelSets("u1"));
+    const sets = await Effect.runPromise(service.modelSets("u1"));
 
     expect(sets.aliased.get("mine")).toEqual(new Set(["canonical-fast"]));
     expect(sets.standalone.get("mine")).toEqual(["weird", "extra"]);
@@ -116,7 +116,7 @@ describe("CustomModelService", () => {
       readerOf([{ id: "p1", slug: "mine", models: [modelRecord({ modelId: "extra" })] }])
     );
 
-    const items = await Effect.runPromise(service.listUserCustomModels("u1"));
+    const items = await Effect.runPromise(service.list("u1"));
 
     expect(items).toHaveLength(1);
     expect(items[0]).toMatchObject({ id: "mine/extra", object: "model", owned_by: "custom:mine" });

@@ -1,5 +1,5 @@
 import type { Provider, ProviderAccount } from "@opendum/providers";
-import { tierPolicyFor } from "./account-tier-policy.js";
+import { tierFor } from "./tiers.js";
 import { stringValue } from "./helpers.js";
 import type { ProviderRoutingOptions, ProviderScore } from "./provider-performance.js";
 
@@ -12,9 +12,9 @@ export function isSyntheticProviderAccountId(accountId: string): boolean {
   return accountId === "opencode" || accountId.startsWith(AUTHLESS_ACCOUNT_PREFIX);
 }
 
-export { ignoringErrors } from "@opendum/core/best-effort";
+export { ignore } from "@opendum/core/best-effort";
 
-export function normalizeAccessMode(mode: string): string {
+export function accessMode(mode: string): string {
   return mode === "whitelist" || mode === "blacklist" ? mode : "all";
 }
 
@@ -26,7 +26,7 @@ export function accountAccessDenial(
   accountId: string,
   access: { mode: string; accounts: string[] }
 ): { message: string; code: string } | null {
-  const mode = normalizeAccessMode(access.mode);
+  const mode = accessMode(access.mode);
   const set = new Set(normalizeAccountIds(access.accounts));
   if (mode === "whitelist" && !set.has(accountId)) {
     return { message: "Selected provider account is not allowed for this API key.", code: "provider_account_not_whitelisted" };
@@ -216,7 +216,7 @@ export function paidFirst(accounts: ProviderAccount[]): ProviderAccount[] {
 }
 
 export function isPaidAccountTier(provider: string, tier: string | null): boolean {
-  return tierPolicyFor(provider).isPaid(tier);
+  return tierFor(provider).isPaid(tier);
 }
 
 export function nullableTimeBefore(a: Date | null | undefined, b: Date | null | undefined): boolean {

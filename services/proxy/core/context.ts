@@ -3,7 +3,7 @@ import { AuthService } from "@opendum/auth";
 import { closeRedis, openRedis } from "@opendum/core/redis";
 import { resolveModelsDir } from "@opendum/models";
 import { Registry as ModelRegistry } from "@opendum/models/runtime";
-import { GuardedFetcher, UnroxyEgress, type GuardedFetch } from "@opendum/core/egress";
+import { Fetcher, UnroxyEgress, type Fetch } from "@opendum/core/egress";
 import { ProviderRegistry, RedisFallbackRouter, type EgressFetch } from "@opendum/providers";
 import { db, closeDatabase } from "@opendum/database";
 import { ProxyService } from "./service.js";
@@ -46,13 +46,13 @@ export const ProxyContextLayer = Layer.effect(
     const guard = yield* Effect.acquireRelease(
       Effect.sync(
         () =>
-          new GuardedFetcher({
+          new Fetcher({
             headersTimeout: config.requestTimeoutMs > 0 ? config.requestTimeoutMs : undefined,
           })
       ),
       (fetcher) => Effect.promise(() => fetcher.close())
     );
-    const guardedFetch: GuardedFetch = (url, init) => guard.fetch(url, init);
+    const guardedFetch: Fetch = (url, init) => guard.fetch(url, init);
     const directFetch = (url: string, init?: RequestInit): Promise<Response> =>
       Effect.runPromise(
         Effect.tryPromise({

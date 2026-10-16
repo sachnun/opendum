@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import type { Registry } from "@opendum/models/runtime";
-import { AccessPolicy } from "../access-policy.js";
+import { Policy } from "../policy.js";
 import { emptyAvailability } from "../types.js";
 
 type Rule = { minTier?: string; allowedTiers?: string[] };
@@ -12,7 +12,7 @@ function policyOf(options: {
   rules?: Record<string, Rule>;
   codexModels?: Array<[string, string]>;
   suggestions?: string[];
-} = {}): AccessPolicy {
+} = {}): Policy {
   const aliases = options.aliases ?? {};
   const supported = new Set(options.supported ?? []);
   const providerModels = options.providerModels ?? {};
@@ -21,18 +21,18 @@ function policyOf(options: {
     resolveAlias: (model: string) => aliases[model] ?? model,
     isSupported: (model: string) => supported.has(model),
     isSupportedByProvider: (model: string, provider: string) => (providerModels[provider] ?? []).includes(model),
-    providersForModel: (model: string) =>
+    providers: (model: string) =>
       Object.entries(providerModels)
         .filter(([, models]) => models.includes(model))
         .map(([provider]) => provider),
-    providerAccessRule: (model: string, provider: string) => rules[`${model}:${provider}`] ?? null,
-    providerModelMap: () => new Map(options.codexModels ?? []),
+    rule: (model: string, provider: string) => rules[`${model}:${provider}`] ?? null,
+    modelMap: () => new Map(options.codexModels ?? []),
     suggestedModels: () => options.suggestions ?? [],
   } as unknown as Registry;
-  return new AccessPolicy(registry);
+  return new Policy(registry);
 }
 
-describe("AccessPolicy", () => {
+describe("Policy", () => {
   it("validates supported models and provider prefixes", () => {
     const policy = policyOf({ supported: ["gpt"], providerModels: { openai: ["gpt"] } });
 
@@ -78,20 +78,20 @@ describe("AccessPolicy", () => {
     availability.accountCountByProvider.set("p", 2);
     availability.disabledCountByProviderModel.set("p:m", 1);
 
-    expect(policy.isModelUsableByAccounts("fast", availability)).toBe(true);
+    expect(policy.usable("fast", availability)).toBe(true);
     availability.disabledCountByProviderModel.set("p:m", 2);
-    expect(policy.isModelUsableByAccounts("m", availability)).toBe(false);
+    expect(policy.usable("m", availability)).toBe(false);
   });
 
   it("treats a lone authless account as unavailable for other models", () => {
     const policy = policyOf({ providerModels: { p: ["m"] } });
     const availability = emptyAvailability();
     availability.accountCountByProvider.set("p", 1);
-    availability.authlessProviderModels.set("p", new Set(["other"]));
+    availability.authlessModels.set("p", new Set(["other"]));
 
-    expect(policy.isModelUsableByAccounts("m", availability)).toBe(false);
+    expect(policy.usable("m", availability)).toBe(false);
     availability.accountCountByProvider.set("p", 2);
-    expect(policy.isModelUsableByAccounts("m", availability)).toBe(true);
+    expect(policy.usable("m", availability)).toBe(true);
   });
 
   it("filters providers by tier rules", () => {
@@ -101,13 +101,13 @@ describe("AccessPolicy", () => {
     availability.activeAccountIdsByProvider.set("p", ["a1"]);
     availability.accountTierById.set("a1", "free");
 
-    expect(policy.isModelUsableByAccounts("m", availability)).toBe(false);
+    expect(policy.usable("m", availability)).toBe(false);
     availability.accountTierById.set("a1", "pro");
-    expect(policy.isModelUsableByAccounts("m", availability)).toBe(true);
+    expect(policy.usable("m", availability)).toBe(true);
 
     const allowedPolicy = policyOf({ providerModels: { p: ["m"] }, rules: { "m:p": { allowedTiers: ["pro", "max"] } } });
     availability.accountTierById.set("a1", "max");
-    expect(allowedPolicy.isModelUsableByAccounts("m", availability)).toBe(true);
+    expect(allowedPolicy.usable("m", availability)).toBe(true);
   });
 
   it("counts custom provider models", () => {
@@ -116,7 +116,7 @@ describe("AccessPolicy", () => {
     availability.accountCountByProvider.set("custom", 1);
     availability.customProviderModels.set("custom", new Set(["m"]));
 
-    expect(policy.isModelUsableByAccounts("m", availability)).toBe(true);
+    expect(policy.usable("m", availability)).toBe(true);
   });
 
   it("checks shared accounts with tiers and disabled counts", () => {
@@ -126,13 +126,13 @@ describe("AccessPolicy", () => {
     availability.sharedAccountTiersByProvider.set("p", ["pro", "free"]);
     availability.sharedDisabledCountByProviderModel.set("p:m", 1);
 
-    expect(policy.isModelUsableBySharedAccounts("m", availability)).toBe(true);
+    expect(policy.usableShared("m", availability)).toBe(true);
     availability.sharedDisabledCountByProviderModel.set("p:m", 2);
-    expect(policy.isModelUsableBySharedAccounts("m", availability)).toBe(false);
+    expect(policy.usableShared("m", availability)).toBe(false);
 
     const freeOnly = emptyAvailability();
     freeOnly.sharedAccountCountByProvider.set("p", 1);
     freeOnly.sharedAccountTiersByProvider.set("p", ["free"]);
-    expect(policy.isModelUsableBySharedAccounts("m", freeOnly)).toBe(false);
+    expect(policy.usableShared("m", freeOnly)).toBe(false);
   });
 });

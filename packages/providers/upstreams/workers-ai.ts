@@ -40,7 +40,7 @@ export class WorkersAiProvider implements Provider {
       if (SUPPORTED_WORKERS_AI.has(key) && value !== undefined && value !== null) payload[key] = value;
     }
     const model = stringValue(request.body.model);
-    payload.model = this.registry.upstreamModelName(model, "workers_ai");
+    payload.model = this.registry.upstream(model, "workers_ai");
     payload.stream = request.stream;
     const url = `https://api.cloudflare.com/client/v4/accounts/${accountId.trim()}/ai/v1/chat/completions`;
     const direct = this.transport.direct;

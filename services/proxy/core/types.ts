@@ -50,7 +50,7 @@ export type ResponseContext = {
   onStreamComplete?: (reason: StreamCompletion) => void;
 };
 
-export type AccountRotationFailure = {
+export type Failure = {
   accountId: string;
   failedAt: Date;
 };
@@ -71,7 +71,7 @@ export type AttemptResult = {
   response: Response;
   requestStartMs: number;
   upstreamFirstResponseMs: number;
-  rotationFailures: AccountRotationFailure[];
+  rotationFailures: Failure[];
   roaming: PointReservation | null;
 };
 
@@ -82,7 +82,7 @@ export type PointReservation = {
   debitId: string;
 };
 
-export type SuccessfulRequestRecord = {
+export type SuccessRecord = {
   accountId: string;
   provider: string;
   model: string;
@@ -99,8 +99,8 @@ export type SuccessfulRequestRecord = {
 };
 
 export type StreamRecorder = {
-  recordSuccessfulRequest(params: SuccessfulRequestRecord): void;
-  storeHypercreditsUsage(
+  recordSuccess(params: SuccessRecord): void;
+  storeCredits(
     accountId: string,
     remaining: number | null,
     cost: number

@@ -3,12 +3,12 @@ import { Effect } from "effect";
 import { hashString } from "@opendum/core/crypto";
 import type { Registry } from "@opendum/models/runtime";
 import {
-  type APIKeyCache,
-  type CachedAPIKeyValidation,
-  INVALID_CACHE_TTL_SECONDS,
-  VALID_CACHE_TTL_SECONDS,
-} from "../api-key-cache.js";
-import { APIKeyValidator, type APIKeyQueries } from "../api-key-validator.js";
+  type Cache,
+  type Cached,
+  INVALID_TTL,
+  VALID_TTL,
+} from "../cache.js";
+import { Keys, type Queries } from "../keys.js";
 
 type KeyRow = {
   id: string;
@@ -53,19 +53,19 @@ function registryOf(aliases: Record<string, string> = {}): Registry {
   } as unknown as Registry;
 }
 
-function cacheOf(cached: CachedAPIKeyValidation | null = null): {
-  cache: APIKeyCache;
+function cacheOf(cached: Cached | null = null): {
+  cache: Cache;
   touched: string[];
   invalidated: Array<{ keyHash: string; apiKeyId: string }>;
-  sets: Array<{ keyHash: string; value: CachedAPIKeyValidation; ttl: number }>;
+  sets: Array<{ keyHash: string; value: Cached; ttl: number }>;
 } {
   const touched: string[] = [];
   const invalidated: Array<{ keyHash: string; apiKeyId: string }> = [];
-  const sets: Array<{ keyHash: string; value: CachedAPIKeyValidation; ttl: number }> = [];
+  const sets: Array<{ keyHash: string; value: Cached; ttl: number }> = [];
   let current = cached;
   const cache = {
     get: () => Effect.succeed(current),
-    set: (keyHash: string, value: CachedAPIKeyValidation, ttl: number) =>
+    set: (keyHash: string, value: Cached, ttl: number) =>
       Effect.sync(() => {
         sets.push({ keyHash, value, ttl });
         current = value;
@@ -78,32 +78,32 @@ function cacheOf(cached: CachedAPIKeyValidation | null = null): {
       Effect.sync(() => {
         invalidated.push({ keyHash, apiKeyId });
       }),
-  } as unknown as APIKeyCache;
+  } as unknown as Cache;
   return { cache, touched, invalidated, sets };
 }
 
-function queriesOf(row: KeyRow | null, rateLimits: RateLimitRow[] = []): APIKeyQueries {
+function queriesOf(row: KeyRow | null, rateLimits: RateLimitRow[] = []): Queries {
   return {
     getAPIKeyByHash: async () => row,
     deactivateAPIKey: async () => undefined,
     listAPIKeyRateLimits: async () => rateLimits,
-  } as unknown as APIKeyQueries;
+  } as unknown as Queries;
 }
 
 function validatorOf(options: {
-  cache: APIKeyCache;
+  cache: Cache;
   row?: KeyRow | null;
   rateLimits?: RateLimitRow[];
   aliases?: Record<string, string>;
-}): APIKeyValidator {
-  return new APIKeyValidator({
+}): Keys {
+  return new Keys({
     registry: registryOf(options.aliases),
     keyCache: options.cache,
     queries: queriesOf(options.row ?? null, options.rateLimits),
   });
 }
 
-describe("APIKeyValidator", () => {
+describe("Keys", () => {
   it("rejects missing authorization headers", async () => {
     const { cache } = cacheOf();
     const validator = validatorOf({ cache });
@@ -125,7 +125,7 @@ describe("APIKeyValidator", () => {
   });
 
   it("returns cached valid results with normalization", async () => {
-    const cached: CachedAPIKeyValidation = {
+    const cached: Cached = {
       valid: true,
       userId: "user-1",
       apiKeyId: "key-1",
@@ -157,7 +157,7 @@ describe("APIKeyValidator", () => {
   });
 
   it("invalidates expired cache entries and falls back to the database", async () => {
-    const expired: CachedAPIKeyValidation = {
+    const expired: Cached = {
       valid: true,
       userId: "user-1",
       apiKeyId: "key-1",
@@ -170,7 +170,7 @@ describe("APIKeyValidator", () => {
 
     expect(invalidated).toEqual([{ keyHash: hashString("token"), apiKeyId: "key-1" }]);
     expect(result.error).toBe("Invalid API key");
-    expect(sets[0].ttl).toBe(INVALID_CACHE_TTL_SECONDS);
+    expect(sets[0].ttl).toBe(INVALID_TTL);
   });
 
   it("rejects revoked keys and caches the failure", async () => {
@@ -185,7 +185,7 @@ describe("APIKeyValidator", () => {
       apiKeyId: "key-1",
       error: "API key has been revoked",
     });
-    expect(sets[0].ttl).toBe(INVALID_CACHE_TTL_SECONDS);
+    expect(sets[0].ttl).toBe(INVALID_TTL);
   });
 
   it("rejects expired keys and caches the failure", async () => {
@@ -232,7 +232,7 @@ describe("APIKeyValidator", () => {
       { target: "m", targetType: "model", perMinute: null, perHour: 3, perDay: null },
       { target: "x", targetType: "model", perMinute: null, perHour: null, perDay: 4 },
     ]);
-    expect(sets[0].ttl).toBe(VALID_CACHE_TTL_SECONDS);
+    expect(sets[0].ttl).toBe(VALID_TTL);
     expect(sets[0].value).toMatchObject({
       valid: true,
       userId: "user-1",

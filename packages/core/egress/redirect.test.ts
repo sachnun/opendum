@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import type { GuardedFetch } from "./guard.js";
-import { DEFAULT_MAX_REDIRECTS, GuardedFetcher, RedirectPolicy } from "./redirect.js";
+import type { Fetch } from "./guard.js";
+import { MAX_REDIRECTS, Fetcher, Redirects } from "./redirect.js";
 import { PrivateHostError } from "./ssrf.js";
 
 type StubCall = {
@@ -9,13 +9,13 @@ type StubCall = {
 };
 
 type Stub = {
-  fetch: GuardedFetch;
+  fetch: Fetch;
   calls: StubCall[];
 };
 
 function stubFetch(handler: (url: string) => Response): Stub {
   const calls: StubCall[] = [];
-  const fetchFn: GuardedFetch = (url, init) => {
+  const fetchFn: Fetch = (url, init) => {
     calls.push({ url, init });
     return Promise.resolve(handler(url));
   };
@@ -35,10 +35,10 @@ async function failureOf(run: () => Promise<unknown>): Promise<unknown> {
   }
 }
 
-describe("RedirectPolicy", () => {
+describe("Redirects", () => {
   it("returns non-redirect responses with a forced manual redirect", async () => {
     const stub = stubFetch(() => new Response("ok", { status: 200 }));
-    const response = await new RedirectPolicy().follow(stub.fetch, "https://example.com/start", {
+    const response = await new Redirects().follow(stub.fetch, "https://example.com/start", {
       method: "POST",
       redirect: "follow",
     });
@@ -54,7 +54,7 @@ describe("RedirectPolicy", () => {
     const stub = stubFetch((url) =>
       url === "https://example.com/start" ? redirectResponse(302, "/next") : new Response("done", { status: 200 })
     );
-    const response = await new RedirectPolicy().follow(stub.fetch, "https://example.com/start");
+    const response = await new Redirects().follow(stub.fetch, "https://example.com/start");
     expect(await response.text()).toBe("done");
     expect(stub.calls.map((call) => call.url)).toEqual(["https://example.com/start", "https://example.com/next"]);
   });
@@ -63,7 +63,7 @@ describe("RedirectPolicy", () => {
     const stub = stubFetch((url) =>
       url === "https://example.com/form" ? redirectResponse(303, "https://example.com/done") : new Response("done", { status: 200 })
     );
-    await new RedirectPolicy().follow(stub.fetch, "https://example.com/form", { method: "POST", body: "payload" });
+    await new Redirects().follow(stub.fetch, "https://example.com/form", { method: "POST", body: "payload" });
     expect(stub.calls[1].init?.method).toBe("GET");
     expect(stub.calls[1].init?.body).toBeUndefined();
     expect(stub.calls[1].init?.redirect).toBe("manual");
@@ -73,28 +73,28 @@ describe("RedirectPolicy", () => {
     const stub = stubFetch((url) =>
       url === "https://example.com/form" ? redirectResponse(301, "https://example.com/done") : new Response("done", { status: 200 })
     );
-    await new RedirectPolicy().follow(stub.fetch, "https://example.com/form", { method: "POST", body: "payload" });
+    await new Redirects().follow(stub.fetch, "https://example.com/form", { method: "POST", body: "payload" });
     expect(stub.calls[1].init?.method).toBe("GET");
   });
 
   it("rejects redirects that leave https", async () => {
     const stub = stubFetch(() => redirectResponse(302, "http://example.com/insecure"));
-    const error = await failureOf(() => new RedirectPolicy().follow(stub.fetch, "https://example.com/start"));
+    const error = await failureOf(() => new Redirects().follow(stub.fetch, "https://example.com/start"));
     expect(error).toBeInstanceOf(Error);
     expect((error as Error).message).toBe("redirect must use https");
   });
 
   it("stops after the default maximum redirects", async () => {
     const stub = stubFetch(() => redirectResponse(302, "https://example.com/loop"));
-    const error = await failureOf(() => new RedirectPolicy().follow(stub.fetch, "https://example.com/loop"));
+    const error = await failureOf(() => new Redirects().follow(stub.fetch, "https://example.com/loop"));
     expect(error).toBeInstanceOf(Error);
     expect((error as Error).message).toBe("stopped after 10 redirects");
-    expect(stub.calls).toHaveLength(DEFAULT_MAX_REDIRECTS + 1);
+    expect(stub.calls).toHaveLength(MAX_REDIRECTS + 1);
   });
 
   it("rejects private hosts before any fetch", async () => {
     const stub = stubFetch(() => new Response("unreachable", { status: 200 }));
-    const error = await failureOf(() => new RedirectPolicy().follow(stub.fetch, "http://10.0.0.1/"));
+    const error = await failureOf(() => new Redirects().follow(stub.fetch, "http://10.0.0.1/"));
     expect(error).toBeInstanceOf(PrivateHostError);
     expect(stub.calls).toHaveLength(0);
   });
@@ -105,23 +105,23 @@ describe("RedirectPolicy", () => {
         ? redirectResponse(302, "https://10.0.0.1/")
         : new Response("unreachable", { status: 200 })
     );
-    const error = await failureOf(() => new RedirectPolicy().follow(stub.fetch, "https://example.com/start"));
+    const error = await failureOf(() => new Redirects().follow(stub.fetch, "https://example.com/start"));
     expect(error).toBeInstanceOf(PrivateHostError);
     expect(stub.calls).toHaveLength(1);
   });
 });
 
-describe("GuardedFetcher", () => {
+describe("Fetcher", () => {
   it("exposes a redirect policy and closes", async () => {
-    const fetcher = new GuardedFetcher();
-    expect(fetcher.policy).toBeInstanceOf(RedirectPolicy);
-    expect(fetcher.policy.maxRedirects).toBe(DEFAULT_MAX_REDIRECTS);
+    const fetcher = new Fetcher();
+    expect(fetcher.policy).toBeInstanceOf(Redirects);
+    expect(fetcher.policy.maxRedirects).toBe(MAX_REDIRECTS);
     await fetcher.close();
   });
 
   it("accepts a custom redirect policy", async () => {
-    const policy = new RedirectPolicy(3);
-    const fetcher = new GuardedFetcher({ policy });
+    const policy = new Redirects(3);
+    const fetcher = new Fetcher({ policy });
     expect(fetcher.policy).toBe(policy);
     await fetcher.close();
   });

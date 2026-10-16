@@ -8,9 +8,9 @@ import { mergeModelData, splitModelData } from "./model/merge.ts";
 import { ModelParseFailure, asError } from "./errors.ts";
 import type { JsonValue, ModelData, ModelIndex, ModelIndexEntry } from "./types.ts";
 
-const MODEL_FILE_EXTENSION = ".json";
+const MODEL_EXT = ".json";
 
-const MODEL_PROPERTY_ORDER = [
+const MODEL_ORDER = [
   "id",
   "providers",
   "aliases",
@@ -25,11 +25,11 @@ const MODEL_PROPERTY_ORDER = [
   "providerConfig",
 ];
 
-const PROVIDER_CONFIG_PROPERTY_ORDER = ["upstream", "contextWindow", "maxOutputTokens", "authless", "free", "minTier", "allowedTiers", "aliases"];
-const COST_PROPERTY_ORDER = ["input", "output", "cacheRead", "cacheWrite"];
-const SCORE_PROPERTY_ORDER = ["index", "estimated", "version"];
+const CONFIG_ORDER = ["upstream", "contextWindow", "maxOutputTokens", "authless", "free", "minTier", "allowedTiers", "aliases"];
+const COST_ORDER = ["input", "output", "cacheRead", "cacheWrite"];
+const SCORE_ORDER = ["index", "estimated", "version"];
 
-function isPlainObject(value: unknown): value is Record<string, JsonValue> {
+function isObject(value: unknown): value is Record<string, JsonValue> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
@@ -52,11 +52,11 @@ function orderObject(value: Record<string, JsonValue>, preferredKeys: string[] =
   return result;
 }
 
-function orderProviderMap(value: Record<string, JsonValue>, preferredKeys: string[]): Record<string, JsonValue> {
+function orderProviders(value: Record<string, JsonValue>, preferredKeys: string[]): Record<string, JsonValue> {
   const result: Record<string, JsonValue> = {};
   for (const provider of Object.keys(value).sort()) {
     const entry = value[provider];
-    result[provider] = isPlainObject(entry)
+    result[provider] = isObject(entry)
       ? orderObject(entry, preferredKeys)
       : orderValue(entry!, provider);
   }
@@ -66,44 +66,44 @@ function orderProviderMap(value: Record<string, JsonValue>, preferredKeys: strin
 function orderValue(value: JsonValue, key?: string): JsonValue {
   if (key === "aliases" && Array.isArray(value)) return [...(value as string[])].sort();
   if (Array.isArray(value)) return value.map((item) => orderValue(item));
-  if (!isPlainObject(value)) return value;
+  if (!isObject(value)) return value;
 
-  if (key === "providerConfig") return orderProviderMap(value, PROVIDER_CONFIG_PROPERTY_ORDER);
-  if (key === "cost") return orderObject(value, COST_PROPERTY_ORDER);
+  if (key === "providerConfig") return orderProviders(value, CONFIG_ORDER);
+  if (key === "cost") return orderObject(value, COST_ORDER);
   if (key === "scores") return orderScores(value);
   return orderObject(value);
 }
 
 function orderScores(value: JsonValue): JsonValue {
-  if (!isPlainObject(value)) return value;
+  if (!isObject(value)) return value;
   const result: Record<string, JsonValue> = {};
   for (const key of Object.keys(value).sort()) {
-    result[key] = orderObject(value[key] as Record<string, JsonValue>, SCORE_PROPERTY_ORDER);
+    result[key] = orderObject(value[key] as Record<string, JsonValue>, SCORE_ORDER);
   }
   return result;
 }
 
-function normalizeModelData(data: ModelData): Record<string, JsonValue> {
+function normalizeData(data: ModelData): Record<string, JsonValue> {
   if (data && typeof data === "object" && !Array.isArray(data)) {
     delete data.family;
   }
-  return orderObject(data as Record<string, JsonValue>, MODEL_PROPERTY_ORDER);
+  return orderObject(data as Record<string, JsonValue>, MODEL_ORDER);
 }
 
-export function readModelJson(content: string): ModelData {
+export function read(content: string): ModelData {
   return JSON.parse(content) as ModelData;
 }
 
 /**
- * Effect wrapper around {@link readModelJson} that reports invalid JSON as a
+ * Effect wrapper around {@link read} that reports invalid JSON as a
  * typed parse failure instead of a thrown `SyntaxError`.
  */
-export function tryReadModelJson(
+export function tryRead(
   content: string,
   path = "<inline>"
 ): Effect.Effect<ModelData, ModelParseFailure> {
   return Effect.try({
-    try: () => readModelJson(content),
+    try: () => read(content),
     catch: (cause) => cause,
   }).pipe(
     Effect.mapError(
@@ -112,46 +112,46 @@ export function tryReadModelJson(
   );
 }
 
-function hasMinorVersionSuffix(base: string | undefined, numericSuffix: string | undefined): boolean {
+function hasVersionSuffix(base: string | undefined, numericSuffix: string | undefined): boolean {
   if (!base || !numericSuffix) return false;
   return /-(?:\d+)$/.test(base) || /-v\d+(?:\.\d+)*$/.test(base);
 }
 
-function getModelPublicId(data: ModelData, fileId: string): string {
+function publicId(data: ModelData, fileId: string): string {
   const id = typeof data.id === "string" ? data.id.trim() : "";
   return id || fileId;
 }
 
-export function writeModelJson(filePath: string, data: ModelData): void {
-  const content = JSON.stringify(normalizeModelData(data), null, 2);
+export function write(filePath: string, data: ModelData): void {
+  const content = JSON.stringify(normalizeData(data), null, 2);
   writeFileSync(filePath, `${content}\n`);
 }
 
-export function writeGeneratedModelJson(filePath: string, data: ModelData): void {
+export function writeGenerated(filePath: string, data: ModelData): void {
   mkdirSync(dirname(filePath), { recursive: true });
-  writeModelJson(filePath, data);
+  write(filePath, data);
 }
 
-export function writeSplitModel(
+export function writeSplit(
   modelsDir: string,
   fileId: string,
   data: ModelData,
   options: { generatedDir?: string } = {},
 ): { authoredPath: string; generatedPath: string } {
-  const generatedDir = options.generatedDir ?? resolveGeneratedDir(modelsDir);
+  const dir = options.generatedDir ?? generatedDir(modelsDir);
   const { generated, authored } = splitModelData(data);
-  const authoredPath = join(modelsDir, fileId + MODEL_FILE_EXTENSION);
-  const generatedPath = join(generatedDir, fileId + MODEL_FILE_EXTENSION);
+  const authoredPath = join(modelsDir, fileId + MODEL_EXT);
+  const generatedPath = join(dir, fileId + MODEL_EXT);
 
   if (Object.keys(authored).length > 0) {
     mkdirSync(dirname(authoredPath), { recursive: true });
-    writeModelJson(authoredPath, authored);
+    write(authoredPath, authored);
   } else if (existsSync(authoredPath)) {
     rmSync(authoredPath, { force: true });
   }
 
   if (Object.keys(generated).length > 0) {
-    writeGeneratedModelJson(generatedPath, generated);
+    writeGenerated(generatedPath, generated);
   } else if (existsSync(generatedPath)) {
     rmSync(generatedPath, { force: true });
   }
@@ -159,7 +159,7 @@ export function writeSplitModel(
   return { authoredPath, generatedPath };
 }
 
-export function collectModelFiles(modelsDir: string): string[] {
+export function collectFiles(modelsDir: string): string[] {
   const files: string[] = [];
   let entries: string[];
   try {
@@ -172,30 +172,30 @@ export function collectModelFiles(modelsDir: string): string[] {
     const stat = statSync(fullPath);
     if (stat.isDirectory()) {
       for (const file of readdirSync(fullPath)) {
-        if (file.endsWith(MODEL_FILE_EXTENSION)) {
+        if (file.endsWith(MODEL_EXT)) {
           files.push(join(fullPath, file));
         }
       }
-    } else if (entry.endsWith(MODEL_FILE_EXTENSION)) {
+    } else if (entry.endsWith(MODEL_EXT)) {
       files.push(fullPath);
     }
   }
   return files;
 }
 
-export function resolveGeneratedDir(modelsDir: string): string {
+export function generatedDir(modelsDir: string): string {
   const configured = process.env.MODELS_GENERATED_DIR;
   if (configured) return resolve(configured);
   return join(dirname(modelsDir), "generated");
 }
 
-function readModelData(filePath: string): ModelData {
-  return readModelJson(readFileSync(filePath, "utf-8"));
+function readData(filePath: string): ModelData {
+  return read(readFileSync(filePath, "utf-8"));
 }
 
-function collectByFileId(modelsDir: string): Map<string, string> {
+function byFileId(modelsDir: string): Map<string, string> {
   const byFileId = new Map<string, string>();
-  for (const filePath of collectModelFiles(modelsDir)) {
+  for (const filePath of collectFiles(modelsDir)) {
     const relativePath = relative(modelsDir, filePath);
     byFileId.set(
       relativePath.replace(/\.json$/, "").split(sep).join("/"),
@@ -205,44 +205,44 @@ function collectByFileId(modelsDir: string): Map<string, string> {
   return byFileId;
 }
 
-export function buildModelIndex(modelsDir: string, options: { generatedDir?: string } = {}): ModelIndex {
-  const generatedDir = options.generatedDir ?? resolveGeneratedDir(modelsDir);
-  const authoredFiles = collectByFileId(modelsDir);
-  const generatedFiles = collectByFileId(generatedDir);
+export function buildIndex(modelsDir: string, options: { generatedDir?: string } = {}): ModelIndex {
+  const dir = options.generatedDir ?? generatedDir(modelsDir);
+  const authoredFiles = byFileId(modelsDir);
+  const generatedFiles = byFileId(dir);
   const index: ModelIndex = {};
 
   for (const relativeId of new Set([...authoredFiles.keys(), ...generatedFiles.keys()])) {
     const authoredPath = authoredFiles.get(relativeId);
     const generatedPath = generatedFiles.get(relativeId);
-    const authored = authoredPath ? readModelData(authoredPath) : undefined;
-    const generated = generatedPath ? readModelData(generatedPath) : undefined;
+    const authored = authoredPath ? readData(authoredPath) : undefined;
+    const generated = generatedPath ? readData(generatedPath) : undefined;
     const data = mergeModelData(generated, authored);
     index[relativeId] = {
-      id: getModelPublicId(data, basename(relativeId)),
+      id: publicId(data, basename(relativeId)),
       fileId: basename(relativeId),
       relativeId,
       path: authoredPath ?? generatedPath!,
       generatedPath,
       modelsDir,
-      generatedDir,
+      generatedDir: dir,
       data,
     };
   }
   return index;
 }
 
-export function generatedModelPath(generatedDir: string, relativeId: string): string {
-  return join(generatedDir, relativeId + MODEL_FILE_EXTENSION);
+export function generatedPath(generatedDir: string, relativeId: string): string {
+  return join(generatedDir, relativeId + MODEL_EXT);
 }
 
-function trailingDateToken(modelId: string): string | null {
+function dateToken(modelId: string): string | null {
   const segment = modelId.slice(modelId.lastIndexOf("/") + 1);
   const tokens = segment.split(/[-_]/);
   const tail = (tokens[tokens.length - 1] ?? "").split(":")[0] ?? "";
   return isDateToken(tail) ? tail : null;
 }
 
-function compareCandidatesNewestFirst(left: { dateToken: string | null }, right: { dateToken: string | null }): number {
+function compareCandidates(left: { dateToken: string | null }, right: { dateToken: string | null }): number {
   if (left.dateToken === null && right.dateToken === null) return 0;
   if (left.dateToken === null) return -1;
   if (right.dateToken === null) return 1;
@@ -260,27 +260,27 @@ function compareCandidatesNewestFirst(left: { dateToken: string | null }, right:
  * older date-pinned variants under `base-<date>` so the registry merge turns
  * them into aliases instead of separate models.
  */
-export function buildModelIdMap(modelIds: string[], toModelKey: (modelId: string) => string): Map<string, string> {
+export function idMap(modelIds: string[], toModelKey: (modelId: string) => string): Map<string, string> {
   const groups = new Map<string, Array<{ modelId: string; key: string; dateToken: string | null }>>();
 
   for (const modelId of modelIds) {
     const key = toModelKey(modelId);
     if (!key) continue;
 
-    const dateToken = trailingDateToken(modelId);
+    const token = dateToken(modelId);
     const baseKey =
-      dateToken && key.endsWith(`-${dateToken}`)
-        ? key.slice(0, key.length - dateToken.length - 1)
+      token && key.endsWith(`-${token}`)
+        ? key.slice(0, key.length - token.length - 1)
         : key;
 
     const group = groups.get(baseKey);
-    if (group) group.push({ modelId, key, dateToken });
-    else groups.set(baseKey, [{ modelId, key, dateToken }]);
+    if (group) group.push({ modelId, key, dateToken: token });
+    else groups.set(baseKey, [{ modelId, key, dateToken: token }]);
   }
 
   const map = new Map<string, string>();
   for (const [baseKey, candidates] of groups) {
-    candidates.sort(compareCandidatesNewestFirst);
+    candidates.sort(compareCandidates);
 
     const [winner, ...losers] = candidates;
     if (winner === undefined) continue;
@@ -301,11 +301,11 @@ export function buildModelIdMap(modelIds: string[], toModelKey: (modelId: string
   return new Map([...map.entries()].sort(([a], [b]) => a.localeCompare(b)));
 }
 
-export function persistModel(entry: Pick<ModelIndexEntry, "modelsDir" | "relativeId">, data: ModelData): void {
-  writeSplitModel(entry.modelsDir, entry.relativeId, data);
+export function persist(entry: Pick<ModelIndexEntry, "modelsDir" | "relativeId">, data: ModelData): void {
+  writeSplit(entry.modelsDir, entry.relativeId, data);
 }
 
-export function renameModelFiles(
+export function renameFiles(
   entry: Pick<ModelIndexEntry, "modelsDir" | "generatedDir" | "relativeId">,
   nextFileId: string,
 ): string {
@@ -314,8 +314,8 @@ export function renameModelFiles(
   if (nextRelativeId === entry.relativeId) return entry.relativeId;
 
   const pairs = [entry.modelsDir, entry.generatedDir].map((base) => ({
-    from: join(base, entry.relativeId + MODEL_FILE_EXTENSION),
-    to: join(base, nextRelativeId + MODEL_FILE_EXTENSION),
+    from: join(base, entry.relativeId + MODEL_EXT),
+    to: join(base, nextRelativeId + MODEL_EXT),
   }));
   if (pairs.some(({ to }) => existsSync(to))) return entry.relativeId;
 
@@ -327,20 +327,20 @@ export function renameModelFiles(
   return nextRelativeId;
 }
 
-function hasCuratedData(data: ModelData): boolean {
+function isCurated(data: ModelData): boolean {
   const authored = splitModelData(data).authored as Record<string, unknown>;
   delete authored.ignored;
   return Object.keys(authored).length > 0;
 }
 
-export function pruneDeadModelEntries(modelsDir: string): string[] {
-  const index = buildModelIndex(modelsDir);
+export function prune(modelsDir: string): string[] {
+  const index = buildIndex(modelsDir);
   const removed: string[] = [];
 
   for (const entry of Object.values(index)) {
     if ((entry.data.providers ?? []).length > 0) continue;
-    if (hasCuratedData(entry.data)) continue;
-    writeSplitModel(entry.modelsDir, entry.relativeId, {});
+    if (isCurated(entry.data)) continue;
+    writeSplit(entry.modelsDir, entry.relativeId, {});
     removed.push(entry.id);
   }
 
@@ -356,24 +356,24 @@ export function pruneDeadModelEntries(modelsDir: string): string[] {
  * @param {{ providerConfigByModel?: Map<string, Record<string, unknown>>, managedProviderConfigKeys?: string[] }} [options]
  * @returns {{ added: string[], removed: string[], updated: string[] }}
  */
-export interface SyncOptions {
+export interface Options {
   providerConfigByModel?: Map<string, Record<string, JsonValue>>;
   managedProviderConfigKeys?: string[];
 }
 
-export interface SyncResult {
+export interface Result {
   added: string[];
   removed: string[];
   updated: string[];
 }
 
-export function syncProviderModels(
+export function sync(
   modelsDir: string,
   providerName: string,
   modelMap: Map<string, string>,
-  options: SyncOptions = {},
-): SyncResult {
-  const index = buildModelIndex(modelsDir);
+  options: Options = {},
+): Result {
+  const index = buildIndex(modelsDir);
   const modelUpstreams = new Set(modelMap.values());
   const added: string[] = [];
   const removed: string[] = [];
@@ -394,7 +394,7 @@ export function syncProviderModels(
         const isMeaningfulSuffix =
           Boolean(versionSuffix) ||
           (numericSuffix !== undefined && Number.parseInt(numericSuffix, 10) >= 2);
-        if (isMeaningfulSuffix && !hasMinorVersionSuffix(base, numericSuffix)) {
+        if (isMeaningfulSuffix && !hasVersionSuffix(base, numericSuffix)) {
           const parent =
             index[base] ||
             entries.find((entry) => entry.id === base) ||
@@ -412,7 +412,7 @@ export function syncProviderModels(
       entries.find(
         (entry) =>
           entry.fileId !== modelKey &&
-          getProviderUpstream(entry.data, providerName, entry.fileId) === upstreamName,
+          upstream(entry.data, providerName, entry.fileId) === upstreamName,
       );
     if (covered) return { baseKey: covered.fileId, entry: covered };
     return null;
@@ -431,7 +431,7 @@ export function syncProviderModels(
     }
     if (changed) {
       parent.entry.data.aliases = [...existingAliases].sort();
-      persistModel(parent.entry, parent.entry.data);
+      persist(parent.entry, parent.entry.data);
       updated.push(parent.baseKey);
     }
     modelMap.delete(modelKey);
@@ -462,8 +462,8 @@ export function syncProviderModels(
 
   function entryMatchesProviderMap(entry: ModelIndexEntry): boolean {
     if (modelMap.has(entry.fileId) || modelMap.has(entry.id)) return true;
-    const upstream = getProviderUpstream(entry.data, providerName, entry.id);
-    if (upstream && modelUpstreams.has(upstream)) return true;
+    const name = upstream(entry.data, providerName, entry.id);
+    if (name && modelUpstreams.has(name)) return true;
     const aliases = entry.data.aliases || [];
     return aliases.some((alias) => modelMap.has(alias) || modelUpstreams.has(alias));
   }
@@ -474,7 +474,7 @@ export function syncProviderModels(
     const entries = Object.values(index);
     return entries.find((entry) => entry.id === modelKey) ||
       entries.find((entry) => (entry.data.aliases || []).includes(modelKey)) ||
-      entries.find((entry) => getProviderUpstream(entry.data, providerName, entry.fileId) === upstreamName) ||
+      entries.find((entry) => upstream(entry.data, providerName, entry.fileId) === upstreamName) ||
       null;
   }
 
@@ -492,7 +492,7 @@ export function syncProviderModels(
       }
     }
 
-    persistModel(entry, entry.data);
+    persist(entry, entry.data);
     removed.push(modelId);
   }
 
@@ -534,14 +534,14 @@ export function syncProviderModels(
       }
 
       if (changed) {
-        persistModel(existing, existing.data);
+        persist(existing, existing.data);
         updated.push(modelKey);
       }
     } else {
       const folder = inferModelFolder(modelKey);
       const filePath = folder
-        ? join(modelsDir, folder, `${modelKey}${MODEL_FILE_EXTENSION}`)
-        : join(modelsDir, `${modelKey}${MODEL_FILE_EXTENSION}`);
+        ? join(modelsDir, folder, `${modelKey}${MODEL_EXT}`)
+        : join(modelsDir, `${modelKey}${MODEL_EXT}`);
       if (folder) {
         const folderPath = join(modelsDir, folder);
         if (!existsSync(folderPath)) mkdirSync(folderPath, { recursive: true });
@@ -552,7 +552,7 @@ export function syncProviderModels(
       // existing file instead of overwriting it. The existing meta/aliases/
       // ignored flags are preserved.
       if (existsSync(filePath)) {
-        const existing = readModelJson(readFileSync(filePath, "utf-8"));
+        const existing = read(readFileSync(filePath, "utf-8"));
         const existingProviders = existing.providers || [];
         let touched = false;
 
@@ -589,7 +589,7 @@ export function syncProviderModels(
         }
 
         if (touched) {
-          persistModel({ modelsDir, relativeId: folder ? `${folder}/${modelKey}` : modelKey }, existing);
+          persist({ modelsDir, relativeId: folder ? `${folder}/${modelKey}` : modelKey }, existing);
           updated.push(modelKey);
         }
         continue;
@@ -609,7 +609,7 @@ export function syncProviderModels(
         };
       }
 
-      persistModel({ modelsDir, relativeId: folder ? `${folder}/${modelKey}` : modelKey }, data);
+      persist({ modelsDir, relativeId: folder ? `${folder}/${modelKey}` : modelKey }, data);
       added.push(modelKey);
     }
   }
@@ -617,7 +617,7 @@ export function syncProviderModels(
   return { added, removed, updated };
 }
 
-export function getProviderUpstream(data: ModelData, providerName: string, modelId: string): string | undefined {
+export function upstream(data: ModelData, providerName: string, modelId: string): string | undefined {
   const providerConfig = data.providerConfig?.[providerName];
   if (
     providerConfig &&

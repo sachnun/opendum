@@ -1,18 +1,18 @@
 import { Effect } from "effect";
 import { tryAsync } from "../best-effort.js";
 import { assertPublicHost } from "./ssrf.js";
-import { createGuardedFetch, type GuardedFetch, type GuardedFetchHandle, type GuardedFetchOptions } from "./guard.js";
+import { createGuardedFetch, type Fetch, type GuardedFetchHandle, type GuardedFetchOptions } from "./guard.js";
 
-export const DEFAULT_MAX_REDIRECTS = 10;
+export const MAX_REDIRECTS = 10;
 
-export class RedirectPolicy {
+export class Redirects {
   readonly maxRedirects: number;
 
-  constructor(maxRedirects: number = DEFAULT_MAX_REDIRECTS) {
+  constructor(maxRedirects: number = MAX_REDIRECTS) {
     this.maxRedirects = maxRedirects;
   }
 
-  async follow(baseFetch: GuardedFetch, url: string, init?: RequestInit): Promise<Response> {
+  async follow(baseFetch: Fetch, url: string, init?: RequestInit): Promise<Response> {
     let current = url;
     let currentInit = init;
     for (let hop = 0; hop <= this.maxRedirects; hop += 1) {
@@ -36,12 +36,12 @@ export class RedirectPolicy {
   }
 }
 
-export class GuardedFetcher {
-  readonly policy: RedirectPolicy;
+export class Fetcher {
+  readonly policy: Redirects;
   private readonly handle: GuardedFetchHandle;
 
-  constructor(options: GuardedFetchOptions & { policy?: RedirectPolicy } = {}) {
-    this.policy = options.policy ?? new RedirectPolicy();
+  constructor(options: GuardedFetchOptions & { policy?: Redirects } = {}) {
+    this.policy = options.policy ?? new Redirects();
     this.handle = createGuardedFetch(options);
   }
 

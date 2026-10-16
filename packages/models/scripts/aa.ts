@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { buildAaIndex, parseLeaderboard, resolveAaScore } from "#models/sync/aa.ts";
 import { modelProbes } from "#models/model/probes.ts";
 import { runFetchText } from "#models/sync/http.ts";
-import { buildModelIndex, generatedModelPath, readModelJson, writeGeneratedModelJson } from "#models/model-store.ts";
+import { buildIndex, generatedPath, read, writeGenerated } from "#models/model-store.ts";
 
 const LEADERBOARD_URL = "https://artificialanalysis.ai/leaderboards/models";
 const USER_AGENT = "Mozilla/5.0 (compatible; opendum-model-sync)";
@@ -30,7 +30,7 @@ async function main(): Promise<void> {
   const index = buildAaIndex(models);
   console.log(`[aa] ${index.bySlug.size} slugs from ${models.length} entries`);
 
-  const registry = buildModelIndex(modelsDir);
+  const registry = buildIndex(modelsDir);
   let scored = 0;
   let updated = 0;
   let cleared = 0;
@@ -38,18 +38,18 @@ async function main(): Promise<void> {
 
   for (const entry of Object.values(registry)) {
     if (entry.data.ignored) continue;
-    const generatedPath = entry.generatedPath ?? generatedModelPath(entry.generatedDir, entry.relativeId);
+    const file = entry.generatedPath ?? generatedPath(entry.generatedDir, entry.relativeId);
     const hit = resolveAaScore(modelProbes(entry), index);
     if (!hit) {
       unmatched.push(entry.id);
-      if (!entry.data.scores?.artificialAnalysis || !existsSync(generatedPath)) continue;
-      const generated = readModelJson(readFileSync(generatedPath, "utf-8"));
+      if (!entry.data.scores?.artificialAnalysis || !existsSync(file)) continue;
+      const generated = read(readFileSync(file, "utf-8"));
       if (!generated.scores?.artificialAnalysis) continue;
       generated.scores = { ...generated.scores };
       delete generated.scores.artificialAnalysis;
       if (Object.keys(generated.scores).length === 0) delete generated.scores;
       cleared += 1;
-      if (!dryRun) writeGeneratedModelJson(generatedPath, generated);
+      if (!dryRun) writeGenerated(file, generated);
       continue;
     }
     scored += 1;
@@ -63,12 +63,12 @@ async function main(): Promise<void> {
       continue;
     }
 
-    const generated = existsSync(generatedPath)
-      ? readModelJson(readFileSync(generatedPath, "utf-8"))
+    const generated = existsSync(file)
+      ? read(readFileSync(file, "utf-8"))
       : {};
     generated.scores = { artificialAnalysis: next };
     updated += 1;
-    if (!dryRun) writeGeneratedModelJson(generatedPath, generated);
+    if (!dryRun) writeGenerated(file, generated);
   }
 
   console.log(`[aa] scored ${scored}/${Object.keys(registry).length}, updated ${updated}, cleared ${cleared}${dryRun ? " (dry run)" : ""}`);

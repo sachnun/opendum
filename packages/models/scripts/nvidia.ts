@@ -2,7 +2,7 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildModelIndex, syncProviderModels, getProviderUpstream } from "#models/model-store.ts";
+import { buildIndex, sync, upstream } from "#models/model-store.ts";
 import { Effect } from "effect";
 import { fetchDecoded, MAX_FETCH_ATTEMPTS, retryTransient, runOrThrow } from "#models/sync/http.ts";
 import { stripParamInfoKey } from "#models/model/clean-key.ts";
@@ -244,13 +244,13 @@ async function main() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
   const modelsDir = resolve(scriptDir, "../data");
 
-  const index = buildModelIndex(modelsDir);
+  const index = buildIndex(modelsDir);
   const existingKeys = new Map();
   for (const [modelId, entry] of Object.entries(index)) {
     const providers = entry.data.providers || [];
     if (providers.includes(PROVIDER_NAME)) {
-      const upstream = getProviderUpstream(entry.data, PROVIDER_NAME, modelId);
-      existingKeys.set(entry.id || modelId, upstream);
+      const name = upstream(entry.data, PROVIDER_NAME, modelId);
+      existingKeys.set(entry.id || modelId, name);
     }
   }
 
@@ -260,7 +260,7 @@ async function main() {
   ]);
   const nextMap = buildModelMap(modelIds, existingKeys, llmModelKeys);
 
-  const result = syncProviderModels(modelsDir, PROVIDER_NAME, nextMap);
+  const result = sync(modelsDir, PROVIDER_NAME, nextMap);
 
   if (result.added.length === 0 && result.removed.length === 0 && result.updated.length === 0) {
     console.log(`Nvidia NIM models are already up to date (${nextMap.size} models).`);

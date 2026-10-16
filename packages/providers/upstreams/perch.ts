@@ -11,8 +11,8 @@ import {
 } from "../core/helpers.js";
 import { normalizeProviderFailure, transportFailure, type UpstreamTransport } from "../core/http.js";
 import { ProviderCredentialFailure } from "../core/errors.js";
-import { OAuthTokenExchange } from "../core/oauth-token-exchange.js";
-import { SseCompletionCollector } from "../transform/collector.js";
+import { OAuth } from "../core/oauth.js";
+import { Collector } from "../transform/collector.js";
 import type {
   CredentialRefresher,
   Provider,
@@ -272,12 +272,12 @@ function perchEffortFromBody(body: Json): { level: string; reasoningEnabled: boo
 function perchModelAlias(registry: Registry, model: string): string {
   let value = model.trim();
   if (value.startsWith("perch/")) value = value.slice("perch/".length);
-  value = registry.upstreamModelName(value, "perch");
+  value = registry.upstream(value, "perch");
   return value || PERCH_FALLBACK_ALIAS;
 }
 
 function perchSupportedModels(registry: Registry): string {
-  return registry.modelsForProvider("perch").sort((a, b) => a.localeCompare(b)).join(", ");
+  return registry.models("perch").sort((a, b) => a.localeCompare(b)).join(", ");
 }
 
 function firstNonNil(...values: unknown[]): unknown {
@@ -331,12 +331,12 @@ export class PerchProvider implements Provider, CredentialRefresher, RefreshBuff
   readonly name = "perch";
   private readonly registry: Registry;
   private readonly transport: UpstreamTransport;
-  private readonly exchange: OAuthTokenExchange;
+  private readonly exchange: OAuth;
 
   constructor(options: PerchOptions) {
     this.registry = options.registry;
     this.transport = options.transport;
-    this.exchange = new OAuthTokenExchange({
+    this.exchange = new OAuth({
       provider: "perch",
       tokenUrl: async () => {
         const config = await fetchPerchAuthConfig(this.transport);
@@ -716,7 +716,7 @@ export async function perchSseToChatCompletion(
   includeReasoning: boolean
 ): Promise<Json> {
   const text = await resp.text();
-  const collector = new SseCompletionCollector({
+  const collector = new Collector({
     model,
     includeReasoning,
     nullableContent: true,

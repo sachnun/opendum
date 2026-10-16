@@ -1,7 +1,7 @@
 import { Cache, Duration, Effect, Result } from "effect";
 import type { OpendumRedis } from "@opendum/core/redis";
 import { parseJson, tryAsync } from "./helpers.js";
-import { ignoringErrors } from "./service-helpers.js";
+import { ignore } from "./service-helpers.js";
 
 export type ProviderPerformanceConfig = {
   sampleTtlSeconds: number;
@@ -151,7 +151,7 @@ export class ProviderPerformance {
     if (ttftMs <= 0 && tokensPerSecond <= 0) return;
     const key = providerPerformanceKey(sample.model);
     await Effect.runPromise(
-      ignoringErrors(async () => {
+      ignore(async () => {
         const previous = parseMetrics(await this.redis.hGet(key, sample.provider));
         const next = blendMetrics(previous, { ttftMs, tokensPerSecond }, this.config.ewmaAlpha);
         await this.redis.hSet(key, sample.provider, JSON.stringify(next));

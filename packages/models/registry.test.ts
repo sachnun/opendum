@@ -3,33 +3,33 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "bun:test";
 import { fileURLToPath } from "node:url";
-import { Registry, suggestionScoreFor } from "./registry.ts";
+import { Registry, scoreFor } from "./registry.ts";
 
 const dataDir = fileURLToPath(new URL("./data", import.meta.url));
 const registry = Registry.load(dataDir);
 
 describe("model suggestion score", () => {
   it("matches an identical value", () => {
-    expect(suggestionScoreFor("gpt-4o", "gpt-4o")).toBe(1);
+    expect(scoreFor("gpt-4o", "gpt-4o")).toBe(1);
   });
 
   it("matches a compacted typo above the threshold", () => {
-    expect(suggestionScoreFor("gpt4o", "gpt-4o") >= 0.7).toBeTruthy();
+    expect(scoreFor("gpt4o", "gpt-4o") >= 0.7).toBeTruthy();
   });
 
   it("matches a substring strongly", () => {
-    const score = suggestionScoreFor("claude", "claude-sonnet-4-6");
+    const score = scoreFor("claude", "claude-sonnet-4-6");
     expect(score >= 0.7).toBeTruthy();
     expect(score < 1).toBeTruthy();
   });
 
   it("rejects an unrelated candidate", () => {
-    expect(suggestionScoreFor("claude-sonnet-4-6", "gpt-4o") < 0.7).toBeTruthy();
+    expect(scoreFor("claude-sonnet-4-6", "gpt-4o") < 0.7).toBeTruthy();
   });
 
   it("handles empty input", () => {
-    expect(suggestionScoreFor("", "gpt-4o")).toBe(0);
-    expect(suggestionScoreFor("gpt-4o", "")).toBe(0);
+    expect(scoreFor("", "gpt-4o")).toBe(0);
+    expect(scoreFor("gpt-4o", "")).toBe(0);
   });
 });
 
@@ -66,7 +66,7 @@ describe("provider config merge", () => {
     );
 
     const merged = Registry.load(authoredDir);
-    const cfg = merged.providerModelConfig("muse-spark-1.3", "opencode");
+    const cfg = merged.config("muse-spark-1.3", "opencode");
     expect(cfg?.upstream).toBe("muse-spark-1.3-free");
     expect(cfg?.contextWindow).toBe(1000);
     expect(cfg?.maxOutputTokens).toBe(100);

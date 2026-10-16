@@ -1,51 +1,51 @@
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
-import { disabledModelsKey, type OpendumRedis } from "@opendum/core/redis";
-import { ignoringErrors, tryAsync } from "@opendum/core/best-effort";
+import { disabledKey, type OpendumRedis } from "@opendum/core/redis";
+import { ignore, tryAsync } from "@opendum/core/best-effort";
 import {
   listActiveAccountTiers,
   listDisabledModelsByAccounts,
   listDisabledModelsByUser,
   listSharedAccounts,
 } from "@opendum/database/queries";
-import type { AccessPolicy } from "./access-policy.js";
-import { AUTHLESS_PROVIDER_NAMES } from "./authless.js";
-import type { CustomModelService } from "./custom-model-service.js";
-import { normalizeDisabledModelList } from "./normalize.js";
+import type { Policy } from "./policy.js";
+import { AUTHLESS } from "./authless.js";
+import type { CustomModels } from "./custom-models.js";
+import { disabledList } from "./normalize.js";
 import { type AccountModelAvailability, emptyAvailability } from "./types.js";
 
-const DISABLED_MODELS_TTL_SECONDS = 60;
+const DISABLED_TTL = 60;
 
-export type AvailabilityQueries = {
+export type Queries = {
   listActiveAccountTiers: typeof listActiveAccountTiers;
   listDisabledModelsByAccounts: typeof listDisabledModelsByAccounts;
   listDisabledModelsByUser: typeof listDisabledModelsByUser;
   listSharedAccounts: typeof listSharedAccounts;
 };
 
-const defaultQueries: AvailabilityQueries = {
+const defaultQueries: Queries = {
   listActiveAccountTiers,
   listDisabledModelsByAccounts,
   listDisabledModelsByUser,
   listSharedAccounts,
 };
 
-export type AvailabilityServiceOptions = {
+export type Options = {
   registry: Registry;
   redis: OpendumRedis;
-  customModels: CustomModelService;
-  accessPolicy: AccessPolicy;
-  queries?: AvailabilityQueries;
+  customModels: CustomModels;
+  accessPolicy: Policy;
+  queries?: Queries;
 };
 
-export class AvailabilityService {
+export class Availability {
   private readonly registry: Registry;
   private readonly redis: OpendumRedis;
-  private readonly customModels: CustomModelService;
-  private readonly accessPolicy: AccessPolicy;
-  private readonly queries: AvailabilityQueries;
+  private readonly customModels: CustomModels;
+  private readonly accessPolicy: Policy;
+  private readonly queries: Queries;
 
-  constructor(options: AvailabilityServiceOptions) {
+  constructor(options: Options) {
     this.registry = options.registry;
     this.redis = options.redis;
     this.customModels = options.customModels;
@@ -53,25 +53,25 @@ export class AvailabilityService {
     this.queries = options.queries ?? defaultQueries;
   }
 
-  disabledModelSetForUser(userId: string): Effect.Effect<Set<string>> {
+  disabledModels(userId: string): Effect.Effect<Set<string>> {
     return Effect.gen({ self: this }, function* () {
       const cached = yield* this.getCachedDisabledModels(userId);
       if (cached) return new Set(cached);
       const rows = yield* Effect.promise(() => this.queries.listDisabledModelsByUser(userId));
-      const modelList = normalizeDisabledModelList(this.registry, rows.map((row) => row.trim()));
+      const modelList = disabledList(this.registry, rows.map((row) => row.trim()));
       yield* this.setCachedDisabledModels(userId, modelList);
       return new Set(modelList);
     });
   }
 
-  isModelDisabledForUser(userId: string, model: string): Effect.Effect<boolean> {
+  isDisabled(userId: string, model: string): Effect.Effect<boolean> {
     return Effect.gen({ self: this }, function* () {
-      const set = yield* this.disabledModelSetForUser(userId);
+      const set = yield* this.disabledModels(userId);
       return set.has(this.registry.resolveAlias(model));
     });
   }
 
-  getAccountModelAvailabilityWithSharing(
+  availability(
     userId: string,
     includeShared: boolean,
     options: { includeInactiveAccounts?: boolean } = {}
@@ -79,12 +79,12 @@ export class AvailabilityService {
     return Effect.gen({ self: this }, function* () {
       const availability = emptyAvailability();
 
-      for (const provider of AUTHLESS_PROVIDER_NAMES) {
+      for (const provider of AUTHLESS) {
         availability.activeProviders.add(provider);
         availability.accountCountByProvider.set(provider, 1);
         availability.activeAccountIdsByProvider.set(provider, [provider]);
       }
-      for (const [provider, models] of this.registry.authlessProviderModels()) {
+      for (const [provider, models] of this.registry.authlessModels()) {
         if (models.length === 0) continue;
         availability.activeProviders.add(provider);
         availability.accountCountByProvider.set(
@@ -95,9 +95,9 @@ export class AvailabilityService {
           ...(availability.activeAccountIdsByProvider.get(provider) ?? []),
           provider,
         ]);
-        const set = availability.authlessProviderModels.get(provider) ?? new Set<string>();
+        const set = availability.authlessModels.get(provider) ?? new Set<string>();
         for (const model of models) set.add(model);
-        availability.authlessProviderModels.set(provider, set);
+        availability.authlessModels.set(provider, set);
       }
 
       const now = new Date();
@@ -135,7 +135,7 @@ export class AvailabilityService {
         }
       }
 
-      const { aliased, standalone } = yield* this.customModels.customProviderModelSets(userId);
+      const { aliased, standalone } = yield* this.customModels.modelSets(userId);
       for (const [slug, models] of aliased) {
         if ((availability.accountCountByProvider.get(slug) ?? 0) === 0) continue;
         availability.customProviderModels.set(slug, models);
@@ -181,7 +181,7 @@ export class AvailabilityService {
     });
   }
 
-  usableModelCandidates(
+  candidates(
     userId: string,
     provider: string | null,
     mode: string,
@@ -189,16 +189,16 @@ export class AvailabilityService {
     roamingEnabled: boolean
   ): Effect.Effect<string[]> {
     return Effect.gen({ self: this }, function* () {
-      const candidates = provider ? this.registry.modelsForProvider(provider) : this.registry.allModels();
-      const disabledSet = yield* this.disabledModelSetForUser(userId);
-      const availability = yield* this.getAccountModelAvailabilityWithSharing(userId, roamingEnabled);
+      const candidates = provider ? this.registry.models(provider) : this.registry.allModels();
+      const disabledSet = yield* this.disabledModels(userId);
+      const availability = yield* this.availability(userId, roamingEnabled);
       const values: string[] = [];
       for (const candidate of candidates) {
         const canonical = this.registry.resolveAlias(candidate);
         if (disabledSet.has(canonical)) continue;
         const usable =
-          this.accessPolicy.isModelUsableByAccounts(canonical, availability) ||
-          (roamingEnabled && this.accessPolicy.isModelUsableBySharedAccounts(canonical, availability));
+          this.accessPolicy.usable(canonical, availability) ||
+          (roamingEnabled && this.accessPolicy.usableShared(canonical, availability));
         if (!usable) continue;
         if (mode === "whitelist" && !modelSet.has(canonical)) continue;
         if (mode === "blacklist" && modelSet.has(canonical)) continue;
@@ -210,19 +210,19 @@ export class AvailabilityService {
 
   private getCachedDisabledModels(userId: string): Effect.Effect<string[] | null> {
     return tryAsync(async () => {
-      const raw = await this.redis.get(disabledModelsKey(userId));
+      const raw = await this.redis.get(disabledKey(userId));
       if (!raw) return null;
       const parsed = JSON.parse(raw) as { models?: string[] };
-      return normalizeDisabledModelList(this.registry, parsed.models ?? []);
+      return disabledList(this.registry, parsed.models ?? []);
     }, null);
   }
 
   private setCachedDisabledModels(userId: string, models: string[]): Effect.Effect<void> {
-    return ignoringErrors(() =>
+    return ignore(() =>
       this.redis.set(
-        disabledModelsKey(userId),
-        JSON.stringify({ models: normalizeDisabledModelList(this.registry, models) }),
-        { EX: DISABLED_MODELS_TTL_SECONDS }
+        disabledKey(userId),
+        JSON.stringify({ models: disabledList(this.registry, models) }),
+        { EX: DISABLED_TTL }
       )
     );
   }

@@ -1,9 +1,9 @@
 import { emptyAuthResult, type AuthResult } from "@opendum/auth/types";
 import { playgroundSignature, signaturesMatch } from "@opendum/core/crypto";
 
-const PLAYGROUND_AUTH_WINDOW_MS = 2 * 60 * 1000;
+const WINDOW_MS = 2 * 60 * 1000;
 
-export type PlaygroundAuthOutcome = {
+export type Outcome = {
   handled: boolean;
   result: AuthResult;
 };
@@ -13,10 +13,10 @@ export type PlaygroundAuthOutcome = {
  * `handled` is false only when the request carries no playground headers at
  * all, so the caller knows to fall back to API key authentication.
  */
-export class PlaygroundAuthenticator {
+export class Playground {
   constructor(private readonly secret: string) {}
 
-  authenticate(request: Request | undefined): PlaygroundAuthOutcome {
+  authenticate(request: Request | undefined): Outcome {
     const invalid = emptyAuthResult("Invalid playground session");
     if (!request) return { handled: false, result: invalid };
     const userId = (request.headers.get("x-opendum-playground-user-id") ?? "").trim();
@@ -29,7 +29,7 @@ export class PlaygroundAuthenticator {
     const timestamp = Number.parseInt(timestampValue, 10);
     if (!Number.isFinite(timestamp)) return { handled: true, result: invalid };
     const requestTime = timestamp * 1000;
-    if (Date.now() - requestTime > PLAYGROUND_AUTH_WINDOW_MS || requestTime - Date.now() > PLAYGROUND_AUTH_WINDOW_MS) {
+    if (Date.now() - requestTime > WINDOW_MS || requestTime - Date.now() > WINDOW_MS) {
       return { handled: true, result: invalid };
     }
     const path = URL.canParse(request.url) ? new URL(request.url).pathname : "/";

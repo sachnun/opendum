@@ -2,13 +2,13 @@ import type { ModelInfo } from "./registry.ts";
 
 type Json = Record<string, unknown>;
 
-export type OpenAIModelCatalog = {
+export type Catalog = {
   models(): string[];
   info(model: string): ModelInfo | null;
 };
 
-export class OpenAIModelSerializer {
-  constructor(private readonly catalog: OpenAIModelCatalog) {}
+export class Serializer {
+  constructor(private readonly catalog: Catalog) {}
 
   format(): Json[] {
     const data: Json[] = [];
@@ -21,9 +21,9 @@ export class OpenAIModelSerializer {
         providers: info.providers,
       };
       if (info.owner) item.owner = info.owner;
-      const reasoning = modelReasoning(info);
-      item.reasoning = reasoning;
-      if (reasoning && (info.reasoning_effort ?? []).length > 0) {
+      const hasReasoning = reasoning(info);
+      item.reasoning = hasReasoning;
+      if (hasReasoning && (info.reasoning_effort ?? []).length > 0) {
         item.reasoning_effort = info.reasoning_effort;
       }
       if (info.modalities != null) item.modalities = info.modalities;
@@ -37,21 +37,21 @@ export class OpenAIModelSerializer {
 
   isReasoning(model: string): boolean {
     const info = this.catalog.info(model);
-    return info ? modelReasoning(info) : false;
+    return info ? reasoning(info) : false;
   }
 
   isVision(model: string): boolean {
     const info = this.catalog.info(model);
-    return info ? modelVision(info) : false;
+    return info ? vision(info) : false;
   }
 }
 
-function modelReasoning(info: ModelInfo): boolean {
+function reasoning(info: ModelInfo): boolean {
   if (info.reasoning == null) return true;
   return info.reasoning;
 }
 
-function modelVision(info: ModelInfo): boolean {
+function vision(info: ModelInfo): boolean {
   if (info.modalities == null) return true;
   return (info.modalities.input ?? []).includes("image");
 }

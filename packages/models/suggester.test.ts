@@ -1,13 +1,13 @@
 import { describe, expect, it } from "bun:test";
-import { ModelSuggester } from "./suggester.ts";
+import { Suggester } from "./suggester.ts";
 
-const suggester = ModelSuggester.fromModels([
+const suggester = Suggester.fromModels([
   { value: "gpt-4o", providers: ["openai"] },
   { value: "gpt-4o-mini", providers: ["openai"] },
   { value: "claude-sonnet-4-6", providers: ["anthropic"] },
 ]);
 
-describe("ModelSuggester", () => {
+describe("Suggester", () => {
   it("prefers the provider pool and prefixes results", () => {
     expect(suggester.suggest("gpt4o", "openai", null, 5)).toEqual(["openai/gpt-4o", "openai/gpt-4o-mini"]);
   });

@@ -1,16 +1,16 @@
 import { describe, expect, it, setSystemTime } from "bun:test";
 import { Effect } from "effect";
 import {
-  QuotaRegistry,
+  Quotas,
   clampFraction,
   displayNumber,
   formatFloat,
   formatTimeUntilReset,
-  isQuotaProvider,
+  isQuota,
   parseQuotaNumber,
   parseResetIso,
   quotaFallbackTier,
-  quotaProvidersWithoutToken,
+  withoutToken,
 } from "./index.js";
 import type { AccountQuotaInfo, QuotaContext, QuotaFetcher } from "./index.js";
 
@@ -75,13 +75,13 @@ function okResult(): AccountQuotaInfo {
 
 describe("quota registry", () => {
   it("knows which providers have quota fetchers", () => {
-    expect(isQuotaProvider("kiro")).toBe(true);
-    expect(isQuotaProvider("openrouter")).toBe(true);
-    expect(isQuotaProvider("unknown-provider")).toBe(false);
+    expect(isQuota("kiro")).toBe(true);
+    expect(isQuota("openrouter")).toBe(true);
+    expect(isQuota("unknown-provider")).toBe(false);
   });
 
   it("reports providers that need no access token", () => {
-    const providers = quotaProvidersWithoutToken();
+    const providers = withoutToken();
     expect(providers.has("openrouter")).toBe(true);
     expect(providers.has("zenmux")).toBe(true);
     expect(providers.has("hyper")).toBe(true);
@@ -90,14 +90,14 @@ describe("quota registry", () => {
 
   it("exposes lookup helpers on custom registries", () => {
     const fetcher: QuotaFetcher = { provider: "custom", withoutToken: true, fetch: () => Effect.succeed(okResult()) };
-    const registry = new QuotaRegistry([fetcher]);
+    const registry = new Quotas([fetcher]);
     expect(registry.isSupported("custom")).toBe(true);
     expect(registry.isSupported("kiro")).toBe(false);
-    expect([...registry.providersWithoutToken()]).toEqual(["custom"]);
+    expect([...registry.withoutToken()]).toEqual(["custom"]);
   });
 
   it("returns an error result for unsupported providers", async () => {
-    const registry = new QuotaRegistry([]);
+    const registry = new Quotas([]);
     const result = await Effect.runPromise(registry.fetch(context(), account("missing"), false));
     expect(result.status).toBe("error");
     expect(result.groups).toEqual([]);
@@ -113,7 +113,7 @@ describe("quota registry", () => {
         return Effect.succeed(okResult());
       },
     };
-    const registry = new QuotaRegistry([fetcher]);
+    const registry = new Quotas([fetcher]);
     const result = await Effect.runPromise(registry.fetch(context(), account("tokenless"), false));
     expect(result.status).toBe("ok");
     expect(seen.token).toBe("");
@@ -129,7 +129,7 @@ describe("quota registry", () => {
         return Effect.succeed(okResult());
       },
     };
-    const registry = new QuotaRegistry([fetcher]);
+    const registry = new Quotas([fetcher]);
     const result = await Effect.runPromise(
       registry.fetch(context({ getCredentials: async () => "secret" }), account("tokened"), false)
     );
@@ -147,7 +147,7 @@ describe("quota registry", () => {
         return Effect.succeed(okResult());
       },
     };
-    const registry = new QuotaRegistry([fetcher]);
+    const registry = new Quotas([fetcher]);
     const result = await Effect.runPromise(
       registry.fetch(
         context({

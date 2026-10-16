@@ -1,15 +1,15 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import type { OpendumRedis } from "@opendum/core/redis";
 import type { Registry } from "@opendum/models/runtime";
-import { AccountHealthService, MAX_STORED_ERROR_LEN } from "../core/account-health.js";
-import { createFakeRepositories, type FakeRepositories } from "./fake-repositories.js";
+import { Health, MAX_ERROR_LEN } from "../core/health.js";
+import { fakes, type Fakes } from "./fake-repositories.js";
 
-type HealthServiceOptions = ConstructorParameters<typeof AccountHealthService>[0];
+type HealthServiceOptions = ConstructorParameters<typeof Health>[0];
 
-let repositories: FakeRepositories;
+let repositories: Fakes;
 
 beforeEach(() => {
-  repositories = createFakeRepositories();
+  repositories = fakes();
 });
 
 function fakeModels(): Registry {
@@ -26,8 +26,8 @@ function fakeRedis(overrides: Partial<Record<string, unknown>> = {}): OpendumRed
   } as unknown as OpendumRedis;
 }
 
-function healthService(options: Partial<HealthServiceOptions> = {}): InstanceType<typeof AccountHealthService> {
-  return new AccountHealthService({
+function healthService(options: Partial<HealthServiceOptions> = {}): InstanceType<typeof Health> {
+  return new Health({
     accounts: repositories.accounts,
     health: repositories.health,
     models: fakeModels(),
@@ -36,7 +36,7 @@ function healthService(options: Partial<HealthServiceOptions> = {}): InstanceTyp
   });
 }
 
-describe("AccountHealthService", () => {
+describe("Health", () => {
   it("inserts a model health row on the first failure", async () => {
     const failedAt = await healthService().markAccountFailed("acc-1", "gpt-4o", 500, "upstream boom");
     expect(failedAt).toBeInstanceOf(Date);
@@ -57,12 +57,12 @@ describe("AccountHealthService", () => {
         return "OK";
       },
     });
-    const message = "x".repeat(MAX_STORED_ERROR_LEN + 50);
+    const message = "x".repeat(MAX_ERROR_LEN + 50);
     await healthService({ redis }).markAccountFailed("acc-1", "gpt-4o", 500, message);
     const entryJson = stored.find((value) => value.includes("errorMessage"));
     expect(entryJson).toBeDefined();
     const entry = JSON.parse(entryJson as string) as { errorMessage: string };
-    expect(entry.errorMessage.length).toBe(MAX_STORED_ERROR_LEN);
+    expect(entry.errorMessage.length).toBe(MAX_ERROR_LEN);
   });
 
   it("puts an account into cooldown once unhealthy rows reach the threshold", async () => {
@@ -86,7 +86,7 @@ describe("AccountHealthService", () => {
       },
     ] as never);
 
-    const coolingDown = await healthService().refreshAccountHealthFromModels("acc-1", now);
+    const coolingDown = await healthService().refresh("acc-1", now);
     expect(coolingDown).toBe(true);
     expect(repositories.health.setAccountCooldown).toHaveBeenCalledTimes(1);
   });
@@ -113,7 +113,7 @@ describe("AccountHealthService", () => {
       },
     ] as never);
 
-    const coolingDown = await healthService().refreshAccountHealthFromModels("acc-1", now);
+    const coolingDown = await healthService().refresh("acc-1", now);
     expect(coolingDown).toBe(false);
     expect(repositories.health.setAccountActive).toHaveBeenCalledTimes(1);
   });
@@ -143,7 +143,7 @@ describe("AccountHealthService", () => {
     await healthService().markAccountSuccess("opencode", "gpt-4o");
     expect(repositories.health.recordRequestError).toHaveBeenCalledTimes(0);
     expect(repositories.health.markAccountSuccess).toHaveBeenCalledTimes(0);
-    expect(await healthService().refreshAccountHealthFromModels("opencode", new Date())).toBe(false);
+    expect(await healthService().refresh("opencode", new Date())).toBe(false);
   });
 
   it("stores account errors in the redis error history", async () => {

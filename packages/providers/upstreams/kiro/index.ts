@@ -3,10 +3,10 @@ import type { Registry } from "@opendum/models/runtime";
 import { jsonResponse, randomId, stringValue } from "../../core/helpers.js";
 import { normalizeProviderFailure, transportFailure, type UpstreamTransport } from "../../core/http.js";
 import { ProviderCredentialFailure } from "../../core/errors.js";
-import { OAuthTokenExchange } from "../../core/oauth-token-exchange.js";
+import { OAuth } from "../../core/oauth.js";
 import { KIRO_REFRESH_ENDPOINT } from "../../endpoints.js";
 import {
-  KiroStreamParser,
+  Parser,
   buildKiroRequest,
   convertKiroEventsToCompletion,
   kiroApiUrlForAccount,
@@ -39,12 +39,12 @@ export class KiroProvider implements Provider, CredentialRefresher, RefreshBuffe
   readonly name = "kiro";
   private readonly registry: Registry;
   private readonly transport: UpstreamTransport;
-  private readonly exchange: OAuthTokenExchange;
+  private readonly exchange: OAuth;
 
   constructor(options: KiroOptions) {
     this.registry = options.registry;
     this.transport = options.transport;
-    this.exchange = new OAuthTokenExchange({
+    this.exchange = new OAuth({
       provider: "kiro",
       tokenUrl: KIRO_REFRESH_ENDPOINT,
       transport: options.transport,
@@ -150,7 +150,7 @@ export class KiroProvider implements Provider, CredentialRefresher, RefreshBuffe
           });
         }
         const rawText = yield* Effect.promise(() => resp.text());
-        const events = new KiroStreamParser().feed(rawText);
+        const events = new Parser().feed(rawText);
         return jsonResponse(200, convertKiroEventsToCompletion(events, modelName));
       })
     );
@@ -158,7 +158,7 @@ export class KiroProvider implements Provider, CredentialRefresher, RefreshBuffe
 }
 
 async function* transformKiroSse(source: ReadableStream<Uint8Array>, model: string): AsyncGenerator<string> {
-  const parser = new KiroStreamParser();
+  const parser = new Parser();
   const completionId = randomId("chatcmpl");
   let sentRole = false;
   let toolCallCount = 0;
@@ -319,4 +319,4 @@ function kiroSseStream(source: ReadableStream<Uint8Array>, model: string): Reada
   });
 }
 
-export { KiroStreamParser, normalizeKiroTier, convertKiroEventsToCompletion };
+export { Parser, normalizeKiroTier, convertKiroEventsToCompletion };

@@ -4,15 +4,15 @@ import { invalid, valid } from "./model-results.js";
 import type { CustomProviderModelRecord, CustomProviderReader } from "./store/custom.js";
 import type { ModelValidationResult } from "./types.js";
 
-export class CustomModelService {
+export class CustomModels {
   constructor(
     private readonly registry: Registry,
     private readonly customProviders: CustomProviderReader
   ) {}
 
-  listUserCustomModels(userId: string): Effect.Effect<Array<Record<string, unknown>>> {
+  list(userId: string): Effect.Effect<Array<Record<string, unknown>>> {
     return Effect.gen({ self: this }, function* () {
-      const { standalone } = yield* this.customProviderModelSets(userId);
+      const { standalone } = yield* this.modelSets(userId);
       const now = Math.floor(Date.now() / 1000);
       const items: Array<Record<string, unknown>> = [];
       for (const [slug, models] of standalone) {
@@ -29,7 +29,7 @@ export class CustomModelService {
     });
   }
 
-  customModelResult(
+  result(
     userId: string,
     slug: string,
     rawModel: string
@@ -45,7 +45,7 @@ export class CustomModelService {
           const canonical = this.registry.resolveAlias(row.modelId);
           if (this.registry.isSupported(canonical)) result.alias = canonical;
         }
-        result.vision = visionForCustomModel(this.registry, row);
+        result.vision = vision(this.registry, row);
         return result;
       }
       return invalid(
@@ -58,7 +58,7 @@ export class CustomModelService {
     });
   }
 
-  customProviderModelSets(
+  modelSets(
     userId: string
   ): Effect.Effect<{ aliased: Map<string, Set<string>>; standalone: Map<string, string[]> }> {
     return Effect.gen({ self: this }, function* () {
@@ -85,7 +85,7 @@ export class CustomModelService {
   }
 }
 
-function visionForCustomModel(
+function vision(
   registry: Registry,
   row: CustomProviderModelRecord
 ): boolean {

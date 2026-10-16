@@ -63,13 +63,13 @@ export async function getAccountModelAvailability(
   options: { includeInactiveAccounts?: boolean } = {}
 ): Promise<AccountModelAvailability> {
   const service = new AuthService(registry, dummyRedis);
-  return Effect.runPromise(service.getAccountModelAvailabilityWithSharing(userId, false, options));
+  return Effect.runPromise(service.availability(userId, false, options));
 }
 
-export function isModelUsableByAccounts(
+export function usable(
   model: string,
   availability: AccountModelAvailability
 ): boolean {
   const service = new AuthService(registry, dummyRedis);
-  return service.isModelUsableByAccounts(model, availability);
+  return service.usable(model, availability);
 }

@@ -1,26 +1,26 @@
 import { Effect } from "effect";
-import type { ModelHealthPort, ProviderAccountPort } from "./repositories.js";
+import type { HealthPort, AccountPort } from "./repositories.js";
 import type { OpendumRedis } from "@opendum/core/redis";
 import type { Registry } from "@opendum/models/runtime";
 import { upsertErrorHistory } from "./error-history.js";
 import {
   cooldownRecoveryCount,
   effectiveUnhealthyCount,
-  ignoringErrors,
+  ignore,
   isSyntheticProviderAccountId,
   modelHealthStatus,
   successRecoveryCount,
 } from "./service-helpers.js";
-import type { AccountRotationFailure } from "./types.js";
+import type { Failure } from "./types.js";
 
-export const MAX_STORED_ERROR_LEN = 10000;
+export const MAX_ERROR_LEN = 10000;
 
 const FAILED_COOLDOWN_MS = 10 * 60 * 1000;
-const ACCOUNT_COOLDOWN_UNHEALTHY_THRESHOLD = 10;
+const UNHEALTHY_THRESHOLD = 10;
 
-export type AccountHealthOptions = {
-  accounts: ProviderAccountPort;
-  health: ModelHealthPort;
+export type Options = {
+  accounts: AccountPort;
+  health: HealthPort;
   models: Registry;
   redis: OpendumRedis;
 };
@@ -29,20 +29,20 @@ export type AccountHealthOptions = {
  * Owns every provider-account health transition: per-model health counters,
  * account cooldowns, rotation recovery, request counts and error history.
  */
-export class AccountHealthService {
-  private readonly accounts: ProviderAccountPort;
-  private readonly health: ModelHealthPort;
+export class Health {
+  private readonly accounts: AccountPort;
+  private readonly health: HealthPort;
   private readonly models: Registry;
   private readonly redis: OpendumRedis;
 
-  constructor(options: AccountHealthOptions) {
+  constructor(options: Options) {
     this.accounts = options.accounts;
     this.health = options.health;
     this.models = options.models;
     this.redis = options.redis;
   }
 
-  async refreshAccountHealthFromModels(accountId: string, now: Date): Promise<boolean> {
+  async refresh(accountId: string, now: Date): Promise<boolean> {
     if (isSyntheticProviderAccountId(accountId)) return false;
     const account = await this.health.getAccountHealthState(accountId);
     if (!account) return false;
@@ -59,7 +59,7 @@ export class AccountHealthService {
       }
       return true;
     }
-    if (total >= ACCOUNT_COOLDOWN_UNHEALTHY_THRESHOLD) {
+    if (total >= UNHEALTHY_THRESHOLD) {
       await this.health.setAccountCooldown(
         {
           id: accountId,
@@ -82,7 +82,7 @@ export class AccountHealthService {
   }
 
   private async normalizeModelHealthRows(
-    rows: Awaited<ReturnType<ModelHealthPort["listModelHealthByAccount"]>>,
+    rows: Awaited<ReturnType<HealthPort["listModelHealthByAccount"]>>,
     now: Date,
     applyCooldownRecovery: boolean
   ): Promise<number> {
@@ -114,7 +114,7 @@ export class AccountHealthService {
     const resolved = this.models.resolveAlias(model);
     const health = await this.health.getModelHealth(accountId, resolved);
     if (!health) {
-      await this.refreshAccountHealthFromModels(accountId, now);
+      await this.refresh(accountId, now);
       return;
     }
     const nextErrors = successRecoveryCount(health, now);
@@ -135,13 +135,13 @@ export class AccountHealthService {
         { id: health.id, consecutiveErrors: nextErrors, lastSuccessAt: now, unhealthyCountUpdatedAt: now }
       );
     }
-    await this.refreshAccountHealthFromModels(accountId, now);
+    await this.refresh(accountId, now);
   }
 
   async markAccountFailed(accountId: string, model: string, statusCode: number, message: string): Promise<Date> {
     const now = new Date();
     if (isSyntheticProviderAccountId(accountId)) return now;
-    const stored = message.length > MAX_STORED_ERROR_LEN ? message.slice(0, MAX_STORED_ERROR_LEN) : message;
+    const stored = message.length > MAX_ERROR_LEN ? message.slice(0, MAX_ERROR_LEN) : message;
     await this.health.recordRequestError({ id: accountId, at: now, code: statusCode });
     const resolved = this.models.resolveAlias(model);
     const health = await this.health.getModelHealth(accountId, resolved);
@@ -188,7 +188,7 @@ export class AccountHealthService {
         }
       );
     }
-    await this.refreshAccountHealthFromModels(accountId, now);
+    await this.refresh(accountId, now);
     const ownerUserId = await this.accounts.getAccountOwnerUserID(accountId);
     if (ownerUserId) {
       await upsertErrorHistory(this.redis, accountId, ownerUserId, resolved, statusCode, stored, now);
@@ -205,16 +205,16 @@ export class AccountHealthService {
         model: resolved,
         status: "failed",
         at: failedAt,
-        consecutiveErrors: ACCOUNT_COOLDOWN_UNHEALTHY_THRESHOLD,
+        consecutiveErrors: UNHEALTHY_THRESHOLD,
       }
     );
-    await this.refreshAccountHealthFromModels(accountId, failedAt);
+    await this.refresh(accountId, failedAt);
     await this.health.setAccountUsageLimited(
       { id: accountId, disabledUntil, status: "failed", at: failedAt }
     );
   }
 
-  async markAccountsRecoveredByRotation(failures: AccountRotationFailure[]): Promise<void> {
+  async markRecovered(failures: Failure[]): Promise<void> {
     const latest = new Map<string, Date>();
     for (const failure of failures) {
       const existing = latest.get(failure.accountId);
@@ -230,13 +230,13 @@ export class AccountHealthService {
 
   async logAccountError(accountId: string, userId: string, model: string, statusCode: number, message: string): Promise<void> {
     if (isSyntheticProviderAccountId(accountId)) return;
-    const stored = message.length > MAX_STORED_ERROR_LEN ? message.slice(0, MAX_STORED_ERROR_LEN) : message;
+    const stored = message.length > MAX_ERROR_LEN ? message.slice(0, MAX_ERROR_LEN) : message;
     const resolved = this.models.resolveAlias(model);
     await upsertErrorHistory(this.redis, accountId, userId, resolved, statusCode, stored, new Date());
   }
 
   bumpRequestCount(accountId: string): void {
     if (isSyntheticProviderAccountId(accountId)) return;
-    void Effect.runFork(ignoringErrors(() => this.health.bumpAccountRequestCount({ id: accountId, at: new Date() })));
+    void Effect.runFork(ignore(() => this.health.bumpAccountRequestCount({ id: accountId, at: new Date() })));
   }
 }

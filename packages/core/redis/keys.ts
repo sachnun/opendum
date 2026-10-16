@@ -14,7 +14,7 @@ export function apiKeyLastUsedKey(apiKeyId: string): string {
   return `${API_KEY_LAST_USED_PREFIX}:${apiKeyId}`;
 }
 
-export function disabledModelsKey(userId: string): string {
+export function disabledKey(userId: string): string {
   return `${USER_DISABLED_MODELS_PREFIX}:${userId}`;
 }
 

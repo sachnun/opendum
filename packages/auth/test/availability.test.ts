@@ -2,9 +2,9 @@ import { describe, expect, it } from "bun:test";
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
 import type { OpendumRedis } from "@opendum/core/redis";
-import { AccessPolicy } from "../access-policy.js";
-import { AvailabilityService, type AvailabilityQueries } from "../availability-service.js";
-import type { CustomModelService } from "../custom-model-service.js";
+import { Policy } from "../policy.js";
+import { Availability, type Queries } from "../availability.js";
+import type { CustomModels } from "../custom-models.js";
 
 type RegistryOptions = {
   aliases?: Record<string, string>;
@@ -21,14 +21,14 @@ function registryOf(options: RegistryOptions = {}): Registry {
   return {
     resolveAlias: (model: string) => aliases[model] ?? model,
     isSupported: (model: string) => supported.has(model),
-    authlessProviderModels: () => new Map(Object.entries(authless)),
-    modelsForProvider: (provider: string) => providerModels[provider] ?? [],
+    authlessModels: () => new Map(Object.entries(authless)),
+    models: (provider: string) => providerModels[provider] ?? [],
     allModels: () => Object.values(providerModels).flat(),
-    providersForModel: (model: string) =>
+    providers: (model: string) =>
       Object.entries(providerModels)
         .filter(([, models]) => models.includes(model))
         .map(([provider]) => provider),
-    providerAccessRule: () => null,
+    rule: () => null,
   } as unknown as Registry;
 }
 
@@ -53,7 +53,7 @@ type QueryOptions = {
 };
 
 function queriesOf(options: QueryOptions = {}): {
-  queries: AvailabilityQueries;
+  queries: Queries;
   calls: { disabledByUser: number };
 } {
   const calls = { disabledByUser: 0, disabledByAccounts: 0 };
@@ -70,47 +70,47 @@ function queriesOf(options: QueryOptions = {}): {
         : options.disabledBySharedAccounts ?? [];
     },
     listSharedAccounts: async () => options.sharedAccounts ?? [],
-  } as unknown as AvailabilityQueries;
+  } as unknown as Queries;
   return { queries, calls };
 }
 
 function customModelsOf(
   aliased: Map<string, Set<string>> = new Map(),
   standalone: Map<string, string[]> = new Map()
-): CustomModelService {
+): CustomModels {
   return {
-    customProviderModelSets: () => Effect.succeed({ aliased, standalone }),
-  } as unknown as CustomModelService;
+    modelSets: () => Effect.succeed({ aliased, standalone }),
+  } as unknown as CustomModels;
 }
 
 function serviceOf(options: {
   redis: OpendumRedis;
-  queries: AvailabilityQueries;
+  queries: Queries;
   registry?: Registry;
-  customModels?: CustomModelService;
-}): AvailabilityService {
+  customModels?: CustomModels;
+}): Availability {
   const registry = options.registry ?? registryOf();
-  return new AvailabilityService({
+  return new Availability({
     registry,
     redis: options.redis,
     customModels: options.customModels ?? customModelsOf(),
-    accessPolicy: new AccessPolicy(registry),
+    accessPolicy: new Policy(registry),
     queries: options.queries,
   });
 }
 
-describe("AvailabilityService", () => {
+describe("Availability", () => {
   it("caches the disabled model set per user", async () => {
     const registry = registryOf({ aliases: { fast: "canonical-fast" }, supported: ["canonical-fast"] });
     const { redis } = redisOf();
     const { queries, calls } = queriesOf({ disabledByUser: ["fast", "model-b"] });
     const service = serviceOf({ registry, redis, queries });
 
-    const first = await Effect.runPromise(service.disabledModelSetForUser("u1"));
+    const first = await Effect.runPromise(service.disabledModels("u1"));
     expect([...first]).toEqual(["canonical-fast", "model-b"]);
     expect(calls.disabledByUser).toBe(1);
 
-    const second = await Effect.runPromise(service.disabledModelSetForUser("u1"));
+    const second = await Effect.runPromise(service.disabledModels("u1"));
     expect([...second]).toEqual(["canonical-fast", "model-b"]);
     expect(calls.disabledByUser).toBe(1);
   });
@@ -125,7 +125,7 @@ describe("AvailabilityService", () => {
     const { queries, calls } = queriesOf({ disabledByUser: ["m"] });
     const service = serviceOf({ redis: failingRedis, queries });
 
-    const set = await Effect.runPromise(service.disabledModelSetForUser("u1"));
+    const set = await Effect.runPromise(service.disabledModels("u1"));
 
     expect([...set]).toEqual(["m"]);
     expect(calls.disabledByUser).toBe(1);
@@ -137,8 +137,8 @@ describe("AvailabilityService", () => {
     const { queries } = queriesOf({ disabledByUser: ["canonical-fast"] });
     const service = serviceOf({ registry, redis, queries });
 
-    expect(await Effect.runPromise(service.isModelDisabledForUser("u1", "fast"))).toBe(true);
-    expect(await Effect.runPromise(service.isModelDisabledForUser("u1", "other"))).toBe(false);
+    expect(await Effect.runPromise(service.isDisabled("u1", "fast"))).toBe(true);
+    expect(await Effect.runPromise(service.isDisabled("u1", "other"))).toBe(false);
   });
 
   it("builds account availability from accounts, shared accounts and custom models", async () => {
@@ -168,14 +168,14 @@ describe("AvailabilityService", () => {
       customModels: customModelsOf(new Map([["mine", new Set(["canonical-fast"])]]), new Map([["other", ["x"]]])),
     });
 
-    const availability = await Effect.runPromise(service.getAccountModelAvailabilityWithSharing("u1", true));
+    const availability = await Effect.runPromise(service.availability("u1", true));
 
     expect(availability.accountCountByProvider.get("p")).toBe(2);
     expect(availability.accountTierById.get("a1")).toBe("pro");
     expect(availability.disabledCountByProviderModel.get("p:m")).toBe(1);
     expect(availability.disabledCountByProviderModel.get("p:canonical-fast")).toBe(1);
     expect(availability.accountCountByProvider.get("opencode")).toBe(2);
-    expect(availability.authlessProviderModels.get("opencode")).toEqual(new Set(["oc-model"]));
+    expect(availability.authlessModels.get("opencode")).toEqual(new Set(["oc-model"]));
     expect(availability.customProviderModels.has("mine")).toBe(false);
     expect(availability.customProviderStandaloneModels.get("other")).toEqual(["x"]);
     expect(availability.sharedAccountCountByProvider.get("q")).toBe(1);
@@ -193,12 +193,12 @@ describe("AvailabilityService", () => {
     const service = serviceOf({ registry, redis, queries });
 
     const whitelist = await Effect.runPromise(
-      service.usableModelCandidates("u1", "p", "whitelist", new Set(["m1"]), false)
+      service.candidates("u1", "p", "whitelist", new Set(["m1"]), false)
     );
     expect(whitelist).toEqual(["m1"]);
 
     const blacklist = await Effect.runPromise(
-      service.usableModelCandidates("u1", "p", "blacklist", new Set(["m2"]), true)
+      service.candidates("u1", "p", "blacklist", new Set(["m2"]), true)
     );
     expect(blacklist).toEqual(["m1"]);
   });

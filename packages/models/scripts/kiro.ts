@@ -18,7 +18,7 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { syncProviderModels } from "#models/model-store.ts";
+import { sync } from "#models/model-store.ts";
 import { fetchDecoded, runFetchText, FETCH_TIMEOUT_MS, runOrThrow } from "#models/sync/http.ts";
 import { stripParamInfoKey } from "#models/model/clean-key.ts";
 import { syncCliVersion } from "./version-sync.ts";
@@ -468,7 +468,7 @@ async function main() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
   const modelsDir = resolve(scriptDir, "../data");
 
-  const result = syncProviderModels(modelsDir, PROVIDER_NAME, modelMap, {
+  const result = sync(modelsDir, PROVIDER_NAME, modelMap, {
     providerConfigByModel,
     managedProviderConfigKeys: ["allowedTiers"],
   });

@@ -9,7 +9,7 @@ import {
   modelFailureMessage,
 } from "./errors.ts";
 import { tryLoadModelEntries } from "./registry.ts";
-import { tryReadModelJson } from "./model-store.ts";
+import { tryRead } from "./model-store.ts";
 
 function failureOf<E>(exit: Exit.Exit<unknown, E>): E {
   const option = Exit.findErrorOption(exit);
@@ -27,7 +27,7 @@ describe("models typed errors", () => {
   });
 
   it("reports invalid model JSON as a typed parse failure", async () => {
-    const exit = await Effect.runPromiseExit(tryReadModelJson("{ not json", "bad.json"));
+    const exit = await Effect.runPromiseExit(tryRead("{ not json", "bad.json"));
     expect(Exit.isFailure(exit)).toBe(true);
     const error = failureOf(exit);
     expect(error).toBeInstanceOf(ModelParseFailure);
@@ -35,7 +35,7 @@ describe("models typed errors", () => {
   });
 
   it("parses valid model JSON on the success channel", async () => {
-    const data = await Effect.runPromise(tryReadModelJson('{"id":"gpt-5"}'));
+    const data = await Effect.runPromise(tryRead('{"id":"gpt-5"}'));
     expect(data.id).toBe("gpt-5");
   });
 

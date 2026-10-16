@@ -106,7 +106,7 @@ async function fetchQuotaFromProxy(userId: string, provider: QuotaProviderKey, a
   }
 }
 
-async function fetchAccountQuota(userId: string, provider: QuotaProviderKey, accountId: string, options: AccountQuotaFetchOptions = {}): Promise<AccountQuotaResult> {
+async function fetchQuota(userId: string, provider: QuotaProviderKey, accountId: string, options: AccountQuotaFetchOptions = {}): Promise<AccountQuotaResult> {
   const inFlightKey = `${userId}:${provider}:${accountId}:${options.forceRefresh ? "force" : "cache"}`;
   const existing = quotaInFlight.get(inFlightKey);
   if (existing) return existing;
@@ -129,7 +129,7 @@ export async function getAccountQuota(userId: string, input: z.infer<typeof acco
       .limit(1);
 
     if (!account) return { success: false, error: "Account not found" } as const;
-    const result = await fetchAccountQuota(userId, input.provider, account.id, { forceRefresh: input.forceRefresh });
+    const result = await fetchQuota(userId, input.provider, account.id, { forceRefresh: input.forceRefresh });
     return result;
   } catch (error) {
     console.error("Failed to fetch provider quota:", error);
@@ -156,7 +156,7 @@ export async function getAccountQuotas(userId: string, input: z.infer<typeof acc
     }
 
     await Promise.all(accountsToFetch.map(async (accountId) => {
-      results[accountId] = await fetchAccountQuota(userId, input.provider, accountId, { forceRefresh: input.forceRefresh });
+      results[accountId] = await fetchQuota(userId, input.provider, accountId, { forceRefresh: input.forceRefresh });
     }));
     return { success: true, data: results } as const;
   } catch (error) {

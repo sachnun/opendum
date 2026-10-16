@@ -1,16 +1,16 @@
 import { Effect } from "effect";
-import type { CustomProviderPort, ModelHealthPort, ProviderAccountPort } from "./repositories.js";
+import type { CustomPort, HealthPort, AccountPort } from "./repositories.js";
 import type { SessionAffinity } from "@opendum/core/redis";
 import type { AuthResult, ModelValidationResult } from "@opendum/auth";
 import type { ProviderAccount, ProviderRegistry } from "@opendum/providers";
 import type { Registry } from "@opendum/models/runtime";
-import type { AccountHealthService } from "./account-health.js";
+import type { Health } from "./health.js";
 import type { ProviderPerformance, ProviderRoutingOptions } from "./provider-performance.js";
-import { PriorityOrderStrategy, StickySessionStrategy, composeRoutingStrategies } from "./routing.js";
+import { Priority, Sticky, compose } from "./routing.js";
 import {
   accountAccessDenial,
   isSyntheticProviderAccountId,
-  normalizeAccessMode,
+  accessMode,
   normalizeAccountIds,
   proxyAccessRuleRestrictsTier,
   proxyTierSatisfiesRule,
@@ -19,15 +19,15 @@ import {
 } from "./service-helpers.js";
 
 /** Result of one account-selection pass. */
-export type AccountSelection = { account: ProviderAccount | null; configured: boolean };
+export type Selection = { account: ProviderAccount | null; configured: boolean };
 
-export type AccountRotationOptions = {
-  accounts: ProviderAccountPort;
-  modelHealth: ModelHealthPort;
-  customProviders: CustomProviderPort;
+export type Options = {
+  accounts: AccountPort;
+  modelHealth: HealthPort;
+  customProviders: CustomPort;
   models: Registry;
   providers: ProviderRegistry;
-  health: AccountHealthService;
+  health: Health;
   performance: ProviderPerformance;
   affinity: SessionAffinity;
 };
@@ -36,17 +36,17 @@ export type AccountRotationOptions = {
  * Account selection and rotation: eligibility lookup, provider-priority and
  * sticky ordering, health filtering, and session-affinity bookkeeping.
  */
-export class AccountRotationService {
-  private readonly accounts: ProviderAccountPort;
-  private readonly modelHealth: ModelHealthPort;
-  private readonly customProviders: CustomProviderPort;
+export class Rotation {
+  private readonly accounts: AccountPort;
+  private readonly modelHealth: HealthPort;
+  private readonly customProviders: CustomPort;
   private readonly models: Registry;
   private readonly providers: ProviderRegistry;
-  private readonly health: AccountHealthService;
+  private readonly health: Health;
   private readonly performance: ProviderPerformance;
   private readonly affinity: SessionAffinity;
 
-  constructor(options: AccountRotationOptions) {
+  constructor(options: Options) {
     this.accounts = options.accounts;
     this.modelHealth = options.modelHealth;
     this.customProviders = options.customProviders;
@@ -57,7 +57,7 @@ export class AccountRotationService {
     this.affinity = options.affinity;
   }
 
-  async nextAttemptAccount(
+  async nextAccount(
     authResult: AuthResult,
     validation: ModelValidationResult,
     tried: string[],
@@ -65,9 +65,9 @@ export class AccountRotationService {
     excludedProviders: string[],
     useShared: boolean,
     sessionId: string
-  ): Promise<AccountSelection> {
+  ): Promise<Selection> {
     if (useShared) {
-      const result = await this.getNextSharedAccount(
+      const result = await this.nextShared(
         authResult.userId,
         validation.model,
         validation.provider,
@@ -76,7 +76,7 @@ export class AccountRotationService {
       );
       return { account: result.account, configured: result.configured };
     }
-    return this.getNextAvailableAccount(
+    return this.nextAvailable(
       authResult.userId,
       validation.model,
       validation.provider,
@@ -87,14 +87,14 @@ export class AccountRotationService {
     );
   }
 
-  canAccountUseModel(account: ProviderAccount, model: string): boolean {
-    const rule = this.models.providerAccessRule(model, account.provider);
+  canUse(account: ProviderAccount, model: string): boolean {
+    const rule = this.models.rule(model, account.provider);
     if (!rule || !proxyAccessRuleRestrictsTier(rule.minTier, rule.allowedTiers)) return true;
     const tier = account.tier ?? quotaFallbackTierLocal(account);
     return proxyTierSatisfiesRule(tier, rule.minTier, rule.allowedTiers);
   }
 
-  private async getNextAvailableAccount(
+  private async nextAvailable(
     userId: string,
     model: string,
     provider: string | null,
@@ -102,31 +102,31 @@ export class AccountRotationService {
     excludeProviders: string[],
     accountAccess: { mode: string; accounts: string[] },
     sessionId: string
-  ): Promise<AccountSelection> {
-    const eligible = await this.getEligibleAccounts(userId, model, provider, exclude, excludeProviders, accountAccess);
+  ): Promise<Selection> {
+    const eligible = await this.eligible(userId, model, provider, exclude, excludeProviders, accountAccess);
     if (eligible.length === 0) return { account: null, configured: false };
-    const routing = await this.performanceRouting(model, provider === null);
+    const routing = await this.routing(model, provider === null);
     const stickyId = await this.affinity.lookup(userId, sessionId);
-    const strategy = composeRoutingStrategies(new PriorityOrderStrategy(), new StickySessionStrategy(stickyId));
+    const strategy = compose(new Priority(), new Sticky(stickyId));
     const prioritized = strategy.order(eligible, {
       crossProvider: provider === null,
-      providerPriority: this.models.providersForModel(model),
+      providerPriority: this.models.providers(model),
       routingOptions: routing,
     });
-    const selected = await this.pickHealthyAccount(prioritized, model);
+    const selected = await this.pickHealthy(prioritized, model);
     if (!selected) return { account: null, configured: true };
-    await this.rememberAffinityAccount(userId, sessionId, selected);
+    await this.remember(userId, sessionId, selected);
     return { account: selected, configured: true };
   }
 
-  private async getNextSharedAccount(
+  private async nextShared(
     _userId: string,
     model: string,
     provider: string | null,
     exclude: string[],
     excludeProviders: string[]
-  ): Promise<AccountSelection> {
-    const targetProviders = provider ? [provider] : this.models.providersForModel(model);
+  ): Promise<Selection> {
+    const targetProviders = provider ? [provider] : this.models.providers(model);
     if (targetProviders.length === 0) return { account: null, configured: false };
     const now = new Date();
     const sharedRows = await this.accounts.listSharedEligibleAccounts(
@@ -148,18 +148,18 @@ export class AccountRotationService {
     const ids = rows.map((row) => row.id);
     const disabled = await this.accounts.listDisabledAccountIDs({ accountIds: ids, models: lookupKeys });
     const disabledSet = new Set(disabled.map((row) => row.providerAccountId));
-    const enabled = rows.filter((row) => !disabledSet.has(row.id) && this.canAccountUseModel(row, model));
+    const enabled = rows.filter((row) => !disabledSet.has(row.id) && this.canUse(row, model));
     if (enabled.length === 0) return { account: null, configured: true };
-    const routing = await this.performanceRouting(model, provider === null);
-    const prioritized = new PriorityOrderStrategy().order(enabled, {
+    const routing = await this.routing(model, provider === null);
+    const prioritized = new Priority().order(enabled, {
       crossProvider: provider === null,
       providerPriority: targetProviders,
       routingOptions: routing,
     });
-    return { account: await this.pickHealthyAccount(prioritized, model), configured: true };
+    return { account: await this.pickHealthy(prioritized, model), configured: true };
   }
 
-  private async getEligibleAccounts(
+  private async eligible(
     userId: string,
     model: string,
     provider: string | null,
@@ -169,7 +169,7 @@ export class AccountRotationService {
   ): Promise<ProviderAccount[]> {
     const targetProviders = provider
       ? [provider]
-      : [...new Set([...this.models.providersForModel(model), ...(await this.customProviderSlugsForModel(userId, model))])];
+      : [...new Set([...this.models.providers(model), ...(await this.customSlugs(userId, model))])];
     if (targetProviders.length === 0) return [];
 
     const rows: ProviderAccount[] = [];
@@ -177,7 +177,7 @@ export class AccountRotationService {
       let account: ProviderAccount | null = null;
       if (this.providers.isAuthless(targetProvider)) {
         account = { id: targetProvider, userId: "", provider: targetProvider, isActive: true, status: "active" };
-      } else if (this.models.isAuthlessProviderModel(model, targetProvider)) {
+      } else if (this.models.isAuthless(model, targetProvider)) {
         account = {
           id: `authless:${targetProvider}`,
           userId: "",
@@ -194,7 +194,7 @@ export class AccountRotationService {
     }
 
     const now = new Date();
-    const mode = normalizeAccessMode(accountAccess.mode);
+    const mode = accessMode(accountAccess.mode);
     const accounts = normalizeAccountIds(accountAccess.accounts);
     const dbRows = await this.accounts.listEligibleAccounts(
       {
@@ -228,13 +228,13 @@ export class AccountRotationService {
     const disabled = await this.accounts.listDisabledAccountIDs({ accountIds: ids, models: lookupKeys });
     const disabledSet = new Set(disabled.map((row) => row.providerAccountId));
     const enabled = rows.filter(
-      (row) => isSyntheticProviderAccountId(row.id) || (!disabledSet.has(row.id) && this.canAccountUseModel(row, model))
+      (row) => isSyntheticProviderAccountId(row.id) || (!disabledSet.has(row.id) && this.canUse(row, model))
     );
     if (provider === null) sortAccountsByProviderPriority(enabled, targetProviders);
     return enabled;
   }
 
-  private async customProviderSlugsForModel(userId: string, model: string): Promise<string[]> {
+  private async customSlugs(userId: string, model: string): Promise<string[]> {
     const providers = await this.customProviders.listCustomProviders(userId);
     if (providers.length === 0) return [];
     const canonical = this.models.resolveAlias(model);
@@ -255,14 +255,14 @@ export class AccountRotationService {
     return results.filter((slug): slug is string => slug !== null);
   }
 
-  private async performanceRouting(model: string, enabled: boolean): Promise<ProviderRoutingOptions | undefined> {
+  private async routing(model: string, enabled: boolean): Promise<ProviderRoutingOptions | undefined> {
     if (!enabled) return undefined;
     const scores = await this.performance.scoresForModel(this.models.resolveAlias(model));
     if (scores.size === 0) return undefined;
     return this.performance.routingOptions(scores);
   }
 
-  private async pickHealthyAccount(
+  private async pickHealthy(
     prioritized: ProviderAccount[],
     model: string
   ): Promise<ProviderAccount | null> {
@@ -271,7 +271,7 @@ export class AccountRotationService {
     let degraded: ProviderAccount | null = null;
     for (const account of prioritized) {
       if (isSyntheticProviderAccountId(account.id)) return account;
-      const coolingDown = await this.health.refreshAccountHealthFromModels(account.id, now);
+      const coolingDown = await this.health.refresh(account.id, now);
       if (coolingDown) continue;
       const health = await this.modelHealth.getModelHealth(account.id, this.models.resolveAlias(model));
       if (health && health.status === "degraded") {
@@ -286,7 +286,7 @@ export class AccountRotationService {
     return degraded;
   }
 
-  private async rememberAffinityAccount(
+  private async remember(
     userId: string,
     sessionId: string,
     account: ProviderAccount

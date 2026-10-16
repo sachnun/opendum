@@ -37,7 +37,7 @@ export type { ToolSchemaMap } from "./transform.js";
 import { convertImageURLsToBase64 } from "../../core/images.js";
 import { normalizeProviderFailure, transportFailure, type UpstreamTransport } from "../../core/http.js";
 import { ProviderCredentialFailure } from "../../core/errors.js";
-import { OAuthTokenExchange } from "../../core/oauth-token-exchange.js";
+import { OAuth } from "../../core/oauth.js";
 import type {
   CredentialRefresher,
   Provider,
@@ -281,14 +281,14 @@ export class AntigravityProvider implements Provider, CredentialRefresher, Refre
   private readonly apiClient = "google-cloud-sdk vscode_cloudshelleditor/0.1";
   private readonly clientMetadata =
     '{"ideType":"IDE_UNSPECIFIED","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI"}';
-  private readonly exchange: OAuthTokenExchange;
+  private readonly exchange: OAuth;
 
   constructor(options: AntigravityOptions) {
     this.registry = options.registry;
     this.transport = options.transport;
     this.redis = options.redis ?? null;
     this.persistAccountInfo = options.persistAccountInfo;
-    this.exchange = new OAuthTokenExchange({
+    this.exchange = new OAuth({
       provider: "antigravity",
       tokenUrl: GOOGLE_OAUTH_TOKEN_ENDPOINT,
       transport: options.transport,
@@ -589,7 +589,7 @@ export class AntigravityProvider implements Provider, CredentialRefresher, Refre
   }
 
   private configValue(model: string, key: string): unknown {
-    const cfg = this.registry.providerModelConfig(model, this.name);
+    const cfg = this.registry.config(model, this.name);
     if (cfg) {
       if (key in cfg) return cfg[key];
       const custom = cfg.custom;
@@ -632,7 +632,7 @@ export class AntigravityProvider implements Provider, CredentialRefresher, Refre
   private resolveModel(model: string): string {
     let value = lastModelSegment(model);
     if (value.endsWith(":thinking")) value = value.slice(0, -":thinking".length);
-    return this.registry.upstreamModelName(value, this.name);
+    return this.registry.upstream(value, this.name);
   }
 
   // Every leveled Gemini wire is addressed as <base>-<level>. Tiered wires and
@@ -874,7 +874,7 @@ export class AntigravityProvider implements Provider, CredentialRefresher, Refre
         let answer = numberFromAny(defaultAny(generation.maxOutputTokens, generation.max_output_tokens));
         if (answer <= 0) answer = DEFAULT_MAX_OUTPUT_TOKENS;
         let maxTokens = answer + budget;
-        const cfg = this.registry.providerModelConfig(model, this.name);
+        const cfg = this.registry.config(model, this.name);
         const limit = cfg?.maxOutputTokens ?? 0;
         if (limit > 0 && maxTokens > limit) maxTokens = limit;
         if (maxTokens <= budget) {
@@ -967,7 +967,7 @@ export class AntigravityProvider implements Provider, CredentialRefresher, Refre
   private applyAntigravitySystemInstruction(payload: Json, model: string): void {
     let needsInjection = this.configBool(model, "system_instruction");
     if (!needsInjection) {
-      if (this.registry.providerModelConfig(model, this.name)) return;
+      if (this.registry.config(model, this.name)) return;
       needsInjection = fallbackAntigravitySystemInstructionModel(model);
     }
     if (!needsInjection) return;

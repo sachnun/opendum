@@ -1,6 +1,6 @@
 import { Effect, Option, Result, Schema } from "effect";
 import { type H3Event } from "h3";
-import { fetchAccountQuota, isQuotaProvider } from "@opendum/providers/quota";
+import { fetchQuota, isQuota } from "@opendum/providers/quota";
 import type { QuotaContext, QuotaJournal } from "@opendum/providers/quota";
 import { assertPublicHost, PrivateHostError } from "@opendum/core/egress";
 import { decrypt } from "@opendum/core/crypto";
@@ -83,7 +83,7 @@ export async function handleQuota(event: H3Event, context: ProxyContext): Promis
       if (!userId || !provider || !accountId) {
         return jsonResponse({ success: false, error: "userId, provider, and accountId are required" }, 400);
       }
-      if (!isQuotaProvider(provider)) {
+      if (!isQuota(provider)) {
         return jsonResponse({ success: false, error: `provider ${provider} is not supported for quota` }, 200);
       }
 
@@ -99,7 +99,7 @@ export async function handleQuota(event: H3Event, context: ProxyContext): Promis
         tier: row.tier,
         accessToken: row.accessToken,
       };
-      const result = yield* fetchAccountQuota(
+      const result = yield* fetchQuota(
         quotaContext(context),
         account,
         Boolean(decoded.forceRefresh)

@@ -13,10 +13,10 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  buildModelIndex,
-  getProviderUpstream,
-  syncProviderModels,
-  persistModel,
+  buildIndex,
+  upstream,
+  sync,
+  persist,
 } from "#models/model-store.ts";
 import { runFetchJson } from "#models/sync/http.ts";
 import { stripParamInfoKey } from "#models/model/clean-key.ts";
@@ -114,15 +114,15 @@ function buildCapabilities(model) {
 }
 
 function buildReverseMap(modelsDir) {
-  const index = buildModelIndex(modelsDir);
+  const index = buildIndex(modelsDir);
   const reverseMap = new Map();
 
   for (const [modelId, entry] of Object.entries(index)) {
     const providers = entry.data.providers || [];
     if (!providers.includes(PROVIDER_NAME)) continue;
 
-    const upstream = getProviderUpstream(entry.data, PROVIDER_NAME, modelId);
-    reverseMap.set(upstream, entry.id || modelId);
+    const name = upstream(entry.data, PROVIDER_NAME, modelId);
+    reverseMap.set(name, entry.id || modelId);
   }
 
   return reverseMap;
@@ -150,7 +150,7 @@ function shouldIncludeModel(model, modelKey, index, existingWorkersAI) {
 }
 
 function buildModelMap(models, modelsDir, reverseMap) {
-  const index = buildModelIndex(modelsDir);
+  const index = buildIndex(modelsDir);
   const map = new Map();
   const metadata = new Map();
 
@@ -179,7 +179,7 @@ function buildModelMap(models, modelsDir, reverseMap) {
 }
 
 function applyMetadata(modelsDir, metadata) {
-  const index = buildModelIndex(modelsDir);
+  const index = buildIndex(modelsDir);
   let updated = 0;
 
   for (const [modelKey, info] of metadata.entries()) {
@@ -198,7 +198,7 @@ function applyMetadata(modelsDir, metadata) {
     }
 
     if (changed) {
-      persistModel(entry, entry.data);
+      persist(entry, entry.data);
       updated += 1;
     }
   }
@@ -233,7 +233,7 @@ async function main() {
 
   const models = await fetchWorkersAIModels();
   const { modelMap, metadata } = buildModelMap(models, modelsDir, reverseMap);
-  const result = syncProviderModels(modelsDir, PROVIDER_NAME, modelMap);
+  const result = sync(modelsDir, PROVIDER_NAME, modelMap);
   const metadataUpdates = applyMetadata(modelsDir, metadata);
 
   if (result.added.length === 0 && result.removed.length === 0 && result.updated.length === 0 && metadataUpdates === 0) {

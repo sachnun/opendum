@@ -3,8 +3,8 @@ import type { Registry } from "@opendum/models/runtime";
 import { jsonResponse, numberFromAny, parseSseDataLines, stringValue } from "../core/helpers.js";
 import { normalizeProviderFailure, transportFailure, type UpstreamTransport } from "../core/http.js";
 import { ProviderCredentialFailure } from "../core/errors.js";
-import { OAuthTokenExchange } from "../core/oauth-token-exchange.js";
-import { SseCompletionCollector } from "../transform/collector.js";
+import { OAuth } from "../core/oauth.js";
+import { Collector } from "../transform/collector.js";
 import type {
   CredentialRefresher,
   Provider,
@@ -54,12 +54,12 @@ export class WorkbuddyProvider implements Provider, CredentialRefresher {
   readonly name = "workbuddy";
   private readonly registry: Registry;
   private readonly transport: UpstreamTransport;
-  private readonly exchange: OAuthTokenExchange;
+  private readonly exchange: OAuth;
 
   constructor(options: WorkbuddyOptions) {
     this.registry = options.registry;
     this.transport = options.transport;
-    this.exchange = new OAuthTokenExchange({
+    this.exchange = new OAuth({
       provider: "workbuddy",
       tokenUrl: `${WORKBUDDY_API_BASE}${WORKBUDDY_REFRESH_PATH}`,
       transport: options.transport,
@@ -114,7 +114,7 @@ export class WorkbuddyProvider implements Provider, CredentialRefresher {
     let model = stringValue(request.body.model);
     if (model.startsWith("workbuddy/")) model = model.slice("workbuddy/".length);
     let modelName = lastModelSegment(model);
-    modelName = this.registry.upstreamModelName(modelName, "workbuddy") || model;
+    modelName = this.registry.upstream(modelName, "workbuddy") || model;
     const messages = Array.isArray(request.body.messages) ? request.body.messages : [];
     payload.messages = ensureSystemMessage(messages);
     let maxTokens = numberFromAny(request.body.max_tokens);
@@ -185,7 +185,7 @@ function workbuddyDeltaText(value: unknown): string {
 }
 
 export function workbuddyStreamToCompletion(text: string, model: string): Json {
-  const collector = new SseCompletionCollector({ model, id: "chatcmpl-workbuddy" });
+  const collector = new Collector({ model, id: "chatcmpl-workbuddy" });
   for (const event of parseSseDataLines(text)) {
     const nextUsage = event.usage;
     if (nextUsage !== null && typeof nextUsage === "object" && Object.keys(nextUsage as Json).length > 0) {

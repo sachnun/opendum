@@ -1,7 +1,7 @@
 import { uniqueSorted, uniqueSortedStable } from "./collections.ts";
 import type { ModelInfo } from "./registry.ts";
 
-export function legacyNvidiaAlias(upstream: string): string {
+export function nvidiaAlias(upstream: string): string {
   const stripped = upstream.startsWith("library/") ? upstream.slice("library/".length) : upstream;
   const replaced = stripped.replace(/[:/]/g, "-").replace(/[^a-zA-Z0-9._-]/g, "-");
   return replaced.replace(/-{2,}/g, "-");
@@ -12,15 +12,15 @@ export type AliasSource = {
   info(model: string): ModelInfo | null;
 };
 
-export class AliasIndex {
+export class Aliases {
   private readonly aliasToCanonical = new Map<string, string>();
   private readonly foldedAliasToCanonical = new Map<string, string>();
   private readonly canonicalToAliases = new Map<string, string[]>();
 
   private constructor() {}
 
-  static build(source: AliasSource): AliasIndex {
-    const index = new AliasIndex();
+  static build(source: AliasSource): Aliases {
+    const index = new Aliases();
     const canonicals = [...source.canonicalIds()].sort((a, b) => a.localeCompare(b));
 
     for (const canonical of canonicals) index.aliasToCanonical.set(canonical, canonical);
@@ -45,7 +45,7 @@ export class AliasIndex {
     for (const upstreamName of [...upstreamNames.keys()].sort((a, b) => a.localeCompare(b))) {
       const canonical = upstreamNames.get(upstreamName) as string;
       if (!index.aliasToCanonical.has(upstreamName)) index.aliasToCanonical.set(upstreamName, canonical);
-      const legacy = legacyNvidiaAlias(upstreamName);
+      const legacy = nvidiaAlias(upstreamName);
       if (legacy !== upstreamName && !index.aliasToCanonical.has(legacy)) {
         index.aliasToCanonical.set(legacy, canonical);
       }

@@ -1,15 +1,15 @@
 import { describe, expect, it } from "bun:test";
-import { AccessPolicy } from "./access-policy.ts";
+import { Policy } from "./policy.ts";
 import type { ModelInfo } from "./registry.ts";
 
-function policyOf(models: Record<string, ModelInfo>): AccessPolicy {
-  return new AccessPolicy({
+function policyOf(models: Record<string, ModelInfo>): Policy {
+  return new Policy({
     info: (model) => models[model] ?? null,
     entries: () => Object.entries(models),
   });
 }
 
-describe("AccessPolicy", () => {
+describe("Policy", () => {
   it("reads provider access rules and configs", () => {
     const policy = policyOf({
       m: {
@@ -21,11 +21,11 @@ describe("AccessPolicy", () => {
       },
     });
 
-    expect(policy.providerAccessRule("m", "a")).toEqual({ minTier: "pro", allowedTiers: ["pro", "max"] });
-    expect(policy.providerAccessRule("m", "b")).toBeNull();
-    expect(policy.providerAccessRule("m", "missing")).toBeNull();
-    expect(policy.providerModelConfig("m", "b")).toEqual({ authless: true, free: true });
-    expect(policy.providerModelConfig("missing", "a")).toBeNull();
+    expect(policy.rule("m", "a")).toEqual({ minTier: "pro", allowedTiers: ["pro", "max"] });
+    expect(policy.rule("m", "b")).toBeNull();
+    expect(policy.rule("m", "missing")).toBeNull();
+    expect(policy.config("m", "b")).toEqual({ authless: true, free: true });
+    expect(policy.config("missing", "a")).toBeNull();
   });
 
   it("detects authless and free models", () => {
@@ -35,11 +35,11 @@ describe("AccessPolicy", () => {
       freeOnly: { providers: ["a"], providerConfig: { a: { free: true } } },
     });
 
-    expect(policy.isAuthlessProviderModel("flagged", "a")).toBe(true);
-    expect(policy.isFreeProviderModel("flagged", "a")).toBe(true);
-    expect(policy.isAuthlessProviderModel("freeOnly", "a")).toBe(false);
-    expect(policy.isFreeProviderModel("freeOnly", "a")).toBe(true);
-    expect(policy.isAuthlessProviderModel("plain", "a")).toBe(false);
+    expect(policy.isAuthless("flagged", "a")).toBe(true);
+    expect(policy.isFree("flagged", "a")).toBe(true);
+    expect(policy.isAuthless("freeOnly", "a")).toBe(false);
+    expect(policy.isFree("freeOnly", "a")).toBe(true);
+    expect(policy.isAuthless("plain", "a")).toBe(false);
   });
 
   it("groups authless models by provider", () => {
@@ -49,7 +49,7 @@ describe("AccessPolicy", () => {
       c: { providers: ["p1"] },
     });
 
-    expect(policy.authlessProviderModels()).toEqual(
+    expect(policy.authlessModels()).toEqual(
       new Map([
         ["p1", ["a", "b"]],
         ["p2", ["b"]],

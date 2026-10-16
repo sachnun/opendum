@@ -6,7 +6,7 @@ import type { Registry } from "@opendum/models/runtime";
 import type { OpendumRedis } from "@opendum/core/redis";
 import { ProxyService } from "../core/service.js";
 import { ChatCompletionsAdapter } from "../core/endpoints.js";
-import { createFakeRepositories } from "./fake-repositories.js";
+import { fakes } from "./fake-repositories.js";
 
 function sseResponse(chunks: string[]): Response {
   const encoder = new TextEncoder();
@@ -46,23 +46,23 @@ describe("ProxyService full flow", () => {
       transport: { direct: () => Promise.reject(new Error("no fetch")) },
     } as unknown as ProviderRegistry;
     const models = {
-      providersForModel: () => ["opencode"],
+      providers: () => ["opencode"],
       resolveAlias: (model: string) => model,
       lookupKeys: (model: string) => [model],
       isVisionModel: () => true,
       isSupportedByProvider: () => true,
-      providerAccessRule: () => null,
+      rule: () => null,
       modelCost: () => null,
-      modelsForProvider: () => [],
+      models: () => [],
     } as unknown as Registry;
     const auth = {
-      validateAPIKey: () => Effect.succeed(validAuth()),
-      validateModelForUser: () => Effect.succeed(validModel()),
-      bumpAnalyticsCacheVersionThrottled: () => Effect.void,
+      validateKey: () => Effect.succeed(validAuth()),
+      validateForUser: () => Effect.succeed(validModel()),
+      bumpVersion: () => Effect.void,
     } as unknown as AuthService;
     const redis = { get: async () => null, set: async () => "OK", del: async () => 1, zAdd: async () => 1, zRemRangeByRank: async () => 0, expire: async () => true } as unknown as OpendumRedis;
 
-    const repositories = createFakeRepositories();
+    const repositories = fakes();
     const service = new ProxyService({
       database: {} as never,
       repositories,

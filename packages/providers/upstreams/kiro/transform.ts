@@ -10,7 +10,7 @@ import {
 } from "../../core/helpers.js";
 import type { ProviderAccount } from "../../types.js";
 import { KIRO_REGION } from "../../endpoints.js";
-import { SseCompletionCollector } from "../../transform/collector.js";
+import { Collector } from "../../transform/collector.js";
 
 export const KIRO_API_BASE_URL = "https://q.%s.amazonaws.com/generateAssistantResponse";
 export const KIRO_THINKING_START = "<thinking>";
@@ -219,7 +219,7 @@ export function isKiroResponseEvent(parsed: Json): boolean {
   return false;
 }
 
-export class KiroStreamParser {
+export class Parser {
   private eventBuffer = "";
   private contentBuffer = "";
   private inThinking = false;
@@ -1059,12 +1059,12 @@ export function buildKiroRequest(registry: Registry, body: Json): Json {
 
 export function normalizeKiroModel(registry: Registry, model: string): string {
   const raw = lastModelSegment(model);
-  if (registry.isSupportedByProvider(raw, "kiro")) return registry.upstreamModelName(raw, "kiro");
+  if (registry.isSupportedByProvider(raw, "kiro")) return registry.upstream(raw, "kiro");
   if (raw.endsWith("-thinking")) {
     const base = raw.slice(0, -"-thinking".length);
-    if (registry.isSupportedByProvider(base, "kiro")) return registry.upstreamModelName(base, "kiro");
+    if (registry.isSupportedByProvider(base, "kiro")) return registry.upstream(base, "kiro");
   }
-  return registry.upstreamModelName(raw, "kiro");
+  return registry.upstream(raw, "kiro");
 }
 
 export function convertKiroEventsToCompletion(events: Json[], model: string): Json {
@@ -1074,7 +1074,7 @@ export function convertKiroEventsToCompletion(events: Json[], model: string): Js
   let activeToolId = "";
   let contextUsagePercentage = 0;
   let explicitUsage: Json | null = null;
-  const parser = new KiroStreamParser();
+  const parser = new Parser();
   let hasNativeReasoning = false;
   const toolById = new Map<string, { name: string; args: string }>();
 
@@ -1118,7 +1118,7 @@ export function convertKiroEventsToCompletion(events: Json[], model: string): Js
   if (!hasNativeReasoning) reasoning += flushReasoning;
   outputText += flushText + flushReasoning;
 
-  const collector = new SseCompletionCollector({
+  const collector = new Collector({
     model,
     nullableContent: true,
     normalizeToolArguments: (args) => defaultEmpty(args, "{}"),
