@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ModelStats } from "~~/lib/model-stats";
+import type { ModelStats } from "@opendum/models/stats";
 
 type StatDeltaTone = "positive" | "negative" | "neutral";
 type StatHit = { text: string; tone: StatDeltaTone; version: number };

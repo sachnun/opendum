@@ -11,12 +11,11 @@ import {
 import type { NavItem, NavSubItem, ProviderAccountIndicator } from "../../lib/navigation";
 import type { AccountOverviewData, AccountOverviewResponse, MeData, PointStatusData } from "../../lib/api-types";
 import { isSwitchSubItem, primaryNavigation, subItemHref } from "../../lib/navigation";
-import { signOut, useSession } from "../../lib/auth-client";
-import { buildProviderHrefMap, getProviderAccountPath, PROVIDER_ACCOUNT_DEFINITIONS } from "../../lib/provider-accounts";
+import { buildProviderHrefMap, getProviderAccountPath, PROVIDER_ACCOUNT_DEFINITIONS } from "@opendum/providers/provider-accounts";
 import { avatarUrl } from "../../lib/utils";
 
 const route = useRoute();
-const { data: session } = await useSession(useFetch);
+const { user: authUser, signOut: endSession } = useAuth();
 
 const {
   mobileOpen,
@@ -41,10 +40,10 @@ const supportItemOpen = reactive<Record<string, boolean>>({ Tools: false });
 const pointMenuOpen = ref(false);
 const { isDesktopViewport } = useDesktopViewport();
 
-const userLabel = computed(() => session.value?.user?.name || session.value?.user?.email || "Account");
-const userEmail = computed(() => session.value?.user?.email || "");
-const userImage = computed(() => avatarUrl(session.value?.user?.image || ""));
-const userInitial = computed(() => (session.value?.user?.name?.[0] || "U").toUpperCase());
+const userLabel = computed(() => authUser.value?.name || authUser.value?.email || "Account");
+const userEmail = computed(() => authUser.value?.email || "");
+const userImage = computed(() => avatarUrl(authUser.value?.image || ""));
+const userInitial = computed(() => (authUser.value?.name?.[0] || "U").toUpperCase());
 
 
 
@@ -503,7 +502,7 @@ async function handleSignOut() {
     return;
   }
 
-  await signOut();
+  await endSession();
   clearDataCache();
   await navigateTo("/");
 }

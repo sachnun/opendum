@@ -39,7 +39,7 @@ const OPENCODE_VERSION_TARGETS = [
   },
   {
     label: "codex web constants",
-    path: resolve(REPO_ROOT, "apps/web/server/lib/providers/codex/constants.ts"),
+    path: resolve(REPO_ROOT, "apps/api/web/lib/providers/codex/constants.ts"),
     pattern: /(const OPENCODE_VERSION = ")(\d+\.\d+\.\d+)(")/,
   },
 ];

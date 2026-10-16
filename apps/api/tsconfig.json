@@ -4,7 +4,10 @@
     "lib": ["ESNext", "DOM"],
     "types": ["node", "bun"],
     "allowImportingTsExtensions": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "paths": {
+      "#web/*": ["./web/*"]
+    }
   },
-  "include": ["core/**/*", "handlers/**/*", "plugins/**/*", "routes/**/*", "test/**/*", "*.ts", "nitro.config.ts"]
+  "include": ["core/**/*", "handlers/**/*", "plugins/**/*", "routes/**/*", "test/**/*", "web/**/*", "*.ts", "nitro.config.ts"]
 }

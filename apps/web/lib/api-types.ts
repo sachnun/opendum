@@ -1,5 +1,5 @@
-import type { ModelStats } from "./model-stats";
-import type { QuotaProviderKey } from "./provider-accounts";
+import type { ModelStats } from "@opendum/models/stats";
+import type { QuotaProviderKey } from "@opendum/providers/provider-accounts";
 import type { ModelModalities } from "./model-capabilities";
 import type { ModelCost } from "./model-cost";
 

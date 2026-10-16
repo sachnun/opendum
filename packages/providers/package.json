@@ -8,6 +8,7 @@
     "./types": "./types.ts",
     "./registry": "./registry.ts",
     "./display-names": "./display-names.ts",
+    "./provider-accounts": "./provider-accounts.ts",
     "./http": "./core/http.ts",
     "./endpoints": "./endpoints.ts",
     "./responses-transform": "./transform/responses.ts",

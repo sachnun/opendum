@@ -1,15 +1,4 @@
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
-import { loadModelEntries } from "@opendum/models/runtime";
-
-const modelRegistryVirtualModule = "virtual:opendum-model-registry";
-
-function buildModelRegistryModule(): string {
-  const dataDir = resolve(dirname(fileURLToPath(import.meta.url)), "../../packages/models/data");
-  const entries = loadModelEntries(dataDir);
-  return `export const MODEL_ENTRIES = ${JSON.stringify(entries)};`;
-}
 
 export default defineNuxtConfig({
   compatibilityDate: "2025-07-15",
@@ -26,7 +15,13 @@ export default defineNuxtConfig({
   },
   runtimeConfig: {
     public: {
-      proxyUrl: "",
+      apiUrl: "",
+    },
+  },
+  nitro: {
+    prerender: {
+      autoSubfolderIndex: false,
+      ignore: ["/404.html"],
     },
   },
   fonts: {
@@ -40,13 +35,7 @@ export default defineNuxtConfig({
       { name: "Geist Mono", preload: false },
     ],
   },
-  nitro: {
-    virtual: {
-      [modelRegistryVirtualModule]: () => buildModelRegistryModule(),
-    },
-  },
-  vite: {
-    optimizeDeps: {
+  vite: {    optimizeDeps: {
       include: [
         "@internationalized/date",
         "@vue/devtools-core",
@@ -65,13 +54,5 @@ export default defineNuxtConfig({
   typescript: {
     strict: true,
     typeCheck: false,
-    serverTsConfig: {
-      compilerOptions: {
-        paths: {
-          "~~": [".."],
-          "~~/*": ["../*"],
-        },
-      },
-    },
   },
 });

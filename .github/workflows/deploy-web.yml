@@ -9,6 +9,7 @@ on:
       - apps/web/**
       - packages/database/**
       - packages/models/**
+      - packages/providers/**
       - package.json
       - bun.lock
   workflow_run:
@@ -23,17 +24,19 @@ permissions:
   deployments: write
 
 concurrency:
-  group: edgeone-web-${{ github.ref }}
+  group: cloudflare-pages-web-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   deploy:
     if: github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
-    name: Web EdgeOne Pages
+    name: Web Cloudflare Pages
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:
       name: web
+    env:
+      NUXT_PUBLIC_API_URL: ${{ vars.NUXT_PUBLIC_API_URL }}
 
     steps:
       - name: Checkout repository
@@ -47,20 +50,16 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Link EdgeOne project
-        working-directory: apps/web
-        run: bun run edgeone makers link -n opendum -t "$EDGEONE_API_TOKEN"
-        env:
-          EDGEONE_API_TOKEN: ${{ secrets.EDGEONE_API_TOKEN }}
-
       - name: Build web
         working-directory: apps/web
-        run: bun run build
+        run: bun run generate
         env:
-          NITRO_PRESET: edgeone_pages
+          NITRO_PRESET: cloudflare-pages-static
 
-      - name: Deploy web to EdgeOne Pages
-        working-directory: apps/web
-        run: bun run edgeone makers deploy .edgeone -n opendum -a overseas -t "$EDGEONE_API_TOKEN" -e production
-        env:
-          EDGEONE_API_TOKEN: ${{ secrets.EDGEONE_API_TOKEN }}
+      - name: Deploy web to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy apps/web/dist --project-name=opendum --branch=main
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}

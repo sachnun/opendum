@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { get, set } from "idb-keyval";
-import { getProviderLabel } from "~~/lib/provider-accounts";
+import { getProviderLabel } from "@opendum/providers/provider-accounts";
 import type { ModelSearchItem } from "~~/lib/api-types";
 import { createIdbStore } from "~/utils/idb";
 

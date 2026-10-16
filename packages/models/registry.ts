@@ -84,8 +84,6 @@ export function providerAlias(provider: string): string {
 }
 
 function generatedDir(dir: string): string {
-  const configured = process.env.MODELS_GENERATED_DIR?.trim();
-  if (configured) return configured;
   return join(dirname(dir), "generated");
 }
 

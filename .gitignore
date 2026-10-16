@@ -11,8 +11,7 @@ out/
 .output/
 .nuxt/
 .nitro/
-.edgeone/
-.edgeone-nitro-config.mjs
+.wrangler/
 .cron/
 .cache/
 .vite/

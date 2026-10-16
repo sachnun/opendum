@@ -1,6 +1,6 @@
-import { MODEL_FAMILY_SORT_ORDER, categorizeModelFamily } from "../../lib/model-families";
-import { compareModelEntries } from "../../lib/model-sort";
-import { BY_KEY, getProviderAccountPath, getProviderLabel, type ProviderAccountKey } from "../../lib/provider-accounts";
+import { MODEL_FAMILY_SORT_ORDER, categorizeModelFamily } from "@opendum/models/ranking";
+import { compareModelEntries } from "@opendum/models/sort";
+import { BY_KEY, getProviderAccountPath, getProviderLabel, type ProviderAccountKey } from "@opendum/providers/provider-accounts";
 import type { PlaygroundOptions } from "../../lib/api-types";
 import {
   generateId,
@@ -277,7 +277,7 @@ const additionalParametersError = computed(() => parseAdditionalParameters(addit
 const canRunPlayground = computed(() => Boolean(selectedScenario.value && hasSelectedModel.value && canUsePlayground.value && !additionalParametersError.value));
 const playgroundSetupMessage = computed(() => {
   if (!hasAnyProviderAccount.value) return "Connect a provider account before running Playground.";
-  if (!isProxyConfigured.value) return "Set NUXT_PUBLIC_PROXY_URL to your proxy service URL before running Playground.";
+  if (!isProxyConfigured.value) return "Set NUXT_PUBLIC_API_URL to your API URL before running Playground.";
   if (providerAccounts.value.length === 0) return "Enable at least one provider account before running Playground.";
   if (models.value.length === 0) return "";
   return "";

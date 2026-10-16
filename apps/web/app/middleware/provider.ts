@@ -1,4 +1,4 @@
-import { getProviderFromSlug } from "../../lib/provider-accounts";
+import { getProviderFromSlug } from "@opendum/providers/provider-accounts";
 
 const SLUG_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/;
 

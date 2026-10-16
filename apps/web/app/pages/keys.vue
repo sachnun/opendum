@@ -24,8 +24,8 @@ const toggleErrors = ref<Record<string, string>>({});
 const roamingUpdatingIds = ref(new Set<string>());
 const roamingErrors = ref<Record<string, string>>({});
 const proxyBaseUrl = computed(() => {
-  const proxyUrl = String(config.public.proxyUrl || "").replace(/\/$/, "");
-  return `${proxyUrl}/v1`;
+  const apiUrl = String(config.public.apiUrl || "").replace(/\/$/, "");
+  return `${apiUrl}/v1`;
 });
 const copiedProxyBaseUrl = ref(false);
 let copyProxyBaseUrlTimeout: ReturnType<typeof setTimeout> | null = null;

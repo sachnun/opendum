@@ -7,7 +7,7 @@ import {
   type OAuthProviderKey,
   type ProviderAccountKey,
   type ProviderAuthMethodKey,
-} from "./provider-accounts";
+} from "@opendum/providers/provider-accounts";
 
 export type Provider = string;
 

@@ -5,5 +5,5 @@
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true
   },
-  "include": ["*.ts", "model/**/*.ts", "sync/**/*.ts", "scripts/models.ts", "scripts/enrich.ts", "scripts/aa.ts"]
+  "include": ["*.ts", "model/**/*.ts", "sync/**/*.ts", "scripts/models.ts", "scripts/enrich.ts", "scripts/aa.ts", "scripts/family-ranking.ts"]
 }

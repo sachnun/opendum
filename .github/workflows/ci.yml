@@ -32,7 +32,9 @@ jobs:
         run: bun run --filter @opendum/web check
 
       - name: Build web
-        run: bun run --filter @opendum/web build
+        run: bun run --filter @opendum/web generate
+        env:
+          NITRO_PRESET: cloudflare-pages-static
 
   checks:
     name: Checks
