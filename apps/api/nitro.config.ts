@@ -5,7 +5,7 @@ export default defineConfig({
   preset: "bun",
   serverDir: "./",
   serverEntry: false,
-  builder: "rollup",
+  builder: "rolldown",
   alias: {
     "#web": fileURLToPath(new URL("./web", import.meta.url)),
   },
