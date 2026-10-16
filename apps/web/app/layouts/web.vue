@@ -40,20 +40,6 @@ const supportItemOpen = reactive<Record<string, boolean>>({ Tools: false });
 const pointMenuOpen = ref(false);
 const { isDesktopViewport } = useDesktopViewport();
 
-const userLabel = computed(() => authUser.value?.name || authUser.value?.email || "Account");
-const userEmail = computed(() => authUser.value?.email || "");
-const userImage = computed(() => avatarUrl(authUser.value?.image || ""));
-const userInitial = computed(() => (authUser.value?.name?.[0] || "U").toUpperCase());
-
-
-
-
-
-
-
-
-
-
 const cachedPinnedProviders = useState<string[] | null>(stateKeys.pinnedProviders, () => null);
 
 const supportNavigation = computed<NavItem[]>(() => [
@@ -107,6 +93,11 @@ watch(me, (value) => {
 const isMaintainer = computed(() => me.value?.isMaintainer ?? false);
 const pointBalance = computed(() => (me.value as MeData | null | undefined)?.points?.balance ?? 0);
 const formattedPointBalance = computed(() => pointBalance.value.toLocaleString("en-US"));
+const currentUser = computed(() => me.value?.actor ?? authUser.value ?? null);
+const userLabel = computed(() => currentUser.value?.name || currentUser.value?.email || "Account");
+const userEmail = computed(() => currentUser.value?.email || "");
+const userImage = computed(() => avatarUrl(currentUser.value?.image || ""));
+const userInitial = computed(() => (currentUser.value?.name?.[0] || "U").toUpperCase());
 const auditUserLabel = computed(() => auditUser.value?.name || auditUser.value?.email || "Audit user");
 const auditUserEmail = computed(() => auditUser.value?.email || "");
 const auditUserImage = computed(() => avatarUrl(auditUser.value?.image || ""));
