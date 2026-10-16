@@ -1,9 +1,10 @@
 import { db, pinnedProvider, providerAccount, providerAccountDisabledModel, providerAccountModelHealth } from "@opendum/database";
+import type { AccountSessionInput, AccountStatsInput, DeleteAccountInput, ErrorHistoryBatchInput, ErrorHistoryInput, ProviderDetailInput, ProviderInput, ResolveErrorsInput, SetAccountModelEnabledInput, TogglePinnedProviderInput, UpdateAccountInput } from "@opendum/providers/contract";
+import { publishAccountsChanged } from "#web/events/bus.js";
 import { getModelLookupKeys, getProviderModelSet, resolveModelAlias } from "#web/lib/proxy/models.js";
 import { clearRefreshFailCount, invalidateDisabledModelsCache } from "#web/lib/proxy/auth.js";
 import { decrypt } from "#web/lib/encryption.js";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
-import { z } from "zod";
 import { isKnownProvider, PROVIDER_ACCOUNT_KEYS } from "./account-providers.js";
 import { customProviderModels } from "./custom-providers.js";
 import { trackProviderEmail } from "./points.js";
@@ -40,7 +41,7 @@ import {
 } from "./accounts-helpers.js";
 export { getProviderModelsForAccountTier };
 
-export { createAccount, createAccountInputSchema } from "./account-connectors.js";
+export { createAccount } from "./account-connectors.js";
 
 const ACCOUNT_COOLDOWN_MS = 10 * 60 * 1000;
 const DEFAULT_ERROR_HISTORY_ROWS = 100;
@@ -57,28 +58,6 @@ interface AccountOverviewReadOptions extends AccountReadOptions {
 }
 
 const PROVIDER_KEY_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/;
-export const providerInputSchema = z.object({
-  provider: z.string().trim().toLowerCase().regex(PROVIDER_KEY_PATTERN, "Invalid provider"),
-});
-const accountIdSchema = z.string().trim().min(1);
-export const updateAccountInputSchema = z.object({ id: accountIdSchema, name: z.string().max(120).optional(), isActive: z.boolean().optional(), disabledUntil: z.coerce.date().nullable().optional() });
-export const deleteAccountInputSchema = z.object({ id: accountIdSchema });
-export const togglePinnedProviderInputSchema = z.object({ providerKey: z.string().trim().min(1) });
-export const setAccountModelEnabledInputSchema = z.object({ accountId: accountIdSchema, modelId: z.string().trim().min(1), enabled: z.boolean() });
-export const errorHistoryInputSchema = z.object({ accountId: accountIdSchema, limit: z.coerce.number().int().min(1).max(200).optional() });
-export const errorHistoryBatchInputSchema = z.object({ accountIds: z.array(accountIdSchema).max(50), limit: z.coerce.number().int().min(1).max(200).optional() });
-export const resolveErrorsInputSchema = z.object({ accountId: accountIdSchema });
-export const accountSessionInputSchema = z.object({ id: accountIdSchema });
-const statsIdsQuerySchema = z.preprocess((value) => (Array.isArray(value) ? value : value == null ? [] : [value]), z.array(z.string().min(1)).max(50));
-const statsCursorsQuerySchema = z.preprocess((value) => (Array.isArray(value) ? value : value == null ? [] : [value]), z.array(z.string()).max(50)).optional();
-
-export const accountStatsInputSchema = z.object({ ids: statsIdsQuerySchema, cursors: statsCursorsQuerySchema }).transform(({ ids, cursors }) => ({
-  accountIds: ids,
-  cursors: cursors ? Object.fromEntries(ids.map((id, index) => [id, cursors[index] ?? ""])) : undefined,
-}));
-export const accountOverviewInputSchema = z.object({ cursor: z.string().min(1).optional() });
-export const providerDetailInputSchema = providerInputSchema.extend({ cursor: z.string().min(1).optional() });
-
 const providerAccountListColumns = {
   id: providerAccount.id,
   provider: providerAccount.provider,
@@ -115,7 +94,7 @@ export async function listAccounts(userId: string) {
   }
 }
 
-export async function listAccountsByProvider(userId: string, input: z.infer<typeof providerInputSchema>) {
+export async function listAccountsByProvider(userId: string, input: ProviderInput) {
   try {
     const now = new Date();
     const accounts = await db.select(providerAccountListColumns).from(providerAccount).where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, input.provider))).orderBy(...providerAccountLastUsedOrder);
@@ -226,7 +205,7 @@ export async function getAccountPing(userId: string, options: AccountReadOptions
   }
 }
 
-export async function getAccountsByProviderDetailed(userId: string, input: z.infer<typeof providerDetailInputSchema>) {
+export async function getAccountsByProviderDetailed(userId: string, input: ProviderDetailInput) {
   try {
     const now = new Date();
     const accounts = await db
@@ -375,7 +354,7 @@ export async function getAccountsByProviderDetailed(userId: string, input: z.inf
   }
 }
 
-export async function getAccountStats(userId: string, input: z.infer<typeof accountStatsInputSchema>) {
+export async function getAccountStats(userId: string, input: AccountStatsInput) {
   try {
     const accountIds = Array.from(new Set(input.accountIds));
     if (accountIds.length === 0) return {};
@@ -392,7 +371,7 @@ export async function getAccountStats(userId: string, input: z.infer<typeof acco
   }
 }
 
-export async function updateAccount(userId: string, input: z.infer<typeof updateAccountInputSchema>) {
+export async function updateAccount(userId: string, input: UpdateAccountInput) {
     try {
       const [account] = await db.select({ id: providerAccount.id, status: providerAccount.status }).from(providerAccount).where(and(eq(providerAccount.id, input.id), eq(providerAccount.userId, userId))).limit(1);
       if (!account) return { success: false, error: "Account not found" } as const;
@@ -433,6 +412,7 @@ export async function updateAccount(userId: string, input: z.infer<typeof update
         .limit(1);
       if (!updated) return { success: false, error: "Account not found" } as const;
 
+      publishAccountsChanged(userId);
       return { success: true, data: { ...withEffectiveActive(updated, now), unhealthyCount: updated.consecutiveErrors } } as const;
     } catch (error) {
       console.error("Failed to update account:", error);
@@ -487,7 +467,7 @@ async function accelerateAccountCooldownForManualEnable(accountId: string, now =
   });
 }
 
-export async function deleteAccount(userId: string, input: z.infer<typeof deleteAccountInputSchema>) {
+export async function deleteAccount(userId: string, input: DeleteAccountInput) {
   try {
     const [account] = await db.select({ id: providerAccount.id, email: providerAccount.email }).from(providerAccount).where(and(eq(providerAccount.id, input.id), eq(providerAccount.userId, userId))).limit(1);
     if (!account) return { success: false, error: "Account not found" } as const;
@@ -496,6 +476,7 @@ export async function deleteAccount(userId: string, input: z.infer<typeof delete
     await db.delete(providerAccount).where(eq(providerAccount.id, input.id));
     await invalidateDisabledModelsCache(userId);
     await clearRefreshFailCount(input.id);
+    publishAccountsChanged(userId);
     return { success: true, data: undefined } as const;
   } catch (error) {
     console.error("Failed to delete account:", error);
@@ -503,7 +484,7 @@ export async function deleteAccount(userId: string, input: z.infer<typeof delete
   }
 }
 
-export async function togglePinnedProvider(userId: string, input: z.infer<typeof togglePinnedProviderInputSchema>) {
+export async function togglePinnedProvider(userId: string, input: TogglePinnedProviderInput) {
   if (!PROVIDER_KEY_PATTERN.test(input.providerKey)) return { success: false, error: "Invalid provider" } as const;
 
   try {
@@ -515,10 +496,12 @@ export async function togglePinnedProvider(userId: string, input: z.infer<typeof
 
     if (existing) {
       await db.delete(pinnedProvider).where(eq(pinnedProvider.id, existing.id));
+      publishAccountsChanged(userId);
       return { success: true, data: { providerKey: input.providerKey, pinned: false } } as const;
     }
 
     await db.insert(pinnedProvider).values({ userId, providerKey: input.providerKey }).onConflictDoNothing({ target: [pinnedProvider.userId, pinnedProvider.providerKey] });
+    publishAccountsChanged(userId);
     return { success: true, data: { providerKey: input.providerKey, pinned: true } } as const;
   } catch (error) {
     console.error("Failed to toggle pinned provider:", error);
@@ -526,7 +509,7 @@ export async function togglePinnedProvider(userId: string, input: z.infer<typeof
   }
 }
 
-export async function setAccountModelEnabled(userId: string, input: z.infer<typeof setAccountModelEnabledInputSchema>) {
+export async function setAccountModelEnabled(userId: string, input: SetAccountModelEnabledInput) {
   try {
     const [account] = await db
       .select({ id: providerAccount.id, provider: providerAccount.provider, tier: providerAccount.tier })
@@ -548,6 +531,7 @@ export async function setAccountModelEnabled(userId: string, input: z.infer<type
     if (!input.enabled) await db.insert(providerAccountDisabledModel).values({ providerAccountId: account.id, model: normalizedModel }).onConflictDoNothing({ target: [providerAccountDisabledModel.providerAccountId, providerAccountDisabledModel.model] });
 
     await invalidateDisabledModelsCache(userId);
+    publishAccountsChanged(userId);
     return { success: true, data: { model: normalizedModel, enabled: input.enabled } } as const;
   } catch (error) {
     console.error("Failed to update account model status:", error);
@@ -555,7 +539,7 @@ export async function setAccountModelEnabled(userId: string, input: z.infer<type
   }
 }
 
-export async function getAccountErrorHistory(userId: string, input: z.infer<typeof errorHistoryInputSchema>) {
+export async function getAccountErrorHistory(userId: string, input: ErrorHistoryInput) {
   try {
     const [account] = await db.select({ id: providerAccount.id }).from(providerAccount).where(and(eq(providerAccount.id, input.accountId), eq(providerAccount.userId, userId))).limit(1);
     if (!account) return { success: false, error: "Account not found" } as const;
@@ -569,7 +553,7 @@ export async function getAccountErrorHistory(userId: string, input: z.infer<type
   }
 }
 
-export async function getAccountErrorHistories(userId: string, input: z.infer<typeof errorHistoryBatchInputSchema>) {
+export async function getAccountErrorHistories(userId: string, input: ErrorHistoryBatchInput) {
   const accountIds = Array.from(new Set(input.accountIds));
   if (accountIds.length === 0) return { success: true, data: {} } as const;
 
@@ -592,7 +576,7 @@ export async function getAccountErrorHistories(userId: string, input: z.infer<ty
   }
 }
 
-export async function getAccountSession(userId: string, input: z.infer<typeof accountSessionInputSchema>) {
+export async function getAccountSession(userId: string, input: AccountSessionInput) {
   try {
     const [account] = await db
       .select({ accessToken: providerAccount.accessToken, refreshToken: providerAccount.refreshToken, apiKey: providerAccount.apiKey, accountId: providerAccount.accountId, provider: providerAccount.provider, email: providerAccount.email })
@@ -609,7 +593,7 @@ export async function getAccountSession(userId: string, input: z.infer<typeof ac
   }
 }
 
-export async function resolveAccountErrors(userId: string, input: z.infer<typeof resolveErrorsInputSchema>) {
+export async function resolveAccountErrors(userId: string, input: ResolveErrorsInput) {
   try {
     const [account] = await db.select({ id: providerAccount.id, status: providerAccount.status }).from(providerAccount).where(and(eq(providerAccount.id, input.accountId), eq(providerAccount.userId, userId))).limit(1);
     if (!account) return { success: false, error: "Account not found" } as const;
@@ -628,6 +612,7 @@ export async function resolveAccountErrors(userId: string, input: z.infer<typeof
     await deleteRedisErrorHistory(input.accountId);
     await db.delete(providerAccountModelHealth).where(eq(providerAccountModelHealth.providerAccountId, input.accountId));
     await clearRefreshFailCount(input.accountId);
+    publishAccountsChanged(userId);
     return { success: true, data: undefined } as const;
   } catch (error) {
     console.error("Failed to resolve provider account errors:", error);

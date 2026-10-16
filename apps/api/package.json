@@ -7,7 +7,7 @@
     "dev": "nitro dev",
     "build": "nitro build",
     "start": "bun .output/server/index.mjs",
-    "check": "bun check",
+    "typecheck": "bun check",
     "test": "bun test",
     "lint": "oxlint ."
   },
@@ -17,6 +17,7 @@
     "@opendum/database": "workspace:*",
     "@opendum/models": "workspace:*",
     "@opendum/providers": "workspace:*",
+    "@orpc/server": "1.15.7",
     "better-auth": "^1.7.10",
     "drizzle-orm": "^0.45.2",
     "effect": "4.0.4",

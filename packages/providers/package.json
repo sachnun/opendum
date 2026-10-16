@@ -13,14 +13,18 @@
     "./endpoints": "./endpoints.ts",
     "./responses-transform": "./transform/responses.ts",
     "./quota": "./quota/index.ts",
-    "./quota/types": "./quota/types.ts"
+    "./quota/types": "./quota/types.ts",
+    "./contract": "./contract/index.ts",
+    "./contract/types": "./contract/types.ts"
   },
   "scripts": {
     "test": "bun test",
-    "check": "bun check"
+    "typecheck": "bun check"
   },
   "dependencies": {
     "@opendum/core": "workspace:*",
+    "@orpc/contract": "1.15.7",
+    "zod": "^4.4.3",
     "@opendum/models": "workspace:*",
     "effect": "4.0.4"
   },

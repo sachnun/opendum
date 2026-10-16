@@ -1,21 +1,12 @@
 import { db, providerAccount, proxyApiKey, usageLog } from "@opendum/database";
 import { and, eq, gte, lte, sql } from "drizzle-orm";
-import { z } from "zod";
 
 import type { ActionResult } from "#web/utils/api.js";
 
-const periodSchema = z.enum(["5m", "15m", "30m", "1h", "6h", "24h", "7d", "30d", "90d"]);
-const analyticsFilterSchema = z.union([
-  periodSchema,
-  z.object({ from: z.string().min(1), to: z.string().min(1) }),
-]);
-const analyticsBaseInputSchema = z.object({ filter: analyticsFilterSchema.optional(), apiKeyId: z.string().trim().min(1).optional() });
-export const analyticsDataInputSchema = analyticsBaseInputSchema.extend({ includeSeries: z.boolean().optional() }).optional();
-export const analyticsSeriesInputSchema = analyticsBaseInputSchema.optional();
-export const analyticsUsageInputSchema = z.object({ range: periodSchema.default("30d") }).optional();
+import type { AnalyticsDataInput, AnalyticsFilterInput, AnalyticsPeriod, AnalyticsSeriesInput, AnalyticsUsageInput } from "@opendum/providers/contract";
 
-type Period = z.infer<typeof periodSchema>;
-type AnalyticsFilter = z.infer<typeof analyticsFilterSchema>;
+type Period = AnalyticsPeriod;
+type AnalyticsFilter = AnalyticsFilterInput;
 type Granularity = "10s" | "1m" | "5m" | "15m" | "1h" | "1d";
 
 interface PeriodConfig {
@@ -204,13 +195,13 @@ async function getAnalyticsDataForUser(
   }
 }
 
-export async function getAnalyticsData(userId: string, input?: z.infer<typeof analyticsDataInputSchema>) {
+export async function getAnalyticsData(userId: string, input?: AnalyticsDataInput) {
   const result = await getAnalyticsDataForUser(userId, input?.filter ?? "30d", input?.apiKeyId, { includeSeries: input?.includeSeries ?? true });
   if (!result.success) throw new Error(result.error);
   return result.data;
 }
 
-export async function getAnalyticsSeries(userId: string, input?: z.infer<typeof analyticsSeriesInputSchema>): Promise<AnalyticsSeriesData> {
+export async function getAnalyticsSeries(userId: string, input?: AnalyticsSeriesInput): Promise<AnalyticsSeriesData> {
   const result = await getAnalyticsDataForUser(userId, input?.filter ?? "30d", input?.apiKeyId, { includeSummary: false, includeSeries: true });
   if (!result.success) throw new Error(result.error);
 
@@ -239,7 +230,7 @@ export async function getAnalyticsOverview(userId: string) {
   };
 }
 
-export async function getUsageRows(userId: string, input?: z.infer<typeof analyticsUsageInputSchema>) {
+export async function getUsageRows(userId: string, input?: AnalyticsUsageInput) {
   const resolvedFilter = resolveFilterConfig(input?.range ?? "30d");
   if (!resolvedFilter.success) throw new Error(resolvedFilter.error);
 

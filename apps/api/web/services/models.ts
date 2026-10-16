@@ -1,24 +1,37 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { createHash } from "node:crypto";
-import { z } from "zod";
+import { Effect } from "effect";
 
+import type { ModelListItem, ModelSearchItem, ModelStatsData, ModelStatsInput, SetModelEnabledInput, SetModelEnabledResult } from "@opendum/providers/contract";
 import { db, disabledModel } from "@opendum/database";
 import { getModelStatsByModel } from "#web/lib/model-stats.js";
 import { getAccountModelAvailability, invalidateDisabledModelsCache, usable, type AccountModelAvailability } from "#web/lib/proxy/auth.js";
 import { MODEL_REGISTRY, getAllModels, getModelFamily, getModelLookupKeys, getProvidersForModel, isModelSupported, resolveModelAlias } from "#web/lib/proxy/models.js";
 import { compareModelEntries } from "@opendum/models/sort";
 
-export const setModelEnabledInputSchema = z.object({ modelId: z.string(), enabled: z.boolean() });
-const statsIdsQuerySchema = z.preprocess((value) => (Array.isArray(value) ? value : value == null ? [] : [value]), z.array(z.string().min(1)).max(50));
-const statsCursorsQuerySchema = z.preprocess((value) => (Array.isArray(value) ? value : value == null ? [] : [value]), z.array(z.string()).max(50)).optional();
-
-export const modelStatsInputSchema = z.object({ ids: statsIdsQuerySchema, cursors: statsCursorsQuerySchema }).transform(({ ids, cursors }) => ({
-  models: ids,
-  cursors: cursors ? Object.fromEntries(ids.map((id, index) => [id, cursors[index] ?? ""])) : undefined,
-}));
-
 function hashModelStatsValue(value: unknown) {
   return createHash("sha256").update(JSON.stringify(value)).digest("base64url").slice(0, 16);
+}
+
+function withModelErrors<A>(message: string, run: () => Promise<A>): Promise<A> {
+  return Effect.runPromise(
+    Effect.tryPromise({
+      try: run,
+      catch: (cause) => {
+        console.error(`${message}:`, cause);
+        return new Error(message, { cause });
+      },
+    })
+  );
+}
+
+function modelInfo(model: string) {
+  const info = MODEL_REGISTRY[model];
+  return {
+    reasoning: info?.reasoning ?? undefined,
+    modalities: info?.modalities ? { input: info.modalities.input ?? [], output: info.modalities.output ?? [] } : undefined,
+    cost: info?.cost ?? undefined,
+  };
 }
 
 async function getAvailableModelsForUser(userId: string) {
@@ -60,41 +73,37 @@ function customModelEntries(availability: AccountModelAvailability): Array<{ id:
   return entries;
 }
 
-export async function listModels(userId: string, options: { includeStats?: boolean } = {}) {
-  try {
+export function listModels(userId: string, options: { includeStats?: boolean } = {}): Promise<ModelListItem[]> {
+  return withModelErrors("Failed to list models", async () => {
     const includeStats = options.includeStats ?? true;
     const { availability, disabledModelSet, models: availableModels } = await getAvailableModelsForUser(userId);
     const availableSet = new Set(availableModels);
     const statsByModel = includeStats ? await getModelStatsByModel(userId, availableModels) : {};
 
-    const result = [
+    const result: ModelListItem[] = [
       ...getAllModels()
         .sort((a, b) => compareModelEntries({ id: a, family: getModelFamily(a) }, { id: b, family: getModelFamily(b) }))
-        .map((model) => {
+        .map((model): ModelListItem => {
           const available = availableSet.has(model);
           return {
             id: model,
             name: model,
-            family: getModelFamily(model),
+            family: getModelFamily(model) ?? "Others",
             providers: modelProviders(model, availability, { all: !available }),
-            reasoning: MODEL_REGISTRY[model]?.reasoning,
-            modalities: MODEL_REGISTRY[model]?.modalities,
-            cost: MODEL_REGISTRY[model]?.cost,
+            ...modelInfo(model),
             isEnabled: !disabledModelSet.has(model),
             available,
             ...(includeStats && available ? { stats: statsByModel[model] } : {}),
           };
         }),
-      ...customModelEntries(availability).map((entry) => {
+      ...customModelEntries(availability).map((entry): ModelListItem => {
         const canonical = resolveModelAlias(entry.modelId);
         return {
           id: entry.id,
           name: entry.id,
-          family: getModelFamily(entry.modelId),
+          family: getModelFamily(entry.modelId) ?? "Others",
           providers: [entry.slug],
-          reasoning: MODEL_REGISTRY[canonical]?.reasoning,
-          modalities: MODEL_REGISTRY[canonical]?.modalities,
-          cost: MODEL_REGISTRY[canonical]?.cost,
+          ...modelInfo(canonical),
           isEnabled: !disabledModelSet.has(entry.id),
           available: true,
           custom: true,
@@ -102,43 +111,35 @@ export async function listModels(userId: string, options: { includeStats?: boole
       }),
     ];
     return result;
-  } catch (error) {
-    console.error("Failed to list models:", error);
-    throw new Error("Failed to list models", { cause: error });
-  }
+  });
 }
 
 export function listKnownModels(): string[] {
   return getAllModels().sort((left, right) => compareModelEntries({ id: left, family: getModelFamily(left) }, { id: right, family: getModelFamily(right) }));
 }
 
-export async function searchModels(userId: string) {
-  try {
+export function searchModels(userId: string): Promise<ModelSearchItem[]> {
+  return withModelErrors("Failed to search models", async () => {
     const { availability, disabledModelSet, models } = await getAvailableModelsForUser(userId);
 
     return [
-      ...models.map((model) => ({
+      ...models.map((model): ModelSearchItem => ({
         id: model,
         providers: modelProviders(model, availability),
-        reasoning: MODEL_REGISTRY[model]?.reasoning,
-        modalities: MODEL_REGISTRY[model]?.modalities,
-        cost: MODEL_REGISTRY[model]?.cost,
+        ...modelInfo(model),
         isEnabled: !disabledModelSet.has(model),
       })),
-      ...customModelEntries(availability).map((entry) => ({
+      ...customModelEntries(availability).map((entry): ModelSearchItem => ({
         id: entry.id,
         providers: [entry.slug],
         isEnabled: !disabledModelSet.has(entry.id),
         custom: true,
       })),
     ];
-  } catch (error) {
-    console.error("Failed to search models:", error);
-    throw new Error("Failed to search models", { cause: error });
-  }
+  });
 }
 
-export async function getModelStats(userId: string, input: z.infer<typeof modelStatsInputSchema>) {
+export async function getModelStats(userId: string, input: ModelStatsInput): Promise<ModelStatsData> {
   try {
     const { models } = await getAvailableModelsForUser(userId);
     const availableModelSet = new Set(models);
@@ -173,7 +174,7 @@ export function getModelFamilyCounts() {
   }, {});
 }
 
-export async function setModelEnabled(userId: string, input: z.infer<typeof setModelEnabledInputSchema>) {
+export async function setModelEnabled(userId: string, input: SetModelEnabledInput): Promise<SetModelEnabledResult> {
   const modelId = input.modelId.trim();
 
   try {

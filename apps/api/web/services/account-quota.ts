@@ -1,18 +1,11 @@
 import { and, eq, inArray } from "drizzle-orm";
-import { z } from "zod";
-
 import { db, providerAccount } from "@opendum/database";
-import { QUOTA_PROVIDER_KEYS, type QuotaProviderKey } from "@opendum/providers/provider-accounts";
+import type { AccountQuotaBatchInput, AccountQuotaInput } from "@opendum/providers/contract";
+import { type QuotaProviderKey } from "@opendum/providers/provider-accounts";
 import { getProxyContext } from "../../context.js";
 import { fetchAccountQuota } from "../../core/quota.js";
 
-const MAX_QUOTA_BATCH_ACCOUNTS = 100;
-const quotaProviderSchema = z.enum([...QUOTA_PROVIDER_KEYS]);
 const quotaInFlight = new Map<string, Promise<AccountQuotaResult>>();
-const accountIdSchema = z.string().trim().min(1);
-
-export const accountQuotaInputSchema = z.object({ provider: quotaProviderSchema, accountId: accountIdSchema, forceRefresh: z.boolean().optional().default(false) });
-export const accountQuotaBatchInputSchema = z.object({ provider: quotaProviderSchema, accountIds: z.array(accountIdSchema).min(1).max(MAX_QUOTA_BATCH_ACCOUNTS), forceRefresh: z.boolean().optional().default(false) });
 
 type JsonRecord = Record<string, unknown>;
 
@@ -123,7 +116,7 @@ async function fetchQuota(userId: string, provider: QuotaProviderKey, accountId:
   }
 }
 
-export async function getAccountQuota(userId: string, input: z.infer<typeof accountQuotaInputSchema>) {
+export async function getAccountQuota(userId: string, input: AccountQuotaInput) {
   try {
     const [account] = await db
       .select(quotaOwnershipColumns)
@@ -140,7 +133,7 @@ export async function getAccountQuota(userId: string, input: z.infer<typeof acco
   }
 }
 
-export async function getAccountQuotas(userId: string, input: z.infer<typeof accountQuotaBatchInputSchema>) {
+export async function getAccountQuotas(userId: string, input: AccountQuotaBatchInput) {
   try {
     const accountIds = [...new Set(input.accountIds)];
     const accounts = await db

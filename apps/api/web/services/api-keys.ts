@@ -1,5 +1,4 @@
 import { and, asc, desc, eq, inArray, lte } from "drizzle-orm";
-import { z } from "zod";
 
 import { db, providerAccount, proxyApiKey, proxyApiKeyRateLimit } from "@opendum/database";
 import { decrypt, encrypt, generateApiKey, getKeyPreview, hashString } from "#web/lib/encryption.js";
@@ -12,40 +11,11 @@ import { compareModelEntries } from "@opendum/models/sort";
 import type { ActionResult } from "#web/utils/api.js";
 import { PROVIDER_ACCOUNT_KEYS } from "./account-providers.js";
 import { API_KEY_UPDATE_POINT_COST, debitUserPoints } from "./points.js";
+import { apiKeyAccessModeSchema, type ApiKeyAccessMode, type CreateApiKeyInput, type UpdateApiKeyAccountAccessInput, type UpdateApiKeyExpirationInput, type UpdateApiKeyModelAccessInput, type UpdateApiKeyNameInput, type UpdateApiKeyRateLimitsInput, type UpdateApiKeyRoamingInput } from "@opendum/providers/contract";
 
-const MAX_API_KEY_ACCESS_ENTRIES = 500;
-const MAX_API_KEY_RATE_LIMIT_RULES = 500;
-const apiKeyIdSchema = z.string().trim().min(1);
-
-export const apiKeyIdInputSchema = z.object({ id: apiKeyIdSchema });
-export const createApiKeyInputSchema = z.object({ name: z.string().max(120).optional(), expiresAt: z.coerce.date().nullable().optional() }).optional();
-export const updateApiKeyNameInputSchema = z.object({ id: apiKeyIdSchema, name: z.string().max(120), key: z.string().optional() });
-export const updateApiKeyExpirationInputSchema = z.object({ id: apiKeyIdSchema, expiresAt: z.coerce.date().nullable() });
-export const updateApiKeyRoamingInputSchema = z.object({ id: apiKeyIdSchema, enabled: z.boolean() });
-
-const apiKeyModelAccessModeSchema = z.enum(["all", "whitelist", "blacklist"]);
-const apiKeyAccountAccessModeSchema = z.enum(["all", "whitelist", "blacklist"]);
 const API_KEY_MIN_LENGTH = 3;
 const API_KEY_MAX_LENGTH = 100;
 const API_KEY_ALLOWED_PATTERN = /^[A-Za-z0-9_-]+$/;
-const rateLimitRuleSchema = z.object({
-  target: z.string().trim().min(1),
-  targetType: z.enum(["model", "family"]),
-  perMinute: z.number().int().nullable(),
-  perHour: z.number().int().nullable(),
-  perDay: z.number().int().nullable(),
-});
-export const updateApiKeyModelAccessInputSchema = z.object({ id: apiKeyIdSchema, mode: apiKeyModelAccessModeSchema, models: z.array(z.string().trim().min(1)).max(MAX_API_KEY_ACCESS_ENTRIES) });
-export const updateApiKeyAccountAccessInputSchema = z.object({ id: apiKeyIdSchema, mode: apiKeyAccountAccessModeSchema, accounts: z.array(z.string().trim().min(1)).max(MAX_API_KEY_ACCESS_ENTRIES) });
-export const updateApiKeyRateLimitsInputSchema = z.object({ id: apiKeyIdSchema, rules: z.array(rateLimitRuleSchema).max(MAX_API_KEY_RATE_LIMIT_RULES) });
-
-type CreateApiKeyInput = z.infer<typeof createApiKeyInputSchema>;
-type UpdateApiKeyNameInput = z.infer<typeof updateApiKeyNameInputSchema>;
-type UpdateApiKeyExpirationInput = z.infer<typeof updateApiKeyExpirationInputSchema>;
-type UpdateApiKeyRoamingInput = z.infer<typeof updateApiKeyRoamingInputSchema>;
-type UpdateApiKeyModelAccessInput = z.infer<typeof updateApiKeyModelAccessInputSchema>;
-type UpdateApiKeyAccountAccessInput = z.infer<typeof updateApiKeyAccountAccessInputSchema>;
-type UpdateApiKeyRateLimitsInput = z.infer<typeof updateApiKeyRateLimitsInputSchema>;
 
 interface ApiKeyReadOptions {
   expireActiveKeys?: boolean;
@@ -298,7 +268,7 @@ export async function updateApiKeyModelAccess(userId: string, input: UpdateApiKe
     const [updated] = await db.update(proxyApiKey).set({ modelAccessMode: input.mode, modelAccessList: normalizedModels }).where(eq(proxyApiKey.id, input.id)).returning({ modelAccessMode: proxyApiKey.modelAccessMode, modelAccessList: proxyApiKey.modelAccessList });
     if (!updated) return { success: false, error: "Failed to update API key model access" } as const;
     await invalidateApiKeyValidationCache(apiKey.keyHash, apiKey.id);
-    return { success: true, data: { mode: apiKeyModelAccessModeSchema.safeParse(updated.modelAccessMode).success ? updated.modelAccessMode as z.infer<typeof apiKeyModelAccessModeSchema> : "all", models: updated.modelAccessList } } as const;
+    return { success: true, data: { mode: apiKeyAccessModeSchema.safeParse(updated.modelAccessMode).success ? updated.modelAccessMode as ApiKeyAccessMode : "all", models: updated.modelAccessList } } as const;
   });
 }
 
@@ -315,7 +285,7 @@ export async function updateApiKeyAccountAccess(userId: string, input: UpdateApi
     const [updated] = await db.update(proxyApiKey).set({ accountAccessMode: input.mode, accountAccessList: normalizedAccounts }).where(eq(proxyApiKey.id, input.id)).returning({ accountAccessMode: proxyApiKey.accountAccessMode, accountAccessList: proxyApiKey.accountAccessList });
     if (!updated) return { success: false, error: "Failed to update API key account access" } as const;
     await invalidateApiKeyValidationCache(apiKey.keyHash, apiKey.id);
-    return { success: true, data: { mode: apiKeyAccountAccessModeSchema.safeParse(updated.accountAccessMode).success ? updated.accountAccessMode as z.infer<typeof apiKeyAccountAccessModeSchema> : "all", accounts: updated.accountAccessList } } as const;
+    return { success: true, data: { mode: apiKeyAccessModeSchema.safeParse(updated.accountAccessMode).success ? updated.accountAccessMode as ApiKeyAccessMode : "all", accounts: updated.accountAccessList } } as const;
   });
 }
 

@@ -8,7 +8,7 @@
     "generate": "nuxt generate",
     "test": "bun test",
     "lint": "oxlint .",
-    "check": "nuxt prepare && vue-tsc --noEmit -p .nuxt/tsconfig.app.json && vue-tsc --noEmit -p .nuxt/tsconfig.server.json"
+    "typecheck": "nuxt prepare && vue-tsc --noEmit -p .nuxt/tsconfig.app.json && vue-tsc --noEmit -p .nuxt/tsconfig.server.json"
   },
   "dependencies": {
     "@internationalized/date": "^3.12.2",
@@ -16,6 +16,7 @@
     "@nuxt/fonts": "^1.0.1",
     "@opendum/models": "workspace:*",
     "@opendum/providers": "workspace:*",
+    "@orpc/client": "1.15.7",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
     "eventsource-parser": "^3.1.0",

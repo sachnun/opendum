@@ -1,6 +1,7 @@
 import { and, eq, gt, gte, inArray, ne, sql } from "drizzle-orm";
 
 import { db, normalizeEmail, pointTransaction, providerEmailRegistry, proxyApiKey, user, userPointBalance, type Database } from "@opendum/database";
+import { publishPointsBalance } from "#web/events/bus.js";
 import { roamingUsagePointsByApiKey } from "#web/lib/roaming-points.js";
 
 export const API_KEY_UPDATE_POINT_COST = 20;
@@ -73,6 +74,8 @@ async function applyPointTransactionWithClient(client: PointDatabase, input: Poi
     .update(pointTransaction)
     .set({ balanceAfter: updated!.balance })
     .where(eq(pointTransaction.id, inserted.id));
+
+  publishPointsBalance(input.userId, updated!.balance);
 
   return { applied: true, balance: updated!.balance };
 }
@@ -249,6 +252,8 @@ export async function debitUserPoints(client: PointDatabase, userId: string, amo
     type,
     balanceAfter: debited.balance,
   });
+
+  publishPointsBalance(userId, debited.balance);
 
   return { success: true, balance: debited.balance };
 }

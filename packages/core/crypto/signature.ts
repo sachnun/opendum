@@ -4,15 +4,6 @@ export function hmacHex(secret: string, message: string): string {
   return createHmac("sha256", secret).update(message).digest("hex");
 }
 
-export function internalSignature(
-  secret: string,
-  timestamp: string,
-  path: string,
-  body: string
-): string {
-  return hmacHex(secret, `${timestamp}\n${path}\n${body}`);
-}
-
 export function playgroundSignature(
   secret: string,
   userID: string,

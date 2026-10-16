@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "dev": "(bun run --filter @opendum/web dev & bun run --filter @opendum/api dev)",
-    "build": "bun run --filter @opendum/web build && bun run --filter @opendum/api check",
+    "build": "bun run --filter @opendum/web build && bun run --filter @opendum/api typecheck",
     "lint": "oxlint .",
     "db:push": "bun run --filter @opendum/database db:push",
     "db:generate": "bun run --filter @opendum/database db:generate",
