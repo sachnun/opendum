@@ -17,7 +17,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "test": "bun test",
-    "check": "bun check"
+    "typecheck": "bun check"
   },
   "dependencies": {
     "@paralleldrive/cuid2": "^3.3.0",

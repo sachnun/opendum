@@ -16,7 +16,7 @@
   },
   "scripts": {
     "test": "bun test",
-    "check": "bun check"
+    "typecheck": "bun check"
   },
   "dependencies": {
     "effect": "4.0.4",

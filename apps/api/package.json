@@ -7,7 +7,7 @@
     "dev": "nitro dev",
     "build": "nitro build",
     "start": "bun .output/server/index.mjs",
-    "check": "bun check",
+    "typecheck": "bun check",
     "test": "bun test",
     "lint": "oxlint ."
   },

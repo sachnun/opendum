@@ -8,7 +8,7 @@
     "generate": "nuxt generate",
     "test": "bun test",
     "lint": "oxlint .",
-    "check": "nuxt prepare && vue-tsc --noEmit -p .nuxt/tsconfig.app.json && vue-tsc --noEmit -p .nuxt/tsconfig.server.json"
+    "typecheck": "nuxt prepare && vue-tsc --noEmit -p .nuxt/tsconfig.app.json && vue-tsc --noEmit -p .nuxt/tsconfig.server.json"
   },
   "dependencies": {
     "@internationalized/date": "^3.12.2",

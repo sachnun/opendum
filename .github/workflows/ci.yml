@@ -29,7 +29,7 @@ jobs:
         run: bun run --filter @opendum/web test
 
       - name: Typecheck web
-        run: bun run --filter @opendum/web check
+        run: bun run --filter @opendum/web typecheck
 
       - name: Build web
         run: bun run --filter @opendum/web generate
@@ -54,13 +54,13 @@ jobs:
         run: bun run lint
 
       - name: Typecheck packages
-        run: bun run --filter "./packages/*" --if-present check
+        run: bun run --filter "./packages/*" --if-present typecheck
 
       - name: Test packages
         run: bun run --filter "./packages/*" --if-present test
 
       - name: Typecheck api
-        run: bun run --filter @opendum/api check
+        run: bun run --filter @opendum/api typecheck
 
       - name: Test api
         run: bun run --filter @opendum/api test

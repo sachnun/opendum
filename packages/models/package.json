@@ -23,7 +23,7 @@
     "refresh": "bun ./scripts/models.ts",
     "family-ranking": "bun ./scripts/family-ranking.ts",
     "test": "bun test",
-    "check": "bun check"
+    "typecheck": "bun check"
   },
   "dependencies": {
     "effect": "4.0.4",
