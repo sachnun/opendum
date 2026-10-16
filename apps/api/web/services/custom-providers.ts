@@ -1,80 +1,17 @@
 import { and, count, eq, inArray } from "drizzle-orm";
-import { z } from "zod";
 
 import { db, customProvider, customProviderModel, providerAccount } from "@opendum/database";
 import { stripParamInfoKey } from "@opendum/models/clean-key";
 import { idMap } from "@opendum/models/model-store";
 import { decrypt, encrypt, hashString } from "#web/lib/encryption.js";
 import { fetchExternal } from "#web/lib/external.js";
+import type { CreateCustomProviderInput, CustomModelInput, PreviewCustomModelsInput, UpdateCustomProviderInput } from "@opendum/providers/contract";
 import { PROVIDER_ACCOUNT_KEYS } from "./account-providers.js";
 import type { ActionResult } from "#web/utils/api.js";
 
-const SLUG_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/;
 const API_KEY_ACCOUNT_EXPIRY = new Date("2100-01-01T00:00:00.000Z");
 const INTERNAL_RELAY_ERROR_HEADER = "X-Opendum-Internal-Relay-Error";
 const VALIDATION_TIMEOUT_MS = 15000;
-
-export const customModelInputSchema = z.object({
-  modelId: z.string().trim().min(1).max(120),
-  upstream: z.string().trim().max(200).optional(),
-  aliased: z.boolean().optional(),
-  authless: z.boolean().optional(),
-  minTier: z.string().trim().max(60).optional(),
-  allowedTiers: z.array(z.string().trim().min(1)).optional(),
-  customFlags: z
-    .object({
-      responses_api: z.boolean().optional(),
-      top_p_deprecated: z.boolean().optional(),
-      convert_external_images: z.boolean().optional(),
-    })
-    .optional(),
-});
-
-export const createCustomProviderSchema = z.object({
-  slug: z.string().trim().toLowerCase().regex(SLUG_PATTERN, "Slug must match [a-z][a-z0-9_-]{0,31}"),
-  name: z.string().trim().min(1).max(120),
-  baseUrl: z.string().trim().min(1).max(500),
-  extraHeaders: z.record(z.string(), z.string()).optional(),
-});
-
-export const previewCustomModelsSchema = z.object({
-  baseUrl: z.string().trim().min(1).max(500),
-  extraHeaders: z.record(z.string(), z.string()).optional(),
-  token: z.string().trim().optional(),
-});
-
-export const updateCustomProviderSchema = z.object({
-  slug: z.string().trim().toLowerCase().regex(SLUG_PATTERN, "Invalid slug"),
-  name: z.string().trim().min(1).max(120).optional(),
-  baseUrl: z.string().trim().min(1).max(500).optional(),
-  extraHeaders: z.record(z.string(), z.string()).optional(),
-  enabled: z.boolean().optional(),
-});
-
-export const deleteCustomProviderSchema = z.object({
-  slug: z.string().trim().toLowerCase().regex(SLUG_PATTERN, "Invalid slug"),
-});
-
-export const connectCustomProviderAccountSchema = z.object({
-  slug: z.string().trim().toLowerCase().regex(SLUG_PATTERN, "Invalid slug"),
-  token: z.string().trim().min(1),
-  name: z.string().trim().max(120).optional(),
-});
-
-export const upsertCustomModelsSchema = z.object({
-  slug: z.string().trim().toLowerCase().regex(SLUG_PATTERN, "Invalid slug"),
-  models: z.array(customModelInputSchema).min(1).max(500),
-});
-
-export const deleteCustomModelSchema = z.object({
-  slug: z.string().trim().toLowerCase().regex(SLUG_PATTERN, "Invalid slug"),
-  modelId: z.string().trim().min(1).max(120),
-});
-
-export const syncCustomModelsSchema = z.object({
-  slug: z.string().trim().toLowerCase().regex(SLUG_PATTERN, "Invalid slug"),
-  token: z.string().trim().optional(),
-});
 
 function isProbablyPrivateTarget(raw: string): boolean {
   let parsed: URL;
@@ -157,7 +94,7 @@ export async function customProviderModels(userId: string, slug: string): Promis
   return rows.map((row) => row.modelId);
 }
 
-export async function createCustomProvider(userId: string, input: z.infer<typeof createCustomProviderSchema>): Promise<ActionResult<{ id: string; slug: string }>> {
+export async function createCustomProvider(userId: string, input: CreateCustomProviderInput): Promise<ActionResult<{ id: string; slug: string }>> {
   const baseUrl = normalizeBaseUrl(input.baseUrl);
   if (!baseUrl) return { success: false, error: "baseUrl is invalid or targets a private network address." };
   if (PROVIDER_ACCOUNT_KEYS.includes(input.slug as (typeof PROVIDER_ACCOUNT_KEYS)[number])) return { success: false, error: `Slug "${input.slug}" is reserved for a built-in provider.` };
@@ -179,7 +116,7 @@ export async function createCustomProvider(userId: string, input: z.infer<typeof
   return { success: true, data: { id: created.id, slug: created.slug } };
 }
 
-export async function updateCustomProvider(userId: string, input: z.infer<typeof updateCustomProviderSchema>): Promise<ActionResult> {
+export async function updateCustomProvider(userId: string, input: UpdateCustomProviderInput): Promise<ActionResult> {
   const provider = await ownedProvider(userId, input.slug);
   if (!provider) return { success: false, error: `Custom provider "${input.slug}" not found.` };
   const baseUrl = input.baseUrl == null ? undefined : normalizeBaseUrl(input.baseUrl);
@@ -204,7 +141,7 @@ export async function deleteCustomProvider(userId: string, slug: string): Promis
   return { success: true, data: undefined };
 }
 
-export async function upsertCustomModels(userId: string, slug: string, models: z.infer<typeof customModelInputSchema>[]): Promise<ActionResult<{ added: number }>> {
+export async function upsertCustomModels(userId: string, slug: string, models: CustomModelInput[]): Promise<ActionResult<{ added: number }>> {
   const provider = await ownedProvider(userId, slug);
   if (!provider) return { success: false, error: `Custom provider "${slug}" not found.` };
   const seen = new Set<string>();
@@ -286,7 +223,7 @@ export async function syncCustomModels(userId: string, slug: string, token?: str
   return { success: true, data: { added: upserted.data.added, discovered: fetched.data.ids.length } };
 }
 
-export async function previewCustomModels(input: z.infer<typeof previewCustomModelsSchema>): Promise<ActionResult<{ models: Array<{ modelId: string; upstream: string }> }>> {
+export async function previewCustomModels(input: PreviewCustomModelsInput): Promise<ActionResult<{ models: Array<{ modelId: string; upstream: string }> }>> {
   const baseUrl = normalizeBaseUrl(input.baseUrl);
   if (!baseUrl) return { success: false, error: "baseUrl is invalid or targets a private network address." };
   const fetched = await syncFromUpstream(baseUrl, input.token, input.extraHeaders);

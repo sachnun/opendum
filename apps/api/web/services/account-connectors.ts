@@ -1,5 +1,6 @@
 import { and, count as countFn, eq } from "drizzle-orm";
-import { z } from "zod";
+
+import type { CreateAccountInput } from "@opendum/providers/contract";
 
 import { db, providerAccount } from "@opendum/database";
 import { publishAccountsChanged } from "#web/events/bus.js";
@@ -21,9 +22,6 @@ const API_KEY_PROVIDER_ACCOUNT_EXPIRY = new Date("2100-01-01T00:00:00.000Z");
 const API_KEY_VALIDATION_TIMEOUT_MS = 15000;
 const INTERNAL_RELAY_ERROR_HEADER = "X-Opendum-Internal-Relay-Error";
 
-const apiKeyProviderSchema = z.enum([...API_KEY_PROVIDER_KEYS]);
-export const createAccountInputSchema = z.object({ provider: z.string(), name: z.string().optional(), token: z.string(), cfAccountId: z.string().optional(), platformKey: z.string().optional() });
-type CreateAccountInput = z.infer<typeof createAccountInputSchema>;
 
 const MODELS_VALIDATION = { validationPath: "/models", requireSuccessfulStatus: true, skipInference: false } as const;
 const CHAT_AUTH_PROBE = { validationPath: "/chat/completions", requireSuccessfulStatus: false, skipInference: true } as const;
@@ -147,7 +145,7 @@ async function connectCloudflare(userId: string, apiToken: string, cfAccountId: 
 }
 
 const ACCOUNT_CONNECTORS = {
-  ...Object.fromEntries(apiKeyProviderSchema.options.map((provider) => [provider, (userId: string, input: CreateAccountInput) => connectApiKeyProviderAccount(userId, provider, input.token, input.name, input.platformKey)])),
+  ...Object.fromEntries(API_KEY_PROVIDER_KEYS.map((provider) => [provider, (userId: string, input: CreateAccountInput) => connectApiKeyProviderAccount(userId, provider, input.token, input.name, input.platformKey)])),
   workers_ai: (userId: string, input: CreateAccountInput) => connectCloudflare(userId, input.token, input.cfAccountId ?? "", input.name),
 } as Record<string, (userId: string, input: CreateAccountInput) => Promise<ActionResult<{ email: string; isUpdate: boolean }>>>;
 

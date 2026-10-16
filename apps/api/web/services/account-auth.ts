@@ -1,6 +1,6 @@
 import { and, count as countFn, eq } from "drizzle-orm";
-import { z } from "zod";
 
+import type { ConnectCodexSessionInput, ExchangeOAuthInput, GetAuthUrlInput, InitiateDeviceAuthInput, PollDeviceAuthInput } from "@opendum/providers/contract";
 import { db, providerAccount } from "@opendum/database";
 import { publishAccountsChanged } from "#web/events/bus.js";
 import { encrypt } from "#web/lib/encryption.js";
@@ -13,17 +13,11 @@ import { exchangePerchOAuthCode, initiatePerchOAuth } from "#web/lib/providers/p
 import { initiateClineDeviceCodeFlow, pollClineDeviceCodeAuthorization } from "#web/lib/providers/cline/index.js";
 import { clearRefreshFailCount } from "#web/lib/proxy/auth.js";
 import type { OAuthResult } from "#web/lib/providers/types.js";
-import { DEVICE_PROVIDER_KEYS, OAUTH_PROVIDER_KEYS, type DeviceProviderKey, type OAuthProviderKey } from "@opendum/providers/provider-accounts";
+import type { DeviceProviderKey, OAuthProviderKey } from "@opendum/providers/provider-accounts";
 import type { ActionResult } from "#web/utils/api.js";
 import { trackProviderEmail } from "./points.js";
 
 const GOOGLE_OAUTH_AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth";
-
-export const getAuthUrlInputSchema = z.object({ provider: z.enum([...OAUTH_PROVIDER_KEYS]) });
-export const exchangeOAuthInputSchema = z.object({ provider: z.enum([...OAUTH_PROVIDER_KEYS]), callbackUrl: z.string(), state: z.string().nullable().optional(), codeVerifier: z.string().nullable().optional() });
-export const initiateDeviceAuthInputSchema = z.object({ provider: z.enum([...DEVICE_PROVIDER_KEYS]), method: z.string().optional() });
-export const pollDeviceAuthInputSchema = z.object({ provider: z.enum([...DEVICE_PROVIDER_KEYS]), deviceCode: z.string(), userCode: z.string().optional(), codeVerifier: z.string().optional(), method: z.string().optional(), machineId: z.string().optional() });
-export const connectCodexSessionInputSchema = z.object({ sessionJson: z.string().min(1, "Session JSON is required") });
 
 type ProviderAccountKey = OAuthProviderKey | DeviceProviderKey;
 type AuthUrlResult = { authUrl: string; state: string | null; codeVerifier: string | null };
@@ -102,7 +96,7 @@ const DEVICE_PROVIDERS = {
     label: "Codex",
     emailPrefix: "codex",
     initiate: initiateCodexDeviceCodeFlow,
-    poll: (input: z.infer<typeof pollDeviceAuthInputSchema>) => pollCodexDeviceCodeAuthorization(input.deviceCode, input.userCode ?? ""),
+    poll: (input: PollDeviceAuthInput) => pollCodexDeviceCodeAuthorization(input.deviceCode, input.userCode ?? ""),
   },
   workbuddy: {
     label: "WorkBuddy",
@@ -118,7 +112,7 @@ const DEVICE_PROVIDERS = {
         interval: result.interval,
       };
     },
-    poll: async (input: z.infer<typeof pollDeviceAuthInputSchema>) => {
+    poll: async (input: PollDeviceAuthInput) => {
       return pollWorkbuddyDeviceCodeAuthorization(input.deviceCode);
     },
   },
@@ -136,11 +130,11 @@ const DEVICE_PROVIDERS = {
         interval: result.interval,
       };
     },
-    poll: async (input: z.infer<typeof pollDeviceAuthInputSchema>) => {
+    poll: async (input: PollDeviceAuthInput) => {
       return pollClineDeviceCodeAuthorization(input.deviceCode);
     },
   },
-} satisfies Record<DeviceProviderKey, { label: string; emailPrefix: string; initiate: (input: z.infer<typeof initiateDeviceAuthInputSchema>) => Promise<unknown>; poll: (input: z.infer<typeof pollDeviceAuthInputSchema>) => Promise<unknown> }>;
+} satisfies Record<DeviceProviderKey, { label: string; emailPrefix: string; initiate: (input: InitiateDeviceAuthInput) => Promise<unknown>; poll: (input: PollDeviceAuthInput) => Promise<unknown> }>;
 
 function parseOAuthCallbackUrl(callbackUrl: string, providerLabel: string): ActionResult<{ code: string; state: string | null }> {
   if (!callbackUrl || typeof callbackUrl !== "string") return { success: false, error: "Callback URL is required" };
@@ -214,14 +208,14 @@ function oauthAccountOptions(provider: OAuthProviderKey, config: (typeof OAUTH_P
   return { email: accountId ? `${config.accountIdPrefix}-${accountId}` : `${config.accountIdPrefix}-${Date.now()}`, accountId, dedupeByAccountId: true };
 }
 
-function validateOAuthContext(config: (typeof OAUTH_PROVIDERS)[OAuthProviderKey], input: z.infer<typeof exchangeOAuthInputSchema>, parsedState: string | null): ActionResult<void> | null {
+function validateOAuthContext(config: (typeof OAUTH_PROVIDERS)[OAuthProviderKey], input: ExchangeOAuthInput, parsedState: string | null): ActionResult<void> | null {
   if (!config.requiresCodeVerifier) return null;
   if (parsedState !== input.state) return { success: false, error: "Invalid OAuth state. Please restart authentication." };
   if (!input.codeVerifier) return { success: false, error: "Missing authentication context. Please restart authentication." };
   return null;
 }
 
-export async function getAccountAuthUrl(input: z.infer<typeof getAuthUrlInputSchema>) {
+export async function getAccountAuthUrl(input: GetAuthUrlInput) {
   try {
     return { success: true, data: await OAUTH_PROVIDERS[input.provider].buildAuthUrl() } as const;
   } catch (error) {
@@ -230,7 +224,7 @@ export async function getAccountAuthUrl(input: z.infer<typeof getAuthUrlInputSch
   }
 }
 
-export async function exchangeOAuthAccount(userId: string, input: z.infer<typeof exchangeOAuthInputSchema>) {
+export async function exchangeOAuthAccount(userId: string, input: ExchangeOAuthInput) {
   try {
     const config = OAUTH_PROVIDERS[input.provider];
     const parsedUrl = parseOAuthCallbackUrl(input.callbackUrl, config.label);
@@ -246,7 +240,7 @@ export async function exchangeOAuthAccount(userId: string, input: z.infer<typeof
   }
 }
 
-export async function connectCodexSessionAccount(userId: string, input: z.infer<typeof connectCodexSessionInputSchema>) {
+export async function connectCodexSessionAccount(userId: string, input: ConnectCodexSessionInput) {
   try {
     const oauthResult = buildOAuthResultFromChatGPTSession(input.sessionJson);
     return await upsertOAuthAccount(userId, "codex", "Codex", oauthResult, oauthAccountOptions("codex", OAUTH_PROVIDERS.codex, oauthResult));
@@ -256,7 +250,7 @@ export async function connectCodexSessionAccount(userId: string, input: z.infer<
   }
 }
 
-export async function initiateDeviceAuth(input: z.infer<typeof initiateDeviceAuthInputSchema>) {
+export async function initiateDeviceAuth(input: InitiateDeviceAuthInput) {
   try {
     const result = await DEVICE_PROVIDERS[input.provider].initiate();
     return { success: true, data: result } as const;
@@ -266,7 +260,7 @@ export async function initiateDeviceAuth(input: z.infer<typeof initiateDeviceAut
   }
 }
 
-export async function pollDeviceAuth(userId: string, input: z.infer<typeof pollDeviceAuthInputSchema>) {
+export async function pollDeviceAuth(userId: string, input: PollDeviceAuthInput) {
   try {
     const config = DEVICE_PROVIDERS[input.provider];
     const result = await config.poll(input);

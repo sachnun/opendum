@@ -1,4 +1,3 @@
-import type { ModelStats } from "@opendum/models/stats";
 import type { QuotaProviderKey } from "../provider-accounts.js";
 export interface ModelModalities {
   input: string[];
@@ -233,27 +232,7 @@ export interface ApiKeyOptions {
   rateLimitsByKeyId: Record<string, Array<{ target: string; targetType: "model" | "family"; perMinute: number | null; perHour: number | null; perDay: number | null }>>;
 }
 
-export interface ModelListItem {
-  id: string;
-  name: string;
-  family: string;
-  providers: string[];
-  reasoning?: boolean;
-  modalities?: ModelModalities;
-  cost?: ModelCost;
-  isEnabled: boolean;
-  available?: boolean;
-  custom?: boolean;
-  stats?: ModelStats;
-}
-
-export interface ModelStatsData {
-  delta: true;
-  cursors: Record<string, string>;
-  stats?: Record<string, ModelStats>;
-}
-
-export type ModelSearchItem = Omit<ModelListItem, "name" | "family" | "stats">;
+export type { ModelListItem, ModelSearchItem, ModelStats, ModelStatsData } from "./models.js";
 
 export interface PlaygroundOptions {
   proxyBaseUrl?: string;

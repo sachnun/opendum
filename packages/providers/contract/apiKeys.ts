@@ -11,7 +11,7 @@ const createApiKeyInputSchema = z.object({ name: z.string().max(120).optional(),
 const updateApiKeyNameInputSchema = z.object({ id: apiKeyIdSchema, name: z.string().max(120), key: z.string().optional() });
 const updateApiKeyExpirationInputSchema = z.object({ id: apiKeyIdSchema, expiresAt: z.coerce.date().nullable() });
 const updateApiKeyRoamingInputSchema = z.object({ id: apiKeyIdSchema, enabled: z.boolean() });
-const apiKeyModelAccessModeSchema = z.enum(["all", "whitelist", "blacklist"]);
+export const apiKeyAccessModeSchema = z.enum(["all", "whitelist", "blacklist"]);
 const rateLimitRuleSchema = z.object({
   target: z.string().trim().min(1),
   targetType: z.enum(["model", "family"]),
@@ -19,8 +19,8 @@ const rateLimitRuleSchema = z.object({
   perHour: z.number().int().nullable(),
   perDay: z.number().int().nullable(),
 });
-const updateApiKeyModelAccessInputSchema = z.object({ id: apiKeyIdSchema, mode: apiKeyModelAccessModeSchema, models: z.array(z.string().trim().min(1)).max(MAX_API_KEY_ACCESS_ENTRIES) });
-const updateApiKeyAccountAccessInputSchema = z.object({ id: apiKeyIdSchema, mode: apiKeyModelAccessModeSchema, accounts: z.array(z.string().trim().min(1)).max(MAX_API_KEY_ACCESS_ENTRIES) });
+const updateApiKeyModelAccessInputSchema = z.object({ id: apiKeyIdSchema, mode: apiKeyAccessModeSchema, models: z.array(z.string().trim().min(1)).max(MAX_API_KEY_ACCESS_ENTRIES) });
+const updateApiKeyAccountAccessInputSchema = z.object({ id: apiKeyIdSchema, mode: apiKeyAccessModeSchema, accounts: z.array(z.string().trim().min(1)).max(MAX_API_KEY_ACCESS_ENTRIES) });
 const updateApiKeyRateLimitsInputSchema = z.object({ id: apiKeyIdSchema, rules: z.array(rateLimitRuleSchema).max(MAX_API_KEY_RATE_LIMIT_RULES) });
 
 export const apiKeysContract = {
@@ -38,6 +38,7 @@ export const apiKeysContract = {
   toggle: oc.input(apiKeyIdInputSchema),
 };
 
+export type ApiKeyAccessMode = z.infer<typeof apiKeyAccessModeSchema>;
 export type ApiKeyIdInput = z.infer<typeof apiKeyIdInputSchema>;
 export type CreateApiKeyInput = z.infer<typeof createApiKeyInputSchema>;
 export type UpdateApiKeyNameInput = z.infer<typeof updateApiKeyNameInputSchema>;
