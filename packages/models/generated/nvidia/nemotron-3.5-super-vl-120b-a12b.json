@@ -4,7 +4,8 @@
     "cline",
     "kilo_code",
     "opencode",
-    "openrouter"
+    "openrouter",
+    "nvidia_nim"
   ],
   "aliases": [
     "cline-free-nemotron-3.5-super-vl",
@@ -53,6 +54,11 @@
       "upstream": "nvidia/nemotron-3.5-super-vl:free",
       "contextWindow": 1000000,
       "maxOutputTokens": 131072
+    },
+    "nvidia_nim": {
+      "upstream": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+      "contextWindow": 1048576,
+      "maxOutputTokens": 1048576
     },
     "opencode": {
       "upstream": "nemotron-3.5-super-vl-free",

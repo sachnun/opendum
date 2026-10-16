@@ -1,6 +1,6 @@
 {
   "providers": [
-    "opencode"
+    "kilo_code"
   ],
   "reasoning": true,
   "reasoning_effort": [
@@ -28,8 +28,8 @@
     "cacheRead": 0
   },
   "providerConfig": {
-    "opencode": {
-      "upstream": "cat-jam-free",
+    "kilo_code": {
+      "upstream": "stealth/cat-jam",
       "contextWindow": 1048576,
       "maxOutputTokens": 131072
     }

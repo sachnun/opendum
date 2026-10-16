@@ -27,8 +27,8 @@
     "output": 16384
   },
   "cost": {
-    "input": 0.85,
-    "output": 2.95
+    "input": 0.5,
+    "output": 1.5
   },
   "scores": {
     "artificialAnalysis": {
