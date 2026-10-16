@@ -33,7 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:
-      name: proxy
+      name: api
     env:
       KOYEB_APP: ${{ vars.KOYEB_APP }}
       KOYEB_SERVICE: ${{ vars.KOYEB_SERVICE }}
