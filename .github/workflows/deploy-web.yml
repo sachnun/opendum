@@ -7,9 +7,13 @@ on:
     paths:
       - .github/workflows/deploy-web.yml
       - apps/web/**
-      - packages/database/**
-      - packages/models/**
-      - packages/providers/**
+      - packages/models/package.json
+      - packages/models/ranking.ts
+      - packages/models/ranking.generated.ts
+      - packages/models/sort.ts
+      - packages/models/stats.ts
+      - packages/providers/package.json
+      - packages/providers/provider-accounts.ts
       - package.json
       - bun.lock
   workflow_run:
