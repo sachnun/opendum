@@ -2,7 +2,8 @@
   "id": "kimi-k3",
   "providers": [
     "hyper",
-    "workbuddy"
+    "workbuddy",
+    "kiro"
   ],
   "aliases": [
     "kimi-k3-eco"
@@ -27,7 +28,7 @@
     "output": 131072
   },
   "cost": {
-    "input": 2.25,
+    "input": 2.025,
     "output": 71.25,
     "cacheRead": 1.4
   },
@@ -41,6 +42,10 @@
     "hyper": {
       "contextWindow": 1048576,
       "maxOutputTokens": 16000
+    },
+    "kiro": {
+      "contextWindow": 1048576,
+      "maxOutputTokens": 131072
     },
     "workbuddy": {
       "contextWindow": 1048576,
