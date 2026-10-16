@@ -234,8 +234,9 @@ export async function upsertCustomModels(userId: string, slug: string, models: z
           allowedTiers: input.allowedTiers ?? null,
           customFlags: input.customFlags ?? {},
         },
-      });
-    added += result.rowCount ?? 0;
+      })
+      .returning({ modelId: customProviderModel.modelId });
+    added += result.length;
   }
   return { success: true, data: { added } };
 }
