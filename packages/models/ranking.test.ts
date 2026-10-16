@@ -5,7 +5,7 @@ import {
   MODEL_FAMILY_SORT_ORDER,
   categorizeModelFamily,
   getModelFamilyAnchorId,
-} from "./model-families";
+} from "./ranking.ts";
 
 const FEATURED_FAMILIES = MODEL_FAMILY_SORT_ORDER.filter((family) => family !== "Others");
 

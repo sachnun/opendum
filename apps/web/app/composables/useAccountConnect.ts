@@ -6,7 +6,7 @@ import {
   isDeviceProvider,
   isOAuthProvider,
 } from "~~/lib/provider-auth-config";
-import type { DeviceProviderKey } from "~~/lib/provider-accounts";
+import type { DeviceProviderKey } from "@opendum/providers/provider-accounts";
 import type { FlowType, MethodKey, Provider, ProviderConfig } from "~~/lib/provider-auth-config";
 
 export function useAccountConnect(

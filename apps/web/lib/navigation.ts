@@ -1,5 +1,5 @@
-import { MODEL_FAMILY_NAV_ITEMS } from "./model-families";
-import { getProviderAccountPath, PROVIDER_ACCOUNT_DEFINITIONS } from "./provider-accounts";
+import { MODEL_FAMILY_NAV_ITEMS } from "@opendum/models/ranking";
+import { getProviderAccountPath, PROVIDER_ACCOUNT_DEFINITIONS } from "@opendum/providers/provider-accounts";
 
 export interface NavItem {
   name: string;

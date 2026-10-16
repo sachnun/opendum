@@ -1,4 +1,4 @@
-import { MODEL_FAMILY_SORT_ORDER, categorizeModelFamily, type ModelFamily } from "./model-families";
+import { MODEL_FAMILY_SORT_ORDER, categorizeModelFamily, type ModelFamily } from "./ranking.ts";
 
 export type ModelSortEntry = string | { id?: string; name?: string; family?: string | null };
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { compareModelIds } from "~~/lib/model-sort";
+import { compareModelIds } from "@opendum/models/sort";
 import type { ProviderAccountModelHealthItem } from "~~/lib/api-types";
 
 const props = defineProps<{

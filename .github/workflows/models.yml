@@ -31,7 +31,7 @@ jobs:
         run: bun run --filter @opendum/models refresh --summary "$RUNNER_TEMP/summary.md"
 
       - name: Regenerate family ranking
-        run: bun run --filter @opendum/web family-ranking
+        run: bun run --filter @opendum/models family-ranking
 
       - name: Build commit message
         id: commit_msg

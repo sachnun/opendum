@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { buildDayKeys, buildEmptyModelStats, buildHourKeys } from "./model-stats";
+import { buildDayKeys, buildEmptyModelStats, buildHourKeys } from "./stats.ts";
 
 test("buildDayKeys returns ascending UTC day keys ending today", () => {
   const keys = buildDayKeys(3);

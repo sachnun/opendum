@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 
-import { MODEL_FAMILY_SORT_ORDER } from "./model-families";
-import { compareModelEntries, compareModelIds } from "./model-sort";
+import { MODEL_FAMILY_SORT_ORDER } from "./ranking.ts";
+import { compareModelEntries, compareModelIds } from "./sort.ts";
 
 const FEATURED_FAMILIES = MODEL_FAMILY_SORT_ORDER.filter((family) => family !== "Others");
 const TOP_FAMILY = FEATURED_FAMILIES[0]!;

@@ -1,4 +1,4 @@
-import { MODEL_FAMILY_RANKING } from "./model-family-ranking.generated";
+import { MODEL_FAMILY_RANKING } from "./ranking.generated.ts";
 
 type ModelFamilyRankingEntry = (typeof MODEL_FAMILY_RANKING)[number];
 export type ModelFamily = ModelFamilyRankingEntry["name"] | "Others";

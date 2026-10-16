@@ -7,8 +7,8 @@ import { fileURLToPath } from "node:url";
 import { flagshipFamilyRanking, loadModelEntries } from "@opendum/models/runtime";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
-const dataDir = resolve(scriptDir, "../../../packages/models/data");
-const outputPath = resolve(scriptDir, "../lib/model-family-ranking.generated.ts");
+const dataDir = resolve(scriptDir, "../data");
+const outputPath = resolve(scriptDir, "../ranking.generated.ts");
 const MIN_FLAGSHIP_SCORE = 20;
 
 const ranking = flagshipFamilyRanking(loadModelEntries(dataDir))

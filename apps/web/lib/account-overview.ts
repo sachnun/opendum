@@ -5,8 +5,8 @@ import type {
   ProviderAccountIndicators,
 } from "./navigation";
 import type { AccountOverviewData, AccountOverviewDeltaData, AccountOverviewResponse, AccountPingData } from "./api-types";
-import { MODEL_FAMILY_NAV_ITEMS, categorizeModelFamily } from "./model-families";
-import { PROVIDER_ACCOUNT_DEFINITIONS } from "./provider-accounts";
+import { MODEL_FAMILY_NAV_ITEMS, categorizeModelFamily } from "@opendum/models/ranking";
+import { PROVIDER_ACCOUNT_DEFINITIONS } from "@opendum/providers/provider-accounts";
 
 export interface ShellAccountSummary {
   accountCounts: ProviderAccountCounts;
