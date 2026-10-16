@@ -119,11 +119,15 @@ export const pingSchema = z.object({
   at: z.string(),
 });
 
-export const serverEventSchema = z.discriminatedUnion("type", [
+const updateEventSchema = z.discriminatedUnion("topic", [
   pointsUpdateSchema,
   accountsUpdateSchema,
   modelsUpdateSchema,
   usageUpdateSchema,
+]);
+
+export const serverEventSchema = z.discriminatedUnion("type", [
+  updateEventSchema,
   pingSchema,
 ]);
 
