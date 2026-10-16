@@ -11,8 +11,8 @@
     "models:refresh": "bun run --filter @opendum/models refresh && bun run --filter @opendum/models family-ranking"
   },
   "devDependencies": {
-    "edgeone": "^1.6.41",
-    "oxlint": "^1.88.0"
+    "oxlint": "^1.88.0",
+    "wrangler": "^4.151.1"
   },
   "trustedDependencies": [
     "esbuild",

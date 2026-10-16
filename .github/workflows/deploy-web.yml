@@ -21,20 +21,24 @@ on:
 
 permissions:
   contents: read
-  deployments: write
 
 concurrency:
-  group: edgeone-web-${{ github.ref }}
+  group: cloudflare-pages-web-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   deploy:
     if: github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
-    name: Web EdgeOne Pages
+    name: Web Cloudflare Pages
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:
       name: web
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_PAGES_PROJECT: opendum
+      NUXT_PUBLIC_API_URL: ${{ vars.NUXT_PUBLIC_API_URL }}
 
     steps:
       - name: Checkout repository
@@ -48,21 +52,27 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Link EdgeOne project
-        working-directory: apps/web
-        run: bun run edgeone makers link -n opendum -t "$EDGEONE_API_TOKEN"
-        env:
-          EDGEONE_API_TOKEN: ${{ secrets.EDGEONE_API_TOKEN }}
+      - name: Validate Cloudflare configuration
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$CLOUDFLARE_PAGES_PROJECT"
+          test -n "$NUXT_PUBLIC_API_URL"
 
       - name: Build web
         working-directory: apps/web
-        run: bun run build
+        run: bun run generate
         env:
-          NITRO_PRESET: edgeone_pages
-          NUXT_PUBLIC_API_URL: ${{ vars.NUXT_PUBLIC_API_URL }}
+          NITRO_PRESET: cloudflare-pages-static
 
-      - name: Deploy web to EdgeOne Pages
-        working-directory: apps/web
-        run: bun run edgeone makers deploy .edgeone -n opendum -a overseas -t "$EDGEONE_API_TOKEN" -e production
-        env:
-          EDGEONE_API_TOKEN: ${{ secrets.EDGEONE_API_TOKEN }}
+      - name: Ensure Pages project
+        run: |
+          set -euo pipefail
+          if bunx wrangler pages project list --json | jq -e --arg name "$CLOUDFLARE_PAGES_PROJECT" '.[] | select(.name == $name)' >/dev/null; then
+            echo "Pages project $CLOUDFLARE_PAGES_PROJECT already exists"
+          else
+            bunx wrangler pages project create "$CLOUDFLARE_PAGES_PROJECT" --production-branch main
+          fi
+
+      - name: Deploy web to Cloudflare Pages
+        run: bunx wrangler pages deploy apps/web/dist --project-name "$CLOUDFLARE_PAGES_PROJECT" --branch main

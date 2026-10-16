@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "nuxt dev",
     "build": "nuxt build",
+    "generate": "nuxt generate",
     "test": "bun test",
     "lint": "oxlint .",
     "check": "nuxt prepare && vue-tsc --noEmit -p .nuxt/tsconfig.app.json && vue-tsc --noEmit -p .nuxt/tsconfig.server.json"

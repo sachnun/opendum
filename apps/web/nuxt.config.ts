@@ -18,6 +18,12 @@ export default defineNuxtConfig({
       apiUrl: "",
     },
   },
+  nitro: {
+    prerender: {
+      autoSubfolderIndex: false,
+      ignore: ["/404.html"],
+    },
+  },
   fonts: {
     defaults: {
       styles: ["normal"],
