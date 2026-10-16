@@ -1,11 +1,11 @@
-import { drizzle as drizzleNodePg, type NodePgDatabase } from "drizzle-orm/node-postgres";
-import type { Pool } from "pg";
+import { SQL } from "bun";
+import { drizzle, type BunSQLDatabase } from "drizzle-orm/bun-sql";
 import * as relations from "./relations.js";
 import * as schema from "./schema/index.js";
 
 export const fullSchema = { ...schema, ...relations };
 
-export type Database = NodePgDatabase<typeof fullSchema> & { $client: Pool };
+export type Database = BunSQLDatabase<typeof fullSchema> & { $client: SQL };
 
 /**
  * Query-capable database handle. Satisfied by both the pooled `Database` and
@@ -18,6 +18,14 @@ const globalForDb = globalThis as unknown as {
   db: Database | undefined;
 };
 
+const MAX_CONNECTIONS = 10;
+
+export function normalizeConnectionString(raw: string): string {
+  const url = new URL(raw);
+  url.searchParams.delete("uselibpqcompat");
+  return url.toString();
+}
+
 function getConnectionString(): string {
   const connectionString = process.env.DATABASE_URL;
 
@@ -25,25 +33,17 @@ function getConnectionString(): string {
     throw new Error("DATABASE_URL is required");
   }
 
-  return connectionString;
+  return normalizeConnectionString(connectionString);
 }
 
 function createDb(): Database {
-  const db = drizzleNodePg({
+  return drizzle({
     connection: {
-      connectionString: getConnectionString(),
-      max: 3,
-      idleTimeoutMillis: 10_000,
-      connectionTimeoutMillis: 10_000,
+      url: getConnectionString(),
+      max: MAX_CONNECTIONS,
     },
     schema: fullSchema,
   });
-
-  db.$client.on("error", (error) => {
-    console.warn("Postgres pool error:", error);
-  });
-
-  return db;
 }
 
 function getDb(): Database {
@@ -64,5 +64,5 @@ export async function closeDatabase(): Promise<void> {
   const current = globalForDb.db;
   if (!current) return;
   globalForDb.db = undefined;
-  await current.$client.end();
+  await current.$client.close();
 }

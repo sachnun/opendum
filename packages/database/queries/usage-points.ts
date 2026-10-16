@@ -114,8 +114,9 @@ export async function insertPointTransactionOnConflictDoNothing(
       usageLogId: params.usageLogId,
       createdAt: params.createdAt,
     })
-    .onConflictDoNothing({ target: pointTransaction.idempotencyKey });
-  return result.rowCount ?? 0;
+    .onConflictDoNothing({ target: pointTransaction.idempotencyKey })
+    .returning({ id: pointTransaction.id });
+  return result.length;
 }
 
 export async function updatePointTransactionBalance(
@@ -140,6 +141,7 @@ export async function insertPointBalanceOnConflictDoNothing(
       createdAt: params.createdAt,
       updatedAt: params.updatedAt,
     })
-    .onConflictDoNothing({ target: userPointBalance.userId });
-  return result.rowCount ?? 0;
+    .onConflictDoNothing({ target: userPointBalance.userId })
+    .returning({ userId: userPointBalance.userId });
+  return result.length;
 }

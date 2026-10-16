@@ -252,8 +252,9 @@ export async function disableFailedAccount(
   const result = await database
     .update(providerAccount)
     .set({ isActive: false, status: params.status, statusChangedAt: params.at, updatedAt: params.at })
-    .where(and(eq(providerAccount.id, params.id), eq(providerAccount.isActive, true)));
-  return result.rowCount ?? 0;
+    .where(and(eq(providerAccount.id, params.id), eq(providerAccount.isActive, true)))
+    .returning({ id: providerAccount.id });
+  return result.length;
 }
 
 export async function updateCodexAccountID(
