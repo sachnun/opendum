@@ -20,7 +20,11 @@ export function createApiClient({ baseUrl, refresh }: CreateApiClientOptions): A
       const response = await fetch(request.clone());
       if (response.status !== 401) return response;
       if (!(await refresh())) return response;
-      return fetch(request.clone());
+
+      const token = getAccessToken();
+      const headers = new Headers(request.headers);
+      if (token) headers.set("authorization", `Bearer ${token}`);
+      return fetch(new Request(request, { headers }));
     },
   });
 
