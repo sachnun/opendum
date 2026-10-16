@@ -1,9 +1,11 @@
+import { Effect } from "effect";
+import { ignore, tryAsync } from "../best-effort.js";
 import type { OpendumRedis } from "./client.js";
-import { sessionAffinityKey } from "./keys.js";
+import { accountAffinityKey } from "./keys.js";
 
-const DEFAULT_TTL_SECONDS = 2 * 60 * 60;
+const DEFAULT_TTL_SECONDS = 24 * 60 * 60;
 
-export class SessionAffinity {
+export class AccountAffinity {
   private readonly redis: OpendumRedis;
   private readonly providers: Set<string>;
   private readonly ttlSeconds: number;
@@ -22,24 +24,18 @@ export class SessionAffinity {
     return this.providers.has(provider.trim());
   }
 
-  async lookup(userId: string, sessionId: string): Promise<string> {
-    if (!validPair(userId, sessionId)) return "";
-    try {
-      return (await this.redis.get(sessionAffinityKey(userId, sessionId))) ?? "";
-    } catch {
-      return "";
-    }
+  lookup(userId: string): Effect.Effect<string> {
+    if (userId.trim() === "") return Effect.succeed("");
+    return tryAsync(async () => (await this.redis.get(accountAffinityKey(userId))) ?? "", "");
   }
 
-  async store(userId: string, sessionId: string, accountId: string): Promise<void> {
-    if (!validPair(userId, sessionId) || accountId.trim() === "") return;
-    try {
-      await this.redis.set(sessionAffinityKey(userId, sessionId), accountId, {
+  store(userId: string, accountId: string): Effect.Effect<void> {
+    if (userId.trim() === "" || accountId.trim() === "") return Effect.void;
+    return ignore(() =>
+      this.redis.set(accountAffinityKey(userId), accountId, {
         EX: this.ttlSeconds,
-      });
-    } catch {
-      return;
-    }
+      })
+    );
   }
 }
 
@@ -50,8 +46,4 @@ export function preferSticky<T>(items: T[], isSticky: (item: T) => boolean): T[]
   const sticky = items[index];
   if (sticky === undefined) return items;
   return [sticky, ...items.slice(0, index), ...items.slice(index + 1)];
-}
-
-function validPair(userId: string, sessionId: string): boolean {
-  return userId.trim() !== "" && sessionId.trim() !== "";
 }

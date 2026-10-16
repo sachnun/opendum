@@ -3,7 +3,7 @@ import type { Database } from "@opendum/database";
 import { decrypt, encrypt } from "@opendum/core/crypto";
 import type { Registry } from "@opendum/models/runtime";
 import type { OpendumRedis } from "@opendum/core/redis";
-import { SessionAffinity } from "@opendum/core/redis";
+import { AccountAffinity } from "@opendum/core/redis";
 import type { AuthResult, AuthService, ModelValidationResult } from "@opendum/auth";
 import {
   adaptForResponsesClient,
@@ -149,7 +149,7 @@ export class ProxyService implements StreamRecorder {
       providers: options.providers,
       health: this.health,
       performance: this.performance,
-      affinity: new SessionAffinity(options.redis, options.providers.names()),
+      affinity: new AccountAffinity(options.redis, options.providers.names()),
     });
     this.roaming = new Roaming(this.repositories.points, options.models);
     this.usage = new Usage({
@@ -596,16 +596,13 @@ export class ProxyService implements StreamRecorder {
         let account: ProviderAccount | null = forced;
         let roaming: PointReservation | null = null;
         if (!account) {
-          const selection = yield* Effect.promise(() =>
-            this.rotation.nextAccount(
-              authResult,
-              validation,
-              tried,
-              sharedTried,
-              excludedProviders,
-              useShared,
-              sessionId
-            )
+          const selection = yield* this.rotation.nextAccount(
+            authResult,
+            validation,
+            tried,
+            sharedTried,
+            excludedProviders,
+            useShared
           );
           accountConfigured = accountConfigured || selection.configured;
           account = selection.account;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import type { SessionAffinity } from "@opendum/core/redis";
+import type { AccountAffinity } from "@opendum/core/redis";
 import type { ProviderAccount, ProviderRegistry } from "@opendum/providers";
 import type { Registry } from "@opendum/models/runtime";
 import type { Health } from "../core/health.js";
@@ -22,7 +22,7 @@ function rotation(models: Partial<Registry>): InstanceType<typeof Rotation> {
     providers: {} as unknown as ProviderRegistry,
     health: {} as unknown as Health,
     performance: {} as unknown as ProviderPerformance,
-    affinity: {} as unknown as SessionAffinity,
+    affinity: {} as unknown as AccountAffinity,
   });
 }
 
