@@ -6,6 +6,7 @@ export default defineConfig({
   serverDir: "./",
   serverEntry: false,
   builder: "rolldown",
+  errorHandler: "./error.ts",
   alias: {
     "#web": fileURLToPath(new URL("./web", import.meta.url)),
   },

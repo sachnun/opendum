@@ -3,7 +3,7 @@ import { type H3Event } from "h3";
 import type { ProxyContext } from "../core/context.js";
 import { extractSessionId } from "../core/service.js";
 import type { Adapter } from "../core/endpoints.js";
-import { jsonResponse } from "./errors.js";
+import { errorEnvelope, internalErrorResponse, jsonResponse } from "./errors.js";
 
 const BodySchema = Schema.Record(Schema.String, Schema.Unknown);
 
@@ -13,18 +13,8 @@ class InvalidBody extends Schema.TaggedError<InvalidBody>()("InvalidBody", {
   message: Schema.String,
 }) {}
 
-const invalidBodyResponse = (): Response =>
-  jsonResponse(
-    {
-      error: {
-        message: "Invalid JSON in request body",
-        type: "invalid_request_error",
-        param: null,
-        code: null,
-      },
-    },
-    400
-  );
+const invalidBodyResponse = (format: Adapter["format"]): Response =>
+  jsonResponse(errorEnvelope(format, "Invalid JSON in request body", "invalid_request_error"), 400);
 
 export async function handleInference(
   event: H3Event,
@@ -46,7 +36,18 @@ export async function handleInference(
 
   return Effect.runPromise(
     program.pipe(
-      Effect.catchTag("InvalidBody", () => Effect.succeed(invalidBodyResponse())),
+      Effect.catchTag("InvalidBody", () => Effect.succeed(invalidBodyResponse(endpoint.format))),
+      Effect.catchCause((cause) =>
+        Effect.sync(() => {
+          void Effect.runFork(
+            Effect.logError("inference request failed", {
+              endpoint: endpoint.endpoint,
+              cause: String(cause),
+            })
+          );
+          return internalErrorResponse(endpoint.format);
+        })
+      ),
       Effect.withSpan("handleInference", { attributes: { endpoint: endpoint.endpoint } })
     )
   );

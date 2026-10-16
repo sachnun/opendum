@@ -1,3 +1,5 @@
+import type { ErrorFormat } from "../core/types.js";
+
 export function jsonResponse(value: unknown, status = 200, extraHeaders?: Record<string, string>): Response {
   const headers = new Headers({ "content-type": "application/json" });
   if (extraHeaders) {
@@ -6,30 +8,54 @@ export function jsonResponse(value: unknown, status = 200, extraHeaders?: Record
   return new Response(JSON.stringify(value), { status, headers });
 }
 
-export function unknownEndpoint(): Response {
-  return jsonResponse(
-    {
-      error: {
-        message: "Unknown API endpoint.",
-        type: "invalid_request_error",
-        param: null,
-        code: null,
-      },
+export type ErrorExtras = { param?: string | null; code?: string | null; requestId?: string | null };
+
+/**
+ * Formats an error body following the provider conventions:
+ * OpenAI `{ error: { message, type, param, code } }` and Anthropic
+ * `{ type: "error", error: { type, message }, request_id }`.
+ */
+export function errorEnvelope(
+  format: ErrorFormat,
+  message: string,
+  type: string,
+  extras?: ErrorExtras
+): Record<string, unknown> {
+  if (format === "anthropic") {
+    return {
+      type: "error",
+      error: { type, message },
+      request_id: extras?.requestId ?? null,
+    };
+  }
+  return {
+    error: {
+      message,
+      type,
+      param: extras?.param ?? null,
+      code: extras?.code ?? null,
     },
-    404
-  );
+  };
+}
+
+export function internalErrorResponse(format: ErrorFormat, message = "Internal server error"): Response {
+  return jsonResponse(errorEnvelope(format, message, "api_error"), 500);
+}
+
+export function unknownEndpoint(): Response {
+  return jsonResponse(errorEnvelope("openai", "Unknown API endpoint.", "invalid_request_error"), 404);
 }
 
 export function notFound(): Response {
-  return jsonResponse(
-    {
-      error: {
-        message: "Not Found",
-        type: "invalid_request_error",
-        param: null,
-        code: null,
-      },
-    },
-    404
-  );
+  return jsonResponse(errorEnvelope("openai", "Not Found", "invalid_request_error"), 404);
+}
+
+const ANTHROPIC_PATHS = new Set(["/v1/messages"]);
+
+export function formatForPath(pathname: string): ErrorFormat {
+  return ANTHROPIC_PATHS.has(pathname) ? "anthropic" : "openai";
+}
+
+export function isInferencePath(pathname: string): boolean {
+  return pathname === "/v1" || pathname.startsWith("/v1/");
 }

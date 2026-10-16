@@ -1,7 +1,7 @@
 import { Effect } from "effect";
 import { type H3Event } from "h3";
 import type { ProxyContext } from "../core/context.js";
-import { jsonResponse } from "./errors.js";
+import { internalErrorResponse, jsonResponse } from "./errors.js";
 
 export async function handleModels(event: H3Event, context: ProxyContext): Promise<Response> {
   return Effect.runPromise(
@@ -80,6 +80,14 @@ export async function handleModels(event: H3Event, context: ProxyContext): Promi
       }
 
       return jsonResponse({ object: "list", data: enabled });
-    }).pipe(Effect.withSpan("handleModels"))
+    }).pipe(
+      Effect.catchCause((cause) =>
+        Effect.sync(() => {
+          void Effect.runFork(Effect.logError("model listing failed", { cause: String(cause) }));
+          return internalErrorResponse("openai", "Failed to list models");
+        })
+      ),
+      Effect.withSpan("handleModels")
+    )
   );
 }
