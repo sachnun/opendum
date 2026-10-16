@@ -8,6 +8,8 @@ on:
       - .github/workflows/deploy-api.yml
       - apps/api/**
       - packages/**
+      - package.json
+      - bun.lock
   workflow_run:
     workflows:
       - Refresh Provider Models
