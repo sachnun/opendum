@@ -72,10 +72,8 @@ type QuotaSummaryGroup = Pick<QuotaGroupDisplay, "name" | "displayName"> & {
 const QUOTA_PROVIDERS = new Set<string>(QUOTA_PROVIDER_KEYS);
 const ACCOUNT_STATS_BATCH_SIZE = 24;
 const ERROR_HISTORY_BATCH_SIZE = 20;
-const ACCOUNT_STATS_POLL_MS = 30_000;
 const ACCOUNT_STATS_ROOT_MARGIN = "600px 0px";
 const QUOTA_AUTO_LOAD_DELAY_MS = 400;
-const PROVIDER_DETAIL_REFRESH_MS = 30_000;
 const WEB_CACHE_DB_NAME = "opendum-web";
 const ACCOUNT_STATS_STORE_NAME = "account-stats";
 const ACCOUNT_QUOTA_STORE_NAME = "account-quota";
@@ -104,10 +102,8 @@ const errorHistoryByAccountId = ref<Record<string, ErrorHistoryEntry[] | null>>(
 const errorHistoryErrorByAccountId = ref<Record<string, string | null>>({});
 const errorHistoryFetchedById = ref<Record<string, boolean>>({});
 let highlightTimer: ReturnType<typeof setTimeout> | null = null;
-let providerDetailRefreshTimer: ReturnType<typeof setInterval> | null = null;
 let accountStatsQueueTimer: ReturnType<typeof setTimeout> | null = null;
 let errorHistoryQueueTimer: ReturnType<typeof setTimeout> | null = null;
-let accountStatsPollTimer: ReturnType<typeof setInterval> | null = null;
 let accountsObserver: IntersectionObserver | null = null;
 let providerDetailRefreshInFlight: Promise<void> | null = null;
 let providerDetailRefreshQueued = false;
@@ -173,22 +169,13 @@ async function refreshProviderDetailOnce(options: { refreshQuota?: boolean } = {
   }
 }
 
-function stopProviderDetailRefresh() {
-  providerDetailRefreshQueued = false;
-  providerDetailRefreshQueuedShouldRefreshQuota = false;
-  if (!providerDetailRefreshTimer) return;
-
-  clearInterval(providerDetailRefreshTimer);
-  providerDetailRefreshTimer = null;
+function refreshProviderDetailOnLiveEvent() {
+  if (document.hidden) return;
+  void refreshProviderDetailOnce();
 }
 
-function startProviderDetailRefresh() {
-  if (providerDetailRefreshTimer) return;
-
-  providerDetailRefreshTimer = setInterval(() => {
-    void refreshProviderDetailOnce();
-  }, PROVIDER_DETAIL_REFRESH_MS);
-}
+useLiveEvent("usage", refreshProviderDetailOnLiveEvent);
+useLiveEvent("accounts", refreshProviderDetailOnLiveEvent);
 
 async function refreshProviderQuotaAfterAccountPoll() {
   if (!supportsProviderQuota.value || providerQuotaRefreshInFlight) return;
@@ -402,17 +389,16 @@ onBeforeUnmount(() => {
   if (highlightTimer) clearTimeout(highlightTimer);
   if (accountStatsQueueTimer) clearTimeout(accountStatsQueueTimer);
   if (errorHistoryQueueTimer) clearTimeout(errorHistoryQueueTimer);
+  providerDetailRefreshQueued = false;
+  providerDetailRefreshQueuedShouldRefreshQuota = false;
   accountsObserver?.disconnect();
   accountsObserver = null;
-  stopAccountStatsPolling();
-  stopProviderDetailRefresh();
   cancelQuotaQueue();
 });
 
 onMounted(() => {
   void warmIdbStore(WEB_CACHE_DB_NAME, ACCOUNT_STATS_STORE_NAME);
   void warmIdbStore(WEB_CACHE_DB_NAME, ACCOUNT_QUOTA_STORE_NAME);
-  startProviderDetailRefresh();
   void hydrateAccountStatsCache();
   accountsObserver = new IntersectionObserver((entries) => {
     const visibleIds: string[] = [];
@@ -437,7 +423,6 @@ onMounted(() => {
     }
   }, { rootMargin: ACCOUNT_STATS_ROOT_MARGIN });
   observeAccountCards();
-  startAccountStatsPolling();
 });
 const quotaSummaryGroups = computed<QuotaSummaryGroup[]>(() => {
   const groups = new Map<string, QuotaSummaryGroup>();
@@ -623,24 +608,6 @@ function observeAccountCards() {
   for (const element of root.querySelectorAll<HTMLElement>("[data-account-id]")) {
     accountsObserver.observe(element);
   }
-}
-
-function startAccountStatsPolling() {
-  if (!import.meta.client || accountStatsPollTimer) return;
-
-  accountStatsPollTimer = setInterval(() => {
-    if (document.hidden) return;
-    const accountIds = Array.from(intersectingAccountIds);
-    queueAccountStatsLoad(accountIds, { force: true });
-    queueErrorHistoryLoad(accountIds, { force: true });
-  }, ACCOUNT_STATS_POLL_MS);
-}
-
-function stopAccountStatsPolling() {
-  if (!accountStatsPollTimer) return;
-
-  clearInterval(accountStatsPollTimer);
-  accountStatsPollTimer = null;
 }
 
 async function loadAccountStats(accountIds: string[], options: { force?: boolean } = {}) {

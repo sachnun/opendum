@@ -6,6 +6,7 @@ import type { Registry } from "@opendum/models/runtime";
 import type { ProviderAccount } from "@opendum/providers";
 import type { Health } from "./health.js";
 import type { ProviderPerformance } from "./provider-performance.js";
+import type { ProxyEvents } from "./events.js";
 import { ignore, isSyntheticProviderAccountId } from "./service-helpers.js";
 import type { StreamRecorder, SuccessRecord } from "./types.js";
 
@@ -32,6 +33,7 @@ export type Options = {
   models: Registry;
   performance: ProviderPerformance;
   health: Health;
+  events?: ProxyEvents;
 };
 
 /**
@@ -46,6 +48,7 @@ export class Usage implements StreamRecorder {
   private readonly models: Registry;
   private readonly performance: ProviderPerformance;
   private readonly health: Health;
+  private readonly events?: ProxyEvents;
 
   constructor(options: Options) {
     this.usage = options.usage;
@@ -54,6 +57,7 @@ export class Usage implements StreamRecorder {
     this.models = options.models;
     this.performance = options.performance;
     this.health = options.health;
+    this.events = options.events;
   }
 
   storeCredits(accountId: string, remaining: number | null, cost: number): void {
@@ -144,6 +148,7 @@ export class Usage implements StreamRecorder {
       duration: params.durationMs,
       createdAt: new Date(),
     });
+    this.events?.publishUsageLogged(params.userId);
     await Effect.runPromise(this.auth.bumpVersion(params.userId));
   }
 }

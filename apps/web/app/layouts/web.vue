@@ -60,15 +60,28 @@ const PROVIDER_STATUS_ORDER = { error: 0, warning: 1, normal: 2 } as const;
 
 const api = useApi();
 const invalidation = useInvalidate();
+function refreshModelsOnce() {
+  return invalidation.refreshData([dataKeys.models, dataKeys.modelSearch, dataKeys.modelCatalog, dataKeys.shellModelFamilyCounts]);
+}
+
 useEventStream({
   onPoints: applyPointsBalance,
   onAccounts: () => {
+    if (document.hidden) return;
     void refreshAccountSummaryOnce();
   },
-  onModels: () => invalidation.refreshData([dataKeys.models, dataKeys.modelSearch, dataKeys.modelCatalog, dataKeys.shellModelFamilyCounts]),
+  onModels: () => {
+    if (document.hidden) return;
+    void refreshModelsOnce();
+  },
+  onUsage: () => {
+    if (document.hidden) return;
+    void refreshAccountSummaryOnce();
+  },
   onResync: () => {
     void refreshAccountSummaryOnce();
     void refreshPointStatusOnce();
+    void refreshModelsOnce();
   },
 });
 const { prefetch } = usePrefetch();

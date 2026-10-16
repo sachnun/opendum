@@ -1,7 +1,7 @@
 import { eventIterator, oc } from "@orpc/contract";
 import { z } from "zod";
 
-export const liveTopicSchema = z.enum(["points", "accounts", "models"]);
+export const liveTopicSchema = z.enum(["points", "accounts", "models", "usage"]);
 
 export const pointsUpdateSchema = z.object({
   type: z.literal("update"),
@@ -12,7 +12,7 @@ export const pointsUpdateSchema = z.object({
 
 export const tickSchema = z.object({
   type: z.literal("tick"),
-  topic: z.enum(["accounts", "models"]),
+  topic: z.enum(["accounts", "models", "usage"]),
   at: z.string(),
 });
 

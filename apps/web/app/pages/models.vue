@@ -14,7 +14,6 @@ const invalidation = useInvalidate();
 
 type ModelListItem = Awaited<ReturnType<typeof api.models.list>>[number];
 const MODEL_STATS_BATCH_SIZE = 24;
-const MODEL_STATS_POLL_MS = 30_000;
 const MODEL_STATS_ROOT_MARGIN = "600px 0px";
 const HIGHLIGHT_DURATION_MS = 2500;
 
@@ -43,7 +42,6 @@ const queuedModelStatsIds = new Set<string>();
 const forceQueuedModelStatsIds = new Set<string>();
 const loadingModelStatsIds = new Set<string>();
 let modelStatsQueueTimer: ReturnType<typeof setTimeout> | null = null;
-let modelStatsPollTimer: ReturnType<typeof setInterval> | null = null;
 let statsObserver: IntersectionObserver | null = null;
 
 const enabledModelCount = computed(() => models.value.filter((model) => model.available !== false && model.isEnabled).length);
@@ -119,13 +117,11 @@ onMounted(() => {
   }, { rootMargin: MODEL_STATS_ROOT_MARGIN });
 
   observeModelCards();
-  startModelStatsPolling();
 });
 
 onBeforeUnmount(() => {
   statsObserver?.disconnect();
   statsObserver = null;
-  stopModelStatsPolling();
   if (modelStatsQueueTimer) clearTimeout(modelStatsQueueTimer);
   if (highlightTimer) {
     clearTimeout(highlightTimer);
@@ -206,21 +202,12 @@ function observeModelCards() {
   }
 }
 
-function startModelStatsPolling() {
-  if (!import.meta.client || modelStatsPollTimer) return;
-
-  modelStatsPollTimer = setInterval(() => {
-    if (document.hidden) return;
-    queueModelStatsLoad(Array.from(intersectingModelIds), { force: true });
-  }, MODEL_STATS_POLL_MS);
+function refreshVisibleModelStats() {
+  if (document.hidden) return;
+  queueModelStatsLoad(Array.from(intersectingModelIds), { force: true });
 }
 
-function stopModelStatsPolling() {
-  if (!modelStatsPollTimer) return;
-
-  clearInterval(modelStatsPollTimer);
-  modelStatsPollTimer = null;
-}
+useLiveEvent("usage", refreshVisibleModelStats);
 
 function pruneModelStats() {
   const availableModelIds = new Set(models.value.filter((model) => model.available !== false).map((model) => model.id));

@@ -62,6 +62,7 @@ import { Rotation } from "./rotation.js";
 import { Playground } from "./playground.js";
 import { Roaming } from "./roaming.js";
 import { Usage } from "./usage-log.js";
+import { proxyEvents, type ProxyEvents } from "./events.js";
 import { repositories, type Repositories } from "./repositories.js";
 import type { Adapter } from "./endpoints.js";
 import type {
@@ -91,6 +92,7 @@ export type ProxyServiceOptions = {
   providers: ProviderRegistry;
   betterAuthSecret: string;
   requestTimeoutMs: number;
+  events?: ProxyEvents;
 };
 
 type AccountErrorContext = {
@@ -159,6 +161,7 @@ export class ProxyService implements StreamRecorder {
       models: options.models,
       performance: this.performance,
       health: this.health,
+      events: options.events ?? proxyEvents,
     });
     this.playground = new Playground(options.betterAuthSecret);
   }
