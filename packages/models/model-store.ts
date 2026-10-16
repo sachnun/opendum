@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { basename, dirname, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, join, relative, sep } from "node:path";
 import { Effect } from "effect";
 
 import { aliasesFromUpstream, isDateToken } from "./model/clean-key.ts";
@@ -184,8 +184,6 @@ export function collectFiles(modelsDir: string): string[] {
 }
 
 export function generatedDir(modelsDir: string): string {
-  const configured = process.env.MODELS_GENERATED_DIR;
-  if (configured) return resolve(configured);
   return join(dirname(modelsDir), "generated");
 }
 
