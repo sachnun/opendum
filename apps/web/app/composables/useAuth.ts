@@ -60,7 +60,6 @@ export function useAuth() {
 
   function expireSession() {
     clearAuthTokens();
-    clearDataCache();
     claims.value = null;
     hasSession.value = false;
   }

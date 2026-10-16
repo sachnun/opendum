@@ -43,7 +43,6 @@ export default defineNuxtConfig({
         "better-auth/vue",
         "clsx",
         "date-fns",
-        "idb-keyval",
         "@lucide/vue",
         "reka-ui",
         "tailwind-merge",

@@ -22,7 +22,7 @@ const emit = defineEmits<{
 }>();
 
 const api = useApi();
-const { data: me } = useNuxtData<MeData>(dataKeys.me);
+const { data: me, refresh: refreshMe } = useQuery<MeData>(dataKeys.me, () => api.me.get());
 const API_KEY_MIN_LENGTH = 3;
 const API_KEY_MAX_LENGTH = 100;
 const API_KEY_UPDATE_POINT_COST = 20;
@@ -91,7 +91,7 @@ async function updateName() {
     const result = await api.apiKeys.updateName({ id: props.id, name: newName.value, ...(saveCostsPoints.value ? { key: normalizedApiKeyValue.value } : {}) });
     if (!result.success) throw new Error(result.error);
     editDialogOpen.value = false;
-    if (saveCostsPoints.value) void refreshNuxtData(dataKeys.me);
+    if (saveCostsPoints.value) void refreshMe();
     emit("updated", { name: result.data.name, keyPreview: result.data.keyPreview });
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : "Failed to update API key";

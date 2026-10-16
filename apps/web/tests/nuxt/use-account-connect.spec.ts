@@ -10,7 +10,7 @@ const invalidateAccountCollection = mock(() => {});
 
 (globalThis as Record<string, unknown>).useApi = () => ({ customProviders: { list } });
 (globalThis as Record<string, unknown>).useInvalidate = () => ({ refreshData, invalidateAccountCollection });
-(globalThis as Record<string, unknown>).useCachedData = () => ({ data: ref([]), refresh: mock(() => {}) });
+(globalThis as Record<string, unknown>).useQuery = () => ({ data: ref([]), error: ref(null), pending: ref(false), refresh: mock(() => {}), set: mock(() => {}), patch: mock(() => {}) });
 (globalThis as Record<string, unknown>).dataKeys = { customProviders: "custom-providers", playgroundOptions: "playground-options" };
 
 type Connect = ReturnType<typeof useAccountConnect>;

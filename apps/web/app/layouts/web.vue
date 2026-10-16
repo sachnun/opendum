@@ -71,8 +71,7 @@ useEventStream({
     void refreshPointStatusOnce();
   },
 });
-const { prefetch } = usePrefetch();
-const { data: customProvidersData } = useCachedData(dataKeys.customProviders, () => api.customProviders.list());
+const { data: customProvidersData } = useQuery(dataKeys.customProviders, () => api.customProviders.list());
 const customProviders = computed(() => customProvidersData.value ?? []);
 const providerHrefByKey = computed<Record<string, string>>(() => Object.fromEntries([
   ...PROVIDER_ACCOUNT_DEFINITIONS.map((definition) => [definition.key, getProviderAccountPath(definition.key)]),
@@ -90,9 +89,9 @@ const navigation = computed<NavItem[]>(() => primaryNavigation.map((item) => ite
     }
   : item));
 const accountsNavigationHref = "/";
-const { data: accountsOverviewData } = useNuxtData<AccountOverviewData>(dataKeys.accountsOverview);
+const { data: accountsOverviewData } = useQuery<AccountOverviewData>(dataKeys.accountsOverview, () => api.accounts.overview());
 
-const { data: me } = useCachedData(dataKeys.me, () => api.me.get(), {
+const { data: me } = useQuery<MeData>(dataKeys.me, () => api.me.get(), {
   default: () => ({ role: "user" as const, isMaintainer: false }),
 });
 const { auditUser, me: meState, isAuditMode, refreshAfterAuditChange } = useAudit();
@@ -144,7 +143,7 @@ function applyAccountOverviewResponse(summary: AccountOverviewResponse): Account
 
 const isProviderOverviewRoute = computed(() => route.path === accountsNavigationHref);
 
-const { data: accountSummaryData, refresh: refreshAccountSummary } = useCachedData(dataKeys.shellAccounts, async (): Promise<ShellAccountSummary> => {
+const { data: accountSummaryData, refresh: refreshAccountSummary, set: setAccountSummary } = useQuery<ShellAccountSummary>(dataKeys.shellAccounts, async () => {
   const useOverview = isProviderOverviewRoute.value;
   if (useOverview) {
     const snapshot = accountsOverviewData.value;
@@ -160,7 +159,7 @@ const { data: accountSummaryData, refresh: refreshAccountSummary } = useCachedDa
 watch(accountsOverviewData, (snapshot) => {
   if (!snapshot || !isProviderOverviewRoute.value) return;
 
-  accountSummaryData.value = toShellAccountSummary(snapshot);
+  setAccountSummary(toShellAccountSummary(snapshot));
 }, { immediate: true });
 
 const accountCounts = computed(() => accountSummaryData.value?.accountCounts ?? emptyShellAccountSummary.accountCounts);
@@ -196,7 +195,7 @@ function customHrefCounts<V>(counts: Record<string, V>): Record<string, V> {
 
 
 
-const { data: defaultModelFamilyCounts } = useCachedData(dataKeys.shellModelFamilyCounts, async () => {
+const { data: defaultModelFamilyCounts } = useQuery(dataKeys.shellModelFamilyCounts, async () => {
   const counts = await api.models.familyCounts();
   return normalizeModelFamilyCounts(counts);
 }, {
@@ -410,21 +409,7 @@ function applyPointsBalance(balance: number) {
   me.value = { ...me.value, points: { balance } };
 }
 
-function schedulePrefetch() {
-  const run = () => prefetch();
-  if (!import.meta.client || typeof window === "undefined") return;
-
-  if ("requestIdleCallback" in window) {
-    window.requestIdleCallback(run, { timeout: 3000 });
-    return;
-  }
-
-  setTimeout(run, 1500);
-}
-
 onMounted(() => {
-  schedulePrefetch();
-
   watch(shouldRefreshAccountSummary, (shouldRefresh) => {
     if (!shouldRefresh) return;
 
@@ -445,7 +430,6 @@ async function handleSignOut() {
   }
 
   await endSession();
-  clearDataCache();
   await navigateTo("/");
 }
 

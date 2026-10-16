@@ -10,7 +10,7 @@ const api = useApi();
 const open = ref(false);
 const search = ref("");
 const searchInput = ref<HTMLInputElement | null>(null);
-const { data: catalog, pending } = useCachedData(dataKeys.modelCatalog, () => api.models.catalog(), { default: () => [] as string[] });
+const { data: catalog, pending } = useQuery(dataKeys.modelCatalog, () => api.models.catalog(), { default: () => [] as string[] });
 
 const models = computed(() => catalog.value ?? []);
 const filteredModels = computed(() => {

@@ -9,7 +9,7 @@ const auth = mock(async () => null);
 
 (globalThis as Record<string, unknown>).useApi = () => ({ playground: { options, auth } });
 (globalThis as Record<string, unknown>).useInvalidate = () => ({ invalidateAccountCollection: mock(() => {}), invalidateAccountOverview: mock(() => {}) });
-(globalThis as Record<string, unknown>).useCachedData = () => ({ data: ref(null), error: ref(null), refresh: mock(() => {}) });
+(globalThis as Record<string, unknown>).useQuery = () => ({ data: ref(null), error: ref(null), pending: ref(false), refresh: mock(() => {}), set: mock(() => {}), patch: mock(() => {}) });
 (globalThis as Record<string, unknown>).dataKeys = { playgroundOptions: "playground-options" };
 (globalThis as Record<string, unknown>).useRoute = () => ({ path: "/playground", query: {} });
 (globalThis as Record<string, unknown>).navigateTo = mock(() => {});

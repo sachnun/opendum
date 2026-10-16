@@ -18,7 +18,7 @@ const MODEL_STATS_POLL_MS = 30_000;
 const MODEL_STATS_ROOT_MARGIN = "600px 0px";
 const HIGHLIGHT_DURATION_MS = 2500;
 
-const { data, error } = useCachedData(dataKeys.models, () => api.models.list({ includeStats: false }));
+const { data, error } = useQuery(dataKeys.models, () => api.models.list({ includeStats: false }));
 const models = computed<ModelListItem[]>(() => data.value ?? []);
 
 function isLinked(model: ModelListItem) {

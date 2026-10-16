@@ -16,8 +16,8 @@ if (import.meta.client && redirectTarget.value !== "/") {
 const api = useApi();
 const { isAuditMode } = useAudit();
 
-const { data, error, refresh } = useCachedData(dataKeys.accountsOverview, () => api.accounts.overview());
-const { data: customProviders, refresh: refreshCustomProviders } = useCachedData(dataKeys.customProviders, () => api.customProviders.list());
+const { data, error, refresh } = useQuery(dataKeys.accountsOverview, () => api.accounts.overview());
+const { data: customProviders, refresh: refreshCustomProviders } = useQuery(dataKeys.customProviders, () => api.customProviders.list());
 
 const customList = computed(() => customProviders.value ?? []);
 const summaries = computed(() => data.value?.summaries ?? null);

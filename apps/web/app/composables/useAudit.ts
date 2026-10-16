@@ -1,4 +1,6 @@
 import type { AuditInfo, MeData } from "../../lib/api-types";
+import { injectRegistry } from "@effect/atom-vue";
+import { invalidateAllQueries } from "../utils/atom";
 
 const emptyAuditInfo: AuditInfo = {
   active: false,
@@ -7,6 +9,7 @@ const emptyAuditInfo: AuditInfo = {
 };
 
 export function useAudit() {
+  const registry = injectRegistry();
   const me = useState<MeData | null>(stateKeys.me, () => null);
   const auditRefreshVersion = useState(stateKeys.auditRefreshVersion, () => 0);
 
@@ -15,13 +18,11 @@ export function useAudit() {
   const auditUser = computed(() => audit.value.user);
 
   async function refreshAfterAuditChange() {
-    clearDataCache();
     auditRefreshVersion.value += 1;
     useState<Record<string, unknown>>(stateKeys.quotaByAccountId, () => ({})).value = {};
     useState<Record<string, string>>(stateKeys.quotaErrorByAccountId, () => ({})).value = {};
     useState<Record<string, boolean>>(stateKeys.quotaLoadingByAccountId, () => ({})).value = {};
-    useState<Record<string, boolean>>(stateKeys.quotaHydratedAccountIds, () => ({})).value = {};
-    await refreshNuxtData();
+    invalidateAllQueries(registry);
   }
 
   return {

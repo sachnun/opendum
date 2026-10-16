@@ -3,7 +3,6 @@ import type { ActionResult, CustomProviderListItem, CustomProviderModelRow, Erro
 import { BY_KEY, getProviderFromSlug, QUOTA_PROVIDER_KEYS, type ProviderAccountKey } from "@opendum/providers/provider-accounts";
 import { COMMON_HEADER_NAMES } from "../../lib/headers";
 import { requestErrorMessage } from "../../lib/utils";
-import { warmIdbStore } from "../utils/idb";
 
 definePageMeta({
   middleware: ["provider", "auth"],
@@ -42,7 +41,7 @@ const { isAuditMode } = useAudit();
 const invalidation = useInvalidate();
 const routeProvider = computed(() => String("provider" in route.params ? route.params.provider : ""));
 const selectedProvider = computed<string>(() => getProviderFromSlug(routeProvider.value) ?? routeProvider.value);
-const { data: customProvidersData, refresh: refreshCustomProviders } = useCachedData(dataKeys.customProviders, () => api.customProviders.list());
+const { data: customProvidersData, refresh: refreshCustomProviders } = useQuery(dataKeys.customProviders, () => api.customProviders.list());
 const customProvider = computed<CustomProviderListItem | null>(() => (customProvidersData.value ?? []).find((row) => row.slug === selectedProvider.value) ?? null);
 const providerMeta = computed<ProviderMeta | null>(() => {
   const builtin = BY_KEY[selectedProvider.value as ProviderAccountKey];
@@ -76,15 +75,11 @@ const ACCOUNT_STATS_POLL_MS = 30_000;
 const ACCOUNT_STATS_ROOT_MARGIN = "600px 0px";
 const QUOTA_AUTO_LOAD_DELAY_MS = 400;
 const PROVIDER_DETAIL_REFRESH_MS = 30_000;
-const WEB_CACHE_DB_NAME = "opendum-web";
-const ACCOUNT_STATS_STORE_NAME = "account-stats";
-const ACCOUNT_QUOTA_STORE_NAME = "account-quota";
 const HIGHLIGHT_DURATION_MS = 2500;
 
-const { data, error, pending, refresh } = useCachedData(
+const { data, error, pending, refresh } = useQuery<ProviderDetailData>(
   () => dataKeys.accountsDetail(selectedProvider.value),
   () => api.accounts.byProviderDetailed({ provider: selectedProvider.value }),
-  { watch: [selectedProvider] }
 );
 
 const detailData = computed<ProviderDetailData | null>(() => data.value ?? null);
@@ -99,7 +94,6 @@ const accountStatsById = shallowReactive<Record<string, ProviderStats>>({});
 const accountStatsCursorById = ref<Record<string, string>>({});
 const accountStatsDeltaReadyById = ref<Record<string, boolean>>({});
 const accountStatsFetchedById = ref<Record<string, boolean>>({});
-const hydratedAccountStatsIds = ref<Record<string, boolean>>({});
 const errorHistoryByAccountId = ref<Record<string, ErrorHistoryEntry[] | null>>({});
 const errorHistoryErrorByAccountId = ref<Record<string, string | null>>({});
 const errorHistoryFetchedById = ref<Record<string, boolean>>({});
@@ -266,7 +260,6 @@ watch(selectedProvider, () => {
   accountStatsCursorById.value = {};
   accountStatsDeltaReadyById.value = {};
   accountStatsFetchedById.value = {};
-  hydratedAccountStatsIds.value = {};
   errorHistoryByAccountId.value = {};
   errorHistoryErrorByAccountId.value = {};
   errorHistoryFetchedById.value = {};
@@ -388,7 +381,6 @@ const {
   quotaByAccountId,
   quotaErrorByAccountId,
   cancelQuotaQueue,
-  hydrateQuotaCache,
   pruneQuotaState,
   runQuotaQueue,
   waitForQuotaQueue,
@@ -410,10 +402,7 @@ onBeforeUnmount(() => {
 });
 
 onMounted(() => {
-  void warmIdbStore(WEB_CACHE_DB_NAME, ACCOUNT_STATS_STORE_NAME);
-  void warmIdbStore(WEB_CACHE_DB_NAME, ACCOUNT_QUOTA_STORE_NAME);
   startProviderDetailRefresh();
-  void hydrateAccountStatsCache();
   accountsObserver = new IntersectionObserver((entries) => {
     const visibleIds: string[] = [];
 
@@ -523,30 +512,6 @@ function quotaBarColor(group: QuotaSummaryGroup): string {
 function getAccountWithStats(account: Account): Account {
   const stats = accountStatsById[account.id] ?? account.stats;
   return stats === account.stats ? account : { ...account, stats };
-}
-
-async function hydrateAccountStatsCache() {
-  if (!import.meta.client) return;
-
-  const accountsToHydrate = accounts.value.filter((account) => !hydratedAccountStatsIds.value[account.id]);
-  if (accountsToHydrate.length === 0) return;
-
-  const cachedStats = await readStatsCache(accountsToHydrate.map((account) => account.id));
-  const nextHydratedIds = { ...hydratedAccountStatsIds.value };
-
-  for (const [index, cached] of cachedStats.entries()) {
-    const account = accountsToHydrate[index];
-    if (!account) continue;
-
-    nextHydratedIds[account.id] = true;
-    if (!cached || cached.accountId !== account.id) continue;
-    if (accountStatsById[account.id]) continue;
-
-    accountStatsById[account.id] = cached.stats;
-  }
-
-  for (const account of accountsToHydrate) nextHydratedIds[account.id] = true;
-  hydratedAccountStatsIds.value = nextHydratedIds;
 }
 
 function queueAccountStatsLoad(accountIds: Iterable<string>, options: { force?: boolean } = {}) {
@@ -673,7 +638,6 @@ async function loadAccountStats(accountIds: string[], options: { force?: boolean
     accountStatsCursorById.value = nextCursorById;
     accountStatsDeltaReadyById.value = nextDeltaReadyById;
     accountStatsFetchedById.value = nextFetchedById;
-    void writeStatsCache(stats);
   } catch (error) {
     console.error("Failed to load account stats:", error);
   } finally {
@@ -733,7 +697,6 @@ function pruneAccountStats() {
   accountStatsCursorById.value = Object.fromEntries(Object.entries(accountStatsCursorById.value).filter(([accountId]) => availableAccountIds.has(accountId)));
   accountStatsDeltaReadyById.value = Object.fromEntries(Object.entries(accountStatsDeltaReadyById.value).filter(([accountId]) => availableAccountIds.has(accountId)));
   accountStatsFetchedById.value = Object.fromEntries(Object.entries(accountStatsFetchedById.value).filter(([accountId]) => availableAccountIds.has(accountId)));
-  hydratedAccountStatsIds.value = Object.fromEntries(Object.entries(hydratedAccountStatsIds.value).filter(([accountId]) => availableAccountIds.has(accountId)));
   for (const accountId of forceQueuedAccountStatsIds) {
     if (!availableAccountIds.has(accountId)) forceQueuedAccountStatsIds.delete(accountId);
   }
@@ -757,7 +720,6 @@ watch(
   () => {
     pruneAccountStats();
     pruneErrorHistories();
-    void hydrateAccountStatsCache();
   },
   { immediate: true }
 );
@@ -818,7 +780,6 @@ watch(
 
     pruneQuotaState();
     cancelQuotaQueue();
-    void hydrateQuotaCache();
     previousQuotaAccountKeys = currentQuotaAccountKeys;
     previousQuotaAccountStates = currentQuotaAccountStates;
     previousQuotaProvider = selectedProvider.value;
