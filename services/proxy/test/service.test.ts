@@ -5,8 +5,8 @@ import type { ProviderRegistry } from "@opendum/providers";
 import type { Registry } from "@opendum/models/runtime";
 import type { OpendumRedis } from "@opendum/core/redis";
 import { ProxyService } from "../core/service.js";
-import { ChatCompletionsAdapter } from "../core/endpoints.js";
-import { fakes } from "./fake-repositories.js";
+import { Chat } from "../core/endpoints.js";
+import { fakes } from "./fakes.js";
 
 type ProxyServiceInstance = InstanceType<typeof ProxyService>;
 
@@ -95,14 +95,14 @@ function buildService(options: {
   });
 }
 
-const cfg = new ChatCompletionsAdapter();
+const cfg = new Chat();
 const chatBody = { model: "gpt-4o", messages: [{ role: "user", content: "hi" }] };
 
 describe("ProxyService.handle", () => {
   it("rejects an invalid API key with 401", async () => {
     const auth = {
       validateKey: () => Effect.succeed({ ...validAuth(), valid: false, error: "Invalid API key" }),
-      validateForUser: () => Effect.succeed(validModel()),
+      validateFor: () => Effect.succeed(validModel()),
       bumpVersion: () => Effect.void,
     } as unknown as AuthService;
     const service = buildService({ auth });
@@ -116,7 +116,7 @@ describe("ProxyService.handle", () => {
   it("rejects an invalid model with 400", async () => {
     const auth = {
       validateKey: () => Effect.succeed(validAuth()),
-      validateForUser: () =>
+      validateFor: () =>
         Effect.succeed({ ...validModel(), valid: false, model: "nope", error: "Invalid model: nope.", param: "model", code: "invalid_model" }),
       bumpVersion: () => Effect.void,
     } as unknown as AuthService;
@@ -136,7 +136,7 @@ describe("ProxyService.handle", () => {
             rateLimitRules: [{ target: "gpt-4o", targetType: "model", perMinute: 1, perHour: null, perDay: null }],
           })
         ),
-      validateForUser: () => Effect.succeed(validModel()),
+      validateFor: () => Effect.succeed(validModel()),
       bumpVersion: () => Effect.void,
     } as unknown as AuthService;
     const service = buildService({ auth, redis: fakeRedis({ get: async () => "1" }) });
@@ -149,7 +149,7 @@ describe("ProxyService.handle", () => {
   it("returns 503 configuration_error when no accounts exist", async () => {
     const auth = {
       validateKey: () => Effect.succeed(validAuth()),
-      validateForUser: () => Effect.succeed(validModel()),
+      validateFor: () => Effect.succeed(validModel()),
       bumpVersion: () => Effect.void,
     } as unknown as AuthService;
     const service = buildService({ auth });
@@ -163,7 +163,7 @@ describe("ProxyService.handle", () => {
   it("rejects an invalid playground session with 401", async () => {
     const auth = {
       validateKey: () => Effect.succeed(validAuth()),
-      validateForUser: () => Effect.succeed(validModel()),
+      validateFor: () => Effect.succeed(validModel()),
       bumpVersion: () => Effect.void,
     } as unknown as AuthService;
     const service = buildService({ auth });

@@ -194,7 +194,7 @@ export function workbuddyStreamToCompletion(text: string, model: string): Json {
     const choices = Array.isArray(event.choices) ? event.choices : [];
     if (choices.length === 0) continue;
     const choice = (choices[0] ?? {}) as Json;
-    collector.setFinishReason(stringValue(choice.finish_reason));
+    collector.setFinish(stringValue(choice.finish_reason));
     const delta = choice.delta;
     if (delta === null || typeof delta !== "object") continue;
     const d = delta as Json;

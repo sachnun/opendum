@@ -6,14 +6,14 @@ import { Policy } from "../policy.js";
 import { Availability, type Queries } from "../availability.js";
 import type { CustomModels } from "../custom-models.js";
 
-type RegistryOptions = {
+type Options = {
   aliases?: Record<string, string>;
   supported?: string[];
   providerModels?: Record<string, string[]>;
   authless?: Record<string, string[]>;
 };
 
-function registryOf(options: RegistryOptions = {}): Registry {
+function registryOf(options: Options = {}): Registry {
   const aliases = options.aliases ?? {};
   const supported = new Set(options.supported ?? []);
   const providerModels = options.providerModels ?? {};
@@ -46,8 +46,8 @@ function redisOf(): { redis: OpendumRedis; store: Map<string, string> } {
 
 type QueryOptions = {
   disabledByUser?: string[];
-  disabledByAccounts?: Array<{ providerAccountId: string; model: string }>;
-  disabledBySharedAccounts?: Array<{ providerAccountId: string; model: string }>;
+  byAccounts?: Array<{ providerAccountId: string; model: string }>;
+  byShared?: Array<{ providerAccountId: string; model: string }>;
   accounts?: Array<{ id: string; provider: string; tier: string | null }>;
   sharedAccounts?: Array<{ id: string; provider: string; tier: string | null }>;
 };
@@ -56,7 +56,7 @@ function queriesOf(options: QueryOptions = {}): {
   queries: Queries;
   calls: { disabledByUser: number };
 } {
-  const calls = { disabledByUser: 0, disabledByAccounts: 0 };
+  const calls = { disabledByUser: 0, byAccounts: 0 };
   const queries = {
     listDisabledModelsByUser: async () => {
       calls.disabledByUser += 1;
@@ -64,10 +64,10 @@ function queriesOf(options: QueryOptions = {}): {
     },
     listActiveAccountTiers: async () => options.accounts ?? [],
     listDisabledModelsByAccounts: async () => {
-      calls.disabledByAccounts += 1;
-      return calls.disabledByAccounts === 1
-        ? options.disabledByAccounts ?? []
-        : options.disabledBySharedAccounts ?? [];
+      calls.byAccounts += 1;
+      return calls.byAccounts === 1
+        ? options.byAccounts ?? []
+        : options.byShared ?? [];
     },
     listSharedAccounts: async () => options.sharedAccounts ?? [],
   } as unknown as Queries;
@@ -154,12 +154,12 @@ describe("Availability", () => {
         { id: "a1", provider: "p", tier: "Pro" },
         { id: "a2", provider: "p", tier: null },
       ],
-      disabledByAccounts: [
+      byAccounts: [
         { providerAccountId: "a1", model: "m" },
         { providerAccountId: "a1", model: "fast" },
       ],
       sharedAccounts: [{ id: "s1", provider: "q", tier: "Max" }],
-      disabledBySharedAccounts: [{ providerAccountId: "s1", model: "m" }],
+      byShared: [{ providerAccountId: "s1", model: "m" }],
     });
     const service = serviceOf({
       registry,

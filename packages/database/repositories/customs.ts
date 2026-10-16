@@ -9,7 +9,7 @@ import {
  * User-defined custom providers and their model catalogs.
  * Delegates to the query layer with the database bound.
  */
-export class CustomProviders {
+export class Customs {
   constructor(private readonly database: DbExecutor) {}
 
   listCustomProviders(userId: string) {

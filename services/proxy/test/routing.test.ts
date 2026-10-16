@@ -1,9 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import type { ProviderAccount } from "@opendum/providers";
 import {
-  AntigravityTier,
-  GenericTier,
-  KiroTier,
+  Antigravity,
+  Generic,
+  Kiro,
   tierFor,
 } from "../core/tiers.js";
 import type { ProviderRoutingOptions, ProviderScore } from "../core/provider-performance.js";
@@ -26,7 +26,7 @@ function scores(entries: Record<string, number>): Map<string, ProviderScore> {
 describe("account tier policies", () => {
   it("classifies antigravity tiers without falling back to the generic list", () => {
     const policy = tierFor("antigravity");
-    expect(policy).toBeInstanceOf(AntigravityTier);
+    expect(policy).toBeInstanceOf(Antigravity);
     expect(policy.isPaid("paid")).toBe(true);
     expect(policy.isPaid("standard-tier")).toBe(true);
     expect(policy.isPaid("  G1-Ultra ")).toBe(true);
@@ -37,7 +37,7 @@ describe("account tier policies", () => {
 
   it("classifies kiro tiers", () => {
     const policy = tierFor("kiro");
-    expect(policy).toBeInstanceOf(KiroTier);
+    expect(policy).toBeInstanceOf(Kiro);
     for (const tier of ["pro", "pro+", "pro-plus", "power"]) {
       expect(policy.isPaid(tier)).toBe(true);
     }
@@ -47,7 +47,7 @@ describe("account tier policies", () => {
 
   it("falls back to the generic paid set for other providers", () => {
     const policy = tierFor("openai");
-    expect(policy).toBeInstanceOf(GenericTier);
+    expect(policy).toBeInstanceOf(Generic);
     for (const tier of ["plus", "team", "business", "enterprise", "edu", "hc"]) {
       expect(policy.isPaid(tier)).toBe(true);
     }
@@ -73,7 +73,7 @@ describe("routing strategies", () => {
         account("fast-paid", "fast", { tier: "plus" }),
         account("slow-paid", "slow", { tier: "pro" }),
       ],
-      { crossProvider: true, providerPriority: ["slow", "fast"] }
+      { crossProvider: true, priority: ["slow", "fast"] }
     );
     expect(ordered.map((item) => item.id)).toEqual(["slow-paid", "slow-1", "fast-paid", "fast-free"]);
   });
@@ -82,7 +82,7 @@ describe("routing strategies", () => {
     const strategy = new Priority();
     const ordered = strategy.order(
       [account("free-1", "fast"), account("paid-1", "fast", { tier: "plus" })],
-      { crossProvider: false, providerPriority: ["fast"] }
+      { crossProvider: false, priority: ["fast"] }
     );
     expect(ordered.map((item) => item.id)).toEqual(["paid-1", "free-1"]);
   });
@@ -92,7 +92,7 @@ describe("routing strategies", () => {
     const routingOptions: ProviderRoutingOptions = { scores: scores({}), bufferRatio: 0.5, explorationRate: 1 };
     const ordered = strategy.order([account("b", "beta"), account("a", "alpha")], {
       crossProvider: true,
-      providerPriority: ["alpha", "beta"],
+      priority: ["alpha", "beta"],
       routingOptions,
     });
     expect(ordered.map((item) => item.id)).toEqual(["a", "b"]);
@@ -115,7 +115,7 @@ describe("routing strategies", () => {
     const strategy = compose(new Priority(), new Sticky("slow-1"));
     const ordered = strategy.order(
       [account("fast-1", "fast", { tier: "plus" }), account("slow-1", "slow")],
-      { crossProvider: true, providerPriority: ["fast", "slow"] }
+      { crossProvider: true, priority: ["fast", "slow"] }
     );
     expect(ordered.map((item) => item.id)).toEqual(["slow-1", "fast-1"]);
   });

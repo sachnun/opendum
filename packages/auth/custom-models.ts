@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
-import { invalid, valid } from "./model-results.js";
+import { invalid, valid } from "./results.js";
 import type { CustomProviderModelRecord, CustomProviderReader } from "./store/custom.js";
 import type { ModelValidationResult } from "./types.js";
 

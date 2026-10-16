@@ -56,7 +56,7 @@ describe("Collector", () => {
 
   it("keeps a non-stop finish reason and falls back for missing tool ids", () => {
     const collector = new Collector({ model: "m" });
-    collector.setFinishReason("length");
+    collector.setFinish("length");
     collector.addToolCall({ key: 2, arguments: "{}" });
 
     const { message, finishReason } = completionOf(collector);
@@ -69,8 +69,8 @@ describe("Collector", () => {
   });
 
   it("forces the tool finish reason when configured", () => {
-    const collector = new Collector({ model: "m", forceToolFinishReason: true });
-    collector.setFinishReason("length");
+    const collector = new Collector({ model: "m", forceFinish: true });
+    collector.setFinish("length");
     collector.addToolCall({ key: 2, arguments: "{}" });
 
     expect(completionOf(collector).finishReason).toBe("tool_calls");
@@ -100,7 +100,7 @@ describe("Collector", () => {
 
   it("ignores empty finish reasons", () => {
     const collector = new Collector({ model: "m" });
-    collector.setFinishReason("");
+    collector.setFinish("");
     expect(completionOf(collector).finishReason).toBe("stop");
   });
 
@@ -116,7 +116,7 @@ describe("Collector", () => {
   it("replaces accumulated arguments for sealed tool calls", () => {
     const collector = new Collector({ model: "m" });
     collector.addToolCall({ key: "call_a", arguments: '{"q":' });
-    collector.addToolCall({ key: "call_a", arguments: '{"q":"x"}', replaceArguments: true });
+    collector.addToolCall({ key: "call_a", arguments: '{"q":"x"}', replaceArgs: true });
 
     const call = ((completionOf(collector).message.tool_calls ?? []) as Json[])[0] as Json;
     expect((call.function as Json).arguments).toBe('{"q":"x"}');
@@ -134,7 +134,7 @@ describe("Collector", () => {
   });
 
   it("emits null content for empty text when nullable", () => {
-    const collector = new Collector({ model: "m", nullableContent: true });
+    const collector = new Collector({ model: "m", nullContent: true });
     expect(completionOf(collector).message.content).toBeNull();
     collector.addContent("hi");
     expect(completionOf(collector).message.content).toBe("hi");
@@ -143,7 +143,7 @@ describe("Collector", () => {
   it("normalizes tool arguments before emitting", () => {
     const collector = new Collector({
       model: "m",
-      normalizeToolArguments: (args) => args.trim() || "{}",
+      normalizeArgs: (args) => args.trim() || "{}",
     });
     collector.addToolCall({ key: "call_a", arguments: "  " });
 

@@ -55,7 +55,7 @@ const queries = {
 mock.module("./queries/index.js", () => queries);
 
 const {
-  CustomProviders,
+  Customs,
   Health,
   Points,
   Accounts,
@@ -85,7 +85,7 @@ describe("repositories", () => {
   });
 
   it("binds the database for custom provider queries", async () => {
-    const repo = new CustomProviders(database);
+    const repo = new Customs(database);
     await repo.getCustomProvider("user-1", "my-provider");
     expect(lastCall(queries.getCustomProvider)).toEqual(["user-1", "my-provider", database]);
   });

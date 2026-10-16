@@ -22,7 +22,7 @@ function stubFetch(handler: (url: string) => Response): Stub {
   return { fetch: fetchFn, calls };
 }
 
-function redirectResponse(status: number, location: string): Response {
+function redirect(status: number, location: string): Response {
   return new Response(null, { status, headers: { location } });
 }
 
@@ -52,7 +52,7 @@ describe("Redirects", () => {
 
   it("follows a relative location", async () => {
     const stub = stubFetch((url) =>
-      url === "https://example.com/start" ? redirectResponse(302, "/next") : new Response("done", { status: 200 })
+      url === "https://example.com/start" ? redirect(302, "/next") : new Response("done", { status: 200 })
     );
     const response = await new Redirects().follow(stub.fetch, "https://example.com/start");
     expect(await response.text()).toBe("done");
@@ -61,7 +61,7 @@ describe("Redirects", () => {
 
   it("rewrites the method to GET on 303", async () => {
     const stub = stubFetch((url) =>
-      url === "https://example.com/form" ? redirectResponse(303, "https://example.com/done") : new Response("done", { status: 200 })
+      url === "https://example.com/form" ? redirect(303, "https://example.com/done") : new Response("done", { status: 200 })
     );
     await new Redirects().follow(stub.fetch, "https://example.com/form", { method: "POST", body: "payload" });
     expect(stub.calls[1].init?.method).toBe("GET");
@@ -71,21 +71,21 @@ describe("Redirects", () => {
 
   it("rewrites a POST to GET on 301", async () => {
     const stub = stubFetch((url) =>
-      url === "https://example.com/form" ? redirectResponse(301, "https://example.com/done") : new Response("done", { status: 200 })
+      url === "https://example.com/form" ? redirect(301, "https://example.com/done") : new Response("done", { status: 200 })
     );
     await new Redirects().follow(stub.fetch, "https://example.com/form", { method: "POST", body: "payload" });
     expect(stub.calls[1].init?.method).toBe("GET");
   });
 
   it("rejects redirects that leave https", async () => {
-    const stub = stubFetch(() => redirectResponse(302, "http://example.com/insecure"));
+    const stub = stubFetch(() => redirect(302, "http://example.com/insecure"));
     const error = await failureOf(() => new Redirects().follow(stub.fetch, "https://example.com/start"));
     expect(error).toBeInstanceOf(Error);
     expect((error as Error).message).toBe("redirect must use https");
   });
 
   it("stops after the default maximum redirects", async () => {
-    const stub = stubFetch(() => redirectResponse(302, "https://example.com/loop"));
+    const stub = stubFetch(() => redirect(302, "https://example.com/loop"));
     const error = await failureOf(() => new Redirects().follow(stub.fetch, "https://example.com/loop"));
     expect(error).toBeInstanceOf(Error);
     expect((error as Error).message).toBe("stopped after 10 redirects");
@@ -102,7 +102,7 @@ describe("Redirects", () => {
   it("rejects private hosts on later hops", async () => {
     const stub = stubFetch((url) =>
       url === "https://example.com/start"
-        ? redirectResponse(302, "https://10.0.0.1/")
+        ? redirect(302, "https://10.0.0.1/")
         : new Response("unreachable", { status: 200 })
     );
     const error = await failureOf(() => new Redirects().follow(stub.fetch, "https://example.com/start"));

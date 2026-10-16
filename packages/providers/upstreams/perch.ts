@@ -719,8 +719,8 @@ export async function perchSseToChatCompletion(
   const collector = new Collector({
     model,
     includeReasoning,
-    nullableContent: true,
-    normalizeToolArguments: (args) => args.trim() || "{}",
+    nullContent: true,
+    normalizeArgs: (args) => args.trim() || "{}",
     usageFallback: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
   });
 
@@ -756,7 +756,7 @@ export async function perchSseToChatCompletion(
               id,
               name,
               arguments: perchToolSealedArguments(call),
-              replaceArguments: true,
+              replaceArgs: true,
             });
           } else {
             collector.addToolCall({ key: id, id, name, arguments: stringValue(call.rawArgumentsText) });

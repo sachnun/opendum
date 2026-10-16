@@ -2,9 +2,9 @@ import { beforeEach, describe, expect, it } from "bun:test";
 import type { OpendumRedis } from "@opendum/core/redis";
 import type { Registry } from "@opendum/models/runtime";
 import { Health, MAX_ERROR_LEN } from "../core/health.js";
-import { fakes, type Fakes } from "./fake-repositories.js";
+import { fakes, type Fakes } from "./fakes.js";
 
-type HealthServiceOptions = ConstructorParameters<typeof Health>[0];
+type Options = ConstructorParameters<typeof Health>[0];
 
 let repositories: Fakes;
 
@@ -26,7 +26,7 @@ function fakeRedis(overrides: Partial<Record<string, unknown>> = {}): OpendumRed
   } as unknown as OpendumRedis;
 }
 
-function healthService(options: Partial<HealthServiceOptions> = {}): InstanceType<typeof Health> {
+function healthService(options: Partial<Options> = {}): InstanceType<typeof Health> {
   return new Health({
     accounts: repositories.accounts,
     health: repositories.health,
@@ -159,7 +159,7 @@ describe("Health", () => {
   });
 
   it("bumps request counts in the background", async () => {
-    healthService().bumpRequestCount("acc-1");
+    healthService().bumpRequest("acc-1");
     await new Promise((resolve) => setTimeout(resolve, 10));
     expect(repositories.health.bumpAccountRequestCount).toHaveBeenCalledTimes(1);
   });

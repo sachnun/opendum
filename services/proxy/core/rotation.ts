@@ -110,7 +110,7 @@ export class Rotation {
     const strategy = compose(new Priority(), new Sticky(stickyId));
     const prioritized = strategy.order(eligible, {
       crossProvider: provider === null,
-      providerPriority: this.models.providers(model),
+      priority: this.models.providers(model),
       routingOptions: routing,
     });
     const selected = await this.pickHealthy(prioritized, model);
@@ -153,7 +153,7 @@ export class Rotation {
     const routing = await this.routing(model, provider === null);
     const prioritized = new Priority().order(enabled, {
       crossProvider: provider === null,
-      providerPriority: targetProviders,
+      priority: targetProviders,
       routingOptions: routing,
     });
     return { account: await this.pickHealthy(prioritized, model), configured: true };
@@ -279,10 +279,10 @@ export class Rotation {
         continue;
       }
       void lookupKeys;
-      this.health.bumpRequestCount(account.id);
+      this.health.bumpRequest(account.id);
       return account;
     }
-    if (degraded) this.health.bumpRequestCount(degraded.id);
+    if (degraded) this.health.bumpRequest(degraded.id);
     return degraded;
   }
 

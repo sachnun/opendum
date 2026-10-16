@@ -11,7 +11,7 @@ import { Cache } from "./cache.js";
 import { Keys } from "./keys.js";
 import { Availability } from "./availability.js";
 import { CustomModels } from "./custom-models.js";
-import { disabled } from "./model-results.js";
+import { disabled } from "./results.js";
 import {
   listed,
   accessMode,
@@ -96,7 +96,7 @@ export class AuthService {
     return this.accessPolicy.validateModel(modelParam);
   }
 
-  validateForUser(
+  validateFor(
     userId: string,
     modelParam: string,
     access: ModelAccess

@@ -112,7 +112,7 @@ export function tryRead(
   );
 }
 
-function hasVersionSuffix(base: string | undefined, numericSuffix: string | undefined): boolean {
+function hasVersion(base: string | undefined, numericSuffix: string | undefined): boolean {
   if (!base || !numericSuffix) return false;
   return /-(?:\d+)$/.test(base) || /-v\d+(?:\.\d+)*$/.test(base);
 }
@@ -242,7 +242,7 @@ function dateToken(modelId: string): string | null {
   return isDateToken(tail) ? tail : null;
 }
 
-function compareCandidates(left: { dateToken: string | null }, right: { dateToken: string | null }): number {
+function compare(left: { dateToken: string | null }, right: { dateToken: string | null }): number {
   if (left.dateToken === null && right.dateToken === null) return 0;
   if (left.dateToken === null) return -1;
   if (right.dateToken === null) return 1;
@@ -280,7 +280,7 @@ export function idMap(modelIds: string[], toModelKey: (modelId: string) => strin
 
   const map = new Map<string, string>();
   for (const [baseKey, candidates] of groups) {
-    candidates.sort(compareCandidates);
+    candidates.sort(compare);
 
     const [winner, ...losers] = candidates;
     if (winner === undefined) continue;
@@ -394,7 +394,7 @@ export function sync(
         const isMeaningfulSuffix =
           Boolean(versionSuffix) ||
           (numericSuffix !== undefined && Number.parseInt(numericSuffix, 10) >= 2);
-        if (isMeaningfulSuffix && !hasVersionSuffix(base, numericSuffix)) {
+        if (isMeaningfulSuffix && !hasVersion(base, numericSuffix)) {
           const parent =
             index[base] ||
             entries.find((entry) => entry.id === base) ||

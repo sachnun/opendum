@@ -53,7 +53,7 @@ function reasoningRequested(body: Json): boolean {
  * model and delegates the rest to `toParsed`; `build` delegates the payload
  * shape to `toPayload` and appends the session hint.
  */
-export abstract class EndpointAdapter {
+export abstract class Adapter {
   abstract readonly endpoint: string;
   abstract readonly format: ErrorFormat;
   abstract readonly rateLimitStatusCode: number;
@@ -79,7 +79,7 @@ export abstract class EndpointAdapter {
   protected abstract toPayload(parsed: ParsedEndpointRequest, model: string, stream: boolean): Json;
 }
 
-export class ChatCompletionsAdapter extends EndpointAdapter {
+export class Chat extends Adapter {
   readonly endpoint = "chat_completions";
   readonly format: ErrorFormat = "openai";
   readonly rateLimitStatusCode = 429;
@@ -115,7 +115,7 @@ export class ChatCompletionsAdapter extends EndpointAdapter {
   }
 }
 
-export class MessagesAdapter extends EndpointAdapter {
+export class Messages extends Adapter {
   readonly endpoint = "messages";
   readonly format: ErrorFormat = "anthropic";
   readonly rateLimitStatusCode = 529;
@@ -147,7 +147,7 @@ export class MessagesAdapter extends EndpointAdapter {
   }
 }
 
-export class ResponsesAdapter extends EndpointAdapter {
+export class Responses extends Adapter {
   readonly endpoint = "responses";
   readonly format: ErrorFormat = "openai";
   readonly rateLimitStatusCode = 429;
@@ -195,11 +195,11 @@ export class ResponsesAdapter extends EndpointAdapter {
   }
 }
 
-export function endpointAdapters(): Record<string, EndpointAdapter> {
+export function adapters(): Record<string, Adapter> {
   return {
-    chat_completions: new ChatCompletionsAdapter(),
-    messages: new MessagesAdapter(),
-    responses: new ResponsesAdapter(),
+    chat_completions: new Chat(),
+    messages: new Messages(),
+    responses: new Responses(),
   };
 }
 

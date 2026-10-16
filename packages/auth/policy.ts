@@ -1,5 +1,5 @@
 import type { Registry } from "@opendum/models/runtime";
-import { invalid, valid } from "./model-results.js";
+import { invalid, valid } from "./results.js";
 import { parseModel } from "./normalize.js";
 import type { AccountModelAvailability, ModelValidationResult } from "./types.js";
 

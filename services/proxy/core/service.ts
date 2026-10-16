@@ -61,7 +61,7 @@ import { Playground } from "./playground.js";
 import { Roaming } from "./roaming.js";
 import { Usage } from "./usage-log.js";
 import { repositories, type Repositories } from "./repositories.js";
-import type { EndpointAdapter } from "./endpoints.js";
+import type { Adapter } from "./endpoints.js";
 import type {
   Failure,
   ParsedEndpointRequest,
@@ -162,7 +162,7 @@ export class ProxyService implements StreamRecorder {
   }
 
   handle(
-    cfg: EndpointAdapter,
+    cfg: Adapter,
     body: Record<string, unknown>,
     authHeader: string,
     sessionId: string,
@@ -172,7 +172,7 @@ export class ProxyService implements StreamRecorder {
   }
 
   runPipeline(
-    cfg: EndpointAdapter,
+    cfg: Adapter,
     body: Record<string, unknown>,
     authHeader: string,
     sessionId: string,
@@ -202,7 +202,7 @@ export class ProxyService implements StreamRecorder {
         parsedRequest.modelParam = selector.model;
       }
 
-      const validation = yield* this.auth.validateForUser(authResult.userId, parsedRequest.modelParam, {
+      const validation = yield* this.auth.validateFor(authResult.userId, parsedRequest.modelParam, {
         mode: authResult.modelAccessMode,
         models: authResult.modelAccessList,
         roamingEnabled: authResult.roamingEnabled,
@@ -354,7 +354,7 @@ export class ProxyService implements StreamRecorder {
   }
 
   private async handleNonStreamFailure(
-    cfg: EndpointAdapter,
+    cfg: Adapter,
     error: unknown,
     context: RoamingCompletionContext
   ): Promise<Response> {
@@ -387,7 +387,7 @@ export class ProxyService implements StreamRecorder {
     );
   }
 
-  routeError(cfg: EndpointAdapter, error: RouteError): Response {
+  routeError(cfg: Adapter, error: RouteError): Response {
     void Effect.runFork(Metric.update(proxyRequestFailures, 1));
     return routeErrorResponse(error, cfg.format);
   }
@@ -561,7 +561,7 @@ export class ProxyService implements StreamRecorder {
   }
 
   private executeWithAccountRotation(
-    cfg: EndpointAdapter,
+    cfg: Adapter,
     parsed: ParsedEndpointRequest,
     authResult: AuthResult,
     validation: ModelValidationResult,
@@ -773,7 +773,7 @@ export class ProxyService implements StreamRecorder {
           return lastFailure;
         }
 
-        if (forced) this.health.bumpRequestCount(account.id);
+        if (forced) this.health.bumpRequest(account.id);
         return {
           account,
           response,
@@ -787,7 +787,7 @@ export class ProxyService implements StreamRecorder {
   }
 
   private errorContext(
-    cfg: EndpointAdapter,
+    cfg: Adapter,
     validation: ModelValidationResult,
     parsed: ParsedEndpointRequest,
     provider: string

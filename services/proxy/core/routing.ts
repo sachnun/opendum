@@ -8,7 +8,7 @@ export type Context = {
   /** True when no explicit provider was requested, so providers compete. */
   crossProvider: boolean;
   /** Provider priority order derived from the model registry. */
-  providerPriority: string[];
+  priority: string[];
   /** EWMA score snapshot; only present for cross-provider routing. */
   routingOptions?: ProviderRoutingOptions;
 };
@@ -25,22 +25,22 @@ export interface Strategy {
  */
 export class Priority implements Strategy {
   order(candidates: ProviderAccount[], context: Context): ProviderAccount[] {
-    return prioritizeAccounts(candidates, context.crossProvider, context.providerPriority, context.routingOptions);
+    return prioritizeAccounts(candidates, context.crossProvider, context.priority, context.routingOptions);
   }
 }
 
 /** Moves the session-affine account back to the front when it is still a candidate. */
 export class Sticky implements Strategy {
-  private readonly stickyAccountId: string | null;
+  private readonly accountId: string | null;
 
-  constructor(stickyAccountId: string | null) {
-    this.stickyAccountId = stickyAccountId;
+  constructor(accountId: string | null) {
+    this.accountId = accountId;
   }
 
   order(candidates: ProviderAccount[]): ProviderAccount[] {
-    const stickyAccountId = this.stickyAccountId;
-    if (!stickyAccountId || isSyntheticProviderAccountId(stickyAccountId)) return candidates;
-    return preferSticky(candidates, (account) => account.id === stickyAccountId);
+    const accountId = this.accountId;
+    if (!accountId || isSyntheticProviderAccountId(accountId)) return candidates;
+    return preferSticky(candidates, (account) => account.id === accountId);
   }
 }
 

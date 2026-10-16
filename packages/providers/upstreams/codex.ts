@@ -433,9 +433,9 @@ export function responsesStreamToCompletion(text: string, model: string): Json {
   const events = parseSseDataLines(text);
   const collector = new Collector({
     model,
-    nullableContent: true,
-    normalizeToolArguments: (args) => defaultStringValue(args, "{}"),
-    forceToolFinishReason: true,
+    nullContent: true,
+    normalizeArgs: (args) => defaultStringValue(args, "{}"),
+    forceFinish: true,
   });
   const reasoningParts = new Map<string, string>();
   const reasoningOrder: string[] = [];
@@ -547,7 +547,7 @@ export function responsesStreamToCompletion(text: string, model: string): Json {
     .filter((value) => value)
     .join("\n\n");
   collector.addReasoning(reasoningText);
-  collector.setFinishReason(status === "incomplete" ? "length" : "stop");
+  collector.setFinish(status === "incomplete" ? "length" : "stop");
   collector.setUsage(responseUsageToChatUsage(rawUsage));
   return collector.toCompletion();
 }

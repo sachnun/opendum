@@ -1,7 +1,7 @@
 import type { Database } from "@opendum/database";
 import {
   Accounts,
-  CustomProviders,
+  Customs,
   Health,
   Points,
   Usage,
@@ -14,7 +14,7 @@ import {
  */
 export type AccountPort = Pick<Accounts, keyof Accounts>;
 export type HealthPort = Pick<Health, keyof Health>;
-export type CustomPort = Pick<CustomProviders, keyof CustomProviders>;
+export type CustomPort = Pick<Customs, keyof Customs>;
 export type UsagePort = Pick<Usage, keyof Usage>;
 
 /**
@@ -38,7 +38,7 @@ export function repositories(database: Database): Repositories {
   return {
     accounts: new Accounts(database),
     health: new Health(database),
-    customProviders: new CustomProviders(database),
+    customProviders: new Customs(database),
     usage: new Usage(database),
     points: new Points(database),
   };

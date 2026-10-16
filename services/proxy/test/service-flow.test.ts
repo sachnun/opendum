@@ -5,8 +5,8 @@ import type { Provider, ProviderRegistry } from "@opendum/providers";
 import type { Registry } from "@opendum/models/runtime";
 import type { OpendumRedis } from "@opendum/core/redis";
 import { ProxyService } from "../core/service.js";
-import { ChatCompletionsAdapter } from "../core/endpoints.js";
-import { fakes } from "./fake-repositories.js";
+import { Chat } from "../core/endpoints.js";
+import { fakes } from "./fakes.js";
 
 function sseResponse(chunks: string[]): Response {
   const encoder = new TextEncoder();
@@ -57,7 +57,7 @@ describe("ProxyService full flow", () => {
     } as unknown as Registry;
     const auth = {
       validateKey: () => Effect.succeed(validAuth()),
-      validateForUser: () => Effect.succeed(validModel()),
+      validateFor: () => Effect.succeed(validModel()),
       bumpVersion: () => Effect.void,
     } as unknown as AuthService;
     const redis = { get: async () => null, set: async () => "OK", del: async () => 1, zAdd: async () => 1, zRemRangeByRank: async () => 0, expire: async () => true } as unknown as OpendumRedis;
@@ -75,7 +75,7 @@ describe("ProxyService full flow", () => {
     });
 
     const response = await service.handle(
-      new ChatCompletionsAdapter(),
+      new Chat(),
       { model: "gpt-4o", messages: [{ role: "user", content: "hi" }], stream: true },
       "Bearer ok",
       ""

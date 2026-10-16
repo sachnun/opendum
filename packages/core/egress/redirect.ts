@@ -1,7 +1,7 @@
 import { Effect } from "effect";
 import { tryAsync } from "../best-effort.js";
 import { assertPublicHost } from "./ssrf.js";
-import { createGuardedFetch, type Fetch, type GuardedFetchHandle, type GuardedFetchOptions } from "./guard.js";
+import { createGuardedFetch, type Fetch, type FetchHandle, type GuardedFetchOptions } from "./guard.js";
 
 export const MAX_REDIRECTS = 10;
 
@@ -38,7 +38,7 @@ export class Redirects {
 
 export class Fetcher {
   readonly policy: Redirects;
-  private readonly handle: GuardedFetchHandle;
+  private readonly handle: FetchHandle;
 
   constructor(options: GuardedFetchOptions & { policy?: Redirects } = {}) {
     this.policy = options.policy ?? new Redirects();

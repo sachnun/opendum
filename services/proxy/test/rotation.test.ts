@@ -5,7 +5,7 @@ import type { Registry } from "@opendum/models/runtime";
 import type { Health } from "../core/health.js";
 import type { ProviderPerformance } from "../core/provider-performance.js";
 import { Rotation } from "../core/rotation.js";
-import { fakes } from "./fake-repositories.js";
+import { fakes } from "./fakes.js";
 
 const repositories = fakes();
 

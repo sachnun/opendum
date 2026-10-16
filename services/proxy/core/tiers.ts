@@ -11,14 +11,14 @@ function normalizedTier(tier: string | null): string {
   return tier ? tier.trim().toLowerCase() : "";
 }
 
-export class AntigravityTier implements TierPolicy {
+export class Antigravity implements TierPolicy {
   isPaid(tier: string | null): boolean {
     const value = normalizedTier(tier);
     return value === "paid" || value === "standard-tier" || value.startsWith("g1-");
   }
 }
 
-export class KiroTier implements TierPolicy {
+export class Kiro implements TierPolicy {
   isPaid(tier: string | null): boolean {
     const value = normalizedTier(tier);
     return value === "pro" || value === "pro+" || value === "pro-plus" || value === "power";
@@ -31,17 +31,17 @@ const GENERIC_PAID_TIERS = new Set([
   "education", "hc",
 ]);
 
-export class GenericTier implements TierPolicy {
+export class Generic implements TierPolicy {
   isPaid(tier: string | null): boolean {
     return GENERIC_PAID_TIERS.has(normalizedTier(tier));
   }
 }
 
-export const GENERIC_TIER: TierPolicy = new GenericTier();
+export const GENERIC_TIER: TierPolicy = new Generic();
 
 const TIERS: Record<string, TierPolicy> = {
-  antigravity: new AntigravityTier(),
-  kiro: new KiroTier(),
+  antigravity: new Antigravity(),
+  kiro: new Kiro(),
 };
 
 export function tierFor(provider: string): TierPolicy {

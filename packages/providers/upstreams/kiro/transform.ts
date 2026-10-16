@@ -1120,8 +1120,8 @@ export function convertKiroEventsToCompletion(events: Json[], model: string): Js
 
   const collector = new Collector({
     model,
-    nullableContent: true,
-    normalizeToolArguments: (args) => defaultEmpty(args, "{}"),
+    nullContent: true,
+    normalizeArgs: (args) => defaultEmpty(args, "{}"),
   });
   for (const [id, call] of toolById) {
     collector.addToolCall({ key: id, id, name: call.name, arguments: call.args });

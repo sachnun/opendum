@@ -235,7 +235,7 @@ export class Health {
     await upsertErrorHistory(this.redis, accountId, userId, resolved, statusCode, stored, new Date());
   }
 
-  bumpRequestCount(accountId: string): void {
+  bumpRequest(accountId: string): void {
     if (isSyntheticProviderAccountId(accountId)) return;
     void Effect.runFork(ignore(() => this.health.bumpAccountRequestCount({ id: accountId, at: new Date() })));
   }

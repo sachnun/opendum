@@ -12,7 +12,7 @@ export type ToolCallDelta = {
   nameMode?: "append" | "first";
   arguments?: string;
   /** Replaces accumulated arguments instead of appending (sealed tool calls). */
-  replaceArguments?: boolean;
+  replaceArgs?: boolean;
 };
 
 export type Options = {
@@ -24,11 +24,11 @@ export type Options = {
   /** Emit accumulated reasoning as `reasoning_content`, defaults to true. */
   includeReasoning?: boolean;
   /** Emit `content: null` instead of an empty string when no text arrived. */
-  nullableContent?: boolean;
+  nullContent?: boolean;
   /** Normalizes accumulated tool arguments before emitting, defaults to identity. */
-  normalizeToolArguments?: (args: string) => string;
+  normalizeArgs?: (args: string) => string;
   /** Forces `tool_calls` as the finish reason whenever tool calls exist, instead of upgrading only a `stop`. */
-  forceToolFinishReason?: boolean;
+  forceFinish?: boolean;
   /** Usage emitted when the stream never carried any, defaults to `{}`. */
   usageFallback?: Json;
 };
@@ -75,12 +75,12 @@ export class Collector {
       else if (!call.name) call.name = delta.name;
     }
     if (delta.arguments) {
-      if (delta.replaceArguments) call.arguments = delta.arguments;
+      if (delta.replaceArgs) call.arguments = delta.arguments;
       else call.arguments += delta.arguments;
     }
   }
 
-  setFinishReason(reason: string): void {
+  setFinish(reason: string): void {
     if (reason) this.finishReason = reason;
   }
 
@@ -89,7 +89,7 @@ export class Collector {
   }
 
   toCompletion(): Json {
-    const normalize = this.options.normalizeToolArguments ?? identity;
+    const normalize = this.options.normalizeArgs ?? identity;
     const toolCalls = Array.from(this.toolCalls, ([key, call]) => ({
       id: call.id || (this.options.toolIdFallback ?? defaultToolId)(key),
       type: call.type || "function",
@@ -97,13 +97,13 @@ export class Collector {
     }));
     const message: Json = {
       role: "assistant",
-      content: this.options.nullableContent ? this.content || null : this.content,
+      content: this.options.nullContent ? this.content || null : this.content,
     };
     if (this.reasoning && this.options.includeReasoning !== false) message.reasoning_content = this.reasoning;
     let finishReason = this.finishReason;
     if (toolCalls.length > 0) {
       message.tool_calls = toolCalls;
-      if (finishReason === "stop" || this.options.forceToolFinishReason) finishReason = "tool_calls";
+      if (finishReason === "stop" || this.options.forceFinish) finishReason = "tool_calls";
     }
     return {
       id: this.options.id ?? randomId("chatcmpl"),
