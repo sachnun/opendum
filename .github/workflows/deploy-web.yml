@@ -9,6 +9,7 @@ on:
       - apps/web/**
       - packages/database/**
       - packages/models/**
+      - packages/providers/**
       - package.json
       - bun.lock
   workflow_run:
@@ -58,6 +59,7 @@ jobs:
         run: bun run build
         env:
           NITRO_PRESET: edgeone_pages
+          NUXT_PUBLIC_API_URL: ${{ vars.NUXT_PUBLIC_API_URL }}
 
       - name: Deploy web to EdgeOne Pages
         working-directory: apps/web

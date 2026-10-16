@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { useSession } from "~~/lib/auth-client";
+const route = useRoute();
+const { isAuthenticated } = useAuth();
 
-const { data: session } = await useSession(useFetch);
-const isAuthenticated = computed(() => Boolean(session.value?.user));
+const isSignInCallback = computed(() => route.path === "/auth/callback");
 </script>
 
 <template>
-  <LoginScreen v-if="!isAuthenticated" />
+  <slot v-if="isSignInCallback" />
+  <LoginScreen v-else-if="!isAuthenticated" />
   <NuxtLayout v-else>
     <slot />
   </NuxtLayout>

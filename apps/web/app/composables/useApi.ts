@@ -8,7 +8,6 @@ import type {
   AnalyticsFilter,
   AnalyticsSeriesData,
   MeData,
-  MaintainerAuditUser,
   MaintainerAuditUserListResult,
   AccountQuotaBatchRequest,
   ApiKeyListItem,
@@ -33,15 +32,46 @@ import type {
   ProviderDetailResponse,
   ProviderAccountUpdateData,
 } from "../../lib/api-types";
-import type { DeviceProviderKey, OAuthProviderKey } from "../../lib/provider-accounts";
+import type { DeviceProviderKey, OAuthProviderKey } from "@opendum/providers/provider-accounts";
+import { getAccessToken } from "../../lib/auth-token";
+import { resolveApiUrl } from "../../lib/api-url";
 
 type ApiKeyAccessMode = "all" | "whitelist" | "blacklist";
 type PlaygroundEndpoint = "chat_completions" | "messages" | "responses";
 type RateLimitRule = { target: string; targetType: "model" | "family"; perMinute: number | null; perHour: number | null; perDay: number | null };
 
-type ApiFetch = ReturnType<typeof useRequestFetch>;
-type ApiFetchOptions = Parameters<ApiFetch>[1];
+type ApiFetchOptions = Record<string, unknown>;
+type ApiFetch = <T = unknown>(url: string, options?: ApiFetchOptions) => Promise<T>;
 type ApiFetchBody = NonNullable<ApiFetchOptions>["body"];
+
+function isUnauthorized(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+
+  const failure = error as { status?: number; statusCode?: number; response?: { status?: number } };
+  return failure.status === 401 || failure.statusCode === 401 || failure.response?.status === 401;
+}
+
+function withAuthHeader(headers: unknown): Record<string, string> | undefined {
+  const merged = { ...(headers as Record<string, string> | undefined) };
+  const token = getAccessToken();
+  if (token && !merged.authorization) merged.authorization = `Bearer ${token}`;
+
+  return Object.keys(merged).length > 0 ? merged : undefined;
+}
+
+function createApiFetch(baseURL: string, refresh: () => Promise<boolean>): ApiFetch {
+  return async <T>(url: string, options?: ApiFetchOptions) => {
+    const request = () => $fetch<T>(`${baseURL}${url}`, { ...options, headers: withAuthHeader(options?.headers) });
+
+    try {
+      return await request();
+    } catch (error) {
+      if (!isUnauthorized(error) || !(await refresh())) throw error;
+
+      return await request();
+    }
+  };
+}
 
 function post<T>(fetcher: ApiFetch, url: string, body?: ApiFetchBody, options?: ApiFetchOptions) {
   const request = fetcher as unknown as (url: string, options?: Record<string, unknown>) => Promise<T>;
@@ -58,7 +88,15 @@ function cursorQuery(ids: string[], cursors?: Record<string, string>) {
 }
 
 export function useApi() {
-  const apiFetch = useRequestFetch();
+  const config = useRuntimeConfig();
+  const auth = useAuth();
+  const apiFetch = createApiFetch(resolveApiUrl(config.public.apiUrl), async () => {
+    if (await auth.refreshAccessToken()) return true;
+
+    auth.expireSession();
+    void navigateTo("/");
+    return false;
+  });
 
   return {
     me: {
@@ -145,8 +183,18 @@ export function useApi() {
         search: (query?: { q?: string; offset?: number; limit?: number }) => apiFetch<MaintainerAuditUserListResult>("/api/web/maintainer/users/search", { query }),
       },
       audit: {
-        start: (body: { userId: string }) => post<ActionResult<{ user: MaintainerAuditUser }>>(apiFetch, "/api/web/maintainer/audit/start", body),
-        stop: () => post<ActionResult>(apiFetch, "/api/web/maintainer/audit/stop"),
+        start: async (body: { userId: string }) => {
+          try {
+            const user = await auth.startAudit(body.userId);
+            return { success: true, data: { user } } as const;
+          } catch (error) {
+            return { success: false, error: error instanceof Error ? error.message : "Failed to start audit mode" } as const;
+          }
+        },
+        stop: async () => {
+          const stopped = await auth.stopAudit();
+          return stopped ? ({ success: true, data: {} } as const) : ({ success: false, error: "Failed to stop audit mode" } as const);
+        },
       },
     },
   };

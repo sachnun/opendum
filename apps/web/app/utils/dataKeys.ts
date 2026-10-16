@@ -15,6 +15,8 @@ export const dataKeys = {
 export const stateKeys = {
   pinnedProviders: "web-shell-pinned-providers",
   me: "web-me-state",
+  authClaims: "web-auth-claims",
+  authSession: "web-auth-session",
   auditRefreshVersion: "web-audit-refresh-version",
   quotaByAccountId: "account-quota-by-account-id",
   quotaErrorByAccountId: "account-quota-error-by-account-id",

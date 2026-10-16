@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { signIn } from "~~/lib/auth-client";
-
 type SocialProvider = "github" | "google";
+
+const { startSignIn } = useAuth();
 
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
   OAuthAccountNotLinked:
@@ -61,17 +61,9 @@ const authError = computed(() => {
   return AUTH_ERROR_MESSAGES[decodedError] ?? "Sign in failed. Please try again.";
 });
 
-async function continueWithProvider(provider: SocialProvider) {
+function continueWithProvider(provider: SocialProvider) {
   loadingProvider.value = provider;
-
-  try {
-    await signIn.social({
-      provider,
-      callbackURL: redirectTarget.value,
-    });
-  } finally {
-    loadingProvider.value = null;
-  }
+  startSignIn(provider, redirectTarget.value);
 }
 
 function rotateShape(shape: number[][]) {

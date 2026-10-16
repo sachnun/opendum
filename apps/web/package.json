@@ -5,11 +5,6 @@
   "scripts": {
     "dev": "nuxt dev",
     "build": "nuxt build",
-    "predev": "bun run family-ranking",
-    "prebuild": "bun run family-ranking",
-    "pretest": "bun run family-ranking",
-    "pretest:unit": "bun run family-ranking",
-    "family-ranking": "bun ./scripts/family-ranking.ts",
     "test": "bun test",
     "lint": "oxlint .",
     "check": "nuxt prepare && vue-tsc --noEmit -p .nuxt/tsconfig.app.json && vue-tsc --noEmit -p .nuxt/tsconfig.server.json"
@@ -18,24 +13,16 @@
     "@internationalized/date": "^3.12.2",
     "@lucide/vue": "^1.43.0",
     "@nuxt/fonts": "^1.0.1",
-    "@opendum/auth": "workspace:*",
-    "@opendum/core": "workspace:*",
-    "@opendum/database": "workspace:*",
     "@opendum/models": "workspace:*",
     "@opendum/providers": "workspace:*",
-    "better-auth": "^1.6.23",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
-    "drizzle-orm": "^0.45.2",
-    "effect": "4.0.4",
     "eventsource-parser": "^3.1.0",
     "idb-keyval": "^6.3.0",
     "nuxt": "npm:nuxt-nightly@5.0.0-2610121449-e69fd4e",
-    "redis": "^6.1.0",
     "reka-ui": "^2.10.1",
     "tailwind-merge": "^3.6.0",
-    "vue-router": "^5.3.1",
-    "zod": "^4.4.3"
+    "vue-router": "^5.3.1"
   },
   "devDependencies": {
     "@nuxt/a11y": "1.0.0-alpha.1",
