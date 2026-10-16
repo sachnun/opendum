@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "nitro";
 
 export default defineConfig({
@@ -5,6 +6,9 @@ export default defineConfig({
   serverDir: "./",
   serverEntry: false,
   builder: "rollup",
+  alias: {
+    "#web": fileURLToPath(new URL("./web", import.meta.url)),
+  },
   routeRules: {
     "/**": {
       cors: {
@@ -17,7 +21,7 @@ export default defineConfig({
     "/": { redirect: { to: "/v1", status: 308 } },
   },
   devServer: {
-    hostname: "127.0.0.1",
+    hostname: "localhost",
     port: 4001,
   },
 });

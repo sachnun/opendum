@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { Effect, Layer } from "effect";
 import { AuthService } from "@opendum/auth";
 import { closeRedis, openRedis } from "@opendum/core/redis";
@@ -9,11 +10,10 @@ import { db, closeDatabase } from "@opendum/database";
 import { ProxyService } from "./service.js";
 import { proxyConfig } from "../config.js";
 import { ProxyContextTag, type ProxyContext } from "./services.js";
-import { tryAsync } from "./helpers.js";
 
 export type { ProxyContext } from "./services.js";
 
-async function resolveModelsDirForService(): Promise<string> {
+export function resolveModelsDirForService(): string {
   const cwd = process.cwd();
   const candidates = [
     `${cwd}/../../packages/models/data`,
@@ -21,9 +21,7 @@ async function resolveModelsDirForService(): Promise<string> {
     "/app/packages/models/data",
   ];
   for (const candidate of candidates) {
-    const normalized = Bun.fileURLToPath(new URL(candidate, "file:///"));
-    const stats = await tryAsync(() => Bun.file(normalized).stat(), null);
-    if (stats?.isDirectory()) return normalized;
+    if (existsSync(candidate)) return candidate;
   }
   return resolveModelsDir();
 }
@@ -32,7 +30,7 @@ export const ProxyContextLayer = Layer.effect(
   ProxyContextTag,
   Effect.gen(function* () {
     const config = yield* proxyConfig;
-    const dir = yield* Effect.promise(() => resolveModelsDirForService());
+    const dir = yield* Effect.sync(() => resolveModelsDirForService());
     const models = yield* Effect.sync(() => ModelRegistry.load(dir));
     const redis = yield* Effect.acquireRelease(
       Effect.promise(() => openRedis(config.redisUrl)),

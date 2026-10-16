@@ -32,9 +32,14 @@ describe("routes", () => {
 });
 
 describe("config", () => {
-  it("applies permissive cors to every route", () => {
+  it("applies cors for any origin", () => {
     expect(config.routeRules?.["/**"]).toMatchObject({
-      cors: { origin: "*", methods: ["GET", "POST", "OPTIONS"], allowHeaders: "*", exposeHeaders: "*" },
+      cors: {
+        origin: "*",
+        methods: ["GET", "POST", "OPTIONS"],
+        allowHeaders: "*",
+        exposeHeaders: "*",
+      },
     });
   });
 

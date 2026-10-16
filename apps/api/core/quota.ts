@@ -1,0 +1,60 @@
+import { Effect } from "effect";
+import { fetchQuota, isQuota } from "@opendum/providers/quota";
+import type { QuotaContext, QuotaJournal } from "@opendum/providers/quota";
+import { decrypt } from "@opendum/core/crypto";
+import type { ProxyContext } from "./context.js";
+
+export type AccountQuotaOutcome =
+  | { status: "success"; data: unknown }
+  | { status: "unsupported"; provider: string }
+  | { status: "not-found" }
+  | { status: "error"; message: string };
+
+function redisJournal(context: ProxyContext): QuotaJournal {
+  return {
+    get: (key) => context.redis.get(key),
+    async set(key, value, ttlSeconds) {
+      await context.redis.set(key, value, { EX: ttlSeconds });
+    },
+  };
+}
+
+function quotaContext(context: ProxyContext): QuotaContext {
+  return {
+    fetch: (url, init) => context.guardedFetch(url, init),
+    journal: redisJournal(context),
+    decrypt: (value) => decrypt(context.config.betterAuthSecret, value),
+    getCredentials: (account) => context.service.quotaCredentials(account),
+  };
+}
+
+export async function fetchAccountQuota(
+  context: ProxyContext,
+  input: { userId: string; provider: string; accountId: string; forceRefresh: boolean }
+): Promise<AccountQuotaOutcome> {
+  if (!isQuota(input.provider)) return { status: "unsupported", provider: input.provider };
+
+  const row = await context.service.quotaAccount(input.accountId, input.userId, input.provider);
+  if (!row) return { status: "not-found" };
+
+  try {
+    const data = await Effect.runPromise(
+      fetchQuota(
+        quotaContext(context),
+        {
+          id: row.id,
+          userId: row.userId,
+          provider: row.provider,
+          projectId: row.projectId,
+          accountId: row.accountId,
+          tier: row.tier,
+          accessToken: row.accessToken,
+        },
+        input.forceRefresh
+      )
+    );
+    return { status: "success", data };
+  } catch (error) {
+    return { status: "error", message: error instanceof Error ? error.message : String(error) };
+  }
+}

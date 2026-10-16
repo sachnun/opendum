@@ -1,10 +1,8 @@
 import { Effect, Option, Result, Schema } from "effect";
 import { type H3Event } from "h3";
-import { fetchQuota, isQuota } from "@opendum/providers/quota";
-import type { QuotaContext, QuotaJournal } from "@opendum/providers/quota";
 import { assertPublicHost, PrivateHostError } from "@opendum/core/egress";
-import { decrypt } from "@opendum/core/crypto";
 import type { ProxyContext } from "../core/context.js";
+import { fetchAccountQuota } from "../core/quota.js";
 import { parseJson, trySyncResult, utf8ByteLength } from "../core/helpers.js";
 import { validateInternalSignature } from "../core/internal-signature.js";
 import { jsonResponse } from "./errors.js";
@@ -41,24 +39,6 @@ const BLOCKED_RELAY_RESPONSE_HEADERS = new Set([
   "transfer-encoding", "upgrade", "content-length", "set-cookie",
 ]);
 
-function redisJournal(context: ProxyContext): QuotaJournal {
-  return {
-    get: (key) => context.redis.get(key),
-    async set(key, value, ttlSeconds) {
-      await context.redis.set(key, value, { EX: ttlSeconds });
-    },
-  };
-}
-
-function quotaContext(context: ProxyContext): QuotaContext {
-  return {
-    fetch: (url, init) => context.guardedFetch(url, init),
-    journal: redisJournal(context),
-    decrypt: (value) => decrypt(context.config.betterAuthSecret, value),
-    getCredentials: (account) => context.service.quotaCredentials(account),
-  };
-}
-
 export async function handleQuota(event: H3Event, context: ProxyContext): Promise<Response> {
   return Effect.runPromise(
     Effect.gen(function* () {
@@ -83,28 +63,20 @@ export async function handleQuota(event: H3Event, context: ProxyContext): Promis
       if (!userId || !provider || !accountId) {
         return jsonResponse({ success: false, error: "userId, provider, and accountId are required" }, 400);
       }
-      if (!isQuota(provider)) {
-        return jsonResponse({ success: false, error: `provider ${provider} is not supported for quota` }, 200);
-      }
 
-      const row = yield* Effect.promise(() => context.service.quotaAccount(accountId, userId, provider));
-      if (!row) return jsonResponse({ success: false, error: "Account not found" }, 404);
-
-      const account = {
-        id: row.id,
-        userId: row.userId,
-        provider: row.provider,
-        projectId: row.projectId,
-        accountId: row.accountId,
-        tier: row.tier,
-        accessToken: row.accessToken,
-      };
-      const result = yield* fetchQuota(
-        quotaContext(context),
-        account,
-        Boolean(decoded.forceRefresh)
+      const outcome = yield* Effect.promise(() =>
+        fetchAccountQuota(context, { userId, provider, accountId, forceRefresh: Boolean(decoded.forceRefresh) })
       );
-      return jsonResponse({ success: true, data: result }, 200);
+      if (outcome.status === "unsupported") {
+        return jsonResponse({ success: false, error: `provider ${outcome.provider} is not supported for quota` }, 200);
+      }
+      if (outcome.status === "not-found") {
+        return jsonResponse({ success: false, error: "Account not found" }, 404);
+      }
+      if (outcome.status === "error") {
+        return jsonResponse({ success: false, error: outcome.message }, 500);
+      }
+      return jsonResponse({ success: true, data: outcome.data }, 200);
     }).pipe(Effect.withSpan("handleQuota"))
   );
 }
