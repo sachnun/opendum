@@ -20,16 +20,12 @@ export const proxyConfig: Config.Config<ProxyConfig> = Config.all({
   redisUrl: Config.NonEmptyString("REDIS_URL"),
   betterAuthSecret: Config.NonEmptyString("BETTER_AUTH_SECRET"),
   nodeEnv,
-  requestTimeoutMs: Config.Finite("PROXY_REQUEST_TIMEOUT_MS").pipe(Config.withDefault(REQUEST_TIMEOUT_MS)),
-  tokenRefreshIntervalMs: Config.Finite("PROXY_TOKEN_REFRESH_INTERVAL_MS").pipe(
-    Config.withDefault(TOKEN_REFRESH_INTERVAL_MS)
-  ),
 }).pipe(
   Config.map(
-    ({ nodeEnv, requestTimeoutMs, tokenRefreshIntervalMs, ...rest }): ProxyConfig => ({
+    ({ nodeEnv, ...rest }): ProxyConfig => ({
       ...rest,
-      requestTimeoutMs,
-      tokenRefreshIntervalMs: nodeEnv === "production" ? tokenRefreshIntervalMs : 0,
+      requestTimeoutMs: REQUEST_TIMEOUT_MS,
+      tokenRefreshIntervalMs: nodeEnv === "production" ? TOKEN_REFRESH_INTERVAL_MS : 0,
     })
   )
 );
