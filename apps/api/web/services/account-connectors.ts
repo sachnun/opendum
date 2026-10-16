@@ -2,6 +2,7 @@ import { and, count as countFn, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { db, providerAccount } from "@opendum/database";
+import { publishAccountsChanged } from "#web/events/bus.js";
 import { encrypt, hashString } from "#web/lib/encryption.js";
 import { clearRefreshFailCount } from "#web/lib/proxy/auth.js";
 import { fetchExternal } from "#web/lib/external.js";
@@ -151,5 +152,10 @@ const ACCOUNT_CONNECTORS = {
 } as Record<string, (userId: string, input: CreateAccountInput) => Promise<ActionResult<{ email: string; isUpdate: boolean }>>>;
 
 export async function createAccount(userId: string, input: CreateAccountInput) {
-  return ACCOUNT_CONNECTORS[input.provider]?.(userId, input) ?? { success: false, error: `${input.provider} does not support direct API-key connection.` } as const;
+  const connect = ACCOUNT_CONNECTORS[input.provider];
+  if (!connect) return { success: false, error: `${input.provider} does not support direct API-key connection.` } as const;
+
+  const result = await connect(userId, input);
+  if (result.success) publishAccountsChanged(userId);
+  return result;
 }

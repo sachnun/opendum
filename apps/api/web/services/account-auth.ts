@@ -2,6 +2,7 @@ import { and, count as countFn, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { db, providerAccount } from "@opendum/database";
+import { publishAccountsChanged } from "#web/events/bus.js";
 import { encrypt } from "#web/lib/encryption.js";
 import { antigravityProvider } from "#web/lib/providers/antigravity/index.js";
 import { CLIENT_ID as antigravityClientId, REDIRECT_URI as antigravityRedirectUri, SCOPES as antigravityScopes } from "#web/lib/providers/antigravity/constants.js";
@@ -177,12 +178,14 @@ async function upsertOAuthAccount(userId: string, provider: ProviderAccountKey, 
     await db.update(providerAccount).set({ accessToken: encrypt(oauthResult.accessToken), refreshToken: encryptOptionalRefreshToken(oauthResult.refreshToken), expiresAt: oauthResult.expiresAt, email: resolvedEmail, ...(oauthResult.projectId ? { projectId: oauthResult.projectId } : {}), ...(oauthResult.tier ? { tier: oauthResult.tier } : {}), ...(accountId ? { accountId } : {}), isActive: true, disabledUntil: null }).where(eq(providerAccount.id, existingAccount.id));
     await clearRefreshFailCount(existingAccount.id);
     await trackProviderEmail(userId, resolvedEmail);
+    publishAccountsChanged(userId);
     return { success: true, data: { email: resolvedEmail, isUpdate: true } };
   }
 
   const [countResult] = await db.select({ value: countFn() }).from(providerAccount).where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, provider)));
   await db.insert(providerAccount).values({ userId, provider, name: `${label} ${(countResult?.value ?? 0) + 1}`, accessToken: encrypt(oauthResult.accessToken), refreshToken: encryptOptionalRefreshToken(oauthResult.refreshToken), expiresAt: oauthResult.expiresAt, email, projectId: oauthResult.projectId, tier: oauthResult.tier, accountId, isActive: true });
   await trackProviderEmail(userId, email);
+  publishAccountsChanged(userId);
   return { success: true, data: { email, isUpdate: false } };
 }
 

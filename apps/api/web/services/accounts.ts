@@ -1,4 +1,5 @@
 import { db, pinnedProvider, providerAccount, providerAccountDisabledModel, providerAccountModelHealth } from "@opendum/database";
+import { publishAccountsChanged } from "#web/events/bus.js";
 import { getModelLookupKeys, getProviderModelSet, resolveModelAlias } from "#web/lib/proxy/models.js";
 import { clearRefreshFailCount, invalidateDisabledModelsCache } from "#web/lib/proxy/auth.js";
 import { decrypt } from "#web/lib/encryption.js";
@@ -433,6 +434,7 @@ export async function updateAccount(userId: string, input: z.infer<typeof update
         .limit(1);
       if (!updated) return { success: false, error: "Account not found" } as const;
 
+      publishAccountsChanged(userId);
       return { success: true, data: { ...withEffectiveActive(updated, now), unhealthyCount: updated.consecutiveErrors } } as const;
     } catch (error) {
       console.error("Failed to update account:", error);
@@ -496,6 +498,7 @@ export async function deleteAccount(userId: string, input: z.infer<typeof delete
     await db.delete(providerAccount).where(eq(providerAccount.id, input.id));
     await invalidateDisabledModelsCache(userId);
     await clearRefreshFailCount(input.id);
+    publishAccountsChanged(userId);
     return { success: true, data: undefined } as const;
   } catch (error) {
     console.error("Failed to delete account:", error);
@@ -515,10 +518,12 @@ export async function togglePinnedProvider(userId: string, input: z.infer<typeof
 
     if (existing) {
       await db.delete(pinnedProvider).where(eq(pinnedProvider.id, existing.id));
+      publishAccountsChanged(userId);
       return { success: true, data: { providerKey: input.providerKey, pinned: false } } as const;
     }
 
     await db.insert(pinnedProvider).values({ userId, providerKey: input.providerKey }).onConflictDoNothing({ target: [pinnedProvider.userId, pinnedProvider.providerKey] });
+    publishAccountsChanged(userId);
     return { success: true, data: { providerKey: input.providerKey, pinned: true } } as const;
   } catch (error) {
     console.error("Failed to toggle pinned provider:", error);
@@ -548,6 +553,7 @@ export async function setAccountModelEnabled(userId: string, input: z.infer<type
     if (!input.enabled) await db.insert(providerAccountDisabledModel).values({ providerAccountId: account.id, model: normalizedModel }).onConflictDoNothing({ target: [providerAccountDisabledModel.providerAccountId, providerAccountDisabledModel.model] });
 
     await invalidateDisabledModelsCache(userId);
+    publishAccountsChanged(userId);
     return { success: true, data: { model: normalizedModel, enabled: input.enabled } } as const;
   } catch (error) {
     console.error("Failed to update account model status:", error);
@@ -628,6 +634,7 @@ export async function resolveAccountErrors(userId: string, input: z.infer<typeof
     await deleteRedisErrorHistory(input.accountId);
     await db.delete(providerAccountModelHealth).where(eq(providerAccountModelHealth.providerAccountId, input.accountId));
     await clearRefreshFailCount(input.accountId);
+    publishAccountsChanged(userId);
     return { success: true, data: undefined } as const;
   } catch (error) {
     console.error("Failed to resolve provider account errors:", error);

@@ -48,8 +48,8 @@ export async function requireSessionToken(event: H3Event): Promise<{ user: AuthU
   return { user: toAuthUser(session.user), sessionToken: token };
 }
 
-export async function requireSession(event: H3Event): Promise<AccessTokenClaims> {
-  const token = bearerToken(event.req.headers);
+export async function requireSessionFromHeaders(headers: Headers): Promise<AccessTokenClaims> {
+  const token = bearerToken(headers);
   if (!token) throw unauthorized();
 
   const identity = await identityService();

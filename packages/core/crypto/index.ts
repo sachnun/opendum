@@ -9,7 +9,6 @@ export {
 } from "./cryptojs.js";
 export {
   hmacHex,
-  internalSignature,
   playgroundSignature,
   signaturesMatch,
   timingSafeEqualHex,

@@ -5,9 +5,13 @@ function forwardedValue(value: string | null): string | undefined {
   return first ? first : undefined;
 }
 
+export function requestOriginFromHeaders(headers: Headers, url: string): string {
+  const parsed = new URL(url);
+  const proto = forwardedValue(headers.get("x-forwarded-proto")) ?? parsed.protocol.replace(":", "");
+  const host = forwardedValue(headers.get("x-forwarded-host")) ?? headers.get("host") ?? parsed.host;
+  return host ? `${proto}://${host}` : parsed.origin;
+}
+
 export function requestOrigin(event: H3Event): string {
-  const url = event.url ?? new URL(event.req.url);
-  const proto = forwardedValue(event.req.headers.get("x-forwarded-proto")) ?? url.protocol.replace(":", "");
-  const host = forwardedValue(event.req.headers.get("x-forwarded-host")) ?? event.req.headers.get("host") ?? url.host;
-  return host ? `${proto}://${host}` : url.origin;
+  return requestOriginFromHeaders(event.req.headers, String(event.url ?? event.req.url));
 }

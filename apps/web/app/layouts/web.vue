@@ -60,6 +60,17 @@ const PROVIDER_STATUS_ORDER = { error: 0, warning: 1, normal: 2 } as const;
 
 const api = useApi();
 const invalidation = useInvalidate();
+useEventStream({
+  onPoints: applyPointsBalance,
+  onAccounts: () => {
+    void refreshAccountSummaryOnce();
+  },
+  onModels: () => invalidation.refreshData([dataKeys.models, dataKeys.modelSearch, dataKeys.modelCatalog, dataKeys.shellModelFamilyCounts]),
+  onResync: () => {
+    void refreshAccountSummaryOnce();
+    void refreshPointStatusOnce();
+  },
+});
 const { prefetch } = usePrefetch();
 const { data: customProvidersData } = useCachedData(dataKeys.customProviders, () => api.customProviders.list());
 const customProviders = computed(() => customProvidersData.value ?? []);
@@ -194,12 +205,8 @@ const { data: defaultModelFamilyCounts } = useCachedData(dataKeys.shellModelFami
 
 const modelFamilyCounts = computed(() => defaultModelFamilyCounts.value ?? emptyModelFamilyCounts);
 
-const ACCOUNT_SUMMARY_REFRESH_MS = 30_000;
-const POINT_STATUS_REFRESH_MS = 15_000;
-let accountSummaryRefreshTimer: ReturnType<typeof setInterval> | null = null;
 let accountSummaryRefreshInFlight: Promise<void> | null = null;
 let accountSummaryRefreshQueued = false;
-let pointStatusRefreshTimer: ReturnType<typeof setInterval> | null = null;
 let pointStatusRefreshInFlight: Promise<void> | null = null;
 let pointStatusRefreshQueued = false;
 
@@ -364,22 +371,6 @@ async function refreshAccountSummaryOnce() {
   }
 }
 
-function stopAccountSummaryRefresh() {
-  accountSummaryRefreshQueued = false;
-  if (!accountSummaryRefreshTimer) return;
-
-  clearInterval(accountSummaryRefreshTimer);
-  accountSummaryRefreshTimer = null;
-}
-
-function startAccountSummaryRefresh() {
-  if (accountSummaryRefreshTimer || !shouldRefreshAccountSummary.value) return;
-
-  accountSummaryRefreshTimer = setInterval(() => {
-    void refreshAccountSummaryOnce();
-  }, ACCOUNT_SUMMARY_REFRESH_MS);
-}
-
 function applyPointStatus(status: PointStatusData) {
   if (me.value) {
     me.value = {
@@ -413,20 +404,10 @@ async function refreshPointStatusOnce() {
   }
 }
 
-function stopPointStatusRefresh() {
-  pointStatusRefreshQueued = false;
-  if (!pointStatusRefreshTimer) return;
+function applyPointsBalance(balance: number) {
+  if (!me.value) return;
 
-  clearInterval(pointStatusRefreshTimer);
-  pointStatusRefreshTimer = null;
-}
-
-function startPointStatusRefresh() {
-  if (pointStatusRefreshTimer) return;
-
-  pointStatusRefreshTimer = setInterval(() => {
-    void refreshPointStatusOnce();
-  }, POINT_STATUS_REFRESH_MS);
+  me.value = { ...me.value, points: { balance } };
 }
 
 function schedulePrefetch() {
@@ -441,47 +422,17 @@ function schedulePrefetch() {
   setTimeout(run, 1500);
 }
 
-function handleVisibilityChange() {
-  if (document.hidden) {
-    stopAccountSummaryRefresh();
-    stopPointStatusRefresh();
-    return;
-  }
-
-  startAccountSummaryRefresh();
-  startPointStatusRefresh();
-  void refreshAccountSummaryOnce();
-  void refreshPointStatusOnce();
-}
-
 onMounted(() => {
-  startPointStatusRefresh();
   schedulePrefetch();
 
-  document.addEventListener("visibilitychange", handleVisibilityChange);
-
-  if (document.hidden) {
-    stopAccountSummaryRefresh();
-    stopPointStatusRefresh();
-  }
-
   watch(shouldRefreshAccountSummary, (shouldRefresh) => {
-    if (!shouldRefresh) {
-      stopAccountSummaryRefresh();
-      return;
-    }
-
-    startAccountSummaryRefresh();
+    if (!shouldRefresh) return;
 
     if (!isDesktopViewport.value) void refreshAccountSummaryOnce();
   }, { immediate: true });
-
 });
 
 onBeforeUnmount(() => {
-  document.removeEventListener("visibilitychange", handleVisibilityChange);
-  stopAccountSummaryRefresh();
-  stopPointStatusRefresh();
   resetMobileSidebarSwipe();
 });
 

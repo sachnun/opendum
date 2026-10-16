@@ -22,9 +22,6 @@ import type {
   CustomProviderSyncResult,
   CustomProviderConnectResult,
   CustomProviderModelFlags,
-  ModelListItem,
-  ModelSearchItem,
-  ModelStatsData,
   PointStatusData,
   PlaygroundOptions,
   PlaygroundProxyAuth,
@@ -33,154 +30,109 @@ import type {
   ProviderAccountUpdateData,
 } from "../../lib/api-types";
 import type { DeviceProviderKey, OAuthProviderKey } from "@opendum/providers/provider-accounts";
-import { getAccessToken } from "../../lib/auth-token";
 import { resolveApiUrl } from "../../lib/api-url";
+import { createApiClient } from "../../lib/orpc";
 
 type ApiKeyAccessMode = "all" | "whitelist" | "blacklist";
 type PlaygroundEndpoint = "chat_completions" | "messages" | "responses";
 type RateLimitRule = { target: string; targetType: "model" | "family"; perMinute: number | null; perHour: number | null; perDay: number | null };
 
-type ApiFetchOptions = Record<string, unknown>;
-type ApiFetch = <T = unknown>(url: string, options?: ApiFetchOptions) => Promise<T>;
-type ApiFetchBody = NonNullable<ApiFetchOptions>["body"];
-
-function isUnauthorized(error: unknown): boolean {
-  if (!error || typeof error !== "object") return false;
-
-  const failure = error as { status?: number; statusCode?: number; response?: { status?: number } };
-  return failure.status === 401 || failure.statusCode === 401 || failure.response?.status === 401;
-}
-
-function withAuthHeader(headers: unknown): Record<string, string> | undefined {
-  const merged = { ...(headers as Record<string, string> | undefined) };
-  const token = getAccessToken();
-  if (token && !merged.authorization) merged.authorization = `Bearer ${token}`;
-
-  return Object.keys(merged).length > 0 ? merged : undefined;
-}
-
-function createApiFetch(baseURL: string, refresh: () => Promise<boolean>): ApiFetch {
-  return async <T>(url: string, options?: ApiFetchOptions) => {
-    const request = () => $fetch<T>(`${baseURL}${url}`, { ...options, headers: withAuthHeader(options?.headers) });
-
-    try {
-      return await request();
-    } catch (error) {
-      if (!isUnauthorized(error) || !(await refresh())) throw error;
-
-      return await request();
-    }
-  };
-}
-
-function post<T>(fetcher: ApiFetch, url: string, body?: ApiFetchBody, options?: ApiFetchOptions) {
-  const request = fetcher as unknown as (url: string, options?: Record<string, unknown>) => Promise<T>;
-  return request(url, { ...options, method: "POST", body });
-}
-
-function cursorQuery(ids: string[], cursors?: Record<string, string>) {
-  const cursorValues = ids.map((id) => cursors?.[id] ?? "");
-
-  return {
-    ids,
-    ...(cursorValues.some(Boolean) ? { cursors: cursorValues } : {}),
-  };
-}
-
 export function useApi() {
   const config = useRuntimeConfig();
   const auth = useAuth();
-  const apiFetch = createApiFetch(resolveApiUrl(config.public.apiUrl), async () => {
+  const refreshAuth = async () => {
     if (await auth.refreshAccessToken()) return true;
 
     auth.expireSession();
     void navigateTo("/");
     return false;
-  });
+  };
+  const baseUrl = resolveApiUrl(config.public.apiUrl);
+  const rpc = createApiClient({ baseUrl, refresh: refreshAuth });
 
   return {
     me: {
-      get: () => apiFetch<MeData>("/web/me"),
+      get: () => rpc.me.get({}) as Promise<MeData>,
     },
     points: {
-      status: () => apiFetch<PointStatusData>("/web/points"),
+      status: () => rpc.points.status({}) as Promise<PointStatusData>,
     },
     accounts: {
-      list: () => apiFetch("/web/accounts"),
-      byProvider: (query: { provider: string }) => apiFetch("/web/accounts/provider", { query }),
-      byProviderDetailed: (query: { provider: string }) => apiFetch<ProviderDetailData>("/web/accounts/provider-detail", { query }),
-      byProviderDetailedDelta: (query: { provider: string; cursor: string }) => apiFetch<ProviderDetailResponse>("/web/accounts/provider-detail", { query }),
-      stats: (query: { accountIds: string[]; cursors?: Record<string, string> }) => apiFetch<AccountStatsData>("/web/accounts/stats", { query: cursorQuery(query.accountIds, query.cursors) }),
-      overview: () => apiFetch<AccountOverviewData>("/web/accounts/overview"),
-      overviewDelta: (query: { cursor: string }) => apiFetch<AccountOverviewResponse>("/web/accounts/overview", { query }),
-      ping: () => apiFetch<AccountPingData>("/web/accounts/ping"),
-      create: (body: { provider: string; name?: string; token: string; cfAccountId?: string; platformKey?: string }) => post<ActionResult<{ email: string; isUpdate: boolean }>>(apiFetch, "/web/accounts/create", body),
-      update: (body: { id: string; name?: string; isActive?: boolean; disabledUntil?: string | Date | null }) => post<ActionResult<ProviderAccountUpdateData>>(apiFetch, "/web/accounts/update", body),
-      delete: (body: { id: string }) => post<ActionResult>(apiFetch, "/web/accounts/delete", body),
-      togglePinned: (body: { providerKey: string }) => post<ActionResult<{ providerKey: string; pinned: boolean }>>(apiFetch, "/web/accounts/pinned", body),
-      setAccountModelEnabled: (body: { accountId: string; modelId: string; enabled: boolean }) => post<ActionResult<{ model: string; enabled: boolean }>>(apiFetch, "/web/accounts/model-enabled", body),
-      errorHistory: (query: { accountId: string; limit?: number }) => apiFetch<ErrorHistoryResult>("/web/accounts/errors", { query }),
-      errorHistories: (body: { accountIds: string[]; limit?: number }) => post<ErrorHistoryBatchResult>(apiFetch, "/web/accounts/errors/batch", body),
-      resolveErrors: (body: { accountId: string }) => post<ActionResult>(apiFetch, "/web/accounts/errors/resolve", body),
-      getAuthUrl: (body: { provider: OAuthProviderKey }) => post<ActionResult<{ authUrl: string; state: string | null; codeVerifier: string | null }>>(apiFetch, "/web/accounts/oauth/url", body),
-      exchangeOAuth: (body: { provider: OAuthProviderKey; callbackUrl: string; state?: string | null; codeVerifier?: string | null }) => post<ActionResult<{ email: string; isUpdate: boolean }>>(apiFetch, "/web/accounts/oauth/exchange", body),
-      connectCodexSession: (body: { sessionJson: string }) => post<ActionResult<{ email: string; isUpdate: boolean }>>(apiFetch, "/web/accounts/codex-session", body),
-      copySession: (body: { id: string }) => post<ActionResult<{ session: string }>>(apiFetch, "/web/accounts/session", body),
-      initiateDeviceAuth: (body: { provider: DeviceProviderKey; method?: string }) => post<ActionResult<{ deviceCode: string; userCode: string; verificationUrl: string; verificationUrlComplete?: string; codeVerifier?: string; machineId?: string; expiresIn?: number; interval?: number }>>(apiFetch, "/web/accounts/device-auth/initiate", body),
-      pollDeviceAuth: (body: { provider: DeviceProviderKey; deviceCode: string; userCode?: string; codeVerifier?: string; method?: string; machineId?: string }) => post<ActionResult<{ status: "pending"; retryAfterSeconds?: number } | { status: "error"; message: string } | { status: "success"; email: string; isUpdate: boolean }>>(apiFetch, "/web/accounts/device-auth/poll", body),
-      quota: (body: AccountQuotaRequest, options?: ApiFetchOptions) => post<ActionResult<AccountQuotaInfo>>(apiFetch, "/web/accounts/quota", body, options),
-      quotas: (body: AccountQuotaBatchRequest, options?: ApiFetchOptions) => post<ActionResult<AccountQuotaBatchResult>>(apiFetch, "/web/accounts/quotas", body, options),
+      list: () => rpc.accounts.list({}),
+      byProvider: (query: { provider: string }) => rpc.accounts.provider(query),
+      byProviderDetailed: (query: { provider: string }) => rpc.accounts.providerDetail(query) as Promise<ProviderDetailData>,
+      byProviderDetailedDelta: (query: { provider: string; cursor: string }) => rpc.accounts.providerDetail(query) as Promise<ProviderDetailResponse>,
+      stats: (query: { accountIds: string[]; cursors?: Record<string, string> }) => rpc.accounts.stats(query) as Promise<AccountStatsData>,
+      overview: () => rpc.accounts.overview({}) as Promise<AccountOverviewData>,
+      overviewDelta: (query: { cursor: string }) => rpc.accounts.overview(query) as Promise<AccountOverviewResponse>,
+      ping: () => rpc.accounts.ping({}) as Promise<AccountPingData>,
+      create: (body: { provider: string; name?: string; token: string; cfAccountId?: string; platformKey?: string }) => rpc.accounts.create(body) as Promise<ActionResult<{ email: string; isUpdate: boolean }>>,
+      update: (body: { id: string; name?: string; isActive?: boolean; disabledUntil?: string | Date | null }) => rpc.accounts.update(body) as Promise<ActionResult<ProviderAccountUpdateData>>,
+      delete: (body: { id: string }) => rpc.accounts.remove(body) as Promise<ActionResult>,
+      togglePinned: (body: { providerKey: string }) => rpc.accounts.pinned(body) as Promise<ActionResult<{ providerKey: string; pinned: boolean }>>,
+      setAccountModelEnabled: (body: { accountId: string; modelId: string; enabled: boolean }) => rpc.accounts.setModelEnabled(body) as Promise<ActionResult<{ model: string; enabled: boolean }>>,
+      errorHistory: (query: { accountId: string; limit?: number }) => rpc.accounts.errorHistory(query) as Promise<ErrorHistoryResult>,
+      errorHistories: (body: { accountIds: string[]; limit?: number }) => rpc.accounts.errorHistories(body) as Promise<ErrorHistoryBatchResult>,
+      resolveErrors: (body: { accountId: string }) => rpc.accounts.resolveErrors(body) as Promise<ActionResult>,
+      getAuthUrl: (body: { provider: OAuthProviderKey }) => rpc.accounts.authUrl(body) as Promise<ActionResult<{ authUrl: string; state: string | null; codeVerifier: string | null }>>,
+      exchangeOAuth: (body: { provider: OAuthProviderKey; callbackUrl: string; state?: string | null; codeVerifier?: string | null }) => rpc.accounts.exchangeOAuth(body) as Promise<ActionResult<{ email: string; isUpdate: boolean }>>,
+      connectCodexSession: (body: { sessionJson: string }) => rpc.accounts.connectCodexSession(body) as Promise<ActionResult<{ email: string; isUpdate: boolean }>>,
+      copySession: (body: { id: string }) => rpc.accounts.session(body) as Promise<ActionResult<{ session: string }>>,
+      initiateDeviceAuth: (body: { provider: DeviceProviderKey; method?: string }) => rpc.accounts.initiateDeviceAuth(body) as Promise<ActionResult<{ deviceCode: string; userCode: string; verificationUrl: string; verificationUrlComplete?: string; codeVerifier?: string; machineId?: string; expiresIn?: number; interval?: number }>>,
+      pollDeviceAuth: (body: { provider: DeviceProviderKey; deviceCode: string; userCode?: string; codeVerifier?: string; method?: string; machineId?: string }) => rpc.accounts.pollDeviceAuth(body) as Promise<ActionResult<{ status: "pending"; retryAfterSeconds?: number } | { status: "error"; message: string } | { status: "success"; email: string; isUpdate: boolean }>>,
+      quota: (body: AccountQuotaRequest) => rpc.accounts.quota(body) as Promise<ActionResult<AccountQuotaInfo>>,
+      quotas: (body: AccountQuotaBatchRequest) => rpc.accounts.quotas(body) as Promise<ActionResult<AccountQuotaBatchResult>>,
     },
     customProviders: {
-      list: () => apiFetch<CustomProviderListItem[]>("/web/custom-providers"),
-      create: (body: { slug: string; name: string; baseUrl: string; extraHeaders?: Record<string, string> }) => post<ActionResult<CustomProviderCreateResult>>(apiFetch, "/web/custom-providers", body),
-      update: (body: { slug: string; name?: string; baseUrl?: string; extraHeaders?: Record<string, string>; enabled?: boolean }) => post<ActionResult>(apiFetch, "/web/custom-providers/update", body),
-      remove: (body: { slug: string }) => post<ActionResult>(apiFetch, "/web/custom-providers/delete", body),
-      connect: (body: { slug: string; token: string; name?: string }) => post<ActionResult<CustomProviderConnectResult>>(apiFetch, "/web/custom-providers/connect", body),
-      syncModels: (body: { slug: string; token?: string }) => post<ActionResult<CustomProviderSyncResult>>(apiFetch, "/web/custom-providers/sync-models", body),
-      previewModels: (body: { baseUrl: string; extraHeaders?: Record<string, string>; token?: string }) => post<ActionResult<{ models: Array<{ modelId: string; upstream: string }> }>>(apiFetch, "/web/custom-providers/preview-models", body),
-      addModels: (body: { slug: string; models: Array<{ modelId: string; upstream?: string; aliased?: boolean; authless?: boolean; minTier?: string; allowedTiers?: string[]; customFlags?: CustomProviderModelFlags }> }) => post<ActionResult<{ added: number }>>(apiFetch, "/web/custom-providers/models", body),
-      deleteModel: (body: { slug: string; modelId: string }) => post<ActionResult>(apiFetch, "/web/custom-providers/models/delete", body),
+      list: () => rpc.customProviders.list({}) as Promise<CustomProviderListItem[]>,
+      create: (body: { slug: string; name: string; baseUrl: string; extraHeaders?: Record<string, string> }) => rpc.customProviders.create(body) as Promise<ActionResult<CustomProviderCreateResult>>,
+      update: (body: { slug: string; name?: string; baseUrl?: string; extraHeaders?: Record<string, string>; enabled?: boolean }) => rpc.customProviders.update(body) as Promise<ActionResult>,
+      remove: (body: { slug: string }) => rpc.customProviders.remove(body) as Promise<ActionResult>,
+      connect: (body: { slug: string; token: string; name?: string }) => rpc.customProviders.connect(body) as Promise<ActionResult<CustomProviderConnectResult>>,
+      syncModels: (body: { slug: string; token?: string }) => rpc.customProviders.syncModels(body) as Promise<ActionResult<CustomProviderSyncResult>>,
+      previewModels: (body: { baseUrl: string; extraHeaders?: Record<string, string>; token?: string }) => rpc.customProviders.previewModels(body) as Promise<ActionResult<{ models: Array<{ modelId: string; upstream: string }> }>>,
+      addModels: (body: { slug: string; models: Array<{ modelId: string; upstream?: string; aliased?: boolean; authless?: boolean; minTier?: string; allowedTiers?: string[]; customFlags?: CustomProviderModelFlags }> }) => rpc.customProviders.upsertModels(body) as Promise<ActionResult<{ added: number }>>,
+      deleteModel: (body: { slug: string; modelId: string }) => rpc.customProviders.deleteModel(body) as Promise<ActionResult>,
     },
     analytics: {
-      data: (body?: { filter?: AnalyticsFilter; apiKeyId?: string; includeSeries?: boolean }) => post<AnalyticsData>(apiFetch, "/web/analytics/data", body),
-      series: (body?: { filter?: AnalyticsFilter; apiKeyId?: string }) => post<AnalyticsSeriesData>(apiFetch, "/web/analytics/series", body),
-      overview: () => apiFetch("/web/analytics/overview"),
-      usage: (query?: { range?: string }) => apiFetch("/web/analytics/usage", { query }),
+      data: (body?: { filter?: AnalyticsFilter; apiKeyId?: string; includeSeries?: boolean }) => rpc.analytics.data(body) as Promise<AnalyticsData>,
+      series: (body?: { filter?: AnalyticsFilter; apiKeyId?: string }) => rpc.analytics.series(body) as Promise<AnalyticsSeriesData>,
+      overview: () => rpc.analytics.overview({}),
+      usage: (query?: { range?: "5m" | "15m" | "30m" | "1h" | "6h" | "24h" | "7d" | "30d" | "90d" }) => rpc.analytics.usage(query),
     },
     sharing: {
-      get: () => apiFetch<{ enabled: boolean }>("/web/sharing"),
-      update: (body: { enabled: boolean }) => post<{ enabled: boolean }>(apiFetch, "/web/sharing", body),
+      get: () => rpc.sharing.get({}) as Promise<{ enabled: boolean }>,
+      update: (body: { enabled: boolean }) => rpc.sharing.set(body) as Promise<{ enabled: boolean }>,
     },
     apiKeys: {
-      list: () => apiFetch<ApiKeyListItem[]>("/web/api-keys"),
-      options: () => apiFetch<ApiKeyOptions>("/web/api-keys/options"),
-      create: (body?: { name?: string; expiresAt?: Date | string | null }) => post<ActionResult<{ id: string; key: string; keyPreview: string; name: string | null; expiresAt: string | Date | null }>>(apiFetch, "/web/api-keys/create", body),
-      toggle: (body: { id: string }) => post<ActionResult<{ id: string; isActive: boolean; expiresAt: string | Date | null }>>(apiFetch, "/web/api-keys/toggle", body),
-      delete: (body: { id: string }) => post<ActionResult>(apiFetch, "/web/api-keys/delete", body),
-      reveal: (body: { id: string }) => post<ActionResult<{ key: string }>>(apiFetch, "/web/api-keys/reveal", body),
-      updateName: (body: { id: string; name: string; key?: string }) => post<ActionResult<{ name: string | null; keyPreview: string }>>(apiFetch, "/web/api-keys/name", body),
-      updateExpiration: (body: { id: string; expiresAt: Date | string | null }) => post<ActionResult<{ expiresAt: string | Date | null }>>(apiFetch, "/web/api-keys/expiration", body),
-      updateRoaming: (body: { id: string; enabled: boolean }) => post<ActionResult<{ roamingEnabled: boolean }>>(apiFetch, "/web/api-keys/roaming", body),
-      updateModelAccess: (body: { id: string; mode: ApiKeyAccessMode; models: string[] }) => post<ActionResult<{ mode: ApiKeyAccessMode; models: string[] }>>(apiFetch, "/web/api-keys/model-access", body),
-      updateAccountAccess: (body: { id: string; mode: ApiKeyAccessMode; accounts: string[] }) => post<ActionResult<{ mode: ApiKeyAccessMode; accounts: string[] }>>(apiFetch, "/web/api-keys/account-access", body),
-      updateRateLimits: (body: { id: string; rules: RateLimitRule[] }) => post<ActionResult<{ rules: RateLimitRule[] }>>(apiFetch, "/web/api-keys/rate-limits", body),
+      list: () => rpc.apiKeys.list({}) as Promise<ApiKeyListItem[]>,
+      options: () => rpc.apiKeys.options({}) as Promise<ApiKeyOptions>,
+      create: (body?: { name?: string; expiresAt?: Date | string | null }) => rpc.apiKeys.create(body) as Promise<ActionResult<{ id: string; key: string; keyPreview: string; name: string | null; expiresAt: string | Date | null }>>,
+      toggle: (body: { id: string }) => rpc.apiKeys.toggle(body) as Promise<ActionResult<{ id: string; isActive: boolean; expiresAt: string | Date | null }>>,
+      delete: (body: { id: string }) => rpc.apiKeys.remove(body) as Promise<ActionResult>,
+      reveal: (body: { id: string }) => rpc.apiKeys.reveal(body) as Promise<ActionResult<{ key: string }>>,
+      updateName: (body: { id: string; name: string; key?: string }) => rpc.apiKeys.name(body) as Promise<ActionResult<{ name: string | null; keyPreview: string }>>,
+      updateExpiration: (body: { id: string; expiresAt: Date | string | null }) => rpc.apiKeys.expiration(body) as Promise<ActionResult<{ expiresAt: string | Date | null }>>,
+      updateRoaming: (body: { id: string; enabled: boolean }) => rpc.apiKeys.roaming(body) as Promise<ActionResult<{ roamingEnabled: boolean }>>,
+      updateModelAccess: (body: { id: string; mode: ApiKeyAccessMode; models: string[] }) => rpc.apiKeys.modelAccess(body) as Promise<ActionResult<{ mode: ApiKeyAccessMode; models: string[] }>>,
+      updateAccountAccess: (body: { id: string; mode: ApiKeyAccessMode; accounts: string[] }) => rpc.apiKeys.accountAccess(body) as Promise<ActionResult<{ mode: ApiKeyAccessMode; accounts: string[] }>>,
+      updateRateLimits: (body: { id: string; rules: RateLimitRule[] }) => rpc.apiKeys.rateLimits(body) as Promise<ActionResult<{ rules: RateLimitRule[] }>>,
     },
     models: {
-      list: (query?: { includeStats?: boolean }) => apiFetch<ModelListItem[]>("/web/models", query ? { query } : undefined),
-      search: () => apiFetch<ModelSearchItem[]>("/web/models/search"),
-      catalog: () => apiFetch<string[]>("/web/models/catalog"),
-      stats: (query: { models: string[]; cursors?: Record<string, string> }) => apiFetch<ModelStatsData>("/web/models/stats", { query: cursorQuery(query.models, query.cursors) }),
-      familyCounts: () => apiFetch<Record<string, number>>("/web/models/families"),
-      setEnabled: (body: { modelId: string; enabled: boolean }) => post<ActionResult<{ model: string; enabled: boolean }>>(apiFetch, "/web/models/enabled", body),
+      list: (query?: { includeStats?: boolean }) => rpc.models.list({ includeStats: query?.includeStats }),
+      search: () => rpc.models.search(),
+      catalog: () => rpc.models.catalog(),
+      stats: (query: { models: string[]; cursors?: Record<string, string> }) => rpc.models.stats(query),
+      familyCounts: () => rpc.models.familyCounts(),
+      setEnabled: (body: { modelId: string; enabled: boolean }) => rpc.models.setEnabled(body),
     },
     playground: {
-      options: () => apiFetch<PlaygroundOptions>("/web/playground/options"),
-      auth: (body: { endpoint: PlaygroundEndpoint }) => post<PlaygroundProxyAuth>(apiFetch, "/web/playground/auth", body),
+      options: () => rpc.playground.options({}) as Promise<PlaygroundOptions>,
+      auth: (body: { endpoint: PlaygroundEndpoint }) => rpc.playground.auth(body) as Promise<PlaygroundProxyAuth>,
     },
     maintainer: {
       users: {
-        search: (query?: { q?: string; offset?: number; limit?: number }) => apiFetch<MaintainerAuditUserListResult>("/web/maintainer/users/search", { query }),
+        search: (query?: { q?: string; offset?: number; limit?: number }) => rpc.maintainer.users.search(query ?? {}) as Promise<MaintainerAuditUserListResult>,
       },
       audit: {
         start: async (body: { userId: string }) => {
