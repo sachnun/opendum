@@ -35,6 +35,7 @@ function createDb(): Database {
     connection: {
       url: getConnectionString(),
       max: MAX_CONNECTIONS,
+      prepare: false,
     },
     schema: fullSchema,
   });

@@ -44,3 +44,7 @@ test("only the pool size is overridden, timeouts keep their defaults", () => {
   expect(options.connectionTimeout).toBeUndefined();
   expect(options.maxLifetime).toBeUndefined();
 });
+
+test("named prepared statements are disabled to avoid stale relation OIDs", () => {
+  expect(client.db.$client.options.prepare).toBe(false);
+});
