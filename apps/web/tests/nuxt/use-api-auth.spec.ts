@@ -37,7 +37,7 @@ describe("useApi access tokens", () => {
     await useApi().me.get();
 
     const [url, options] = callAt(0);
-    expect(url).toBe("https://api.example.com/api/web/me");
+    expect(url).toBe("https://api.example.com/web/me");
     expect(options.headers.authorization).toBe("Bearer access-token");
   });
 
