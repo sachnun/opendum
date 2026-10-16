@@ -20,12 +20,6 @@ const globalForDb = globalThis as unknown as {
 
 const MAX_CONNECTIONS = 10;
 
-export function normalizeConnectionString(raw: string): string {
-  const url = new URL(raw);
-  url.searchParams.delete("uselibpqcompat");
-  return url.toString();
-}
-
 function getConnectionString(): string {
   const connectionString = process.env.DATABASE_URL;
 
@@ -33,7 +27,7 @@ function getConnectionString(): string {
     throw new Error("DATABASE_URL is required");
   }
 
-  return normalizeConnectionString(connectionString);
+  return connectionString;
 }
 
 function createDb(): Database {
