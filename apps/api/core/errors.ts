@@ -272,6 +272,24 @@ export function shouldRotate(status: number): boolean {
   return status >= 500 || [429, 408, 404, 403, 402, 401].includes(status);
 }
 
+const WORKBUDDY_RESTRICTION_CODES = new Set([11140, 11141, 11142, 17271, 17272, 17273, 17274, 17275, 17276]);
+const WORKBUDDY_RESTRICTION_COOLDOWN_MS = 30 * 60 * 1000;
+
+export function workbuddyRestrictionDisabledUntil(
+  provider: string,
+  body: string,
+  now: Date
+): Date | null {
+  if (provider !== "workbuddy") return null;
+  const parsed = parseJson(body.trim());
+  if (Result.isFailure(parsed)) return null;
+  const payload = parsed.success;
+  if (payload === null || typeof payload !== "object" || Array.isArray(payload)) return null;
+  const code = (payload as Record<string, unknown>).code;
+  if (typeof code !== "number" || !WORKBUDDY_RESTRICTION_CODES.has(code)) return null;
+  return new Date(now.getTime() + WORKBUDDY_RESTRICTION_COOLDOWN_MS);
+}
+
 export function isAntigravityResourceExhausted(provider: string, status: number, body: string): boolean {
   if (provider !== "antigravity" || status !== 429) return false;
   const parsed = parseJson(body.trim());

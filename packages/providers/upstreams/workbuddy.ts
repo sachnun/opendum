@@ -69,6 +69,26 @@ function traceHeaders(): Record<string, string> {
   };
 }
 
+function parseJsonValue(text: string): unknown {
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return undefined;
+  }
+}
+
+function normalizeTools(value: unknown): unknown[] | null {
+  let candidate = value;
+  if (typeof candidate === "string") {
+    const trimmed = candidate.trim();
+    if (!trimmed) return null;
+    candidate = parseJsonValue(trimmed);
+  }
+  if (!Array.isArray(candidate)) return null;
+  const tools = candidate.filter((tool) => tool !== null && typeof tool === "object" && !Array.isArray(tool));
+  return tools.length > 0 ? tools : null;
+}
+
 function conversationSeed(uid: string, request: ProviderRequest, messages: unknown[]): string {
   const sessionId = stringValue(request.sessionId).trim();
   if (sessionId) return `${uid}:${sessionId}`;
@@ -153,7 +173,14 @@ export class WorkbuddyProvider implements Provider, CredentialRefresher {
     }
     const payload: Json = {};
     for (const [key, value] of Object.entries(request.body)) {
+      if (key === "tools" || key === "tool_choice") continue;
       if (SUPPORTED_WORKBUDDY.has(key) && value !== undefined && value !== null) payload[key] = value;
+    }
+    const tools = normalizeTools(request.body.tools);
+    if (tools) {
+      payload.tools = tools;
+      const toolChoice = request.body.tool_choice;
+      if (toolChoice !== undefined && toolChoice !== null) payload.tool_choice = toolChoice;
     }
     let model = stringValue(request.body.model);
     if (model.startsWith("workbuddy/")) model = model.slice("workbuddy/".length);

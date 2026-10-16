@@ -105,6 +105,7 @@ type ChatOptions = {
   sessionId?: string;
   requestId?: string;
   messages?: unknown[];
+  body?: Record<string, unknown>;
 };
 
 async function chat(buddy: WorkbuddyProvider, options: ChatOptions = {}): Promise<void> {
@@ -115,12 +116,17 @@ async function chat(buddy: WorkbuddyProvider, options: ChatOptions = {}): Promis
       body: {
         model: "deepseek-v4.1-flash",
         messages: options.messages ?? [{ role: "user", content: "hi" }],
+        ...options.body,
       },
       stream: true,
       sessionId: options.sessionId,
       requestId: options.requestId,
     })
   );
+}
+
+function requestBody(captured: Captured[]): Record<string, unknown> {
+  return JSON.parse(String(captured[0]?.init?.body)) as Record<string, unknown>;
 }
 
 describe("WorkbuddyProvider.makeRequest", () => {
@@ -195,6 +201,53 @@ describe("WorkbuddyProvider.makeRequest", () => {
     expect(result.ok).toBe(true);
     const headers = captured[0]?.init?.headers as Record<string, string>;
     for (const name of CONVERSATION_HEADERS) expect(headers[name]).toBeUndefined();
+  });
+
+  it("parses tool definitions sent as a JSON string", async () => {
+    const captured: Captured[] = [];
+    const fake = provider({ body: "" }, captured);
+    const tools = [{ type: "function", function: { name: "read", parameters: { type: "object" } } }];
+    await chat(fake, { body: { tools: JSON.stringify(tools), tool_choice: "auto" } });
+    const body = requestBody(captured);
+    expect(body.tools).toEqual(tools);
+    expect(body.tool_choice).toBe("auto");
+  });
+
+  it("drops tools that cannot be parsed instead of forwarding a string", async () => {
+    const captured: Captured[] = [];
+    const fake = provider({ body: "" }, captured);
+    await chat(fake, { body: { tools: "[5 tool(s): read, bash]", tool_choice: "auto" } });
+    const body = requestBody(captured);
+    expect(body.tools).toBeUndefined();
+    expect(body.tool_choice).toBeUndefined();
+  });
+
+  it("drops tools that are not an array or hold no objects", async () => {
+    const notArray: Captured[] = [];
+    await chat(provider({ body: "" }, notArray), { body: { tools: { type: "function" }, tool_choice: "auto" } });
+    expect(requestBody(notArray).tools).toBeUndefined();
+    expect(requestBody(notArray).tool_choice).toBeUndefined();
+    const primitives: Captured[] = [];
+    await chat(provider({ body: "" }, primitives), { body: { tools: ["read", "bash"] } });
+    expect(requestBody(primitives).tools).toBeUndefined();
+  });
+
+  it("keeps object tool entries and skips primitives in a mixed array", async () => {
+    const captured: Captured[] = [];
+    const fake = provider({ body: "" }, captured);
+    const entry = { type: "function", function: { name: "read" } };
+    await chat(fake, { body: { tools: [entry, "bash", null] } });
+    expect(requestBody(captured).tools).toEqual([entry]);
+  });
+
+  it("forwards array tools with tool_choice untouched", async () => {
+    const captured: Captured[] = [];
+    const fake = provider({ body: "" }, captured);
+    const tools = [{ type: "function", function: { name: "edit" } }];
+    await chat(fake, { body: { tools, tool_choice: { type: "function", function: { name: "edit" } } } });
+    const body = requestBody(captured);
+    expect(body.tools).toEqual(tools);
+    expect(body.tool_choice).toEqual({ type: "function", function: { name: "edit" } });
   });
 });
 

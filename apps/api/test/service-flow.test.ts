@@ -89,4 +89,78 @@ describe("ProxyService full flow", () => {
     }
     expect(repositories.usage.insertUsageLog.mock.calls.length >= 1).toBe(true);
   });
+
+  it("cools down a workbuddy account when the provider reports a risk restriction", async () => {
+    const provider: Provider = {
+      name: "workbuddy",
+      makeRequest: () =>
+        Effect.succeed(new Response(JSON.stringify({ code: 11140, msg: "request illegal" }), { status: 403 })),
+    };
+    const providers = {
+      names: () => ["workbuddy"],
+      has: (name: string) => name === "workbuddy",
+      get: (name: string) => (name === "workbuddy" ? provider : undefined),
+      isAuthless: () => false,
+      refreshableProviderNames: () => [],
+      transport: { direct: () => Promise.reject(new Error("no fetch")) },
+    } as unknown as ProviderRegistry;
+    const models = {
+      providers: () => ["workbuddy"],
+      resolveAlias: (model: string) => model,
+      lookupKeys: (model: string) => [model],
+      isVisionModel: () => true,
+      isSupportedByProvider: () => true,
+      isAuthless: () => false,
+      rule: () => null,
+      modelCost: () => null,
+      models: () => [],
+    } as unknown as Registry;
+    const auth = {
+      validateKey: () => Effect.succeed(validAuth()),
+      validateFor: () => Effect.succeed({ ...validModel(), model: "deepseek-v4.1-flash", provider: "workbuddy" }),
+      bumpVersion: () => Effect.void,
+    } as unknown as AuthService;
+    const redis = { get: async () => null, set: async () => "OK", del: async () => 1, zAdd: async () => 1, zRemRangeByRank: async () => 0, expire: async () => true } as unknown as OpendumRedis;
+
+    const repositories = fakes();
+    repositories.accounts.listEligibleAccounts.mockImplementation(async (params) => {
+      if (params.excludeIds.includes("acc-1")) return [];
+      return [
+        {
+          id: "acc-1",
+          userId: "user-1",
+          provider: "workbuddy",
+          accountId: "uid-1",
+          status: "active",
+          tier: null,
+          disabledUntil: null,
+          lastUsedAt: null,
+          createdAt: new Date(),
+        } as never,
+      ];
+    });
+    const service = new ProxyService({
+      database: {} as never,
+      repositories,
+      redis,
+      models,
+      auth,
+      providers,
+      betterAuthSecret: "secret",
+      requestTimeoutMs: 0,
+    });
+
+    const response = await service.handle(
+      new Chat(),
+      { model: "deepseek-v4.1-flash", messages: [{ role: "user", content: "hi" }], stream: true },
+      "Bearer ok",
+      ""
+    );
+    expect(response.status).toBe(403);
+    expect(repositories.health.markUsageLimitedHealth.mock.calls.length).toBe(1);
+    const limited = repositories.health.setAccountUsageLimited.mock.calls[0]?.[0];
+    expect(limited?.id).toBe("acc-1");
+    expect(limited?.status).toBe("failed");
+    expect(limited?.disabledUntil.getTime()).toBeGreaterThan(Date.now() + 29 * 60 * 1000);
+  });
 });

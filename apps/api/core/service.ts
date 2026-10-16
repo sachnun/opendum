@@ -36,6 +36,7 @@ import {
   routeErrorResponse,
   sanitizedProxyError,
   shouldRotate,
+  workbuddyRestrictionDisabledUntil,
 } from "./errors.js";
 import { upsertErrorHistory } from "./error-history.js";
 import {
@@ -757,6 +758,12 @@ export class ProxyService implements StreamRecorder {
               this.health.logAccountError(account.id, account.userId, validation.model, response.status, detailed)
             );
           }
+          const restrictedUntil = workbuddyRestrictionDisabledUntil(account.provider, bodyText, new Date());
+          if (restrictedUntil) {
+            yield* Effect.promise(() =>
+              this.health.markAccountUsageLimited(account.id, validation.model, restrictedUntil, failedAt ?? new Date())
+            );
+          }
           yield* ignore(() =>
             this.usage.logUsage(authResult, account, validation, response.status, Date.now() - startMs)
           );
@@ -774,7 +781,7 @@ export class ProxyService implements StreamRecorder {
             if (!excludedProviders.includes(account.provider)) excludedProviders.push(account.provider);
             continue;
           }
-          if (shouldRotate(response.status) && !forced) {
+          if ((shouldRotate(response.status) || restrictedUntil !== null) && !forced) {
             if (failedAt) recoverableFailures.push({ accountId: account.id, failedAt });
             yield* Metric.update(accountRotations, 1);
             continue;
