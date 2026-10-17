@@ -4,25 +4,51 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { buildAaIndex, parseLeaderboard, resolveAaScore } from "#models/sync/aa.ts";
+import {
+  buildAaIndex,
+  decodeLeaderboardManifest,
+  parseLeaderboard,
+  parseLeaderboardManifest,
+  resolveAaScore,
+  type AaEntry,
+} from "#models/sync/aa.ts";
 import { modelProbes } from "#models/model/probes.ts";
-import { runFetchText } from "#models/sync/http.ts";
+import { runFetchText, request, runOrThrow } from "#models/sync/http.ts";
 import { buildIndex, generatedPath, read, writeGenerated } from "#models/model-store.ts";
 
 const LEADERBOARD_URL = "https://artificialanalysis.ai/leaderboards/models";
 const USER_AGENT = "Mozilla/5.0 (compatible; opendum-model-sync)";
 const MIN_EXPECTED_MODELS = 100;
 
+async function fetchManifestModels(path: string, key: string): Promise<AaEntry[]> {
+  const url = new URL(path, LEADERBOARD_URL).toString();
+  const payload = await runOrThrow(
+    request(url, { label: "Artificial Analysis manifest", headers: { "User-Agent": USER_AGENT } }, (response) =>
+      response.arrayBuffer().then((buffer) => new Uint8Array(buffer)),
+    ),
+  );
+  return decodeLeaderboardManifest(payload, key);
+}
+
+async function loadModels(): Promise<AaEntry[]> {
+  const html = await runFetchText(LEADERBOARD_URL, {
+    label: "Artificial Analysis leaderboard",
+    headers: { "User-Agent": USER_AGENT },
+  });
+  const manifest = parseLeaderboardManifest(html);
+  if (!manifest) return parseLeaderboard(html);
+
+  const models = await fetchManifestModels(manifest.path, manifest.key);
+  console.log(`[aa] manifest ${manifest.path} returned ${models.length} entries`);
+  return models;
+}
+
 async function main(): Promise<void> {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
   const modelsDir = resolve(scriptDir, "../data");
   const dryRun = process.argv.includes("--dry-run");
 
-  const html = await runFetchText(LEADERBOARD_URL, {
-    label: "Artificial Analysis leaderboard",
-    headers: { "User-Agent": USER_AGENT },
-  });
-  const models = parseLeaderboard(html);
+  const models = await loadModels();
   if (models.length < MIN_EXPECTED_MODELS) {
     throw new Error(`Artificial Analysis leaderboard returned ${models.length} scored models, expected at least ${MIN_EXPECTED_MODELS}`);
   }

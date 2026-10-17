@@ -1,17 +1,35 @@
 import { expect, test } from "bun:test";
+import { createCipheriv, createHash, randomBytes } from "node:crypto";
+import { gzipSync } from "node:zlib";
 
 import {
   buildAaIndex,
+  decodeLeaderboardManifest,
   normalizeAaSlug,
   parseLeaderboard,
+  parseLeaderboardManifest,
   resolveAaScore,
   stripEffortSuffix,
 } from "./aa.ts";
 
-function leaderboardHtml(models: unknown[]): string {
-  const inner = `{"models":${JSON.stringify(models)}}`;
+function leaderboardHtml(models: unknown[], key = "models"): string {
+  const inner = `{"${key}":${JSON.stringify(models)}}`;
   const escaped = inner.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   return `<html><script>self.__next_f.push([1,"${escaped}"])</script></html>`;
+}
+
+function manifestHtml(path: string, key: string): string {
+  const inner = `{"manifest":{"path":"${path}","key":"${key}"}}`;
+  const escaped = inner.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  return `<html><script>self.__next_f.push([1,"${escaped}"])</script></html>`;
+}
+
+function encodeManifest(models: unknown[], keyHex: string): Uint8Array {
+  const key = Buffer.from(keyHex, "hex");
+  const iv = createHash("sha256").update(key).digest().subarray(0, 12);
+  const cipher = createCipheriv("aes-256-gcm", key, iv);
+  const body = Buffer.concat([cipher.update(gzipSync(Buffer.from(JSON.stringify(models)))), cipher.final()]);
+  return new Uint8Array(Buffer.concat([body, cipher.getAuthTag()]));
 }
 
 const SAMPLE = [
@@ -48,6 +66,41 @@ test("parseLeaderboard extracts scored models", () => {
     estimated: false,
   });
   expect(models.find((model) => model.slug === "MiniMax-M3")?.estimated).toBe(true);
+});
+
+test("parseLeaderboard accepts renamed model list keys", () => {
+  expect(parseLeaderboard(leaderboardHtml(SAMPLE, "initialModels"))).toHaveLength(6);
+  expect(parseLeaderboard(leaderboardHtml(SAMPLE, "scoredModels"))).toHaveLength(6);
+});
+
+test("parseLeaderboardManifest reads the encrypted payload pointer", () => {
+  const key = randomBytes(32).toString("hex");
+  expect(parseLeaderboardManifest(manifestHtml("/data/abc.txt", key))).toEqual({
+    path: "/data/abc.txt",
+    key,
+  });
+  expect(parseLeaderboardManifest(leaderboardHtml(SAMPLE))).toBe(null);
+});
+
+test("decodeLeaderboardManifest decrypts the full scored list", () => {
+  const key = randomBytes(32).toString("hex");
+  const entries = decodeLeaderboardManifest(encodeManifest(SAMPLE, key), key);
+  expect(entries.map((entry) => entry.slug)).toEqual([
+    "claude-opus-5-5",
+    "claude-opus-5-5-xhigh",
+    "gpt-5-4-nano-medium",
+    "gpt-5-4-nano",
+    "MiniMax-M3",
+    "glm-4-5v",
+  ]);
+  expect(entries[4]?.estimated).toBe(true);
+});
+
+test("decodeLeaderboardManifest fails closed on a wrong key", () => {
+  const key = randomBytes(32).toString("hex");
+  const other = randomBytes(32).toString("hex");
+  expect(() => decodeLeaderboardManifest(encodeManifest(SAMPLE, key), other)).toThrow();
+  expect(decodeLeaderboardManifest(new Uint8Array(), key)).toEqual([]);
 });
 
 test("parseLeaderboard tolerates malformed input", () => {

@@ -1,3 +1,6 @@
+import { createDecipheriv, createHash } from "node:crypto";
+import { gunzipSync } from "node:zlib";
+
 export interface AaEntry {
   slug: string;
   name: string;
@@ -93,15 +96,14 @@ function balancedArray(text: string, from: number): string | null {
   return null;
 }
 
+const MODEL_LIST_KEY = /"[A-Za-z]*[Mm]odels":\[/g;
+
 function scoredModels(payload: string): Record<string, unknown>[] {
-  const marker = '"models":[';
   let best: Record<string, unknown>[] = [];
-  let cursor = 0;
-  for (;;) {
-    const at = payload.indexOf(marker, cursor);
-    if (at === -1) break;
-    cursor = at + 1;
-    const raw = balancedArray(payload, at + marker.length - 1);
+  MODEL_LIST_KEY.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = MODEL_LIST_KEY.exec(payload)) !== null) {
+    const raw = balancedArray(payload, match.index + match[0].length - 1);
     if (!raw) continue;
     let parsed: unknown;
     try {
@@ -119,9 +121,16 @@ function scoredModels(payload: string): Record<string, unknown>[] {
   return best;
 }
 
-export function parseLeaderboard(html: string): AaEntry[] {
+export interface AaManifest {
+  path: string;
+  key: string;
+}
+
+const MANIFEST_PATTERN = /"manifest":\{"path":"([^"]+)","key":"([0-9a-fA-F]+)"\}/;
+
+function recordsToEntries(records: readonly Record<string, unknown>[]): AaEntry[] {
   const models: AaEntry[] = [];
-  for (const record of scoredModels(flightPayload(html))) {
+  for (const record of records) {
     const slug = typeof record.slug === "string" ? record.slug.trim() : "";
     if (!slug) continue;
     models.push({
@@ -132,6 +141,38 @@ export function parseLeaderboard(html: string): AaEntry[] {
     });
   }
   return models;
+}
+
+export function parseLeaderboard(html: string): AaEntry[] {
+  return recordsToEntries(scoredModels(flightPayload(html)));
+}
+
+export function parseLeaderboardManifest(html: string): AaManifest | null {
+  const match = MANIFEST_PATTERN.exec(flightPayload(html));
+  if (!match) return null;
+  return { path: match[1]!, key: match[2]! };
+}
+
+export function decodeLeaderboardManifest(payload: Uint8Array, keyHex: string): AaEntry[] {
+  const key = Buffer.from(keyHex, "hex");
+  const iv = createHash("sha256").update(key).digest().subarray(0, 12);
+  const tagLength = 16;
+  if (payload.length <= tagLength) return [];
+
+  const decipher = createDecipheriv("aes-256-gcm", key, iv);
+  decipher.setAuthTag(payload.subarray(payload.length - tagLength));
+  const plain = Buffer.concat([
+    decipher.update(payload.subarray(0, payload.length - tagLength)),
+    decipher.final(),
+  ]);
+  const records = JSON.parse(gunzipSync(plain).toString("utf-8")) as unknown;
+  if (!Array.isArray(records)) return [];
+  return recordsToEntries(
+    records.filter(
+      (record): record is Record<string, unknown> =>
+        record !== null && typeof record === "object" && typeof (record as Record<string, unknown>).intelligenceIndex === "number",
+    ),
+  );
 }
 
 export function buildAaIndex(models: readonly AaEntry[]): AaIndex {
