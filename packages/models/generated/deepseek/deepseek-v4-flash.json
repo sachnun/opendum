@@ -19,7 +19,8 @@
   "reasoning_effort": [
     "low",
     "medium",
-    "high"
+    "high",
+    "max"
   ],
   "modalities": {
     "input": [
@@ -34,9 +35,9 @@
     "output": 384000
   },
   "cost": {
-    "input": 0.0375,
+    "input": 0.0235,
     "output": 0.9,
-    "cacheRead": 0.0075
+    "cacheRead": 0.014
   },
   "scores": {
     "artificialAnalysis": {
