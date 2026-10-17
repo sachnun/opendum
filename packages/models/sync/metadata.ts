@@ -341,6 +341,17 @@ function firstDefined<T>(values: Array<T | null | undefined>): T | null {
   return null;
 }
 
+/** Union the declared effort lists in canonical order so a wider provider is not masked by a narrower one. */
+function mergeEfforts(values: ReadonlyArray<string[] | null>): string[] | null {
+  const supported = new Set<string>();
+  for (const value of values) {
+    if (!value) continue;
+    for (const effort of value) supported.add(effort);
+  }
+  if (supported.size === 0) return null;
+  return REASONING_EFFORTS.filter((effort) => supported.has(effort));
+}
+
 interface SourceExtractor {
   name: RegistryName;
   url: string;
@@ -552,7 +563,7 @@ export function buildModelPatch(
 
   const reasoning = firstDefined(candidates.map((item) => reasoningFrom(item.source, item.entry)));
 
-  const reasoningEffort = firstDefined(candidates.map((item) => effortsFrom(item.source, item.entry)));
+  const reasoningEffort = mergeEfforts(candidates.map((item) => effortsFrom(item.source, item.entry)));
 
   const cost = mergeCosts(candidates.map((item) => pointsFrom(item.source, item.entry)));
 
