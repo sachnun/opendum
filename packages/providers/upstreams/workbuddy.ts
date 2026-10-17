@@ -39,7 +39,18 @@ const WORKBUDDY_PRODUCT = "SaaS";
 const WORKBUDDY_AGENT_INTENT = "craft";
 const WORKBUDDY_AGENT_PURPOSE = "conversation";
 const WORKBUDDY_AGENT_TYPE = "main";
-const WORKBUDDY_USER_AGENT = `WorkBuddy/${WORKBUDDY_IDE_VERSION} WorkBuddy/${WORKBUDDY_IDE_VERSION}`;
+const WORKBUDDY_AGENT_RUNTIME = "other";
+const WORKBUDDY_CLI_VERSION = "2.161.0";
+const WORKBUDDY_USER_AGENT = `WorkBuddy/${WORKBUDDY_IDE_VERSION} WorkBuddy/${WORKBUDDY_IDE_VERSION} CLI/${WORKBUDDY_CLI_VERSION}`;
+const WORKBUDDY_SDK_HEADERS: Record<string, string> = {
+  "x-stainless-lang": "js",
+  "x-stainless-package-version": "6.25.0",
+  "x-stainless-os": "Linux",
+  "x-stainless-arch": "x64",
+  "x-stainless-retry-count": "0",
+  "x-stainless-runtime": "node",
+  "x-stainless-runtime-version": "v22.22.3",
+};
 
 export const SUPPORTED_WORKBUDDY = new Set([
   "model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream",
@@ -201,6 +212,8 @@ export class WorkbuddyProvider implements Provider, CredentialRefresher {
     const conversationId = seed ? seededUuidV7Hex(seed) : randomUuidV7Hex();
     const conversationRequestId = stringValue(request.requestId).trim() || randomUuidV7Hex();
     const messageId = randomUuidV7Hex();
+    const acpConnectionId = seed ? seededUuidV7Hex(`${seed}:acp`) : randomUuidV7Hex();
+    const sessionTag = conversationId;
 
     const url = `${WORKBUDDY_API_BASE}${WORKBUDDY_CHAT_PATH}`;
     const direct = this.transport.direct;
@@ -218,10 +231,15 @@ export class WorkbuddyProvider implements Provider, CredentialRefresher {
                 "X-Conversation-ID": conversationId,
                 "X-Conversation-Request-ID": conversationRequestId,
                 "X-Conversation-Message-ID": messageId,
+                "X-Root-Request-ID": conversationRequestId,
                 "X-Request-ID": messageId,
+                "acp-connection-id": acpConnectionId,
+                "baggage": `codebuddy.session_id=${sessionTag},codebuddy.conversation_request_id=${conversationRequestId}`,
                 "X-Agent-Intent": WORKBUDDY_AGENT_INTENT,
                 "X-Agent-Purpose": WORKBUDDY_AGENT_PURPOSE,
                 "X-Agent-Type": WORKBUDDY_AGENT_TYPE,
+                "X-Agent-Runtime": WORKBUDDY_AGENT_RUNTIME,
+                ...WORKBUDDY_SDK_HEADERS,
                 "X-IDE-Type": WORKBUDDY_IDE_TYPE,
                 "X-IDE-Name": WORKBUDDY_IDE_NAME,
                 "X-IDE-Version": WORKBUDDY_IDE_VERSION,
@@ -248,12 +266,41 @@ export class WorkbuddyProvider implements Provider, CredentialRefresher {
   }
 }
 
+function sanitizeChannelText(text: string): string {
+  if (!text) return text;
+  let out = text;
+  if (out.includes("Anthropic's official CLI for Claude")) {
+    out = out.replaceAll("Anthropic's official CLI for Claude", "Anthropic official CLI for Claude");
+  }
+  if (out.includes("Main branch") && out.includes("for PRs")) {
+    out = out.replaceAll(" (you will usually use this for PRs)", "");
+  }
+  return out;
+}
+
+function sanitizeContent(content: unknown): unknown {
+  if (typeof content === "string") return sanitizeChannelText(content);
+  if (Array.isArray(content)) return content.map(sanitizeContent);
+  if (content !== null && typeof content === "object") {
+    const record = content as Json;
+    const next: Json = { ...record };
+    if (typeof record.text === "string") next.text = sanitizeChannelText(record.text);
+    if (record.content !== undefined) next.content = sanitizeContent(record.content);
+    return next;
+  }
+  return content;
+}
+
 function ensureSystemMessage(messages: unknown[]): unknown[] {
   const normalized: unknown[] = [];
   for (const raw of messages) {
     const msg = raw as Json;
     if (msg && stringValue(msg.role) === "developer") {
-      normalized.push({ ...msg, role: "system" });
+      normalized.push({ ...msg, role: "system", content: sanitizeContent(msg.content) });
+      continue;
+    }
+    if (msg && stringValue(msg.role) === "system") {
+      normalized.push({ ...msg, content: sanitizeContent(msg.content) });
       continue;
     }
     normalized.push(raw);

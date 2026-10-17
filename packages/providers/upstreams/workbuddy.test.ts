@@ -185,13 +185,60 @@ describe("WorkbuddyProvider.makeRequest", () => {
     expect(headers["X-Private-Data"]).toBe("true");
     expect(headers["x-requested-with"]).toBe("XMLHttpRequest");
     expect(headers["x-codebuddy-request"]).toBe("1");
-    expect(headers["User-Agent"]).toBe("WorkBuddy/5.8.4 WorkBuddy/5.8.4");
+    expect(headers["x-stainless-lang"]).toBe("js");
+    expect(headers["x-stainless-package-version"]).toBe("6.25.0");
+    expect(headers["x-stainless-runtime"]).toBe("node");
+    expect(headers["X-Agent-Runtime"]).toBe("other");
+    expect(headers["User-Agent"]).toBe("WorkBuddy/5.8.4 WorkBuddy/5.8.4 CLI/2.161.0");
     expect(headers.Accept).toBe("text/event-stream");
     expect(headers["Content-Type"]).toBe("application/json");
     expect(headers.traceparent).toMatch(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/);
     expect(headers.b3).toMatch(/^[0-9a-f]{32}-[0-9a-f]{16}-1-[0-9a-f]{16}$/);
     expect(headers["X-B3-TraceId"]).toBe(headers["X-Trace-ID"]);
     expect(headers["X-B3-Sampled"]).toBe("1");
+    expect(headers["X-Root-Request-ID"]).toBe(headers["X-Conversation-Request-ID"]);
+    expect(headers["acp-connection-id"]).toMatch(UUID_V7_HEX);
+    expect(headers.baggage).toContain(`codebuddy.session_id=${headers["X-Conversation-ID"]}`);
+    expect(headers.baggage).toContain(`codebuddy.conversation_request_id=${headers["X-Conversation-Request-ID"]}`);
+  });
+
+  it("rewrites the Claude Code channel fingerprint in system content", async () => {
+    const captured: Captured[] = [];
+    const fake = provider({ body: "" }, captured);
+    await chat(fake, {
+      messages: [
+        { role: "developer", content: "You are Claude Code, Anthropic's official CLI for Claude." },
+        { role: "user", content: "hi" },
+      ],
+    });
+    const messages = requestBody(captured).messages as Array<Record<string, unknown>>;
+    expect(messages[0]?.role).toBe("system");
+    expect(messages[0]?.content).toBe("You are Claude Code, Anthropic official CLI for Claude.");
+    expect(messages[1]?.role).toBe("user");
+  });
+
+  it("drops the Main branch PR hint from system content", async () => {
+    const captured: Captured[] = [];
+    const fake = provider({ body: "" }, captured);
+    await chat(fake, {
+      messages: [
+        { role: "system", content: "Main branch (you will usually use this for PRs)" },
+        { role: "user", content: "hi" },
+      ],
+    });
+    const messages = requestBody(captured).messages as Array<Record<string, unknown>>;
+    expect(messages[0]?.content).toBe("Main branch");
+  });
+
+  it("keeps the acp connection id sticky for a session", async () => {
+    const captured: Captured[] = [];
+    const fake = provider({ body: "" }, captured);
+    await chat(fake, { sessionId: "session-1" });
+    await chat(fake, { sessionId: "session-1" });
+    const first = captured[0]?.init?.headers as Record<string, string>;
+    const second = captured[1]?.init?.headers as Record<string, string>;
+    expect(first["acp-connection-id"]).toMatch(UUID_V7_HEX);
+    expect(second["acp-connection-id"]).toBe(first["acp-connection-id"]);
   });
 
   it("keeps the conversation headers off the refresh call", async () => {
