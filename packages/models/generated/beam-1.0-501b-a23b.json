@@ -6,7 +6,9 @@
   ],
   "aliases": [
     "beam",
-    "beam-free"
+    "beam-free",
+    "reflection-beam-free",
+    "reflection/beam-free"
   ],
   "reasoning": true,
   "reasoning_effort": [
