@@ -26,18 +26,14 @@ function patchNuxtData<T>(key: string, patcher: (value: T) => T) {
   const { data } = useNuxtData<T>(key);
   if (!data.value) return;
 
-  const next = patcher(data.value);
-  data.value = next;
-  writeDataCache(key, next);
+  data.value = patcher(data.value);
 }
 
 function refreshData(keys: string | string[]) {
-  removeDataCache(keys);
   return refreshNuxtData(keys);
 }
 
 function clearData(keys: string | string[]) {
-  removeDataCache(keys);
   clearNuxtData(keys);
 }
 

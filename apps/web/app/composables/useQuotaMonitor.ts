@@ -1,17 +1,7 @@
-import { getMany, set } from "idb-keyval";
 import type { ComputedRef } from "vue";
 import type { AccountQuotaInfo, ProviderDetailData, QuotaProviderKey } from "../../lib/api-types";
-import { createIdbStore } from "../utils/idb";
 
 type Account = ProviderDetailData["accounts"][number];
-
-type CachedAccountQuota = {
-  accountId: string;
-  provider: QuotaProviderKey;
-  quota: AccountQuotaInfo;
-  error?: string;
-  cachedAt: number;
-};
 
 type LoadAccountQuotaOptions = {
   refreshExisting?: boolean;
@@ -24,35 +14,6 @@ type RunQuotaRefreshOptions = {
   forceRefresh?: boolean;
 };
 
-const QUOTA_DB_NAME = "opendum-web";
-const QUOTA_STORE_NAME = "account-quota";
-const quotaStore = createIdbStore(QUOTA_DB_NAME, QUOTA_STORE_NAME);
-
-function getQuotaCacheKey(accountId: string) {
-  return `account-quota:${accountId}`;
-}
-
-async function readCachedQuotas(accountIds: string[]) {
-  if (!quotaStore || accountIds.length === 0) return [];
-
-  try {
-    return await getMany<CachedAccountQuota>(accountIds.map(getQuotaCacheKey), quotaStore);
-  } catch (error) {
-    console.warn("Failed to read quota cache:", error);
-    return [];
-  }
-}
-
-async function writeCachedQuota(account: Account, provider: QuotaProviderKey, quota: AccountQuotaInfo) {
-  if (!quotaStore) return;
-
-  try {
-    await set(getQuotaCacheKey(account.id), { accountId: account.id, provider, quota, cachedAt: Date.now() } satisfies CachedAccountQuota, quotaStore);
-  } catch (error) {
-    console.warn("Failed to write quota cache:", error);
-  }
-}
-
 export function useQuotaMonitor(options: {
   accounts: ComputedRef<Account[]>;
   quotaCapableAccounts: ComputedRef<Account[]>;
@@ -63,7 +24,6 @@ export function useQuotaMonitor(options: {
   const quotaByAccountId = useState<Record<string, AccountQuotaInfo>>(stateKeys.quotaByAccountId, () => ({}));
   const quotaErrorByAccountId = useState<Record<string, string>>(stateKeys.quotaErrorByAccountId, () => ({}));
   const quotaLoadingByAccountId = useState<Record<string, boolean>>(stateKeys.quotaLoadingByAccountId, () => ({}));
-  const hydratedAccountIds = useState<Record<string, boolean>>(stateKeys.quotaHydratedAccountIds, () => ({}));
   let quotaQueueRunId = 0;
   let quotaRunInFlight: Promise<void> | null = null;
   const quotaLoadingRunByAccountId = new Map<string, number>();
@@ -87,41 +47,6 @@ export function useQuotaMonitor(options: {
     }
   }
 
-  async function hydrateQuotaCache() {
-    if (!import.meta.client) return;
-
-    const accountsToHydrate = options.quotaCapableAccounts.value.filter((account) => !hydratedAccountIds.value[account.id]);
-    if (accountsToHydrate.length === 0) return;
-
-    const cachedQuotas = await readCachedQuotas(accountsToHydrate.map((account) => account.id));
-    const nextQuotaByAccountId = { ...quotaByAccountId.value };
-    const nextErrorByAccountId = { ...quotaErrorByAccountId.value };
-    const nextHydratedAccountIds = { ...hydratedAccountIds.value };
-    let hasQuotaChanges = false;
-    let hasErrorChanges = false;
-
-    for (const [index, cached] of cachedQuotas.entries()) {
-      const account = accountsToHydrate[index];
-      if (!account) continue;
-
-      nextHydratedAccountIds[account.id] = true;
-      if (!cached || cached.accountId !== account.id || cached.provider !== options.toQuotaProvider(account.provider)) continue;
-
-      nextQuotaByAccountId[account.id] = cached.quota;
-      hasQuotaChanges = true;
-
-      if (cached.error) {
-        nextErrorByAccountId[account.id] = cached.error;
-        hasErrorChanges = true;
-      }
-    }
-
-    for (const account of accountsToHydrate) nextHydratedAccountIds[account.id] = true;
-    hydratedAccountIds.value = nextHydratedAccountIds;
-    if (hasQuotaChanges) quotaByAccountId.value = nextQuotaByAccountId;
-    if (hasErrorChanges) quotaErrorByAccountId.value = nextErrorByAccountId;
-  }
-
   async function loadAccountQuota(account: Account, loadOptions: LoadAccountQuotaOptions = {}) {
     const { refreshExisting = false, forceRefresh = false, runId } = loadOptions;
     const provider = options.toQuotaProvider(account.provider);
@@ -139,7 +64,6 @@ export function useQuotaMonitor(options: {
 
       quotaByAccountId.value = { ...quotaByAccountId.value, [account.id]: result.data };
       quotaErrorByAccountId.value = Object.fromEntries(Object.entries(quotaErrorByAccountId.value).filter(([accountId]) => accountId !== account.id));
-      await writeCachedQuota(account, provider, result.data);
     } catch (error) {
       if (runId !== undefined && runId !== quotaQueueRunId) return;
 
@@ -195,7 +119,6 @@ export function useQuotaMonitor(options: {
 
       const nextQuotaByAccountId = { ...quotaByAccountId.value };
       const nextErrorByAccountId = { ...quotaErrorByAccountId.value };
-      const cacheWrites: Array<Promise<void>> = [];
 
       for (const providerResult of providerResults) {
         if (!providerResult.ok) {
@@ -210,7 +133,6 @@ export function useQuotaMonitor(options: {
 
           if (accountResult.success) {
             nextQuotaByAccountId[account.id] = accountResult.data;
-            cacheWrites.push(writeCachedQuota(account, providerResult.provider, accountResult.data));
           } else if (refreshExisting || !hadQuotaByAccountId[account.id]) {
             nextErrorByAccountId[account.id] = accountResult.error;
           }
@@ -219,7 +141,6 @@ export function useQuotaMonitor(options: {
 
       quotaByAccountId.value = nextQuotaByAccountId;
       quotaErrorByAccountId.value = Object.fromEntries(Object.entries(nextErrorByAccountId).filter(([accountId]) => !nextQuotaByAccountId[accountId]));
-      await Promise.all(cacheWrites);
     };
 
     const runPromise = run().finally(() => {
@@ -243,7 +164,6 @@ export function useQuotaMonitor(options: {
     quotaErrorByAccountId,
     quotaLoadingByAccountId,
     cancelQuotaQueue,
-    hydrateQuotaCache,
     loadAccountQuota,
     pruneQuotaState,
     runQuotaQueue,

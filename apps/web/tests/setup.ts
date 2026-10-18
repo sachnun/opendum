@@ -1,5 +1,4 @@
 import { Window } from "happy-dom";
-import "fake-indexeddb/auto";
 
 const win = new Window({ url: "http://localhost/" });
 const browserGlobals = [

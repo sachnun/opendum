@@ -10,7 +10,7 @@ const invalidateAccountCollection = mock(() => {});
 
 (globalThis as Record<string, unknown>).useApi = () => ({ customProviders: { list } });
 (globalThis as Record<string, unknown>).useInvalidate = () => ({ refreshData, invalidateAccountCollection });
-(globalThis as Record<string, unknown>).useCachedData = () => ({ data: ref([]), refresh: mock(() => {}) });
+(globalThis as Record<string, unknown>).useAsyncData = () => ({ data: ref([]), refresh: mock(() => {}) });
 (globalThis as Record<string, unknown>).dataKeys = { customProviders: "custom-providers", playgroundOptions: "playground-options" };
 
 type Connect = ReturnType<typeof useAccountConnect>;
