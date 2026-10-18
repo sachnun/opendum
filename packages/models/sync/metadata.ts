@@ -1,12 +1,6 @@
-/**
- * External model registry clients and metadata extraction.
- *
- * Pulls model metadata from OpenRouter, models.dev, LiteLLM, and NVIDIA NIM so
- * the local registry can be enriched with `owner`, `limit`, `cost`, and
- * `modalities` without hand-maintaining those fields.
- */
+import { Cause, Effect, Exit } from "effect";
 
-import { runFetchJson } from "./http.ts";
+import { runFetchJsonEffect } from "./http.ts";
 import { buildIndex, resolveCandidates, type IndexedModel } from "../model/similarity.ts";
 import {
   MODELSDEV_CANONICAL_URL,
@@ -19,10 +13,8 @@ export const MODELSDEV_URL = "https://models.dev/api.json";
 export const LITELLM_URL = "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json";
 export const NVIDIA_MODELS_URL = "https://integrate.api.nvidia.com/v1/models";
 
-/** Points granted per USD, mirroring the web points rate (5 points = 1 USD). */
 export const POINTS_PER_USD = 5;
 
-/** Local provider -> models.dev provider id, for provider-scoped matching. */
 export const PROVIDER_TO_MODELSDEV: Readonly<Record<string, string>> = {
   kilo_code: "kilo",
   openrouter: "openrouter",
@@ -54,7 +46,6 @@ export interface ModelLimit {
   output?: number;
 }
 
-/** Model price in points per million tokens. 5 points = 1 USD. */
 export interface ModelCost {
   input?: number;
   output?: number;
@@ -192,12 +183,6 @@ function buildPoints(values: ModelCost): ModelCost | null {
   return Object.keys(points).length > 0 ? points : null;
 }
 
-/**
- * Extract per-million-token prices and convert them to points.
- *
- * `POINTS_PER_USD` mirrors the web points rate (5 points = 1 USD), so a
- * stored value is points per million tokens.
- */
 function pointsFrom(source: RegistryName, entry: unknown): ModelCost | null {
   const record = asRecord(entry);
   if (!record) return null;
@@ -241,11 +226,6 @@ function hasProviderLimits(limits: ProviderLimits): boolean {
   return limits.contextWindow !== undefined || limits.maxOutputTokens !== undefined;
 }
 
-/**
- * Pick the lowest non-zero price per field across all candidate costs, falling
- * back to zero when every candidate is free. Zero is ignored so free provider
- * tiers do not mask the model's paid reference price.
- */
 function mergeCosts(costs: Array<ModelCost | null>): ModelCost | null {
   const present = costs.filter((cost): cost is ModelCost => cost !== null);
   if (present.length === 0) return null;
@@ -341,7 +321,6 @@ function firstDefined<T>(values: Array<T | null | undefined>): T | null {
   return null;
 }
 
-/** Union the declared effort lists in canonical order so a wider provider is not masked by a narrower one. */
 function mergeEfforts(values: ReadonlyArray<string[] | null>): string[] | null {
   const supported = new Set<string>();
   for (const value of values) {
@@ -443,36 +422,59 @@ function groupByProvider(
   return result;
 }
 
+function describeFailure(cause: unknown): string {
+  return cause instanceof Error ? cause.message : String(cause);
+}
+
 export async function fetchExternalRegistries(
   options: { logger?: (message: string) => void } = {},
 ): Promise<ExternalCatalogs> {
   const logger = options.logger ?? (() => {});
+
+  const settled = await Effect.runPromise(
+    Effect.forEach(
+      SOURCES,
+      (source) =>
+        runFetchJsonEffect(source.url, { label: `external registry ${source.name}` }).pipe(
+          Effect.map((payload) => ({ source, payload })),
+          Effect.exit,
+        ),
+      { concurrency: SOURCES.length },
+    ),
+  );
+
   const registries: Registries = {};
   let canonicalModels: unknown;
 
-  for (const source of SOURCES) {
-    try {
-      const payload = await runFetchJson(source.url, { label: `external registry ${source.name}` });
-      const entries = source.extract(payload);
-      registries[source.name] = {
-        entries,
-        index: buildIndex(entries, source.name),
-        byProvider: groupByProvider(entries, source.name),
-      };
-      if (source.name === "modelsdev") canonicalModels = payload;
-      logger(`[metadata] ${source.name}: ${entries.length} entries`);
-    } catch (error) {
-      logger(`[metadata] ${source.name} unavailable: ${error instanceof Error ? error.message : String(error)}`);
+  for (const result of settled) {
+    if (Exit.isFailure(result)) {
+      logger(`[metadata] registry unavailable: ${describeFailure(Cause.squash(result.cause))}`);
+      continue;
     }
+
+    const { source, payload } = result.value;
+    const entries = source.extract(payload);
+    registries[source.name] = {
+      entries,
+      index: buildIndex(entries, source.name),
+      byProvider: groupByProvider(entries, source.name),
+    };
+    if (source.name === "modelsdev") canonicalModels = payload;
+    logger(`[metadata] ${source.name}: ${entries.length} entries`);
   }
 
   let canonicalModelsJson: unknown;
-  try {
-    canonicalModelsJson = await runFetchJson(MODELSDEV_CANONICAL_URL, { label: "models.dev canonical models" });
+  const canonicalExit = await Effect.runPromise(
+    Effect.exit(
+      runFetchJsonEffect(MODELSDEV_CANONICAL_URL, { label: "models.dev canonical models" }),
+    ),
+  );
+  if (Exit.isSuccess(canonicalExit)) {
+    canonicalModelsJson = canonicalExit.value;
     const count = Object.keys(asRecord(canonicalModelsJson) ?? {}).length;
     logger(`[metadata] canonical models: ${count} entries`);
-  } catch (error) {
-    logger(`[metadata] canonical models unavailable: ${error instanceof Error ? error.message : String(error)}`);
+  } else {
+    logger(`[metadata] canonical models unavailable: ${describeFailure(Cause.squash(canonicalExit.cause))}`);
   }
 
   const canonical = buildCanonicalIndex({

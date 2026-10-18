@@ -1,179 +1,172 @@
-#!/usr/bin/env node
-
-import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { homedir, tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-
 import { buildIndex, persist, sync } from "#models/model-store.ts";
-import { runFetchJson } from "#models/sync/http.ts";
+import { arrayAt, asTrimmedString, booleanAt, stringAt } from "#models/json.ts";
+import { exists, readText } from "#models/fs.ts";
+import { join } from "#models/paths.ts";
+import { env, fetchPackageJson, packageModelsDir, runScript } from "./shared.ts";
+import type { ModelData, ModelIndexEntry } from "#models/types.ts";
 
 const PROVIDER_NAME = "workbuddy";
 const WORKBUDDY_NPM_PACKAGE = "@tencent-ai/codebuddy-code";
-const WORKBUDDY_PRODUCT_MEMBER = "package/product.json";
+
+const WORKBUDDY_PRODUCT_FILE = "product.json";
 
 const MIN_EXPECTED_MODELS = 20;
 
-// House/preset routing ids (default-model, fast-model, ...) are not real models.
 const HOUSE_MODEL_PATTERN = /(?:^|-)model$/;
 
-function isExcludedId(id) {
+interface CatalogEntry {
+  id: string;
+  reasoning: boolean;
+}
+
+function isExcludedId(id: string): boolean {
   if (id.includes("image")) return true;
   if (id.startsWith("hunyuan-video")) return true;
   return false;
 }
 
-async function fetchWorkbuddyCatalog() {
-  const metadata = await runFetchJson(`https://registry.npmjs.org/${WORKBUDDY_NPM_PACKAGE}`, {
-    label: `${WORKBUDDY_NPM_PACKAGE} npm metadata`,
+function toCatalogEntry(value: unknown): CatalogEntry | null {
+  const id = asTrimmedString(stringAt(value, "id"));
+  if (!id || isExcludedId(id)) return null;
+  return { id, reasoning: booleanAt(value, "supportsReasoning") === true };
+}
+
+async function fetchWorkbuddyCatalog(): Promise<CatalogEntry[]> {
+  const { version, payload } = await fetchPackageJson(
+    WORKBUDDY_NPM_PACKAGE,
+    WORKBUDDY_PRODUCT_FILE,
+    { label: `${WORKBUDDY_NPM_PACKAGE} product catalog` }
+  );
+
+  const models = arrayAt(payload, "models");
+  if (models.length === 0) {
+    throw new Error(`Unexpected models payload in ${WORKBUDDY_NPM_PACKAGE}@${version}`);
+  }
+  return models.flatMap((item) => {
+    const entry = toCatalogEntry(item);
+    return entry ? [entry] : [];
   });
-  const version = metadata?.["dist-tags"]?.latest;
-  const tarball = metadata?.versions?.[version]?.dist?.tarball;
-  if (typeof version !== "string" || typeof tarball !== "string") {
-    throw new Error(`Unexpected ${WORKBUDDY_NPM_PACKAGE} npm metadata payload`);
-  }
+}
 
-  const tempDir = mkdtempSync(join(tmpdir(), "workbuddy-"));
+function readLocalCatalog(): CatalogEntry[] {
+  const home = env("HOME");
+  if (!home) return [];
+
+  const candidate = join(home, ".workbuddy-ai", "cache", "acc-product-config-v3.json");
+  if (!exists(candidate)) return [];
+
   try {
-    const archivePath = join(tempDir, `${PROVIDER_NAME}-${version}.tgz`);
-    const response = await fetch(tarball, { signal: AbortSignal.timeout(30_000) });
-    if (!response.ok) {
-      throw new Error(`Failed to download ${WORKBUDDY_NPM_PACKAGE} tarball (${response.status} ${response.statusText})`);
-    }
-    writeFileSync(archivePath, Buffer.from(await response.arrayBuffer()));
-
-    let source;
-    try {
-      source = execFileSync("tar", ["-xzO", "-f", archivePath, WORKBUDDY_PRODUCT_MEMBER], {
-        encoding: "utf8",
-        maxBuffer: 32 * 1024 * 1024,
-      });
-    } catch {
-      throw new Error(`Failed to extract ${WORKBUDDY_PRODUCT_MEMBER} from ${WORKBUDDY_NPM_PACKAGE}@${version}`);
-    }
-
-    let product;
-    try {
-      product = JSON.parse(source);
-    } catch {
-      throw new Error(`Invalid ${WORKBUDDY_PRODUCT_MEMBER} JSON in ${WORKBUDDY_NPM_PACKAGE}@${version}`);
-    }
-    const models = product?.models;
-    if (!Array.isArray(models) || models.length === 0) {
-      throw new Error(`Unexpected models payload in ${WORKBUDDY_NPM_PACKAGE}@${version}`);
-    }
-    return models;
-  } finally {
-    rmSync(tempDir, { recursive: true, force: true });
+    const payload: unknown = JSON.parse(readText(candidate));
+    const models = Array.isArray(payload) ? payload : arrayAt(payload, "models");
+    return models.flatMap((item) => {
+      const entry = toCatalogEntry(item);
+      return entry ? [entry] : [];
+    });
+  } catch {
+    return [];
   }
 }
 
-function readLocalCatalog() {
-  const candidates = [join(homedir(), ".workbuddy-ai", "cache", "acc-product-config-v3.json")];
-  for (const candidate of candidates) {
-    if (!existsSync(candidate)) continue;
-    try {
-      const payload = JSON.parse(readFileSync(candidate, "utf-8"));
-      const models = Array.isArray(payload) ? payload : payload?.models;
-      if (Array.isArray(models) && models.length > 0) return models;
-    } catch {
-      continue;
-    }
-  }
-  return [];
-}
+function buildModelMap(catalog: CatalogEntry[]): {
+  modelMap: Map<string, string>;
+  metadataLookup: Map<string, CatalogEntry>;
+} {
+  const modelMap = new Map<string, string>();
+  const metadataLookup = new Map<string, CatalogEntry>();
 
-function metaFromCatalogEntry(entry) {
-  return {
-    reasoning: entry?.supportsReasoning === true,
+  const register = (entry: CatalogEntry): void => {
+    if (modelMap.has(entry.id)) return;
+    modelMap.set(entry.id, entry.id);
+    metadataLookup.set(entry.id, entry);
   };
-}
 
-function buildModelMap(catalog) {
-  const modelMap = new Map();
-  const metadataLookup = new Map();
-  for (const entry of catalog) {
-    const id = typeof entry?.id === "string" ? entry.id.trim() : "";
-    if (!id || isExcludedId(id)) continue;
-    if (!modelMap.has(id)) {
-      modelMap.set(id, id);
-      metadataLookup.set(id, entry);
-    }
-  }
-
-  for (const local of readLocalCatalog()) {
-    const id = typeof local?.id === "string" ? local.id.trim() : "";
-    if (!id || isExcludedId(id) || modelMap.has(id)) continue;
-    modelMap.set(id, id);
-    metadataLookup.set(id, local);
-  }
+  for (const entry of catalog) register(entry);
+  for (const entry of readLocalCatalog()) register(entry);
 
   if (modelMap.size === 0) {
     throw new Error("WorkBuddy catalog produced no models");
   }
   if (modelMap.size < MIN_EXPECTED_MODELS) {
-    console.warn(`WorkBuddy catalog produced ${modelMap.size} models (expected >= ${MIN_EXPECTED_MODELS})`);
+    console.warn(
+      `WorkBuddy catalog produced ${modelMap.size} models (expected >= ${MIN_EXPECTED_MODELS})`
+    );
   }
-  return { modelMap: new Map([...modelMap.entries()].sort(([a], [b]) => a.localeCompare(b))), metadataLookup };
+
+  return {
+    modelMap: new Map([...modelMap.entries()].sort(([a], [b]) => a.localeCompare(b))),
+    metadataLookup,
+  };
 }
 
-function enrichNewModels(modelsDir, addedKeys, modelMap, metadataLookup) {
+function enrichNewModels(
+  modelsDir: string,
+  addedKeys: string[],
+  modelMap: Map<string, string>,
+  metadataLookup: Map<string, CatalogEntry>
+): void {
   const index = buildIndex(modelsDir);
 
   for (const modelKey of addedKeys) {
-    const entry = Object.values(index).find((item) => item.fileId === modelKey || item.id === modelKey);
+    const entry = Object.values(index).find(
+      (item) => item.fileId === modelKey || item.id === modelKey
+    );
     if (!entry) continue;
 
     const upstreamName = modelMap.get(modelKey);
-    const catalogEntry = upstreamName ? metadataLookup.get(upstreamName) : null;
-    const meta = catalogEntry ? metaFromCatalogEntry(catalogEntry) : null;
-    if (!meta) continue;
+    const catalogEntry = upstreamName ? metadataLookup.get(upstreamName) : undefined;
+    if (!catalogEntry) continue;
 
-    const data = entry.data;
-    data.reasoning = meta.reasoning;
-
-    persist(entry, data);
+    const data: ModelData = entry.data;
+    data.reasoning = catalogEntry.reasoning;
+    persist(entry as ModelIndexEntry, data);
   }
 }
 
-function enforceHouseIgnored(modelsDir) {
+function enforceHouseIgnored(modelsDir: string): string[] {
   const index = buildIndex(modelsDir);
-  const changed = [];
+  const changed: string[] = [];
+
   for (const entry of Object.values(index)) {
     const modelKey = entry.id || entry.fileId;
     if (!modelKey || !HOUSE_MODEL_PATTERN.test(modelKey)) continue;
     if (entry.data.ignored === true) continue;
-    const providers = entry.data.providers || [];
+
+    const providers = entry.data.providers ?? [];
     if (providers.length > 0 && !providers.every((provider) => provider === PROVIDER_NAME)) continue;
+
     entry.data.ignored = true;
     persist(entry, entry.data);
     changed.push(modelKey);
   }
+
   return changed;
 }
 
-async function main() {
-  const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const modelsDir = resolve(scriptDir, "../data");
+async function main(): Promise<void> {
+  const modelsDir = packageModelsDir();
 
   const catalog = await fetchWorkbuddyCatalog();
   const { modelMap, metadataLookup } = buildModelMap(catalog);
-  const result = sync(modelsDir, PROVIDER_NAME, modelMap);
+
+  const result = await sync(modelsDir, PROVIDER_NAME, modelMap);
   const ignored = enforceHouseIgnored(modelsDir);
 
   if (result.added.length > 0) {
     enrichNewModels(modelsDir, result.added, modelMap, metadataLookup);
   }
 
-  if (result.added.length === 0 && result.removed.length === 0 && result.updated.length === 0 && ignored.length === 0) {
+  if (
+    result.added.length === 0 &&
+    result.removed.length === 0 &&
+    result.updated.length === 0 &&
+    ignored.length === 0
+  ) {
     console.log(`WorkBuddy models are already up to date (${modelMap.size} models).`);
   } else {
-    console.log(`WorkBuddy: ${modelMap.size} models (added ${result.added.length}, removed ${result.removed.length}, updated ${result.updated.length}, disabled ${ignored.length}).`);
+    console.log(
+      `WorkBuddy: ${modelMap.size} models (added ${result.added.length}, removed ${result.removed.length}, updated ${result.updated.length}, disabled ${ignored.length}).`
+    );
   }
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
-});
+runScript(main);

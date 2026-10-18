@@ -1,45 +1,41 @@
-#!/usr/bin/env node
-
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { buildIndex, sync } from "#models/model-store.ts";
-import { runFetchText, runFetchJson } from "#models/sync/http.ts";
+import { runFetchText } from "#models/sync/http.ts";
 import { normalizeKey, normalizeName } from "#models/model/similarity.ts";
 import { syncCliVersion } from "./version-sync.ts";
+import { join } from "#models/paths.ts";
+import { latestPackageVersion, packageModelsDir, repoRoot, runScript } from "./shared.ts";
+import type { ModelIndexEntry } from "#models/types.ts";
 
 const PROVIDER_NAME = "perch";
 
-// Perch publishes the current Starter (free) pool on its models docs page
-// (https://www.perchai.app/docs/concepts/models). That page is the live source
-// of truth for which models a free account can pin; anything outside the
-// Starter pool is Pro-only and paid, so it is intentionally never registered.
-// The Starter table carries the display name plus the Perch CLI command
-// (/model <alias>), so the command is reused as the Perch upstream alias and
-// the display name is resolved against the registry to find the canonical id.
 const PERCH_DOCS_URL = "https://www.perchai.app/docs/concepts/models";
-const PERCH_CLI_NPM_URL = "https://registry.npmjs.org/perchai-cli/latest";
+const PERCH_CLI_NPM_PACKAGE = "perchai-cli";
 
-const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
+const REPO_ROOT = repoRoot();
 
 const PERCH_CLI_VERSION_TARGETS = [
   {
     label: "perch provider",
-    path: resolve(REPO_ROOT, "packages/providers/upstreams/perch.ts"),
+    path: join(REPO_ROOT, "packages/providers/upstreams/perch.ts"),
     pattern: /(const PERCH_CLI_VERSION = ")(\d+\.\d+\.\d+)(")/,
   },
 ];
 
-async function syncCliVersionFromNpm() {
-  const metadata = await runFetchJson(PERCH_CLI_NPM_URL, { label: "perchai-cli npm metadata" });
-  const latestVersion = metadata?.version;
-  if (typeof latestVersion !== "string" || !/^\d+\.\d+\.\d+$/.test(latestVersion)) {
-    console.warn("[perch] Could not determine the latest CLI version from npm, skipping.");
+interface StarterRow {
+  name: string;
+  command: string;
+}
+
+async function syncCliVersionFromNpm(): Promise<void> {
+  const latestVersion = await latestPackageVersion(PERCH_CLI_NPM_PACKAGE).catch(() => null);
+  if (!latestVersion || !/^\d+\.\d+\.\d+$/.test(latestVersion)) {
+    console.warn("[perch] Could not determine the latest CLI version from unpkg, skipping.");
     return;
   }
   syncCliVersion("perch", PERCH_CLI_VERSION_TARGETS, latestVersion);
 }
 
-function decodeHtmlEntities(text) {
+function decodeHtmlEntities(text: string): string {
   return text
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
@@ -49,19 +45,16 @@ function decodeHtmlEntities(text) {
     .replace(/&nbsp;/g, " ");
 }
 
-function stripHtml(text) {
+function stripHtml(text: string): string {
   return decodeHtmlEntities(text)
     .replace(/<[^>]+>/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
 
-// Locate the Starter table by its header instead of a prose anchor: the docs
-// page has been reworded more than once, but the "Desktop and CLI command"
-// column is what makes this table the selectable Starter pool.
-function extractStarterPool(html) {
+function extractStarterPool(html: string): StarterRow[] {
   for (const tableMatch of html.matchAll(/<table[^>]*>([\s\S]*?)<\/table>/g)) {
-    const table = tableMatch[1];
+    const table = tableMatch[1] ?? "";
     const headerEnd = table.indexOf("</thead>");
     const header = headerEnd === -1 ? table : table.slice(0, headerEnd);
     if (!/Desktop and CLI command/i.test(header)) continue;
@@ -70,12 +63,14 @@ function extractStarterPool(html) {
     const bodyEnd = table.indexOf("</tbody>", bodyStart);
     const body = bodyStart === -1 ? table : table.slice(bodyStart, bodyEnd);
 
-    const rows = [];
+    const rows: StarterRow[] = [];
     for (const rowMatch of body.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/g)) {
-      const cells = [...rowMatch[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map((cell) => stripHtml(cell[1]));
+      const cells = [...(rowMatch[1] ?? "").matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map((cell) =>
+        stripHtml(cell[1] ?? "")
+      );
       if (cells.length < 3) continue;
       const name = cells[0];
-      const command = cells[2].match(/\/model\s+(\S+)/i)?.[1];
+      const command = cells[2]?.match(/\/model\s+(\S+)/i)?.[1];
       if (!name || !command) continue;
       rows.push({ name, command });
     }
@@ -84,7 +79,7 @@ function extractStarterPool(html) {
   throw new Error("Unable to locate the Perch Starter model table in the docs page");
 }
 
-async function fetchStarterPool() {
+async function fetchStarterPool(): Promise<StarterRow[]> {
   const html = await runFetchText(PERCH_DOCS_URL, {
     label: "Perch models docs",
     headers: { "User-Agent": "Mozilla/5.0 (compatible; opendum-model-sync)" },
@@ -96,34 +91,37 @@ async function fetchStarterPool() {
   return rows;
 }
 
-function perchUpstream(entry) {
-  const upstream = entry.data.providerConfig?.perch?.upstream;
+function perchUpstream(entry: ModelIndexEntry): string | null {
+  const upstream = entry.data.providerConfig?.[PROVIDER_NAME]?.upstream;
   return typeof upstream === "string" && upstream.trim() ? upstream.trim() : null;
 }
 
-function compactName(value) {
-  return String(value ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+function compactName(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-function stripTrailingDate(value) {
+function stripTrailingDate(value: string): string {
   return value.replace(/[\s_-]+\d{4,8}$/, "").trim();
 }
 
-function buildLookup(modelsDir) {
-  const byCompact = new Map();
-  const byNormalized = new Map();
+type Lookup = Map<string, ModelIndexEntry | null>;
 
-  const register = (map, key, entry) => {
-    if (!key) return;
-    if (map.has(key)) {
-      if (map.get(key) !== entry) map.set(key, null);
-      return;
-    }
+function register(map: Lookup, key: string, entry: ModelIndexEntry): void {
+  if (!key) return;
+  const existing = map.get(key);
+  if (existing === undefined) {
     map.set(key, entry);
-  };
+    return;
+  }
+  if (existing !== entry) map.set(key, null);
+}
+
+function buildLookup(modelsDir: string): { byCompact: Lookup; byNormalized: Lookup } {
+  const byCompact: Lookup = new Map();
+  const byNormalized: Lookup = new Map();
 
   for (const entry of Object.values(buildIndex(modelsDir))) {
-    const keys = [entry.fileId, entry.id, ...(entry.data.aliases || []), perchUpstream(entry)];
+    const keys = [entry.fileId, entry.id, ...(entry.data.aliases ?? []), perchUpstream(entry)];
     for (const key of keys) {
       if (typeof key !== "string" || !key.trim()) continue;
       register(byCompact, compactName(key), entry);
@@ -135,14 +133,18 @@ function buildLookup(modelsDir) {
   return { byCompact, byNormalized };
 }
 
-function resolveStarterPool(modelsDir, rows) {
+function resolveStarterPool(
+  modelsDir: string,
+  rows: StarterRow[]
+): { modelMap: Map<string, string>; unresolved: string[] } {
   const { byCompact, byNormalized } = buildLookup(modelsDir);
 
-  const modelMap = new Map();
-  const unresolved = [];
+  const modelMap = new Map<string, string>();
+  const unresolved: string[] = [];
+
   for (const row of rows) {
     const candidates = [row.command, row.name, stripTrailingDate(row.name)];
-    let entry = null;
+    let entry: ModelIndexEntry | null = null;
     for (const candidate of candidates) {
       entry =
         byCompact.get(compactName(candidate)) ??
@@ -155,7 +157,8 @@ function resolveStarterPool(modelsDir, rows) {
       unresolved.push(row.name);
       continue;
     }
-    if (modelMap.has(entry.fileId) && modelMap.get(entry.fileId) !== row.command) {
+    const existing = modelMap.get(entry.fileId);
+    if (existing !== undefined && existing !== row.command) {
       throw new Error(`Duplicate Perch Starter mapping for ${entry.fileId}`);
     }
     modelMap.set(entry.fileId, row.command);
@@ -167,9 +170,8 @@ function resolveStarterPool(modelsDir, rows) {
   };
 }
 
-async function main() {
-  const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const modelsDir = resolve(scriptDir, "../data");
+async function main(): Promise<void> {
+  const modelsDir = packageModelsDir();
 
   const rows = await fetchStarterPool();
   const { modelMap, unresolved } = resolveStarterPool(modelsDir, rows);
@@ -177,21 +179,20 @@ async function main() {
     console.warn(`[perch] Skipped Starter model(s) absent from the registry: ${unresolved.join(", ")}`);
   }
 
-  const result = sync(modelsDir, PROVIDER_NAME, modelMap);
+  const result = await sync(modelsDir, PROVIDER_NAME, modelMap);
 
   if (result.added.length === 0 && result.removed.length === 0 && result.updated.length === 0) {
     console.log(`Perch Starter models are already up to date (${modelMap.size} models).`);
   } else {
-    console.log(`Perch: ${modelMap.size} Starter models (added ${result.added.length}, removed ${result.removed.length}, updated ${result.updated.length}).`);
+    console.log(
+      `Perch: ${modelMap.size} Starter models (added ${result.added.length}, removed ${result.removed.length}, updated ${result.updated.length}).`
+    );
   }
 
-  await syncCliVersionFromNpm().catch((error) => {
+  await syncCliVersionFromNpm().catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
     console.warn(`[perch] CLI version sync failed (${message})`);
   });
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
-});
+runScript(main);

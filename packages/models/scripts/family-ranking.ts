@@ -1,40 +1,57 @@
-#!/usr/bin/env node
-
-import { writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-
 import { flagshipFamilyRanking, loadModelEntries } from "@opendum/models/runtime";
+import { readText, writeText } from "#models/fs.ts";
+import { join } from "#models/paths.ts";
+import { packageModelsDir, runScript } from "./shared.ts";
 
-const scriptDir = dirname(fileURLToPath(import.meta.url));
-const dataDir = resolve(scriptDir, "../data");
-const outputPath = resolve(scriptDir, "../ranking.generated.ts");
 const MIN_FLAGSHIP_SCORE = 20;
 
-const ranking = flagshipFamilyRanking(loadModelEntries(dataDir))
-  .filter((entry) => entry.score >= MIN_FLAGSHIP_SCORE)
-  .map((entry) => ({
-    name: entry.family,
-    anchorId: `${entry.folder}-models`,
-    score: entry.score,
-  }));
+interface FamilyRankingRow {
+  name: string;
+  anchorId: string;
+  score: number;
+}
 
-const lines = ranking.map(
-  (entry) =>
-    `  { name: ${JSON.stringify(entry.name)}, anchorId: ${JSON.stringify(entry.anchorId)}, score: ${entry.score} },`,
-);
-const content = [
-  "export type ModelFamilyRankingEntry = {",
-  "  name: string;",
-  "  anchorId: string;",
-  "  score: number;",
-  "};",
-  "",
-  "export const MODEL_FAMILY_RANKING: readonly ModelFamilyRankingEntry[] = [",
-  ...lines,
-  "];",
-  "",
-].join("\n");
+function renderRanking(ranking: FamilyRankingRow[]): string {
+  const lines = ranking.map(
+    (entry) =>
+      `  { name: ${JSON.stringify(entry.name)}, anchorId: ${JSON.stringify(entry.anchorId)}, score: ${entry.score} },`
+  );
 
-writeFileSync(outputPath, content);
-console.log(`[family-ranking] wrote ${ranking.length} families to ${outputPath}`);
+  return [
+    "export type ModelFamilyRankingEntry = {",
+    "  name: string;",
+    "  anchorId: string;",
+    "  score: number;",
+    "};",
+    "",
+    "export const MODEL_FAMILY_RANKING: readonly ModelFamilyRankingEntry[] = [",
+    ...lines,
+    "];",
+    "",
+  ].join("\n");
+}
+
+async function main(): Promise<void> {
+  const dataDir = packageModelsDir();
+  const outputPath = join(dataDir, "..", "ranking.generated.ts");
+
+  const ranking = flagshipFamilyRanking(loadModelEntries(dataDir))
+    .filter((entry) => entry.score >= MIN_FLAGSHIP_SCORE)
+    .map((entry) => ({
+      name: entry.family,
+      anchorId: `${entry.folder}-models`,
+      score: entry.score,
+    }));
+
+  const content = renderRanking(ranking);
+  const previous = readText(outputPath);
+  if (previous === content) {
+    console.log(`[family-ranking] ${ranking.length} families already up to date`);
+    return;
+  }
+
+  writeText(outputPath, content);
+  console.log(`[family-ranking] wrote ${ranking.length} families to ${outputPath}`);
+}
+
+runScript(main);

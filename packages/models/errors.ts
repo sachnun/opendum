@@ -37,12 +37,32 @@ export class ModelFetchFailure extends Schema.TaggedError<ModelFetchFailure>()("
   cause: OptionalUnknown,
 }) {}
 
+export class ModelTimeoutFailure extends Schema.TaggedError<ModelTimeoutFailure>()(
+  "ModelTimeoutFailure",
+  {
+    message: Schema.String,
+    label: Schema.String,
+    timeoutMs: Schema.Number,
+  }
+) {}
+
+export class ModelDecodeFailure extends Schema.TaggedError<ModelDecodeFailure>()(
+  "ModelDecodeFailure",
+  {
+    message: Schema.String,
+    label: Schema.String,
+    cause: OptionalUnknown,
+  }
+) {}
+
 export type ModelFailure =
   | ModelsDirectoryFailure
   | ModelReadFailure
   | ModelParseFailure
   | ModelWriteFailure
-  | ModelFetchFailure;
+  | ModelFetchFailure
+  | ModelTimeoutFailure
+  | ModelDecodeFailure;
 
 export function modelFailureMessage(cause: unknown): string {
   if (cause instanceof Error) return cause.message;
@@ -52,4 +72,9 @@ export function modelFailureMessage(cause: unknown): string {
 
 export function asError(cause: unknown): Error {
   return cause instanceof Error ? cause : new Error(modelFailureMessage(cause));
+}
+
+export function isRetryableStatus(status: number | undefined): boolean {
+  if (status === undefined) return true;
+  return status === 408 || status === 425 || status === 429 || status >= 500;
 }

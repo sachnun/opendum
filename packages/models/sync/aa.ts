@@ -1,5 +1,7 @@
-import { createDecipheriv, createHash } from "node:crypto";
-import { gunzipSync } from "node:zlib";
+import { Effect } from "effect";
+
+import { ModelDecodeFailure, asError } from "../errors.ts";
+import { aesGcmDecrypt, decodeText, fromHex, gunzip, sha256Bytes } from "../fs.ts";
 
 export interface AaEntry {
   slug: string;
@@ -153,19 +155,19 @@ export function parseLeaderboardManifest(html: string): AaManifest | null {
   return { path: match[1]!, key: match[2]! };
 }
 
-export function decodeLeaderboardManifest(payload: Uint8Array, keyHex: string): AaEntry[] {
-  const key = Buffer.from(keyHex, "hex");
-  const iv = createHash("sha256").update(key).digest().subarray(0, 12);
+function sealWithTag(payload: Uint8Array): Uint8Array | null {
   const tagLength = 16;
-  if (payload.length <= tagLength) return [];
+  if (payload.length <= tagLength) return null;
+  const body = payload.subarray(0, payload.length - tagLength);
+  const tag = payload.subarray(payload.length - tagLength);
+  const sealed = new Uint8Array(body.length + tag.length);
+  sealed.set(body, 0);
+  sealed.set(tag, body.length);
+  return sealed;
+}
 
-  const decipher = createDecipheriv("aes-256-gcm", key, iv);
-  decipher.setAuthTag(payload.subarray(payload.length - tagLength));
-  const plain = Buffer.concat([
-    decipher.update(payload.subarray(0, payload.length - tagLength)),
-    decipher.final(),
-  ]);
-  const records = JSON.parse(gunzipSync(plain).toString("utf-8")) as unknown;
+function entriesFromPlain(plain: Uint8Array): AaEntry[] {
+  const records = JSON.parse(decodeText(gunzip(plain))) as unknown;
   if (!Array.isArray(records)) return [];
   return recordsToEntries(
     records.filter(
@@ -173,6 +175,32 @@ export function decodeLeaderboardManifest(payload: Uint8Array, keyHex: string): 
         record !== null && typeof record === "object" && typeof (record as Record<string, unknown>).intelligenceIndex === "number",
     ),
   );
+}
+
+export async function decodeLeaderboardManifest(
+  payload: Uint8Array,
+  keyHex: string
+): Promise<AaEntry[]> {
+  const key = fromHex(keyHex);
+  const iv = sha256Bytes(key).subarray(0, 12);
+  const sealed = sealWithTag(payload);
+  if (!sealed) return [];
+  return entriesFromPlain(await aesGcmDecrypt(key, iv, sealed));
+}
+
+export function tryDecodeLeaderboardManifest(
+  payload: Uint8Array,
+  keyHex: string
+): Effect.Effect<AaEntry[], ModelDecodeFailure> {
+  return Effect.tryPromise({
+    try: () => decodeLeaderboardManifest(payload, keyHex),
+    catch: (cause) =>
+      new ModelDecodeFailure({
+        message: `invalid Artificial Analysis manifest: ${asError(cause).message}`,
+        label: "Artificial Analysis manifest",
+        cause,
+      }),
+  });
 }
 
 export function buildAaIndex(models: readonly AaEntry[]): AaIndex {

@@ -53,15 +53,6 @@ jobs:
             cat "$RUNNER_TEMP/summary.md" >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      - name: Report failure
-        if: failure()
-        run: |
-          {
-            echo '## Refresh failed'
-            echo ''
-            echo 'Provider model refresh did not complete, so the web and proxy deploys were skipped.'
-          } >> "$GITHUB_STEP_SUMMARY"
-
       - name: Commit and push changes
         uses: stefanzweifel/git-auto-commit-action@v7
         with:

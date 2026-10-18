@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
-import { createCipheriv, createHash, randomBytes } from "node:crypto";
-import { gzipSync } from "node:zlib";
+
+import { gzip, sha256Bytes } from "../fs.ts";
 
 import {
   buildAaIndex,
@@ -24,12 +24,24 @@ function manifestHtml(path: string, key: string): string {
   return `<html><script>self.__next_f.push([1,"${escaped}"])</script></html>`;
 }
 
-function encodeManifest(models: unknown[], keyHex: string): Uint8Array {
-  const key = Buffer.from(keyHex, "hex");
-  const iv = createHash("sha256").update(key).digest().subarray(0, 12);
-  const cipher = createCipheriv("aes-256-gcm", key, iv);
-  const body = Buffer.concat([cipher.update(gzipSync(Buffer.from(JSON.stringify(models)))), cipher.final()]);
-  return new Uint8Array(Buffer.concat([body, cipher.getAuthTag()]));
+function bufferSource(value: Uint8Array): ArrayBuffer {
+  return value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength) as ArrayBuffer;
+}
+
+async function encodeManifest(models: unknown[], keyHex: string): Promise<Uint8Array> {
+  const key = Uint8Array.fromHex(keyHex);
+  const iv = sha256Bytes(key).subarray(0, 12);
+  const cryptoKey = await crypto.subtle.importKey("raw", bufferSource(key), "AES-GCM", false, ["encrypt"]);
+  const sealed = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv: bufferSource(iv), tagLength: 128 },
+    cryptoKey,
+    bufferSource(gzip(new TextEncoder().encode(JSON.stringify(models))))
+  );
+  return new Uint8Array(sealed);
+}
+
+function randomKeyHex(): string {
+  return crypto.getRandomValues(new Uint8Array(32)).toHex();
 }
 
 const SAMPLE = [
@@ -74,7 +86,7 @@ test("parseLeaderboard accepts renamed model list keys", () => {
 });
 
 test("parseLeaderboardManifest reads the encrypted payload pointer", () => {
-  const key = randomBytes(32).toString("hex");
+  const key = randomKeyHex();
   expect(parseLeaderboardManifest(manifestHtml("/data/abc.txt", key))).toEqual({
     path: "/data/abc.txt",
     key,
@@ -82,9 +94,9 @@ test("parseLeaderboardManifest reads the encrypted payload pointer", () => {
   expect(parseLeaderboardManifest(leaderboardHtml(SAMPLE))).toBe(null);
 });
 
-test("decodeLeaderboardManifest decrypts the full scored list", () => {
-  const key = randomBytes(32).toString("hex");
-  const entries = decodeLeaderboardManifest(encodeManifest(SAMPLE, key), key);
+test("decodeLeaderboardManifest decrypts the full scored list", async () => {
+  const key = randomKeyHex();
+  const entries = await decodeLeaderboardManifest(await encodeManifest(SAMPLE, key), key);
   expect(entries.map((entry) => entry.slug)).toEqual([
     "claude-opus-5-5",
     "claude-opus-5-5-xhigh",
@@ -96,11 +108,11 @@ test("decodeLeaderboardManifest decrypts the full scored list", () => {
   expect(entries[4]?.estimated).toBe(true);
 });
 
-test("decodeLeaderboardManifest fails closed on a wrong key", () => {
-  const key = randomBytes(32).toString("hex");
-  const other = randomBytes(32).toString("hex");
-  expect(() => decodeLeaderboardManifest(encodeManifest(SAMPLE, key), other)).toThrow();
-  expect(decodeLeaderboardManifest(new Uint8Array(), key)).toEqual([]);
+test("decodeLeaderboardManifest fails closed on a wrong key", async () => {
+  const key = randomKeyHex();
+  const other = randomKeyHex();
+  await expect(decodeLeaderboardManifest(await encodeManifest(SAMPLE, key), other)).rejects.toThrow();
+  expect(await decodeLeaderboardManifest(new Uint8Array(), key)).toEqual([]);
 });
 
 test("parseLeaderboard tolerates malformed input", () => {

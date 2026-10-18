@@ -1,23 +1,14 @@
-#!/usr/bin/env node
-
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { buildIndex, persist, sync } from "#models/model-store.ts";
 import { fetchDecoded, runFetchText, runOrThrow } from "#models/sync/http.ts";
+import { arrayAt, asTrimmedString, booleanAt, stringAt } from "#models/json.ts";
+import { packageModelsDir, runScript } from "./shared.ts";
+import type { JsonValue } from "#models/types.ts";
 
 const CODEX_MODELS_URL =
   "https://raw.githubusercontent.com/openai/codex/main/codex-rs/models-manager/models.json";
 
-// Codex's public models feed includes CLI/API variants that are not accepted by
-// the ChatGPT-backed Codex account flow used by this project. Filter by
-// visibility and supported_in_api; models that are still rejected by the
-// ChatGPT Codex backend opt out with `"ignored": true` in their JSON file.
 const CHATGPT_SUPPORTED_VISIBILITY = "list";
 
-// Codex is included on the Free and Go plans with only a low-tier model, while
-// the frontier models require a paid ChatGPT plan. The public models.json feed
-// lists "free" for every model, so it cannot drive tier gating; the plan
-// breakdown comes from the Codex pricing docs instead.
 const CODEX_PRICING_DOCS_URL = "https://learn.chatgpt.com/docs/pricing.md";
 const FREE_PLAN_NAMES = new Set(["Free", "Go"]);
 const PAID_CODEX_TIERS = [
@@ -30,94 +21,86 @@ const PAID_CODEX_TIERS = [
   "student",
 ];
 
-/**
- * Fetch the public models.json from the openai/codex GitHub repo.
- * Returns the parsed array of model entries.
- */
-async function fetchCodexModels() {
+interface CodexModel {
+  slug: string;
+  displayName: string | null;
+  hasReasoning: boolean;
+}
+
+function toCodexModel(item: unknown): CodexModel | null {
+  const slug = asTrimmedString(stringAt(item, "slug"));
+  if (!slug) return null;
+
+  const visibility = stringAt(item, "visibility");
+  if (visibility && visibility !== CHATGPT_SUPPORTED_VISIBILITY) return null;
+  if (booleanAt(item, "supported_in_api") === false) return null;
+
+  const displayName = asTrimmedString(stringAt(item, "display_name")) ?? null;
+  const hasReasoning = arrayAt(item, "supported_reasoning_levels").length > 0;
+  return { slug, displayName, hasReasoning };
+}
+
+async function fetchCodexModels(): Promise<CodexModel[]> {
   return runOrThrow(
     fetchDecoded(
       CODEX_MODELS_URL,
       { label: "Codex CLI models", headers: { Accept: "application/json" } },
       async (response) => {
         const payload = await response.json();
-        if (!payload || !Array.isArray(payload.models)) {
+        const models = arrayAt(payload, "models");
+        if (models.length === 0) {
           throw new Error("Unexpected Codex models.json payload format");
         }
-
-        return payload.models;
+        return models.flatMap((item) => {
+          const model = toCodexModel(item);
+          return model ? [model] : [];
+        });
       }
     )
   );
 }
 
-/**
- * Filter models that are visible and supported in API.
- */
-function filterModels(models) {
-  return models.filter((m) => {
-    if (!m.slug || typeof m.slug !== "string") return false;
-    if (m.visibility && m.visibility !== CHATGPT_SUPPORTED_VISIBILITY) return false;
-    if (m.supported_in_api === false) return false;
-    return true;
-  });
+function buildModelMap(models: CodexModel[]): Map<string, string> {
+  return new Map(
+    models
+      .map((model): [string, string] => [model.slug, model.slug])
+      .sort(([a], [b]) => a.localeCompare(b))
+  );
 }
 
-/**
- * Build the modelKey -> upstreamName map.
- * For Codex the slug is already a clean key so modelKey === slug.
- */
-function buildModelMap(models) {
-  const map = new Map();
-
-  for (const model of models) {
-    map.set(model.slug, model.slug);
-  }
-
-  return new Map([...map.entries()].sort(([a], [b]) => a.localeCompare(b)));
+function normalizeModelName(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "");
 }
 
-function normalizeModelName(value) {
-  return String(value ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "");
-}
-
-/**
- * Fetch the Codex pricing docs and join the model mentions from the Free/Go
- * plan cards. Any Codex model whose name is not mentioned there requires a paid
- * ChatGPT plan.
- */
-async function fetchFreePlanModelNames() {
+async function fetchFreePlanModelNames(): Promise<string> {
   const markdown = await runFetchText(CODEX_PRICING_DOCS_URL, {
     label: "Codex pricing docs",
     headers: { Accept: "text/markdown" },
   });
 
-  const mentions = [];
-  for (const [, body] of markdown.matchAll(/<PricingCard([\s\S]*?)<\/PricingCard>/g)) {
-    const name = (body.match(/name="([^"]+)"/) ?? [])[1] ?? "";
+  const mentions: string[] = [];
+  for (const match of markdown.matchAll(/<PricingCard([\s\S]*?)<\/PricingCard>/g)) {
+    const body = match[1] ?? "";
+    const name = body.match(/name="([^"]+)"/)?.[1] ?? "";
     if (!FREE_PLAN_NAMES.has(name)) continue;
     for (const line of body.split(/\r?\n/)) {
-      const bullet = line.match(/^\s*-\s+(.*)$/);
-      if (bullet) mentions.push(normalizeModelName(bullet[1]));
+      const bullet = line.match(/^\s*-\s+(.*)$/)?.[1];
+      if (bullet) mentions.push(normalizeModelName(bullet));
     }
   }
 
   return mentions.join(" ");
 }
 
-/**
- * Build per-model provider config with tier restrictions.
- *
- * Models not advertised on the Free/Go plan get `allowedTiers` restricted to
- * paid plans, which makes the web dim them for free-tier accounts (same pattern
- * as Kiro). If the docs cannot be read, no gating is applied.
- */
-function buildProviderTierConfig(models, freePlanMentions) {
-  const providerConfigByModel = new Map();
+function buildProviderTierConfig(
+  models: CodexModel[],
+  freePlanMentions: string
+): Map<string, Record<string, JsonValue>> {
+  const providerConfigByModel = new Map<string, Record<string, JsonValue>>();
   if (!freePlanMentions) return providerConfigByModel;
 
   for (const model of models) {
-    const name = normalizeModelName(model.display_name || model.slug);
+    const name = normalizeModelName(model.displayName ?? model.slug);
     if (name && freePlanMentions.includes(name)) continue;
     providerConfigByModel.set(model.slug, { allowedTiers: PAID_CODEX_TIERS });
   }
@@ -125,52 +108,30 @@ function buildProviderTierConfig(models, freePlanMentions) {
   return providerConfigByModel;
 }
 
-/**
- * Build a lookup from slug -> models.json entry for enrichment.
- */
-function buildMetadataLookup(models) {
-  const lookup = new Map();
-  for (const m of models) {
-    if (m.slug) lookup.set(m.slug, m);
-  }
-  return lookup;
-}
-
-/**
- * After sync creates bare-bones JSON files for new models,
- * enrich them with metadata from models.json.
- */
-function enrichNewModels(modelsDir, addedKeys, metadataLookup) {
+function enrichNewModels(modelsDir: string, addedKeys: string[], lookup: Map<string, CodexModel>): void {
   const index = buildIndex(modelsDir);
 
   for (const modelKey of addedKeys) {
-    const entry = Object.values(index).find((item) => item.fileId === modelKey || item.id === modelKey);
+    const entry = Object.values(index).find(
+      (item) => item.fileId === modelKey || item.id === modelKey
+    );
     if (!entry) continue;
 
-    const meta = metadataLookup.get(modelKey);
-    if (!meta) continue;
+    const meta = lookup.get(modelKey);
+    if (!meta || !meta.hasReasoning) continue;
+    if (entry.data.reasoning === true) continue;
 
-    const data = entry.data;
-
-    const hasReasoning =
-      Array.isArray(meta.supported_reasoning_levels) &&
-      meta.supported_reasoning_levels.length > 0;
-    if (hasReasoning && data.reasoning !== true) {
-      data.reasoning = true;
-    }
-
-    persist(entry, data);
+    entry.data.reasoning = true;
+    persist(entry, entry.data);
   }
 }
 
-async function main() {
-  const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const modelsDir = resolve(scriptDir, "../data");
+async function main(): Promise<void> {
+  const modelsDir = packageModelsDir();
 
-  const allModels = await fetchCodexModels();
-  const filtered = filterModels(allModels);
-  const modelMap = buildModelMap(filtered);
-  const metadataLookup = buildMetadataLookup(filtered);
+  const models = await fetchCodexModels();
+  const modelMap = buildModelMap(models);
+  const lookup = new Map(models.map((model) => [model.slug, model]));
 
   let freePlanMentions = "";
   try {
@@ -180,27 +141,24 @@ async function main() {
     console.warn(`[codex] Could not load pricing docs for tier gating (${message}); skipping gating.`);
   }
 
-  const providerConfigByModel = buildProviderTierConfig(filtered, freePlanMentions);
+  const providerConfigByModel = buildProviderTierConfig(models, freePlanMentions);
   if (providerConfigByModel.size > 0) {
-    console.log(`[codex] Paid-plan models (gated by allowedTiers): ${[...providerConfigByModel.keys()].join(", ")}`);
+    console.log(
+      `[codex] Paid-plan models (gated by allowedTiers): ${[...providerConfigByModel.keys()].join(", ")}`
+    );
   }
-  const result = sync(modelsDir, "codex", modelMap, {
+
+  const result = await sync(modelsDir, "codex", modelMap, {
     providerConfigByModel,
     managedProviderConfigKeys: ["allowedTiers"],
   });
 
   if (result.added.length > 0) {
-    enrichNewModels(modelsDir, result.added, metadataLookup);
+    enrichNewModels(modelsDir, result.added, lookup);
   }
 
-  if (
-    result.added.length === 0 &&
-    result.removed.length === 0 &&
-    result.updated.length === 0
-  ) {
-    console.log(
-      `Codex CLI models are already up to date (${modelMap.size} models).`
-    );
+  if (result.added.length === 0 && result.removed.length === 0 && result.updated.length === 0) {
+    console.log(`Codex CLI models are already up to date (${modelMap.size} models).`);
   } else {
     console.log(
       `Codex ChatGPT-compatible models: ${modelMap.size} models (added ${result.added.length}, removed ${result.removed.length}, updated ${result.updated.length}).`
@@ -208,7 +166,4 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
-});
+runScript(main);

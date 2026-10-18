@@ -3,7 +3,7 @@ import { Effect, Layer } from "effect";
 import { AuthService } from "@opendum/auth";
 import { closeRedis, openRedis } from "@opendum/core/redis";
 import { resolveModelsDir } from "@opendum/models";
-import { Registry as ModelRegistry } from "@opendum/models/runtime";
+import { tryLoadRegistry } from "@opendum/models/runtime";
 import { Fetcher, UnroxyEgress, type Fetch } from "@opendum/core/egress";
 import { ProviderRegistry, RedisFallbackRouter, type EgressFetch } from "@opendum/providers";
 import { db, closeDatabase } from "@opendum/database";
@@ -31,7 +31,7 @@ export const ProxyContextLayer = Layer.effect(
   Effect.gen(function* () {
     const config = yield* proxyConfig;
     const dir = yield* Effect.sync(() => resolveModelsDirForService());
-    const models = yield* Effect.sync(() => ModelRegistry.load(dir));
+    const models = yield* tryLoadRegistry(dir);
     const redis = yield* Effect.acquireRelease(
       Effect.promise(() => openRedis(config.redisUrl)),
       (client) => Effect.promise(() => closeRedis(client))

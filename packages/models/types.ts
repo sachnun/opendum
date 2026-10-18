@@ -1,11 +1,4 @@
-/**
- * Model registry data shapes.
- *
- * These describe the JSON files under `data/` and the derived index used by
- * the refresh scripts.
- */
-
-interface ModelModalities {
+export interface ModelModalities {
   input: string[];
   output: string[];
 }
@@ -49,12 +42,12 @@ export interface ModelData {
   aliases?: string[];
   description?: string;
   ignored?: boolean;
-  reasoning?: boolean;
-  reasoning_effort?: string[];
-  modalities?: ModelModalities;
-  limit?: ModelLimit;
-  cost?: ModelCost;
-  scores?: ModelScores;
+  reasoning?: boolean | null;
+  reasoning_effort?: string[] | null;
+  modalities?: ModelModalities | null;
+  limit?: ModelLimit | null;
+  cost?: ModelCost | null;
+  scores?: ModelScores | null;
   providerConfig?: Record<string, ProviderModelConfig>;
   family?: string;
   [key: string]: unknown;

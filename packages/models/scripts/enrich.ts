@@ -1,26 +1,10 @@
-#!/usr/bin/env bun
-
-/**
- * Enrich the local model registry with external metadata and normalize file
- * placement.
- *
- * Fills `reasoning`, `reasoning_effort`, `modalities`, `limit`, `cost`, and the per-provider
- * `contextWindow` / `maxOutputTokens` by matching local model ids against
- * OpenRouter, models.dev, LiteLLM, and NVIDIA NIM. Also moves root-level model
- * files into their inferred family folder.
- *
- * Runs as the final step of the provider refresh:
- *   bun run models:refresh
- */
-
-import { basename, dirname, join, resolve } from "node:path";
-import { existsSync, mkdirSync, renameSync, rmSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-
 import { inferModelFolder } from "#models/model/families.ts";
 import { buildIndex, persist, renameFiles, generatedDir } from "#models/model-store.ts";
 import { applyCanonicalMerge, planCanonicalization } from "#models/model/canonicalize.ts";
 import { modelProbes } from "#models/model/probes.ts";
+import { exists, remove, rename } from "#models/fs.ts";
+import { basename, dirname, join } from "#models/paths.ts";
+import { flags, packageModelsDir, runScript } from "./shared.ts";
 import type { ModelData } from "#models/types.ts";
 import {
   buildModelPatch,
@@ -31,11 +15,9 @@ import {
   type Registries,
 } from "#models/sync/metadata.ts";
 
-const scriptDir = dirname(fileURLToPath(import.meta.url));
-const modelsDir = resolve(scriptDir, "../data");
+const modelsDir = packageModelsDir();
 
 const MANAGED_PROVIDER_KEYS = ["contextWindow", "maxOutputTokens"] as const;
-
 
 function sameValue(left: unknown, right: unknown): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
@@ -192,7 +174,7 @@ function canonicalizeIds(
     stats.canonicalized.push({ from: action.from, to: action.to, tier: `merge:${action.tier}` });
     if (dryRun) continue;
     persist({ modelsDir, relativeId: target.relativeId }, target.data as ModelData);
-    rmSync(action.path, { force: true });
+    remove(action.path);
   }
 
   stats.ambiguous.push(...plan.unresolved);
@@ -221,19 +203,15 @@ function relocateRootFiles(dryRun: boolean): string[] {
     const folder = inferModelFolder(id);
     if (!folder) continue;
     const target = join(modelsDir, folder, basename(entry.path));
-    if (existsSync(target)) continue;
+    if (exists(target)) continue;
     moved.push(`${id} -> ${folder}/`);
-    if (!dryRun) {
-      mkdirSync(join(modelsDir, folder), { recursive: true });
-      renameSync(entry.path, target);
-    }
+    if (!dryRun) rename(entry.path, target);
   }
   return moved;
 }
 
 async function main(): Promise<void> {
-  const dryRun = process.argv.includes("--dry-run");
-  const verbose = process.argv.includes("--verbose") || process.argv.includes("-v");
+  const { dryRun, verbose } = flags();
 
   const catalogs = await fetchExternalRegistries({ logger: (message) => console.log(message) });
   const registries = catalogs.registries;
@@ -318,7 +296,4 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error: unknown) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
-});
+runScript(main);

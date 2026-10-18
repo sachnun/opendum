@@ -1,21 +1,19 @@
 import { expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 
 import { idMap, buildIndex, upstream, prune, renameFiles, sync, writeGenerated, write } from "./model-store.ts";
+import { readText } from "./fs.ts";
+import { join } from "./paths.ts";
+import { makeTempDir, removeDir } from "./test-support.ts";
 import type { ModelData } from "./types.ts";
 
-function withTempDir<T>(run: (dataDir: string, generatedDir: string) => T): T {
-  const root = mkdtempSync(join(tmpdir(), "models-registry-"));
+async function withTempDir<A>(run: (dataDir: string, generatedDir: string) => A | Promise<A>): Promise<A> {
+  const root = makeTempDir("models-registry-");
   const dataDir = join(root, "data");
   const generatedDir = join(root, "generated");
-  mkdirSync(dataDir, { recursive: true });
-  mkdirSync(generatedDir, { recursive: true });
   try {
-    return run(dataDir, generatedDir);
+    return await run(dataDir, generatedDir);
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    removeDir(root);
   }
 }
 
@@ -52,16 +50,16 @@ test("upstream falls back to the model id", () => {
   expect(upstream({ providerConfig: { openrouter: { upstream: "   " } } }, "openrouter", "model-id")).toBe("model-id");
 });
 
-test("write drops family and orders keys deterministically", () => {
-  withTempDir((dataDir) => {
+test("write drops family and orders keys deterministically", async () => {
+  await withTempDir(async (dataDir) => {
     const path = join(dataDir, "model.json");
-    write(path, {
+    await write(path, {
       id: "mock-model",
       providers: ["zeta", "opencode"],
       family: "should-be-removed",
       cost: { cacheWrite: 1, input: 2 },
     });
-    const written = readFileSync(path, "utf-8");
+    const written = readText(path);
     expect(!written.includes("family")).toBeTruthy();
     expect(written).toMatch(/"providers": \[\s*"zeta",\s*"opencode"\s*\]/);
     expect(written.indexOf('"id"') < written.indexOf('"providers"')).toBeTruthy();
@@ -76,65 +74,65 @@ function mergedData(dataDir: string, relativeId: string): ModelData {
   return entry.data;
 }
 
-test("sync adds, updates and removes provider entries", () => {
-  withTempDir((dataDir) => {
+test("sync adds, updates and removes provider entries", async () => {
+  await withTempDir(async (dataDir) => {
     const map = new Map([["mock-model", "vendor/mock-model"]]);
-    const added = sync(dataDir, "openrouter", map);
+    const added = await sync(dataDir, "openrouter", map);
     expect(added.added).toEqual(["mock-model"]);
 
     const data = mergedData(dataDir, "mock-model");
     expect(data.providers).toEqual(["openrouter"]);
     expect(data.providerConfig?.openrouter?.upstream).toBe("vendor/mock-model");
 
-    const unchanged = sync(dataDir, "openrouter", new Map([["mock-model", "vendor/mock-model"]]));
+    const unchanged = await sync(dataDir, "openrouter", new Map([["mock-model", "vendor/mock-model"]]));
     expect(unchanged.added).toEqual([]);
     expect(unchanged.updated).toEqual([]);
 
-    const removed = sync(dataDir, "openrouter", new Map());
+    const removed = await sync(dataDir, "openrouter", new Map());
     expect(removed.removed).toEqual(["mock-model"]);
   });
 });
 
-test("sync writes derived fields to generated only", () => {
-  withTempDir((dataDir, generatedDir) => {
-    sync(dataDir, "openrouter", new Map([["mock-model", "vendor/mock-model"]]));
-    const generated = JSON.parse(readFileSync(join(generatedDir, "mock-model.json"), "utf-8")) as ModelData;
+test("sync writes derived fields to generated only", async () => {
+  await withTempDir(async (dataDir, generatedDir) => {
+    await sync(dataDir, "openrouter", new Map([["mock-model", "vendor/mock-model"]]));
+    const generated = JSON.parse(readText(join(generatedDir, "mock-model.json"))) as ModelData;
     expect(generated.providers).toEqual(["openrouter"]);
     expect(generated.providerConfig?.openrouter?.upstream).toBe("vendor/mock-model");
   });
 });
 
-test("renameFiles moves both halves and keeps the folder", () => {
-  withTempDir((dataDir, generatedDir) => {
-    writeGenerated(join(generatedDir, "gemma-3.json"), { providers: ["openrouter"] });
-    write(join(dataDir, "gemma-3.json"), { ignored: true });
+test("renameFiles moves both halves and keeps the folder", async () => {
+  await withTempDir(async (dataDir, generatedDir) => {
+    await writeGenerated(join(generatedDir, "gemma-3.json"), { providers: ["openrouter"] });
+    await write(join(dataDir, "gemma-3.json"), { ignored: true });
 
-    const next = renameFiles({ modelsDir: dataDir, generatedDir, relativeId: "gemma-3" }, "gemma-3-12b-it");
+    const next = await renameFiles({ modelsDir: dataDir, generatedDir, relativeId: "gemma-3" }, "gemma-3-12b-it");
     expect(next).toBe("gemma-3-12b-it");
-    expect(() => readFileSync(join(generatedDir, "gemma-3.json"))).toThrow();
-    expect(() => readFileSync(join(dataDir, "gemma-3.json"))).toThrow();
-    expect(JSON.parse(readFileSync(join(generatedDir, "gemma-3-12b-it.json"), "utf-8")).providers).toEqual(["openrouter"]);
-    expect(JSON.parse(readFileSync(join(dataDir, "gemma-3-12b-it.json"), "utf-8"))).toEqual({ ignored: true });
+    expect(() => readText(join(generatedDir, "gemma-3.json"))).toThrow();
+    expect(() => readText(join(dataDir, "gemma-3.json"))).toThrow();
+    expect(JSON.parse(readText(join(generatedDir, "gemma-3-12b-it.json"))).providers).toEqual(["openrouter"]);
+    expect(JSON.parse(readText(join(dataDir, "gemma-3-12b-it.json")))).toEqual({ ignored: true });
   });
 });
 
-test("renameFiles keeps the folder and refuses to clobber", () => {
-  withTempDir((dataDir, generatedDir) => {
-    writeGenerated(join(generatedDir, "vendor/old.json"), { providers: ["openrouter"] });
-    writeGenerated(join(generatedDir, "vendor/new.json"), { providers: ["kiro"] });
+test("renameFiles keeps the folder and refuses to clobber", async () => {
+  await withTempDir(async (dataDir, generatedDir) => {
+    await writeGenerated(join(generatedDir, "vendor/old.json"), { providers: ["openrouter"] });
+    await writeGenerated(join(generatedDir, "vendor/new.json"), { providers: ["kiro"] });
 
-    const next = renameFiles({ modelsDir: dataDir, generatedDir, relativeId: "vendor/old" }, "new");
+    const next = await renameFiles({ modelsDir: dataDir, generatedDir, relativeId: "vendor/old" }, "new");
     expect(next).toBe("vendor/old");
-    expect(JSON.parse(readFileSync(join(generatedDir, "vendor/new.json"), "utf-8")).providers).toEqual(["kiro"]);
+    expect(JSON.parse(readText(join(generatedDir, "vendor/new.json"))).providers).toEqual(["kiro"]);
 
-    const moved = renameFiles({ modelsDir: dataDir, generatedDir, relativeId: "vendor/old" }, "renamed");
+    const moved = await renameFiles({ modelsDir: dataDir, generatedDir, relativeId: "vendor/old" }, "renamed");
     expect(moved).toBe("vendor/renamed");
   });
 });
 
-test("buildIndex needs the generated half to expose providers", () => {
-  withTempDir((dataDir, generatedDir) => {
-    sync(dataDir, "openrouter", new Map([["mock-model", "vendor/mock-model"]]));
+test("buildIndex needs the generated half to expose providers", async () => {
+  await withTempDir(async (dataDir, generatedDir) => {
+    await sync(dataDir, "openrouter", new Map([["mock-model", "vendor/mock-model"]]));
     expect(buildIndex(dataDir)["mock-model"].data.providers).toEqual(["openrouter"]);
 
     const authoredOnly = buildIndex(dataDir, { generatedDir: join(generatedDir, "absent") });
@@ -142,17 +140,17 @@ test("buildIndex needs the generated half to expose providers", () => {
   });
 });
 
-test("prune drops uncurated dead entries and keeps the rest", () => {
-  withTempDir((dataDir, generatedDir) => {
-    writeGenerated(join(generatedDir, "dead.json"), { providers: [] });
-    writeGenerated(join(generatedDir, "live.json"), { providers: ["openrouter"] });
-    write(join(dataDir, "ignored-dead.json"), { ignored: true });
-    write(join(dataDir, "curated-dead.json"), {
+test("prune drops uncurated dead entries and keeps the rest", async () => {
+  await withTempDir(async (dataDir, generatedDir) => {
+    await writeGenerated(join(generatedDir, "dead.json"), { providers: [] });
+    await writeGenerated(join(generatedDir, "live.json"), { providers: ["openrouter"] });
+    await write(join(dataDir, "ignored-dead.json"), { ignored: true });
+    await write(join(dataDir, "curated-dead.json"), {
       ignored: true,
       providerConfig: { example: { agent: "base2-free" } },
     });
 
-    expect(prune(dataDir)).toEqual(["dead", "ignored-dead"]);
+    expect(await prune(dataDir)).toEqual(["dead", "ignored-dead"]);
 
     const index = buildIndex(dataDir);
     expect(index["dead"]).toBeUndefined();
@@ -162,19 +160,19 @@ test("prune drops uncurated dead entries and keeps the rest", () => {
   });
 });
 
-test("sync removes the file once the last provider leaves", () => {
-  withTempDir((dataDir, generatedDir) => {
-    sync(dataDir, "openrouter", new Map([["mock-model", "vendor/mock-model"]]));
-    sync(dataDir, "openrouter", new Map());
+test("sync removes the file once the last provider leaves", async () => {
+  await withTempDir(async (dataDir, generatedDir) => {
+    await sync(dataDir, "openrouter", new Map([["mock-model", "vendor/mock-model"]]));
+    await sync(dataDir, "openrouter", new Map());
     expect(buildIndex(dataDir)["mock-model"]).toBeUndefined();
-    expect(() => readFileSync(join(generatedDir, "mock-model.json"))).toThrow();
+    expect(() => readText(join(generatedDir, "mock-model.json"))).toThrow();
   });
 });
 
-test("sync adds aliases to a colliding parent", () => {
-  withTempDir((dataDir) => {
-    sync(dataDir, "openrouter", new Map([["base-model", "vendor/base-model"]]));
-    const result = sync(dataDir, "openrouter", new Map([["base-model-2", "vendor/base-model-2"]]));
+test("sync adds aliases to a colliding parent", async () => {
+  await withTempDir(async (dataDir) => {
+    await sync(dataDir, "openrouter", new Map([["base-model", "vendor/base-model"]]));
+    const result = await sync(dataDir, "openrouter", new Map([["base-model-2", "vendor/base-model-2"]]));
     const parent = Object.values(buildIndex(dataDir)).find((entry) => entry.id === "base-model");
     expect(parent).toBeTruthy();
     if (!parent) return;
@@ -183,10 +181,10 @@ test("sync adds aliases to a colliding parent", () => {
   });
 });
 
-test("sync keeps minor versions as separate models", () => {
-  withTempDir((dataDir) => {
-    sync(dataDir, "kiro", new Map([["claude-opus-5", "claude-opus-5"]]));
-    const result = sync(dataDir, "antigravity", new Map([["claude-opus-5-5", "claude-opus-5-5-medium"]]));
+test("sync keeps minor versions as separate models", async () => {
+  await withTempDir(async (dataDir) => {
+    await sync(dataDir, "kiro", new Map([["claude-opus-5", "claude-opus-5"]]));
+    const result = await sync(dataDir, "antigravity", new Map([["claude-opus-5-5", "claude-opus-5-5-medium"]]));
 
     expect(result.added).toEqual(["claude-opus-5-5"]);
     expect(mergedData(dataDir, "anthropic/claude-opus-5").providers).toEqual(["kiro"]);
@@ -197,10 +195,10 @@ test("sync keeps minor versions as separate models", () => {
   });
 });
 
-test("sync still folds real revision suffixes into the parent", () => {
-  withTempDir((dataDir) => {
-    sync(dataDir, "openrouter", new Map([["mock-model", "vendor/mock-model"]]));
-    const result = sync(dataDir, "openrouter", new Map([["mock-model-2", "vendor/mock-model-2"]]));
+test("sync still folds real revision suffixes into the parent", async () => {
+  await withTempDir(async (dataDir) => {
+    await sync(dataDir, "openrouter", new Map([["mock-model", "vendor/mock-model"]]));
+    const result = await sync(dataDir, "openrouter", new Map([["mock-model-2", "vendor/mock-model-2"]]));
     expect(result.added).toEqual([]);
   });
 });

@@ -1,20 +1,19 @@
-/**
- * Shared fetch utilities for the model refresh scripts.
- *
- * The exported functions are Effect based, so retry, timeout, and typed
- * failure behaviour stays consistent across every provider scraper. The
- * `run*` prefixed helpers bridge into Promise based callers.
- */
-
 import { Duration, Effect, Schedule } from "effect";
-import { ModelFetchFailure, asError, modelFailureMessage } from "../errors.ts";
+
+import {
+  ModelFetchFailure,
+  ModelTimeoutFailure,
+  asError,
+  isRetryableStatus,
+  modelFailureMessage,
+} from "../errors.ts";
 
 export const MAX_FETCH_ATTEMPTS = 3;
 export const FETCH_TIMEOUT_MS = 20_000;
 export const FETCH_RETRY_BASE_DELAY_MS = 1_000;
 export const FETCH_RETRY_AFTER_CAP_MS = 30_000;
 
-const RATE_LIMIT_STATUSES = new Set([429, 503]);
+const retryDelayHint = new Map<string, number>();
 
 function retryAfterMs(response: Response): number {
   const header = response.headers.get("retry-after");
@@ -35,6 +34,10 @@ export function sleep(ms: number): Promise<void> {
   return Effect.runPromise(Effect.sleep(Duration.millis(ms)));
 }
 
+export function sleepEffect(ms: number): Effect.Effect<void> {
+  return Effect.sleep(Duration.millis(ms));
+}
+
 export interface FetchOptions {
   attempts?: number;
   timeout?: number;
@@ -42,13 +45,8 @@ export interface FetchOptions {
   headers?: Record<string, string>;
 }
 
-export type FetchResponseType = "json" | "text";
+export type FetchResponseType = "json" | "text" | "bytes";
 
-/**
- * Retries a transient Effect with an exponential, jittered schedule. The source
- * is evaluated once before the schedule applies, so `attempts` counts total
- * evaluations.
- */
 export function retryTransient<A, E, R>(
   self: Effect.Effect<A, E, R>,
   attempts: number
@@ -62,9 +60,65 @@ export function retryTransient<A, E, R>(
   return Effect.retry(self, policy);
 }
 
+export function retryFetchLabeled<A>(
+  label: string,
+  self: Effect.Effect<A, ModelFetchFailure | ModelTimeoutFailure>,
+  attempts: number
+): Effect.Effect<A, ModelFetchFailure | ModelTimeoutFailure> {
+  return retryFetch(label, self, attempts);
+}
+
+function isRetryable(cause: ModelFetchFailure | ModelTimeoutFailure): boolean {
+  if (cause._tag === "ModelTimeoutFailure") return true;
+  return isRetryableStatus(cause.status);
+}
+
+function fetchSchedule(
+  label: string,
+  retries: number
+): Schedule.Schedule<unknown, ModelFetchFailure | ModelTimeoutFailure> {
+  return Schedule.exponential(Duration.millis(FETCH_RETRY_BASE_DELAY_MS)).pipe(
+    Schedule.jittered,
+    Schedule.upTo({ times: retries }),
+    Schedule.while(({ input }) => isRetryable(input as ModelFetchFailure | ModelTimeoutFailure)),
+    Schedule.modifyDelay(({ duration }) => {
+      const hint = retryDelayHint.get(label);
+      if (hint === undefined) return Effect.succeed(duration);
+      retryDelayHint.delete(label);
+      return Effect.succeed(Duration.millis(Math.max(hint, Duration.toMillis(duration))));
+    })
+  ) as Schedule.Schedule<unknown, ModelFetchFailure | ModelTimeoutFailure>;
+}
+
+function retryFetch<A>(
+  label: string,
+  self: Effect.Effect<A, ModelFetchFailure | ModelTimeoutFailure>,
+  attempts: number
+): Effect.Effect<A, ModelFetchFailure | ModelTimeoutFailure> {
+  const retries = Math.max(0, Math.trunc(attempts) - 1);
+  if (retries === 0) return self;
+  return Effect.retry(self, fetchSchedule(label, retries)).pipe(
+    Effect.ensuring(Effect.sync(() => retryDelayHint.delete(label)))
+  );
+}
+
 export function runOrThrow<A>(effect: Effect.Effect<A, unknown>): Promise<A> {
   return Effect.runPromise(effect).catch((cause: unknown) => {
     throw asError(cause);
+  });
+}
+
+export function runTyped<A, E>(effect: Effect.Effect<A, E>): Promise<A> {
+  return Effect.runPromise(effect);
+}
+
+function requestFailure(label: string, cause: unknown, status?: number): ModelFetchFailure {
+  if (cause instanceof ModelFetchFailure) return cause;
+  return new ModelFetchFailure({
+    message: modelFailureMessage(cause),
+    label,
+    status,
+    cause,
   });
 }
 
@@ -72,7 +126,7 @@ export function request<T>(
   url: string,
   options: FetchOptions,
   decode: (response: Response) => T | Promise<T>
-): Effect.Effect<T, ModelFetchFailure> {
+): Effect.Effect<T, ModelFetchFailure | ModelTimeoutFailure> {
   const {
     attempts = MAX_FETCH_ATTEMPTS,
     timeout = FETCH_TIMEOUT_MS,
@@ -80,78 +134,117 @@ export function request<T>(
     headers = {},
   } = options;
 
-  const attempt = Effect.tryPromise({
-    try: async () => {
-      const response = await fetch(url, {
-        headers,
-        signal: AbortSignal.timeout(timeout),
-      });
-      if (!response.ok) {
-        if (RATE_LIMIT_STATUSES.has(response.status)) {
-          const wait = retryAfterMs(response);
-          if (wait > 0) await sleep(wait);
+  const attempt = Effect.gen(function* () {
+    const response = yield* Effect.tryPromise({
+      try: () =>
+        fetch(url, {
+          headers,
+          signal: AbortSignal.timeout(timeout),
+        }),
+      catch: (cause) => {
+        const name = (cause as { name?: string } | null)?.name;
+        if (name === "TimeoutError" || name === "AbortError") {
+          return new ModelTimeoutFailure({
+            message: `Timed out after ${timeout}ms fetching ${label}`,
+            label,
+            timeoutMs: timeout,
+          });
         }
-        throw new ModelFetchFailure({
+        return requestFailure(label, cause);
+      },
+    });
+
+    if (!response.ok) {
+      const wait = retryAfterMs(response);
+      if (wait > 0) retryDelayHint.set(label, wait);
+      return yield* Effect.fail(
+        new ModelFetchFailure({
           message: `Failed to fetch ${label} (${response.status} ${response.statusText})`,
           label,
           status: response.status,
-        });
-      }
-      return decode(response);
-    },
-    catch: (cause) => {
-      if (cause instanceof ModelFetchFailure) return cause;
-      return new ModelFetchFailure({
-        message: modelFailureMessage(cause),
-        label,
-        cause,
-      });
-    },
+        })
+      );
+    }
+
+    return yield* Effect.tryPromise({
+      try: () => Promise.resolve(decode(response)),
+      catch: (cause) => requestFailure(label, cause, response.status),
+    });
   });
 
-  return retryTransient(attempt, attempts);
+  const bounded = attempt.pipe(
+    Effect.timeoutOrElse({
+      duration: Duration.millis(timeout),
+      orElse: () =>
+        Effect.fail(
+          new ModelTimeoutFailure({
+            message: `Timed out after ${timeout}ms reading ${label}`,
+            label,
+            timeoutMs: timeout,
+          })
+        ),
+    })
+  );
+
+  return retryFetch(label, bounded, attempts);
+}
+
+function accepts(responseType: FetchResponseType): string {
+  if (responseType === "text") return "text/plain";
+  if (responseType === "bytes") return "application/octet-stream";
+  return "application/json";
+}
+
+async function decodeResponse(response: Response, responseType: FetchResponseType): Promise<unknown> {
+  if (responseType === "text") return response.text();
+  if (responseType === "bytes") return new Uint8Array(await response.arrayBuffer());
+  return response.json();
 }
 
 export function fetchWithRetry(
   url: string,
   options: FetchOptions & { responseType?: FetchResponseType } = {}
-): Effect.Effect<unknown, ModelFetchFailure> {
+): Effect.Effect<unknown, ModelFetchFailure | ModelTimeoutFailure> {
   const { responseType = "json", ...rest } = options;
-  const accept = responseType === "text" ? "text/plain" : "application/json";
   return request(
     url,
-    { ...rest, headers: { Accept: accept, ...rest.headers } },
-    (response) => (responseType === "text" ? response.text() : response.json())
+    { ...rest, headers: { Accept: accepts(responseType), ...rest.headers } },
+    (response) => decodeResponse(response, responseType)
   );
 }
 
 export function fetchJson(
   url: string,
   options: FetchOptions = {}
-): Effect.Effect<unknown, ModelFetchFailure> {
+): Effect.Effect<unknown, ModelFetchFailure | ModelTimeoutFailure> {
   return fetchWithRetry(url, { ...options, responseType: "json" });
 }
 
 export function fetchText(
   url: string,
   options: FetchOptions = {}
-): Effect.Effect<string, ModelFetchFailure> {
+): Effect.Effect<string, ModelFetchFailure | ModelTimeoutFailure> {
   return fetchWithRetry(url, { ...options, responseType: "text" }) as Effect.Effect<
     string,
-    ModelFetchFailure
+    ModelFetchFailure | ModelTimeoutFailure
   >;
 }
 
-/**
- * Fetches a URL and decodes the response with a scraper specific function.
- * Decode failures are retried like transport failures, matching the previous
- * hand written loops.
- */
+export function fetchBytes(
+  url: string,
+  options: FetchOptions = {}
+): Effect.Effect<Uint8Array, ModelFetchFailure | ModelTimeoutFailure> {
+  return fetchWithRetry(url, { ...options, responseType: "bytes" }) as Effect.Effect<
+    Uint8Array,
+    ModelFetchFailure | ModelTimeoutFailure
+  >;
+}
+
 export function fetchDecoded<T>(
   url: string,
   options: FetchOptions,
   decode: (response: Response) => T | Promise<T>
-): Effect.Effect<T, ModelFetchFailure> {
+): Effect.Effect<T, ModelFetchFailure | ModelTimeoutFailure> {
   return request(url, options, decode);
 }
 
@@ -159,6 +252,24 @@ export function runFetchJson(url: string, options: FetchOptions = {}): Promise<u
   return runOrThrow(fetchJson(url, options));
 }
 
+export function runFetchJsonEffect(
+  url: string,
+  options: FetchOptions = {}
+): Effect.Effect<unknown, ModelFetchFailure | ModelTimeoutFailure> {
+  return fetchJson(url, options);
+}
+
 export function runFetchText(url: string, options: FetchOptions = {}): Promise<string> {
   return runOrThrow(fetchText(url, options));
+}
+
+export function runFetchBytes(url: string, options: FetchOptions = {}): Promise<Uint8Array> {
+  return runOrThrow(fetchBytes(url, options));
+}
+
+export function fetchAll<A, E, R>(
+  effects: ReadonlyArray<Effect.Effect<A, E, R>>,
+  concurrency = 8
+): Effect.Effect<Array<A>, E, R> {
+  return Effect.forEach(effects, (effect) => effect, { concurrency });
 }

@@ -1,9 +1,10 @@
-import { readFileSync, readdirSync, statSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
 import { Effect } from "effect";
 
 import { inferFamilyFromFolder } from "./model/families.ts";
 import { ModelParseFailure, ModelReadFailure, ModelsDirectoryFailure, asError } from "./errors.ts";
+import { exists, isDirectory, listJsonFiles, readText } from "./fs.ts";
+import { basename, dirname, join } from "./paths.ts";
+import { decodeModelDataSync } from "./schema.ts";
 import { Catalog } from "./catalog.ts";
 import { Aliases } from "./aliases.ts";
 import { View } from "./view.ts";
@@ -88,43 +89,41 @@ function generatedDir(dir: string): string {
 }
 
 function readModelEntries(dir: string, required: boolean): ModelEntry[] {
-  let stat;
-  try {
-    stat = statSync(dir);
-  } catch (cause) {
-    if (required) throw new ModelsDirectoryFailure({ message: `models directory not found: ${dir}`, path: dir, cause });
+  if (!exists(dir)) {
+    if (required) {
+      throw new ModelsDirectoryFailure({
+        message: `models directory not found: ${dir}`,
+        path: dir,
+        cause: undefined,
+      });
+    }
     return [];
   }
-  if (!stat.isDirectory()) {
-    if (required) throw new ModelsDirectoryFailure({ message: `models path is not a directory: ${dir}`, path: dir });
+  if (!isDirectory(dir)) {
+    if (required) {
+      throw new ModelsDirectoryFailure({ message: `models path is not a directory: ${dir}`, path: dir });
+    }
     return [];
   }
 
   const entries: ModelEntry[] = [];
-  const walk = (current: string): void => {
-    for (const name of readdirSync(current)) {
-      const fullPath = join(current, name);
-      const entryStat = statSync(fullPath);
-      if (entryStat.isDirectory()) {
-        walk(fullPath);
-        continue;
-      }
-      if (!name.endsWith(".json")) continue;
-      let parsed: ModelInfo;
-      try {
-        parsed = JSON.parse(readFileSync(fullPath, "utf8")) as ModelInfo;
-      } catch (cause) {
-        throw new ModelParseFailure({ message: `invalid model JSON: ${fullPath}`, path: fullPath, cause });
-      }
-      const parent = dirname(fullPath);
-      entries.push({
-        fileId: basename(name, ".json"),
-        owner: parent === dir ? "" : basename(parent),
-        info: parsed,
-      });
+  for (const relativePath of listJsonFiles(dir)) {
+    if (!relativePath.endsWith(".json")) continue;
+    const fullPath = join(dir, relativePath);
+    let parsed: ModelInfo;
+    try {
+      parsed = decodeModelDataSync(readText(fullPath), fullPath) as ModelInfo;
+    } catch (cause) {
+      if (cause instanceof ModelParseFailure) throw cause;
+      throw new ModelParseFailure({ message: `invalid model JSON: ${fullPath}`, path: fullPath, cause });
     }
-  };
-  walk(dir);
+    const segments = relativePath.split("/");
+    entries.push({
+      fileId: basename(relativePath, ".json"),
+      owner: segments.length > 1 ? (segments[0] ?? "") : "",
+      info: parsed,
+    });
+  }
   return entries;
 }
 
@@ -178,8 +177,6 @@ function mergeProviderConfig(
   if (authored.free) merged.free = true;
   if ((authored.aliases ?? []).length > 0) merged.aliases = authored.aliases;
 
-  // Provider flags outside the known fields (for example opencode's
-  // responses_api) are preserved under `custom`, matching the Go registry.
   const custom: Record<string, unknown> = { ...merged.custom };
   for (const [key, value] of Object.entries(authored)) {
     if (KNOWN_PROVIDER_CONFIG_KEYS.has(key)) continue;
@@ -219,10 +216,6 @@ export function loadModelEntries(dir: string): ModelEntry[] {
   return collectModelEntries(dir, generatedDir(dir));
 }
 
-/**
- * Effect wrapper around {@link loadModelEntries} exposing directory, read, and
- * parse problems on the typed failure channel.
- */
 export function tryLoadModelEntries(
   dir: string
 ): Effect.Effect<ModelEntry[], ModelsDirectoryFailure | ModelReadFailure | ModelParseFailure> {
@@ -241,6 +234,13 @@ export function tryLoadModelEntries(
       return new ModelReadFailure({ message: asError(cause).message, path: dir, cause });
     })
   );
+}
+
+export function tryLoadRegistry(
+  dir: string,
+  options: { familyFromFolder?: boolean } = {}
+): Effect.Effect<Registry, ModelsDirectoryFailure | ModelReadFailure | ModelParseFailure> {
+  return Effect.map(tryLoadModelEntries(dir), (entries) => Registry.fromEntries(entries, options));
 }
 
 export type FlagshipFamily = {

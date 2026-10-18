@@ -1,11 +1,11 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { basename, dirname, join, relative, sep } from "node:path";
 import { Effect } from "effect";
 
 import { aliasesFromUpstream, isDateToken } from "./model/clean-key.ts";
 import { inferModelFolder } from "./model/families.ts";
 import { mergeModelData, splitModelData } from "./model/merge.ts";
 import { ModelParseFailure, asError } from "./errors.ts";
+import { exists, listJsonFiles, readJson, remove, rename, writeText } from "./fs.ts";
+import { basename, dirname, join, relative, sep } from "./paths.ts";
 import type { JsonValue, ModelData, ModelIndex, ModelIndexEntry } from "./types.ts";
 
 const MODEL_EXT = ".json";
@@ -94,10 +94,6 @@ export function read(content: string): ModelData {
   return JSON.parse(content) as ModelData;
 }
 
-/**
- * Effect wrapper around {@link read} that reports invalid JSON as a
- * typed parse failure instead of a thrown `SyntaxError`.
- */
 export function tryRead(
   content: string,
   path = "<inline>"
@@ -122,65 +118,45 @@ function publicId(data: ModelData, fileId: string): string {
   return id || fileId;
 }
 
-export function write(filePath: string, data: ModelData): void {
+export async function write(filePath: string, data: ModelData): Promise<void> {
   const content = JSON.stringify(normalizeData(data), null, 2);
-  writeFileSync(filePath, `${content}\n`);
+  await writeText(filePath, `${content}\n`);
 }
 
-export function writeGenerated(filePath: string, data: ModelData): void {
-  mkdirSync(dirname(filePath), { recursive: true });
-  write(filePath, data);
+export async function writeGenerated(filePath: string, data: ModelData): Promise<void> {
+  await write(filePath, data);
 }
 
-export function writeSplit(
+export async function writeSplit(
   modelsDir: string,
   fileId: string,
   data: ModelData,
   options: { generatedDir?: string } = {},
-): { authoredPath: string; generatedPath: string } {
+): Promise<{ authoredPath: string; generatedPath: string }> {
   const dir = options.generatedDir ?? generatedDir(modelsDir);
   const { generated, authored } = splitModelData(data);
   const authoredPath = join(modelsDir, fileId + MODEL_EXT);
   const generatedPath = join(dir, fileId + MODEL_EXT);
 
   if (Object.keys(authored).length > 0) {
-    mkdirSync(dirname(authoredPath), { recursive: true });
-    write(authoredPath, authored);
-  } else if (existsSync(authoredPath)) {
-    rmSync(authoredPath, { force: true });
+    await write(authoredPath, authored);
+  } else if (exists(authoredPath)) {
+    await remove(authoredPath);
   }
 
   if (Object.keys(generated).length > 0) {
-    writeGenerated(generatedPath, generated);
-  } else if (existsSync(generatedPath)) {
-    rmSync(generatedPath, { force: true });
+    await writeGenerated(generatedPath, generated);
+  } else if (exists(generatedPath)) {
+    await remove(generatedPath);
   }
 
   return { authoredPath, generatedPath };
 }
 
 export function collectFiles(modelsDir: string): string[] {
-  const files: string[] = [];
-  let entries: string[];
-  try {
-    entries = readdirSync(modelsDir);
-  } catch {
-    return files;
-  }
-  for (const entry of entries) {
-    const fullPath = join(modelsDir, entry);
-    const stat = statSync(fullPath);
-    if (stat.isDirectory()) {
-      for (const file of readdirSync(fullPath)) {
-        if (file.endsWith(MODEL_EXT)) {
-          files.push(join(fullPath, file));
-        }
-      }
-    } else if (entry.endsWith(MODEL_EXT)) {
-      files.push(fullPath);
-    }
-  }
-  return files;
+  return listJsonFiles(modelsDir)
+    .filter((relativePath) => relativePath.split("/").length <= 2)
+    .map((relativePath) => join(modelsDir, relativePath));
 }
 
 export function generatedDir(modelsDir: string): string {
@@ -188,7 +164,7 @@ export function generatedDir(modelsDir: string): string {
 }
 
 function readData(filePath: string): ModelData {
-  return read(readFileSync(filePath, "utf-8"));
+  return readJson(filePath) as ModelData;
 }
 
 function byFileId(modelsDir: string): Map<string, string> {
@@ -247,17 +223,6 @@ function compare(left: { dateToken: string | null }, right: { dateToken: string 
   return Number.parseInt(right.dateToken, 10) - Number.parseInt(left.dateToken, 10);
 }
 
-/**
- * Build a modelKey -> upstreamId map from a raw provider model id list.
- *
- * Provider feeds often carry both a rolling base id and date-pinned variants
- * of the same model (e.g. `deepseek/deepseek-v4-flash` next to
- * `deepseek/deepseek-v4-flash-0731` or `-0813`). All of them normalize to the
- * same base key via `toModelKey`; this helper makes the newest variant own
- * the base key (an undated rolling id counts as the newest) and re-keys
- * older date-pinned variants under `base-<date>` so the registry merge turns
- * them into aliases instead of separate models.
- */
 export function idMap(modelIds: string[], toModelKey: (modelId: string) => string): Map<string, string> {
   const groups = new Map<string, Array<{ modelId: string; key: string; dateToken: string | null }>>();
 
@@ -299,14 +264,17 @@ export function idMap(modelIds: string[], toModelKey: (modelId: string) => strin
   return new Map([...map.entries()].sort(([a], [b]) => a.localeCompare(b)));
 }
 
-export function persist(entry: Pick<ModelIndexEntry, "modelsDir" | "relativeId">, data: ModelData): void {
-  writeSplit(entry.modelsDir, entry.relativeId, data);
+export function persist(
+  entry: Pick<ModelIndexEntry, "modelsDir" | "relativeId">,
+  data: ModelData,
+): Promise<{ authoredPath: string; generatedPath: string }> {
+  return writeSplit(entry.modelsDir, entry.relativeId, data);
 }
 
-export function renameFiles(
+export async function renameFiles(
   entry: Pick<ModelIndexEntry, "modelsDir" | "generatedDir" | "relativeId">,
   nextFileId: string,
-): string {
+): Promise<string> {
   const folder = dirname(entry.relativeId);
   const nextRelativeId = folder === "." ? nextFileId : join(folder, nextFileId);
   if (nextRelativeId === entry.relativeId) return entry.relativeId;
@@ -315,12 +283,11 @@ export function renameFiles(
     from: join(base, entry.relativeId + MODEL_EXT),
     to: join(base, nextRelativeId + MODEL_EXT),
   }));
-  if (pairs.some(({ to }) => existsSync(to))) return entry.relativeId;
+  if (pairs.some(({ to }) => exists(to))) return entry.relativeId;
 
   for (const { from, to } of pairs) {
-    if (!existsSync(from)) continue;
-    mkdirSync(dirname(to), { recursive: true });
-    renameSync(from, to);
+    if (!exists(from)) continue;
+    await rename(from, to);
   }
   return nextRelativeId;
 }
@@ -331,29 +298,20 @@ function isCurated(data: ModelData): boolean {
   return Object.keys(authored).length > 0;
 }
 
-export function prune(modelsDir: string): string[] {
+export async function prune(modelsDir: string): Promise<string[]> {
   const index = buildIndex(modelsDir);
   const removed: string[] = [];
 
   for (const entry of Object.values(index)) {
     if ((entry.data.providers ?? []).length > 0) continue;
     if (isCurated(entry.data)) continue;
-    writeSplit(entry.modelsDir, entry.relativeId, {});
+    await writeSplit(entry.modelsDir, entry.relativeId, {});
     removed.push(entry.id);
   }
 
   return removed.sort();
 }
 
-/**
- * Sync a provider's model map into the JSON registry.
- *
- * @param {string} modelsDir Path to models/ directory
- * @param {string} providerName e.g. "nvidia_nim"
- * @param {Map<string,string>} modelMap modelKey -> upstreamName
- * @param {{ providerConfigByModel?: Map<string, Record<string, unknown>>, managedProviderConfigKeys?: string[] }} [options]
- * @returns {{ added: string[], removed: string[], updated: string[] }}
- */
 export interface Options {
   providerConfigByModel?: Map<string, Record<string, JsonValue>>;
   managedProviderConfigKeys?: string[];
@@ -365,12 +323,12 @@ export interface Result {
   updated: string[];
 }
 
-export function sync(
+export async function sync(
   modelsDir: string,
   providerName: string,
   modelMap: Map<string, string>,
   options: Options = {},
-): Result {
+): Promise<Result> {
   const index = buildIndex(modelsDir);
   const modelUpstreams = new Set(modelMap.values());
   const added: string[] = [];
@@ -429,7 +387,7 @@ export function sync(
     }
     if (changed) {
       parent.entry.data.aliases = [...existingAliases].sort();
-      persist(parent.entry, parent.entry.data);
+      await persist(parent.entry, parent.entry.data);
       updated.push(parent.baseKey);
     }
     modelMap.delete(modelKey);
@@ -490,7 +448,7 @@ export function sync(
       }
     }
 
-    persist(entry, entry.data);
+    await persist(entry, entry.data);
     removed.push(modelId);
   }
 
@@ -532,25 +490,16 @@ export function sync(
       }
 
       if (changed) {
-        persist(existing, existing.data);
+        await persist(existing, existing.data);
         updated.push(modelKey);
       }
     } else {
       const folder = inferModelFolder(modelKey);
-      const filePath = folder
-        ? join(modelsDir, folder, `${modelKey}${MODEL_EXT}`)
-        : join(modelsDir, `${modelKey}${MODEL_EXT}`);
-      if (folder) {
-        const folderPath = join(modelsDir, folder);
-        if (!existsSync(folderPath)) mkdirSync(folderPath, { recursive: true });
-      }
+      const relativeId = folder ? `${folder}/${modelKey}` : modelKey;
+      const filePath = join(modelsDir, `${relativeId}${MODEL_EXT}`);
 
-      // If a file with the same canonical name already exists (e.g. as a
-      // legacy/ignored catch-all), merge providers/providerConfig into the
-      // existing file instead of overwriting it. The existing meta/aliases/
-      // ignored flags are preserved.
-      if (existsSync(filePath)) {
-        const existing = read(readFileSync(filePath, "utf-8"));
+      if (exists(filePath)) {
+        const existing = readJson(filePath) as ModelData;
         const existingProviders = existing.providers || [];
         let touched = false;
 
@@ -587,7 +536,7 @@ export function sync(
         }
 
         if (touched) {
-          persist({ modelsDir, relativeId: folder ? `${folder}/${modelKey}` : modelKey }, existing);
+          await persist({ modelsDir, relativeId }, existing);
           updated.push(modelKey);
         }
         continue;
@@ -607,7 +556,7 @@ export function sync(
         };
       }
 
-      persist({ modelsDir, relativeId: folder ? `${folder}/${modelKey}` : modelKey }, data);
+      await persist({ modelsDir, relativeId }, data);
       added.push(modelKey);
     }
   }

@@ -1,72 +1,59 @@
-#!/usr/bin/env node
-
-/**
- * Antigravity refresh script.
- *
- * Fetches the public Google Antigravity model documentation and syncs the
- * reasoning models into the JSON model registry. The model list, IDs and tier
- * availability come from the machine-readable model selector embedded in the
- * docs page (`data-model-id` / `data-tiers`), so new Gemini/Claude/GPT-OSS
- * versions flow through without updating a hardcoded list.
- *
- * It also refreshes the User-Agent version used by the Go proxy and web
- * Antigravity providers from the Antigravity changelog, so the hardcoded
- * version does not go stale between releases.
- *
- * Source: https://antigravity.google/docs/models
- *
- * Usage:
- *   node scripts/antigravity.ts
- *   node scripts/antigravity.ts --dry-run
- */
-
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { buildIndex, persist, sync } from "#models/model-store.ts";
 import { runFetchText } from "#models/sync/http.ts";
 import { syncCliVersion } from "./version-sync.ts";
+import { join } from "#models/paths.ts";
+import { flags, packageModelsDir, repoRoot, runScript } from "./shared.ts";
+import type { ModelIndexEntry, ModelModalities } from "#models/types.ts";
+
+interface WidgetEntry {
+  id: string;
+  name: string;
+  tiers: Record<string, unknown>;
+  defaultLevel: string;
+  levels: string[];
+}
+
+interface DiscoveredModel {
+  displayName: string;
+  key: string;
+  upstream: string;
+}
+
+interface SyncResult {
+  added: string[];
+  removed: string[];
+  updated: string[];
+}
 
 const ANTIGRAVITY_MODELS_URL = "https://antigravity.google/docs/models";
 const PROVIDER_NAME = "antigravity";
 
 const ANTIGRAVITY_PAID_TIERS = ["g1-pro-tier", "g1-ultra-tier", "standard-tier", "paid"];
 
-const scriptDir = dirname(fileURLToPath(import.meta.url));
-const packageDir = resolve(scriptDir, "..");
-const modelsDir = resolve(packageDir, "data");
+const modelsDir = packageModelsDir();
 
-// Antigravity publishes the same release notes as Markdown. This page is a
-// stable, first party URL, unlike the auto updater bucket whose host embeds a
-// numeric project id, so the emulated client version is read from here.
 const ANTIGRAVITY_CHANGELOG_URL = "https://antigravity.google/docs/changelog.md";
-// The desktop app section owns the version the providers emulate. Its release
-// headings link to the `hub` release tab, which is a stabler anchor than the
-// section title.
+
 const ANTIGRAVITY_CHANGELOG_RELEASE_TAB = "hub";
 const VERSION_FETCH_TIMEOUT_MS = 15_000;
 
-const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
+const REPO_ROOT = repoRoot();
 
-// Antigravity's emulated IDE version is reused by the provider and the quota
-// fetcher, so both are refreshed together from the published release feed.
 const ANTIGRAVITY_VERSION_TARGETS = [
   {
     label: "antigravity provider",
-    path: resolve(REPO_ROOT, "packages/providers/upstreams/antigravity/index.ts"),
+    path: join(REPO_ROOT, "packages/providers/upstreams/antigravity/index.ts"),
     pattern: /(antigravity\/)(\d+\.\d+\.\d+)( \$\{process\.platform\})/,
   },
   {
     label: "antigravity quota fetcher",
-    path: resolve(REPO_ROOT, "packages/providers/quota/fetchers/antigravity.ts"),
+    path: join(REPO_ROOT, "packages/providers/quota/fetchers/antigravity.ts"),
     pattern: /(antigravity\/)(\d+\.\d+\.\d+)( \$\{process\.platform\})/,
   },
 ];
 
 const GEMINI_3X_FLASH_LEVELS = ["low", "medium", "high"];
 
-// cloudcode-pa appends an effort/reasoning SKU to the documented model ID.
-// Gemini models derive it from their documented level; Claude and GPT-OSS use
-// a fixed default SKU that the public docs do not list.
 const DOCUMENTED_EFFORT_SUFFIX = new Map([
   ["claude-opus-4-6", "thinking"],
   ["claude-sonnet-4-6", ""],
@@ -77,28 +64,25 @@ const DOCUMENTED_EFFORT_SUFFIX = new Map([
 
 const GEMINI_3X_FLASH_PATTERN = /^gemini-3\.(\d+)-flash$/;
 
-// Documented Gemini models whose wire name carries an effort suffix. The docs
-// picker exposes one level per model (e.g. Gemini 3.5 Flash, Gemini 4 Argon),
-// so the registry stores the default wire and the provider appends the level.
-function leveledGeminiModelKey(modelKey) {
+function leveledGeminiModelKey(modelKey: string): string {
   const flash = GEMINI_3X_FLASH_PATTERN.exec(modelKey);
   if (flash) return Number(flash[1]) >= 5 ? modelKey : "";
   return /^gemini-\d+-[a-z]+$/.test(modelKey) ? modelKey : "";
 }
 
-function leveledGeminiUpstream(modelKey) {
+function leveledGeminiUpstream(modelKey: string): string {
   if (!leveledGeminiModelKey(modelKey)) return "";
   const flash = GEMINI_3X_FLASH_PATTERN.exec(modelKey);
   if (flash) return Number(flash[1]) >= 7 ? `${modelKey}-tiered` : `${modelKey}-medium`;
   return `${modelKey}-medium`;
 }
 
-function leveledGeminiAliases(modelKey) {
+function leveledGeminiAliases(modelKey: string): string[] {
   if (!leveledGeminiModelKey(modelKey)) return [];
   return GEMINI_3X_FLASH_LEVELS.map((level) => `${modelKey}-${level}`);
 }
 
-function decodeHtmlEntities(value) {
+function decodeHtmlEntities(value: string): string {
   return value
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
@@ -107,16 +91,7 @@ function decodeHtmlEntities(value) {
     .replace(/&gt;/g, ">");
 }
 
-/**
- * Parse the model selector widget embedded in the Antigravity docs page.
- *
- * Each row carries the published model ID, display name, plan availability and
- * (for leveled models) the selectable reasoning levels.
- *
- * @param {string} html
- * @returns {Array<{ id: string, name: string, tiers: Record<string, boolean>, defaultLevel: string, levels: string[] }>}
- */
-function parseModelSelectorWidget(html) {
+function parseModelSelectorWidget(html: string): WidgetEntry[] {
   const groupIndex = html.indexOf("model-selector-group");
   if (groupIndex < 0) {
     throw new Error(
@@ -124,7 +99,7 @@ function parseModelSelectorWidget(html) {
     );
   }
 
-  const entries = [];
+  const entries: WidgetEntry[] = [];
   for (const row of html.slice(groupIndex).split(/<div class="model-item-row/).slice(1)) {
     const id = row.match(/data-model-id="([^"]+)"/)?.[1];
     if (!id) continue;
@@ -133,7 +108,7 @@ function parseModelSelectorWidget(html) {
       row.match(/<span class="model-name">([^<]*)<\/span>/)?.[1] ?? ""
     ).trim();
     const tiersRaw = decodeHtmlEntities(row.match(/data-tiers="([^"]*)"/)?.[1] ?? "");
-    let tiers = {};
+    let tiers: Record<string, unknown> = {};
     try {
       tiers = JSON.parse(tiersRaw);
     } catch {
@@ -143,13 +118,13 @@ function parseModelSelectorWidget(html) {
     const defaultLevel = decodeHtmlEntities(
       row.match(/data-level-display="[^"]*">([^<]*)</)?.[1] ?? ""
     ).trim();
-    const levels = [...row.matchAll(/data-level-btn="([^"]+)"/g)].map((m) => m[1].trim());
+    const levels: string[] = [...row.matchAll(/data-level-btn="([^"]+)"/g)].map((m) => m[1].trim());
 
     entries.push({ id, name, tiers, defaultLevel, levels });
     if (entries.length >= 50) break;
   }
 
-  const unique = new Map();
+  const unique = new Map<string, WidgetEntry>();
   for (const entry of entries) {
     if (!unique.has(entry.id)) unique.set(entry.id, entry);
   }
@@ -161,17 +136,17 @@ function parseModelSelectorWidget(html) {
   return models;
 }
 
-function keyFromDocsId(id) {
+function keyFromDocsId(id: string): string {
   if (id.startsWith("claude-")) return id.replace(/\.(?=\d)/g, "-");
   if (/^gemini-\d+(?:\.\d+)*-pro$/.test(id)) return `${id}-preview`;
   return id;
 }
 
-function aliasesForWidgetEntry(entry) {
+function aliasesForWidgetEntry(entry: WidgetEntry): string[] {
   return entry.levels.map((level) => `${entry.id}-${level.toLowerCase()}`);
 }
 
-function canonicalizeWidgetModel(entry) {
+function canonicalizeWidgetModel(entry: WidgetEntry): DiscoveredModel {
   const key = keyFromDocsId(entry.id);
   let upstream;
 
@@ -187,10 +162,10 @@ function canonicalizeWidgetModel(entry) {
   return { displayName: entry.name, key, upstream };
 }
 
-function buildDiscoveredModelMap(widgetEntries) {
-  const map = new Map();
-  const ranks = new Map();
-  const discovered = [];
+function buildDiscoveredModelMap(widgetEntries: WidgetEntry[]): { modelMap: Map<string, string>; discovered: DiscoveredModel[] } {
+  const map = new Map<string, string>();
+  const ranks = new Map<string, number>();
+  const discovered: DiscoveredModel[] = [];
 
   for (const entry of widgetEntries) {
     const model = canonicalizeWidgetModel(entry);
@@ -210,22 +185,26 @@ function buildDiscoveredModelMap(widgetEntries) {
   return { modelMap: map, discovered };
 }
 
-function upstreamRank(upstream) {
+function upstreamRank(upstream: string): number {
   if (upstream.endsWith("-high")) return 3;
   if (upstream.endsWith("-medium")) return 2;
   if (upstream.endsWith("-low")) return 1;
   return 0;
 }
 
-function buildAntigravityTierConfig(modelMap, documentedModelKeys, widgetEntries) {
-  const freeByKey = new Map();
+function buildAntigravityTierConfig(
+  modelMap: Map<string, string>,
+  documentedModelKeys: Set<string>,
+  widgetEntries: WidgetEntry[]
+): Map<string, { allowedTiers: string[] }> {
+  const freeByKey = new Map<string, boolean>();
   for (const entry of widgetEntries) {
     const key = keyFromDocsId(entry.id);
     if (entry.tiers?.freeAndPlus === true) freeByKey.set(key, true);
     else if (!freeByKey.has(key)) freeByKey.set(key, false);
   }
 
-  const config = new Map();
+  const config = new Map<string, { allowedTiers: string[] }>();
   for (const key of modelMap.keys()) {
     if (!documentedModelKeys.has(key)) continue;
     if (freeByKey.get(key) === true) continue;
@@ -234,13 +213,9 @@ function buildAntigravityTierConfig(modelMap, documentedModelKeys, widgetEntries
   return config;
 }
 
-// Preserve any existing model file that already has the antigravity
-// provider configured even when the model is not in the public docs.
-// This keeps JSON the source of truth: edit providerConfig to a file
-// to retain an antigravity binding across refresh runs.
-function mergePreservedExtras(modelMap) {
+function mergePreservedExtras(modelMap: Map<string, string>): Array<{ key: string; upstream: string }> {
   const index = buildIndex(modelsDir);
-  const extras = [];
+  const extras: Array<{ key: string; upstream: string }> = [];
 
   for (const [, entry] of Object.entries(index)) {
     const providers = entry.data.providers || [];
@@ -267,7 +242,7 @@ function mergePreservedExtras(modelMap) {
   return extras;
 }
 
-function findModelEntry(index, modelKey) {
+function findModelEntry(index: Record<string, ModelIndexEntry>, modelKey: string): ModelIndexEntry | null {
   const exact = Object.values(index).find((entry) => entry.fileId === modelKey || entry.id === modelKey);
   if (exact) return exact;
 
@@ -277,7 +252,7 @@ function findModelEntry(index, modelKey) {
   }) || null;
 }
 
-function getExistingProviderUpstream(entry, provider) {
+function getExistingProviderUpstream(entry: ModelIndexEntry, provider: string): string {
   const upstream = entry.data.providerConfig?.[provider]?.upstream;
   if (typeof upstream === "string" && upstream.trim() !== "") {
     return upstream.trim();
@@ -285,11 +260,15 @@ function getExistingProviderUpstream(entry, provider) {
   return entry.id || entry.fileId;
 }
 
-function isGeminiImageModel(modelKey) {
+function isGeminiImageModel(modelKey: string): boolean {
   return modelKey.includes("image");
 }
 
-function enrichModelMetadata(result, documentedModelKeys, aliasesByKey) {
+async function enrichModelMetadata(
+  result: SyncResult,
+  documentedModelKeys: Set<string>,
+  aliasesByKey: Map<string, string[]>
+): Promise<void> {
   const index = buildIndex(modelsDir);
   const changedKeys = new Set([...result.added, ...result.updated]);
 
@@ -338,7 +317,7 @@ function enrichModelMetadata(result, documentedModelKeys, aliasesByKey) {
   }
 }
 
-function inferMetadata(modelKey) {
+function inferMetadata(modelKey: string): { reasoning: boolean; modalities: ModelModalities } | null {
   if (modelKey.startsWith("gemini-")) {
     return {
       reasoning: !isGeminiImageModel(modelKey),
@@ -363,13 +342,17 @@ function inferMetadata(modelKey) {
   return null;
 }
 
-function syncJson(modelMap, dryRun, tierConfig) {
+async function syncJson(
+  modelMap: Map<string, string>,
+  dryRun: boolean,
+  tierConfig: Map<string, { allowedTiers: string[] }>
+): Promise<SyncResult> {
   if (dryRun) {
     console.log("[antigravity] Dry run - no JSON files modified.");
 
     const index = buildIndex(modelsDir);
-    const wouldRemove = [];
-    const wouldKeep = [];
+    const wouldRemove: string[] = [];
+    const wouldKeep: string[] = [];
 
     for (const [modelId, entry] of Object.entries(index)) {
       const publicId = entry.id || modelId;
@@ -383,13 +366,12 @@ function syncJson(modelMap, dryRun, tierConfig) {
       }
     }
 
-    const wouldAdd = [];
-    const wouldUpdate = [];
+    const wouldAdd: string[] = [];
+    const wouldUpdate: string[] = [];
     for (const [key, upstream] of modelMap.entries()) {
       const existing = findModelEntry(index, key);
       if (!existing) {
-        // Don't propose adding antigravity to an existing model that is
-        // ignored (e.g. an alias-only entry).
+
         const ignored = Object.values(index).find(
           (entry) =>
             entry.data.ignored &&
@@ -430,21 +412,14 @@ function syncJson(modelMap, dryRun, tierConfig) {
     return { added: wouldAdd, removed: wouldRemove, updated: wouldUpdate };
   }
 
-  return sync(modelsDir, PROVIDER_NAME, modelMap, {
+  return await sync(modelsDir, PROVIDER_NAME, modelMap, {
     providerConfigByModel: tierConfig,
     managedProviderConfigKeys: ["allowedTiers"],
   });
 }
 
-/**
- * Read the newest desktop app version from the published changelog.
- *
- * Release headings look like `### [v2.23.0](/releases?tab=hub&version=2.23.0)`.
- * Matching the release tab keeps the CLI and IDE lines from being mistaken for
- * the desktop app version even if a section title is renamed.
- */
-function parseLatestVersion(text, releaseTab) {
-  const versions = [];
+function parseLatestVersion(text: string, releaseTab: string): string | null {
+  const versions: string[] = [];
   for (const match of text.matchAll(/^###\s+\[v?(\d+\.\d+\.\d+)\]\(([^)]*)\)/gm)) {
     if (releaseTab && !match[2].includes(`tab=${releaseTab}`)) continue;
     versions.push(match[1]);
@@ -454,7 +429,7 @@ function parseLatestVersion(text, releaseTab) {
   return versions.sort(compareSemver).at(-1) ?? null;
 }
 
-function compareSemver(a, b) {
+function compareSemver(a: string, b: string): number {
   const [aMajor, aMinor, aPatch] = a.split(".").map(Number);
   const [bMajor, bMinor, bPatch] = b.split(".").map(Number);
   if (aMajor !== bMajor) return aMajor > bMajor ? 1 : -1;
@@ -463,7 +438,7 @@ function compareSemver(a, b) {
   return 0;
 }
 
-async function syncUserAgent(dryRun) {
+async function syncUserAgent(dryRun: boolean): Promise<void> {
   let latestVersion = null;
   try {
     const text = await runFetchText(ANTIGRAVITY_CHANGELOG_URL, {
@@ -492,17 +467,16 @@ async function syncUserAgent(dryRun) {
   syncCliVersion("antigravity", ANTIGRAVITY_VERSION_TARGETS, latestVersion);
 }
 
-async function main() {
-  const dryRun = process.argv.includes("--dry-run");
-  const verbose = process.argv.includes("--verbose") || process.argv.includes("-v");
+async function main(): Promise<void> {
+  const { dryRun, verbose } = flags();
 
-  await syncUserAgent(dryRun).catch((error) => {
+  await syncUserAgent(dryRun).catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
     console.warn(`[antigravity] User-Agent sync failed (${message})`);
   });
 
   console.log("[antigravity] Fetching official Antigravity model docs ...");
-  let html;
+  let html: string;
   try {
     html = await runFetchText(ANTIGRAVITY_MODELS_URL, { label: "Antigravity model docs" });
   } catch (error) {
@@ -545,10 +519,10 @@ async function main() {
     console.log();
   }
 
-  const result = syncJson(modelMap, dryRun, tierConfig);
+  const result = await syncJson(modelMap, dryRun, tierConfig);
 
   if (!dryRun && (result.added.length > 0 || result.updated.length > 0)) {
-    enrichModelMetadata(result, documentedModelKeys, aliasesByKey);
+    await enrichModelMetadata(result, documentedModelKeys, aliasesByKey);
   }
 
   if (
@@ -570,7 +544,4 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
-});
+runScript(main);

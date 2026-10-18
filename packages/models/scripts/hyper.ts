@@ -1,17 +1,21 @@
-#!/usr/bin/env node
-
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { buildIndex, persist, sync } from "#models/model-store.ts";
 import { runFetchJson } from "#models/sync/http.ts";
 import { stripParamInfoKey } from "#models/model/clean-key.ts";
+import { arrayAt, asRecord, asTrimmedString, stringAt } from "#models/json.ts";
+import { packageModelsDir, runScript } from "./shared.ts";
+import type { ModelData, ModelIndexEntry } from "#models/types.ts";
 
 const PROVIDER_NAME = "hyper";
 const HYPER_MODELS_URL = "https://hyper.charm.land/v1/models";
 
 const MIN_EXPECTED_MODELS = 10;
 
-function toModelKey(modelId) {
+interface HyperModel {
+  id: string;
+  reasoning: boolean;
+}
+
+function toModelKey(modelId: string): string {
   const normalized = modelId
     .replace(/[:/]/g, "-")
     .replace(/[^a-zA-Z0-9._-]/g, "-")
@@ -20,103 +24,94 @@ function toModelKey(modelId) {
   return stripParamInfoKey(normalized);
 }
 
-function fullModelKey(modelId) {
+function fullModelKey(modelId: string): string {
   return modelId
     .replace(/[:/]/g, "-")
     .replace(/[^a-zA-Z0-9._-]/g, "-")
     .replace(/-{2,}/g, "-");
 }
 
-function buildModelMap(models) {
-  const map = new Map();
+function buildModelMap(models: HyperModel[]): Map<string, string> {
+  const map = new Map<string, string>();
 
   for (const model of models) {
-    const modelId = typeof model.id === "string" ? model.id.trim() : "";
-    if (!modelId) continue;
-
-    const baseModelKey = toModelKey(modelId);
+    const baseModelKey = toModelKey(model.id);
     let modelKey = baseModelKey;
     let suffix = 2;
 
-    // Distinct upstream models must never collapse onto the same key (e.g.
-    // "qwen3.8-27b" vs "qwen3.8-2.4t-a95b" both strip to "qwen3.8"). When a
-    // collision occurs, fall back to the full normalized id so the model stays
-    // addressable instead of being merged as a wrong alias.
-    while (map.has(modelKey) && map.get(modelKey) !== modelId) {
-      modelKey = suffix === 2 ? fullModelKey(modelId) : `${fullModelKey(modelId)}-${suffix}`;
+    while (map.has(modelKey) && map.get(modelKey) !== model.id) {
+      modelKey = suffix === 2 ? fullModelKey(model.id) : `${fullModelKey(model.id)}-${suffix}`;
       suffix += 1;
     }
 
-    map.set(modelKey, modelId);
+    map.set(modelKey, model.id);
   }
 
   return new Map([...map.entries()].sort(([a], [b]) => a.localeCompare(b)));
 }
 
-function buildMetadataLookup(models) {
-  const lookup = new Map();
-  for (const model of models) {
-    if (typeof model.id === "string" && model.id.trim()) {
-      lookup.set(model.id.trim(), model);
-    }
-  }
-  return lookup;
-}
-
-function enrichNewModels(modelsDir, addedKeys, modelMap, metadataLookup) {
+function enrichNewModels(
+  modelsDir: string,
+  addedKeys: string[],
+  modelMap: Map<string, string>,
+  metadataLookup: Map<string, HyperModel>
+): void {
   const index = buildIndex(modelsDir);
 
   for (const modelKey of addedKeys) {
-    const entry = Object.values(index).find((item) => item.fileId === modelKey || item.id === modelKey);
+    const entry = Object.values(index).find(
+      (item) => item.fileId === modelKey || item.id === modelKey
+    );
     if (!entry) continue;
 
     const upstreamName = modelMap.get(modelKey);
-    const model = upstreamName ? metadataLookup.get(upstreamName) : null;
-    if (!model) continue;
+    const model = upstreamName ? metadataLookup.get(upstreamName) : undefined;
+    if (!model || !model.reasoning) continue;
 
-    const data = entry.data;
-
-    const hasReasoning =
-      Array.isArray(model.reasoning?.effort_levels) &&
-      model.reasoning.effort_levels.length > 0;
-    if (hasReasoning && data.reasoning !== true) {
-      data.reasoning = true;
-    }
-
-    persist(entry, data);
+    const data: ModelData = entry.data;
+    if (data.reasoning === true) continue;
+    data.reasoning = true;
+    persist(entry as ModelIndexEntry, data);
   }
 }
 
-async function fetchHyperModels() {
-  const payload = await runFetchJson(HYPER_MODELS_URL, {
-    label: "Hyper /v1/models",
-  });
-  if (!payload || !Array.isArray(payload.data)) {
+function toHyperModels(payload: unknown): HyperModel[] {
+  const data = arrayAt(payload, "data");
+  if (data.length === 0) {
     throw new Error("Unexpected Hyper /v1/models payload format");
   }
 
-  const models = payload.data.filter(
-    (model) => typeof model.id === "string" && model.id.trim().length > 0
-  );
+  const models: HyperModel[] = [];
+  for (const item of data) {
+    const id = asTrimmedString(stringAt(item, "id"));
+    if (!id) continue;
+    const effortLevels = arrayAt(asRecord(asRecord(item)?.["reasoning"]), "effort_levels");
+    models.push({ id, reasoning: effortLevels.length > 0 });
+  }
   if (models.length === 0) {
     throw new Error("Hyper /v1/models returned no models");
   }
   if (models.length < MIN_EXPECTED_MODELS) {
-    console.warn(`Hyper /v1/models returned only ${models.length} models (expected >= ${MIN_EXPECTED_MODELS})`);
+    console.warn(
+      `Hyper /v1/models returned only ${models.length} models (expected >= ${MIN_EXPECTED_MODELS})`
+    );
   }
-
   return models;
 }
 
-async function main() {
-  const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const modelsDir = resolve(scriptDir, "../data");
+async function fetchHyperModels(): Promise<HyperModel[]> {
+  const payload = await runFetchJson(HYPER_MODELS_URL, { label: "Hyper /v1/models" });
+  return toHyperModels(payload);
+}
+
+async function main(): Promise<void> {
+  const modelsDir = packageModelsDir();
 
   const models = await fetchHyperModels();
   const modelMap = buildModelMap(models);
-  const metadataLookup = buildMetadataLookup(models);
+  const metadataLookup = new Map(models.map((model) => [model.id, model]));
 
-  const result = sync(modelsDir, PROVIDER_NAME, modelMap);
+  const result = await sync(modelsDir, PROVIDER_NAME, modelMap);
 
   if (result.added.length > 0) {
     enrichNewModels(modelsDir, result.added, modelMap, metadataLookup);
@@ -125,11 +120,10 @@ async function main() {
   if (result.added.length === 0 && result.removed.length === 0 && result.updated.length === 0) {
     console.log(`Hyper models are already up to date (${modelMap.size} models).`);
   } else {
-    console.log(`Hyper: ${modelMap.size} models (added ${result.added.length}, removed ${result.removed.length}, updated ${result.updated.length}).`);
+    console.log(
+      `Hyper: ${modelMap.size} models (added ${result.added.length}, removed ${result.removed.length}, updated ${result.updated.length}).`
+    );
   }
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
-});
+runScript(main);
