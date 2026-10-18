@@ -29,6 +29,8 @@ jobs:
 
       - name: Refresh provider models
         run: bun run --filter @opendum/models refresh --summary "$RUNNER_TEMP/summary.md"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
 
       - name: Regenerate family ranking
         run: bun run --filter @opendum/models family-ranking

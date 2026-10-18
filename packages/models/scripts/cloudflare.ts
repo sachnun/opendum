@@ -3,11 +3,13 @@
 /**
  * Sync Cloudflare Workers AI model availability into JSON registry.
  *
- * Data source: Cloudflare's public docs repository (no auth required)
+ * Data source: Cloudflare's public docs repository
  *   https://github.com/cloudflare/cloudflare-docs/tree/production/src/content/workers-ai-models
  *
  * The account API requires Cloudflare credentials, so the scheduled refresh uses
- * the docs model metadata that powers developers.cloudflare.com.
+ * the docs model metadata that powers developers.cloudflare.com. The repository
+ * listing is fetched from the GitHub API, authenticated with GITHUB_TOKEN when
+ * present so scheduled runs do not trip the anonymous rate limit.
  */
 
 import { dirname, resolve } from "node:path";
@@ -24,6 +26,11 @@ import { stripParamInfoKey } from "#models/model/clean-key.ts";
 const PROVIDER_NAME = "workers_ai";
 const WORKERS_AI_MODELS_API_URL = "https://api.github.com/repos/cloudflare/cloudflare-docs/contents/src/content/workers-ai-models?ref=production";
 const FETCH_CONCURRENCY = 8;
+
+function githubApiHeaders(): Record<string, string> {
+  const token = process.env.GITHUB_TOKEN?.trim() || process.env.GH_TOKEN?.trim();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 const EXCLUDED_MODEL_KEY_TOKENS = ["guard"];
 
@@ -207,7 +214,7 @@ function applyMetadata(modelsDir, metadata) {
 }
 
 async function fetchWorkersAIModelFiles() {
-  const files = await runFetchJson(WORKERS_AI_MODELS_API_URL);
+  const files = await runFetchJson(WORKERS_AI_MODELS_API_URL, { headers: githubApiHeaders() });
   if (!Array.isArray(files)) {
     throw new Error("Unexpected Cloudflare Workers AI model file list payload");
   }
