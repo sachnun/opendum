@@ -1,49 +1,13 @@
 <script setup lang="ts">
-import { get, set } from "idb-keyval";
 import { getProviderLabel } from "@opendum/providers/provider-accounts";
 import type { ModelSearchItem } from "~~/lib/api-types";
-import { createIdbStore } from "~/utils/idb";
 
 type ModelListItem = ModelSearchItem;
-
-type CachedModelSearch = {
-  models: ModelListItem[];
-  cachedAt: number;
-};
-
-const MODEL_SEARCH_CACHE_KEY = "model-search";
-const MODEL_SEARCH_CACHE_TTL_MS = 60 * 60_000;
-const MODEL_SEARCH_DB_NAME = "opendum-web";
-const MODEL_SEARCH_STORE_NAME = "model-search";
-const modelSearchStore = createIdbStore(MODEL_SEARCH_DB_NAME, MODEL_SEARCH_STORE_NAME);
-
-async function readCachedModelSearch(): Promise<CachedModelSearch | null> {
-  if (!modelSearchStore) return null;
-
-  try {
-    return (await get<CachedModelSearch>(MODEL_SEARCH_CACHE_KEY, modelSearchStore)) ?? null;
-  } catch (error) {
-    console.warn("Failed to read model search cache:", error);
-    return null;
-  }
-}
-
-async function writeCachedModelSearch(models: ModelListItem[]) {
-  if (!modelSearchStore) return;
-
-  try {
-    await set(MODEL_SEARCH_CACHE_KEY, { models, cachedAt: Date.now() } satisfies CachedModelSearch, modelSearchStore);
-  } catch (error) {
-    console.warn("Failed to write model search cache:", error);
-  }
-}
 
 const api = useApi();
 
 async function loadModelSearch() {
-  const models = await api.models.search();
-  void writeCachedModelSearch(models);
-  return models;
+  return await api.models.search();
 }
 
 const route = useRoute();
@@ -108,16 +72,7 @@ watch(() => route.fullPath, () => {
   search.value = "";
 });
 
-onMounted(async () => {
-  const cached = await readCachedModelSearch();
-
-  if (cached?.models.length) {
-    if (models.value.length === 0) data.value = cached.models;
-    modelsRequested.value = true;
-
-    if (Date.now() - cached.cachedAt >= MODEL_SEARCH_CACHE_TTL_MS) void refresh();
-  }
-
+onMounted(() => {
   placeholderTimer = window.setInterval(() => {
     const total = placeholderModels.value.length;
     if (total <= 1) return;

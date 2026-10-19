@@ -31,7 +31,7 @@ const invalidation = useInvalidate();
 
 
 
-const customProviders = useCachedData(dataKeys.customProviders, () => api.customProviders.list());
+const customProviders = useAsyncData(dataKeys.customProviders, () => api.customProviders.list());
 const customList = computed(() => customProviders.data.value ?? []);
 const customProviderConfigs = computed<Record<string, ProviderConfig>>(() => Object.fromEntries(
   customList.value.map((row) => [row.slug, {

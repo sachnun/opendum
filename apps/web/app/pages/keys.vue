@@ -11,7 +11,7 @@ type ApiKeyOptions = Awaited<ReturnType<typeof api.apiKeys.options>>;
 type AccessMode = "all" | "whitelist" | "blacklist";
 type RateLimitRule = ApiKeyOptions["rateLimitsByKeyId"][string][number];
 
-const { data, error, refresh } = useCachedData(dataKeys.apiKeys, async () => {
+const { data, error, refresh } = useAsyncData(dataKeys.apiKeys, async () => {
   const [apiKeys, options] = await Promise.all([api.apiKeys.list(), api.apiKeys.options()]);
   return { apiKeys, options };
 });

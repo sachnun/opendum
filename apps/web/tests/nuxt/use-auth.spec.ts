@@ -16,7 +16,7 @@ const fetchMock = mock((..._args: unknown[]) => Promise.resolve<unknown>({}));
 (globalThis as Record<string, unknown>).useRuntimeConfig = () => ({ public: { apiUrl: "https://api.example.com" } });
 (globalThis as Record<string, unknown>).useState = <T>(_key: string, init?: () => T) => ref<T | undefined>(init ? init() : undefined);
 (globalThis as Record<string, unknown>).stateKeys = stateKeys;
-(globalThis as Record<string, unknown>).clearDataCache = mock(() => {});
+(globalThis as Record<string, unknown>).clearNuxtData = mock(() => {});
 (globalThis as Record<string, unknown>).$fetch = fetchMock;
 
 type FetchCall = [string, { method?: string; headers: Record<string, string>; body?: unknown }];

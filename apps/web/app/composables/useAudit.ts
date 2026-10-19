@@ -15,12 +15,10 @@ export function useAudit() {
   const auditUser = computed(() => audit.value.user);
 
   async function refreshAfterAuditChange() {
-    clearDataCache();
     auditRefreshVersion.value += 1;
     useState<Record<string, unknown>>(stateKeys.quotaByAccountId, () => ({})).value = {};
     useState<Record<string, string>>(stateKeys.quotaErrorByAccountId, () => ({})).value = {};
     useState<Record<string, boolean>>(stateKeys.quotaLoadingByAccountId, () => ({})).value = {};
-    useState<Record<string, boolean>>(stateKeys.quotaHydratedAccountIds, () => ({})).value = {};
     await refreshNuxtData();
   }
 

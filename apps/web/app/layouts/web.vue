@@ -64,8 +64,9 @@ const { models: liveModels } = useEventStream({
   onModels: applyModelsSnapshot,
   onUsage: applyUsageSnapshot,
 });
-const { prefetch } = usePrefetch();
-const { data: customProvidersData } = useCachedData(dataKeys.customProviders, () => api.customProviders.list());
+const accountsNavigationHref = "/";
+const { data: accountsOverviewData } = useNuxtData<AccountOverviewData>(dataKeys.accountsOverview);
+const { data: customProvidersData } = useAsyncData(dataKeys.customProviders, () => api.customProviders.list());
 const customProviders = computed(() => customProvidersData.value ?? []);
 const providerHrefByKey = computed<Record<string, string>>(() => Object.fromEntries([
   ...PROVIDER_ACCOUNT_DEFINITIONS.map((definition) => [definition.key, getProviderAccountPath(definition.key)]),
@@ -82,10 +83,8 @@ const navigation = computed<NavItem[]>(() => primaryNavigation.map((item) => ite
       ],
     }
   : item));
-const accountsNavigationHref = "/";
-const { data: accountsOverviewData } = useNuxtData<AccountOverviewData>(dataKeys.accountsOverview);
 
-const { data: me } = useCachedData(dataKeys.me, () => api.me.get(), {
+const { data: me } = useAsyncData<MeData>(dataKeys.me, () => api.me.get(), {
   default: () => ({ role: "user" as const, isMaintainer: false }),
 });
 const { auditUser, me: meState, isAuditMode, refreshAfterAuditChange } = useAudit();
@@ -134,7 +133,7 @@ function applyModelsSnapshot(data: ModelsData): void {
 
 const isProviderOverviewRoute = computed(() => route.path === accountsNavigationHref);
 
-const { data: accountSummaryData } = useCachedData(dataKeys.shellAccounts, async (): Promise<ShellAccountSummary> => {
+const { data: accountSummaryData } = useAsyncData(dataKeys.shellAccounts, async (): Promise<ShellAccountSummary> => {
   if (isProviderOverviewRoute.value) {
     const snapshot = accountsOverviewData.value;
     return snapshot ? toShellAccountSummary(snapshot) : emptyShellAccountSummary;
@@ -181,7 +180,7 @@ function customHrefCounts<V>(counts: Record<string, V>): Record<string, V> {
 
 
 
-const { data: defaultModelFamilyCounts } = useCachedData(dataKeys.shellModelFamilyCounts, async () => {
+const { data: defaultModelFamilyCounts } = useAsyncData(dataKeys.shellModelFamilyCounts, async () => {
   const counts = await api.models.familyCounts();
   return normalizeModelFamilyCounts(counts);
 }, {
@@ -339,22 +338,6 @@ function applyPointsBalance(balance: number) {
   me.value = { ...me.value, points: { balance } };
 }
 
-function schedulePrefetch() {
-  const run = () => prefetch();
-  if (!import.meta.client || typeof window === "undefined") return;
-
-  if ("requestIdleCallback" in window) {
-    window.requestIdleCallback(run, { timeout: 3000 });
-    return;
-  }
-
-  setTimeout(run, 1500);
-}
-
-onMounted(() => {
-  schedulePrefetch();
-});
-
 onBeforeUnmount(() => {
   resetMobileSidebarSwipe();
 });
@@ -368,7 +351,6 @@ async function handleSignOut() {
   }
 
   await endSession();
-  clearDataCache();
   await navigateTo("/");
 }
 

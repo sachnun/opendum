@@ -183,7 +183,7 @@ const REASONING_OPTIONS: Array<{ value: ReasoningEffort; label: string }> = [
   { value: "max", label: "Max" },
 ];
 
-const { data, error } = useCachedData(dataKeys.playgroundOptions, () => api.playground.options());
+const { data, error } = useAsyncData(dataKeys.playgroundOptions, () => api.playground.options());
 watch(data, (value) => {
   if (value && !value.hasAnyProviderAccount) void navigateTo("/", { replace: true });
 }, { immediate: true });
