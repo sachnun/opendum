@@ -1,0 +1,36 @@
+{
+  "providers": [
+    "harbor"
+  ],
+  "reasoning": true,
+  "reasoning_effort": [
+    "low",
+    "high",
+    "max"
+  ],
+  "modalities": {
+    "input": [
+      "image",
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 1048576,
+    "output": 262144
+  },
+  "cost": {
+    "input": 0.05,
+    "output": 3,
+    "cacheRead": 0.015,
+    "cacheWrite": 0.45
+  },
+  "providerConfig": {
+    "harbor": {
+      "contextWindow": 1048576,
+      "maxOutputTokens": 262144
+    }
+  }
+}

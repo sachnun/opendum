@@ -20,8 +20,8 @@
     "output": 65536
   },
   "cost": {
-    "input": 1.4,
-    "output": 2,
+    "input": 1.35,
+    "output": 2.1,
     "cacheRead": 0.14
   },
   "scores": {

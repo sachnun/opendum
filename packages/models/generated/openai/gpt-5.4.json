@@ -7,8 +7,7 @@
     "low",
     "medium",
     "high",
-    "xhigh",
-    "max"
+    "xhigh"
   ],
   "modalities": {
     "input": [
@@ -17,6 +16,7 @@
       "text"
     ],
     "output": [
+      "image",
       "text"
     ]
   },
