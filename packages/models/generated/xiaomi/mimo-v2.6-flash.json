@@ -24,7 +24,7 @@
     ]
   },
   "limit": {
-    "context": 1048576,
+    "context": 1050000,
     "output": 131072
   },
   "cost": {
@@ -41,12 +41,12 @@
   "providerConfig": {
     "cline": {
       "upstream": "cline-free/mimo-v2.6-flash",
-      "contextWindow": 1048576,
+      "contextWindow": 1050000,
       "maxOutputTokens": 131072
     },
     "harbor": {
       "upstream": "mimo-v2.6-flash:free",
-      "contextWindow": 1048576,
+      "contextWindow": 1050000,
       "maxOutputTokens": 131072
     },
     "opencode": {

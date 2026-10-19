@@ -1,0 +1,69 @@
+{
+  "providers": [
+    "cline",
+    "kilo_code",
+    "opencode",
+    "openrouter",
+    "perch"
+  ],
+  "reasoning": true,
+  "reasoning_effort": [
+    "low",
+    "medium",
+    "high",
+    "xhigh",
+    "max"
+  ],
+  "modalities": {
+    "input": [
+      "image",
+      "text",
+      "video"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 1000000,
+    "output": 524288
+  },
+  "cost": {
+    "input": 0,
+    "output": 0,
+    "cacheRead": 0
+  },
+  "scores": {
+    "artificialAnalysis": {
+      "index": 42.4,
+      "estimated": false
+    }
+  },
+  "providerConfig": {
+    "cline": {
+      "upstream": "cline-free/minimax-m3.1-flash",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 524288
+    },
+    "kilo_code": {
+      "upstream": "minimax/minimax-m3.1-flash:free",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 524288
+    },
+    "opencode": {
+      "upstream": "minimax-m3.1-flash-free",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 512000
+    },
+    "openrouter": {
+      "upstream": "minimax/minimax-m3.1-flash:free",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 524288
+    },
+    "perch": {
+      "upstream": "minimax-m3.1-flash-starter",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 524288
+    }
+  }
+}

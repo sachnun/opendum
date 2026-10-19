@@ -6,8 +6,6 @@
   ],
   "reasoning": true,
   "reasoning_effort": [
-    "low",
-    "medium",
     "high"
   ],
   "modalities": {
@@ -25,8 +23,7 @@
   "cost": {
     "input": 0.45,
     "output": 0.9,
-    "cacheRead": 0.045,
-    "cacheWrite": 0.5
+    "cacheRead": 0.045
   },
   "providerConfig": {
     "kilo_code": {
@@ -41,7 +38,7 @@
     },
     "perch": {
       "upstream": "laguna-s",
-      "contextWindow": 1000000,
+      "contextWindow": 1048576,
       "maxOutputTokens": 131072
     }
   }

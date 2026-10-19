@@ -17,9 +17,7 @@
     "input": [
       "audio",
       "image",
-      "pdf",
-      "text",
-      "video"
+      "text"
     ],
     "output": [
       "text"
@@ -27,13 +25,13 @@
   },
   "limit": {
     "context": 1048576,
-    "output": 65536
+    "output": 65535
   },
   "cost": {
     "input": 3.75,
     "output": 18.75,
     "cacheRead": 0.375,
-    "cacheWrite": 0.208333
+    "cacheWrite": 0.19
   },
   "scores": {
     "artificialAnalysis": {
@@ -45,7 +43,7 @@
     "antigravity": {
       "upstream": "gemini-3.6-flash-medium",
       "contextWindow": 1048576,
-      "maxOutputTokens": 65536
+      "maxOutputTokens": 65535
     }
   }
 }

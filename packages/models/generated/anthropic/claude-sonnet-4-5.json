@@ -28,7 +28,7 @@
   },
   "limit": {
     "context": 200000,
-    "output": 64000
+    "output": 16384
   },
   "cost": {
     "input": 15,
@@ -46,7 +46,7 @@
     "kiro": {
       "upstream": "claude-sonnet-4.5-1m",
       "contextWindow": 200000,
-      "maxOutputTokens": 64000
+      "maxOutputTokens": 16384
     }
   }
 }

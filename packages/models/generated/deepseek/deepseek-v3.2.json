@@ -7,6 +7,11 @@
     "deepseek-ai/DeepSeek-V3.2-Exp"
   ],
   "reasoning": true,
+  "reasoning_effort": [
+    "low",
+    "medium",
+    "high"
+  ],
   "modalities": {
     "input": [
       "text"
@@ -20,7 +25,7 @@
     "output": 65536
   },
   "cost": {
-    "input": 1.35,
+    "input": 1.4,
     "output": 2.1,
     "cacheRead": 0.14
   },
