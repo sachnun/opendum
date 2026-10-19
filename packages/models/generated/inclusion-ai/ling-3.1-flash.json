@@ -18,11 +18,11 @@
   },
   "limit": {
     "context": 262144,
-    "output": 32768
+    "output": 262144
   },
   "cost": {
     "input": 0.375,
-    "output": 1.1,
+    "output": 1.125,
     "cacheRead": 0.075
   },
   "scores": {
@@ -35,7 +35,7 @@
     "zenmux": {
       "upstream": "inclusionai/ling-3.1-flash",
       "contextWindow": 262144,
-      "maxOutputTokens": 32768
+      "maxOutputTokens": 262144
     }
   }
 }

@@ -24,7 +24,7 @@
   },
   "limit": {
     "context": 1048576,
-    "output": 1048576
+    "output": 943718
   },
   "cost": {
     "input": 20,
@@ -35,7 +35,7 @@
     "zenmux": {
       "upstream": "meta/muse-wonder-1.0",
       "contextWindow": 1048576,
-      "maxOutputTokens": 1048576
+      "maxOutputTokens": 943718
     }
   }
 }

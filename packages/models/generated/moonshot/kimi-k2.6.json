@@ -16,7 +16,7 @@
   },
   "limit": {
     "context": 262144,
-    "output": 16384
+    "output": 262144
   },
   "cost": {
     "input": 3.25,
@@ -33,11 +33,11 @@
     "nvidia_nim": {
       "upstream": "moonshotai/kimi-k2.6",
       "contextWindow": 262144,
-      "maxOutputTokens": 16384
+      "maxOutputTokens": 262144
     },
     "workbuddy": {
       "contextWindow": 262144,
-      "maxOutputTokens": 16384
+      "maxOutputTokens": 262144
     }
   }
 }

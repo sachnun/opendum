@@ -22,9 +22,9 @@
     "output": 131072
   },
   "cost": {
-    "input": 3.75,
-    "output": 14.75,
-    "cacheRead": 0.075
+    "input": 1.5,
+    "output": 6,
+    "cacheRead": 0.03
   },
   "providerConfig": {
     "opencode": {

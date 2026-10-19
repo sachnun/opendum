@@ -16,12 +16,12 @@
   },
   "limit": {
     "context": 202752,
-    "output": 16384
+    "output": 131072
   },
   "cost": {
-    "input": 3,
-    "output": 10.4,
-    "cacheRead": 0.6,
+    "input": 5,
+    "output": 16,
+    "cacheRead": 1,
     "cacheWrite": 0
   },
   "scores": {
@@ -33,7 +33,7 @@
   "providerConfig": {
     "kiro": {
       "contextWindow": 202752,
-      "maxOutputTokens": 16384
+      "maxOutputTokens": 131072
     }
   }
 }
