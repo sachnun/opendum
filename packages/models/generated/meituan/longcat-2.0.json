@@ -19,8 +19,8 @@
     ]
   },
   "limit": {
-    "context": 1048756,
-    "output": 262144
+    "context": 1049000,
+    "output": 131072
   },
   "cost": {
     "input": 1.5,
@@ -36,8 +36,8 @@
   "providerConfig": {
     "zenmux": {
       "upstream": "meituan/longcat-2.0",
-      "contextWindow": 1048756,
-      "maxOutputTokens": 262144
+      "contextWindow": 1049000,
+      "maxOutputTokens": 131072
     }
   }
 }

@@ -25,14 +25,14 @@
     ]
   },
   "limit": {
-    "context": 200000,
+    "context": 192000,
     "output": 64000
   },
   "cost": {
-    "input": 5,
-    "output": 25,
-    "cacheRead": 0.5,
-    "cacheWrite": 6.25
+    "input": 4.25,
+    "output": 21.5,
+    "cacheRead": 0.425,
+    "cacheWrite": 5.5
   },
   "scores": {
     "artificialAnalysis": {
@@ -43,7 +43,7 @@
   "providerConfig": {
     "kiro": {
       "upstream": "claude-haiku-4.5",
-      "contextWindow": 200000,
+      "contextWindow": 192000,
       "maxOutputTokens": 64000
     }
   }

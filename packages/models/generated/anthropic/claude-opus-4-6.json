@@ -28,14 +28,14 @@
     ]
   },
   "limit": {
-    "context": 1000000,
+    "context": 983040,
     "output": 128000
   },
   "cost": {
-    "input": 25,
-    "output": 125,
-    "cacheRead": 2.5,
-    "cacheWrite": 31.25
+    "input": 21.5,
+    "output": 105,
+    "cacheRead": 2.15,
+    "cacheWrite": 26.5
   },
   "scores": {
     "artificialAnalysis": {
@@ -46,12 +46,12 @@
   "providerConfig": {
     "antigravity": {
       "upstream": "claude-opus-4-6-thinking",
-      "contextWindow": 1000000,
+      "contextWindow": 983040,
       "maxOutputTokens": 128000
     },
     "kiro": {
       "upstream": "claude-opus-4.6-1m",
-      "contextWindow": 1000000,
+      "contextWindow": 983040,
       "maxOutputTokens": 128000
     }
   }

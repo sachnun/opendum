@@ -27,14 +27,14 @@
     ]
   },
   "limit": {
-    "context": 200000,
-    "output": 64000
+    "context": 983040,
+    "output": 128000
   },
   "cost": {
-    "input": 15,
-    "output": 75,
-    "cacheRead": 1.5,
-    "cacheWrite": 18.75
+    "input": 13,
+    "output": 65,
+    "cacheRead": 1.3,
+    "cacheWrite": 16
   },
   "scores": {
     "artificialAnalysis": {
@@ -45,13 +45,13 @@
   "providerConfig": {
     "antigravity": {
       "upstream": "claude-sonnet-4-6",
-      "contextWindow": 200000,
-      "maxOutputTokens": 64000
+      "contextWindow": 983040,
+      "maxOutputTokens": 128000
     },
     "kiro": {
       "upstream": "claude-sonnet-4.6-1m",
-      "contextWindow": 200000,
-      "maxOutputTokens": 64000
+      "contextWindow": 983040,
+      "maxOutputTokens": 128000
     }
   }
 }

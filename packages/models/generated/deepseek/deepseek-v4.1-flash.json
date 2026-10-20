@@ -46,7 +46,7 @@
   "providerConfig": {
     "harbor": {
       "upstream": "deepseek-v4.1-flash:free",
-      "contextWindow": 1048576,
+      "contextWindow": 1000000,
       "maxOutputTokens": 384000
     },
     "hyper": {
@@ -61,11 +61,11 @@
     },
     "perch": {
       "upstream": "deepseek-flash-starter",
-      "contextWindow": 1048576,
+      "contextWindow": 1000000,
       "maxOutputTokens": 384000
     },
     "workbuddy": {
-      "contextWindow": 1048576,
+      "contextWindow": 1000000,
       "maxOutputTokens": 384000
     },
     "zenmux": {
