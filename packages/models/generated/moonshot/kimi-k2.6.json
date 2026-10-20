@@ -6,9 +6,7 @@
   "reasoning": true,
   "modalities": {
     "input": [
-      "image",
-      "text",
-      "video"
+      "text"
     ],
     "output": [
       "text"
@@ -16,7 +14,7 @@
   },
   "limit": {
     "context": 262144,
-    "output": 32768
+    "output": 262144
   },
   "cost": {
     "input": 3.25,
@@ -33,11 +31,11 @@
     "nvidia_nim": {
       "upstream": "moonshotai/kimi-k2.6",
       "contextWindow": 262144,
-      "maxOutputTokens": 32768
+      "maxOutputTokens": 262144
     },
     "workbuddy": {
       "contextWindow": 262144,
-      "maxOutputTokens": 32768
+      "maxOutputTokens": 262144
     }
   }
 }

@@ -1,6 +1,5 @@
 {
   "providers": [
-    "kilo_code",
     "openrouter"
   ],
   "reasoning": true,
@@ -8,6 +7,7 @@
     "low",
     "medium",
     "high",
+    "xhigh",
     "max"
   ],
   "modalities": {
@@ -36,11 +36,6 @@
     }
   },
   "providerConfig": {
-    "kilo_code": {
-      "upstream": "thinkingmachines/inkling-small:free",
-      "contextWindow": 524288,
-      "maxOutputTokens": 262144
-    },
     "openrouter": {
       "upstream": "thinkingmachines/inkling-small:free",
       "contextWindow": 524288,

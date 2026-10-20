@@ -12,7 +12,6 @@
     "input": [
       "audio",
       "image",
-      "pdf",
       "text",
       "video"
     ],

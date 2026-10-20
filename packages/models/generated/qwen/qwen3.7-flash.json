@@ -23,10 +23,10 @@
     "output": 64000
   },
   "cost": {
-    "input": 0.141,
-    "output": 0.564,
-    "cacheRead": 0.0282,
-    "cacheWrite": 0.17625
+    "input": 0.15,
+    "output": 0.65,
+    "cacheRead": 0.03,
+    "cacheWrite": 0.19
   },
   "providerConfig": {
     "hyper": {
@@ -35,8 +35,8 @@
     },
     "zenmux": {
       "upstream": "qwen/qwen3.7-flash",
-      "contextWindow": 991000,
-      "maxOutputTokens": 64000
+      "contextWindow": 1000000,
+      "maxOutputTokens": 50000
     }
   }
 }
