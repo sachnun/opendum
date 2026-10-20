@@ -26,6 +26,8 @@ describe("proxy config", () => {
     expect(config.redisUrl).toBe(env.REDIS_URL);
     expect(config.betterAuthSecret).toBe(env.BETTER_AUTH_SECRET);
     expect(config.requestTimeoutMs).toBe(90 * 1000);
+    expect(config.streamTimeoutMs).toBe(60 * 1000);
+    expect(config.streamHeartbeatMs).toBe(15 * 1000);
   });
 
   it("disables the token refresh loop outside production", async () => {

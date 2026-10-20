@@ -5,11 +5,15 @@ export type ProxyConfig = {
   redisUrl: string;
   betterAuthSecret: string;
   requestTimeoutMs: number;
+  streamTimeoutMs: number;
+  streamHeartbeatMs: number;
   tokenRefreshIntervalMs: number;
 };
 
 const TOKEN_REFRESH_INTERVAL_MS = 600 * 1000;
 const REQUEST_TIMEOUT_MS = 90 * 1000;
+const STREAM_TIMEOUT_MS = 60 * 1000;
+const STREAM_HEARTBEAT_MS = 15 * 1000;
 
 const nodeEnv = Config.Literals(["development", "test", "production"], "NODE_ENV").pipe(
   Config.withDefault("development")
@@ -25,6 +29,8 @@ export const proxyConfig: Config.Config<ProxyConfig> = Config.all({
     ({ nodeEnv, ...rest }): ProxyConfig => ({
       ...rest,
       requestTimeoutMs: REQUEST_TIMEOUT_MS,
+      streamTimeoutMs: STREAM_TIMEOUT_MS,
+      streamHeartbeatMs: STREAM_HEARTBEAT_MS,
       tokenRefreshIntervalMs: nodeEnv === "production" ? TOKEN_REFRESH_INTERVAL_MS : 0,
     })
   )

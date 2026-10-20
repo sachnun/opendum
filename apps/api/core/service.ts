@@ -17,6 +17,7 @@ import {
   type RefreshedCredentials,
 } from "@opendum/providers";
 import { cloneMap, numberAsInt, sleep, tryAsync, trySync, trySyncResult } from "./helpers.js";
+import { HeadersTimeout, HEADERS_TIMEOUT_MESSAGE } from "./upstream-timeout.js";
 import {
   accountAccessDenial,
   accountNeedsCredentialRefresh,
@@ -92,6 +93,8 @@ export type ProxyServiceOptions = {
   providers: ProviderRegistry;
   betterAuthSecret: string;
   requestTimeoutMs: number;
+  streamTimeoutMs?: number;
+  streamHeartbeatMs?: number;
   events?: ProxyEvents;
 };
 
@@ -120,6 +123,8 @@ export class ProxyService implements StreamRecorder {
   private readonly providers: ProviderRegistry;
   private readonly secret: string;
   private readonly requestTimeoutMs: number;
+  private readonly streamTimeoutMs: number;
+  private readonly streamHeartbeatMs: number;
   private readonly repositories: Repositories;
   private readonly rotation: Rotation;
   private readonly performance: ProviderPerformance;
@@ -135,6 +140,8 @@ export class ProxyService implements StreamRecorder {
     this.providers = options.providers;
     this.secret = options.betterAuthSecret;
     this.requestTimeoutMs = options.requestTimeoutMs;
+    this.streamTimeoutMs = options.streamTimeoutMs ?? options.requestTimeoutMs;
+    this.streamHeartbeatMs = options.streamHeartbeatMs ?? 0;
     this.repositories = { ...repositories(options.database), ...options.repositories };
     this.performance = new ProviderPerformance(options.redis);
     this.health = new Health({
@@ -284,6 +291,7 @@ export class ProxyService implements StreamRecorder {
         apiKeyId: authResult.apiKeyId,
         model: validation.model,
         usage: { inputTokens: 0, outputTokens: 0, cachedTokens: 0, cacheWriteTokens: 0 },
+        heartbeatMs: this.streamHeartbeatMs,
       };
 
       if (parsedRequest.stream) {
@@ -874,23 +882,68 @@ export class ProxyService implements StreamRecorder {
       sessionId,
       requestId,
     });
-    const response = !stream && this.requestTimeoutMs > 0
-      ? await Effect.runPromise(
-          request.pipe(
-            Effect.timeoutOrElse({
-              duration: this.requestTimeoutMs,
-              orElse: () => Effect.fail(new Error("upstream request timed out")),
-            }),
-            Effect.withSpan("ProxyService.providerRequest", {
-              attributes: { provider: account.provider, accountId: account.id },
-            })
-          )
-        )
-      : await Effect.runPromise(request);
+    const response = stream
+      ? await this.runStreamRequest(account, request)
+      : await this.runBufferedRequest(account, request);
     if (response.status >= 200 && response.status < 300) {
       return adaptForResponsesClient(providerImpl as unknown as { responsesNative?(model: string): boolean }, response, payload, stream);
     }
     return response;
+  }
+
+  private runBufferedRequest(
+    account: ProviderAccount,
+    request: Effect.Effect<Response, unknown>
+  ): Promise<Response> {
+    if (this.requestTimeoutMs <= 0) {
+      return Effect.runPromise(request.pipe(this.requestSpan(account)));
+    }
+    return Effect.runPromise(
+      request.pipe(
+        Effect.timeoutOrElse({
+          duration: this.requestTimeoutMs,
+          orElse: () => Effect.fail(new Error("upstream request timed out")),
+        }),
+        this.requestSpan(account)
+      )
+    );
+  }
+
+  private runStreamRequest(
+    account: ProviderAccount,
+    request: Effect.Effect<Response, unknown>
+  ): Promise<Response> {
+    if (this.streamTimeoutMs <= 0) {
+      return Effect.runPromise(request.pipe(this.requestSpan(account)));
+    }
+    return Effect.runPromise(
+      Effect.suspend(() => {
+        const timeout = new HeadersTimeout(this.streamTimeoutMs);
+        return request.pipe(
+          Effect.raceFirst(
+            Effect.callback<Response, Error>((resume) => {
+              if (timeout.signal.aborted) {
+                resume(Effect.fail(new Error(HEADERS_TIMEOUT_MESSAGE)));
+                return;
+              }
+              const onAbort = (): void => {
+                resume(Effect.fail(new Error(HEADERS_TIMEOUT_MESSAGE)));
+              };
+              timeout.signal.addEventListener("abort", onAbort, { once: true });
+              return Effect.sync(() => timeout.signal.removeEventListener("abort", onAbort));
+            })
+          ),
+          Effect.ensuring(Effect.sync(() => timeout.clear())),
+          this.requestSpan(account)
+        );
+      })
+    );
+  }
+
+  private requestSpan(account: ProviderAccount) {
+    return Effect.withSpan("ProxyService.providerRequest", {
+      attributes: { provider: account.provider, accountId: account.id },
+    });
   }
 
   private async credentialsForAccount(

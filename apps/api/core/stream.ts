@@ -1,5 +1,6 @@
 import { Cause, Effect, Exit, Result, Stream } from "effect";
 import { numberAsInt, parseJson, stringValue } from "./helpers.js";
+import { withHeartbeat } from "./heartbeat.js";
 import { SseScanner } from "./sse.js";
 import { transformOpenAIToAnthropic } from "./endpoints.js";
 import { OpenAIStreamUsageTracker, usageCacheCounts, usageFromJson, usageObject } from "./usage.js";
@@ -85,7 +86,7 @@ export async function passthroughStream(ctx: ResponseContext, recorder: StreamRe
     Stream.toReadableStream()
   );
 
-  return new Response(stream, { status: 200, headers: sseHeaders(ctx.accountId) });
+  return new Response(withHeartbeat(stream, ctx.heartbeatMs ?? 0), { status: 200, headers: sseHeaders(ctx.accountId) });
 }
 
 export async function passthroughNonStream(ctx: ResponseContext, recorder: StreamRecorder): Promise<Response> {
@@ -528,7 +529,7 @@ export async function anthropicStream(ctx: ResponseContext, recorder: StreamReco
     Stream.toReadableStream()
   );
 
-  return new Response(stream, { status: 200, headers: sseHeaders(ctx.accountId) });
+  return new Response(withHeartbeat(stream, ctx.heartbeatMs ?? 0), { status: 200, headers: sseHeaders(ctx.accountId) });
 }
 
 function joinBytes(parts: Uint8Array[]): Uint8Array {

@@ -38,7 +38,12 @@ export const ProxyContextLayer = Layer.effect(
     );
     const auth = new AuthService(models, redis);
     const egress = yield* Effect.acquireRelease(
-      Effect.sync(() => new UnroxyEgress()),
+      Effect.sync(
+        () =>
+          new UnroxyEgress({
+            headersTimeout: config.requestTimeoutMs > 0 ? config.requestTimeoutMs : undefined,
+          })
+      ),
       (value) => Effect.promise(() => value.close())
     );
     const guard = yield* Effect.acquireRelease(
@@ -74,6 +79,8 @@ export const ProxyContextLayer = Layer.effect(
       providers,
       betterAuthSecret: config.betterAuthSecret,
       requestTimeoutMs: config.requestTimeoutMs,
+      streamTimeoutMs: config.streamTimeoutMs,
+      streamHeartbeatMs: config.streamHeartbeatMs,
     });
 
     if (config.tokenRefreshIntervalMs > 0) {

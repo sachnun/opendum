@@ -47,6 +47,7 @@ export type ResponseContext = {
   request?: Request;
   tools?: unknown;
   streamHandled?: boolean;
+  heartbeatMs?: number;
   onStreamComplete?: (reason: StreamCompletion) => void;
 };
 
