@@ -32,9 +32,10 @@
     "output": 182520
   },
   "cost": {
-    "input": 2,
-    "output": 8.8,
-    "cacheRead": 0.4
+    "input": 2.5,
+    "output": 12,
+    "cacheRead": 0.6,
+    "cacheWrite": 2.5
   },
   "scores": {
     "artificialAnalysis": {
@@ -45,8 +46,8 @@
   "providerConfig": {
     "kilo_code": {
       "upstream": "nvidia/nemotron-3-ultra-550b-a55b:free",
-      "contextWindow": 202800,
-      "maxOutputTokens": 182520
+      "contextWindow": 1000000,
+      "maxOutputTokens": 65536
     },
     "nvidia_nim": {
       "upstream": "nvidia/nemotron-3-ultra-550b-a55b",

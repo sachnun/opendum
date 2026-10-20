@@ -13,7 +13,6 @@
   "modalities": {
     "input": [
       "image",
-      "pdf",
       "text"
     ],
     "output": [
@@ -21,12 +20,12 @@
     ]
   },
   "limit": {
-    "context": 1048576,
-    "output": 128000
+    "context": 200000,
+    "output": 32000
   },
   "cost": {
-    "input": 21.4645,
-    "output": 107.323,
+    "input": 25,
+    "output": 125,
     "cacheRead": 2.5,
     "cacheWrite": 31.25
   },
@@ -39,8 +38,8 @@
   "providerConfig": {
     "kiro": {
       "upstream": "claude-opus-4.8",
-      "contextWindow": 1048576,
-      "maxOutputTokens": 128000
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000
     }
   }
 }

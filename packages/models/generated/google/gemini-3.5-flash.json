@@ -17,6 +17,7 @@
   ],
   "modalities": {
     "input": [
+      "audio",
       "image",
       "text",
       "video"
@@ -26,8 +27,8 @@
     ]
   },
   "limit": {
-    "context": 1048576,
-    "output": 65536
+    "context": 1000000,
+    "output": 64000
   },
   "cost": {
     "input": 7.5,
@@ -44,12 +45,12 @@
   "providerConfig": {
     "antigravity": {
       "upstream": "gemini-3.5-flash-medium",
-      "contextWindow": 1048576,
-      "maxOutputTokens": 65536
+      "contextWindow": 1000000,
+      "maxOutputTokens": 64000
     },
     "workbuddy": {
-      "contextWindow": 1048576,
-      "maxOutputTokens": 65536
+      "contextWindow": 1000000,
+      "maxOutputTokens": 64000
     }
   }
 }

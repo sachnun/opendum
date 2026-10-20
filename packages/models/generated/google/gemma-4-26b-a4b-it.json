@@ -42,7 +42,7 @@
   },
   "limit": {
     "context": 262144,
-    "output": 262144
+    "output": 235929
   },
   "cost": {
     "input": 0.45,
@@ -57,8 +57,8 @@
     },
     "nvidia_nim": {
       "upstream": "google/gemma-4-31b-it",
-      "contextWindow": 262144,
-      "maxOutputTokens": 262144
+      "contextWindow": 256000,
+      "maxOutputTokens": 25600
     },
     "openrouter": {
       "upstream": "google/gemma-4-26b-a4b-it:free",
