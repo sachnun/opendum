@@ -8,7 +8,6 @@ export const MODEL_FAMILY_RANKING: readonly ModelFamilyRankingEntry[] = [
   { name: "Anthropic", anchorId: "anthropic-models", score: 57.6 },
   { name: "OpenAI", anchorId: "openai-models", score: 52.7 },
   { name: "Google", anchorId: "google-models", score: 52.6 },
-  { name: "Meta", anchorId: "meta-models", score: 48.1 },
   { name: "Qwen", anchorId: "qwen-models", score: 45.4 },
   { name: "Z.AI", anchorId: "z-ai-models", score: 44.8 },
   { name: "StepFun", anchorId: "step-fun-models", score: 43.7 },

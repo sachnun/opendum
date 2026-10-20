@@ -14,12 +14,10 @@
     "low",
     "medium",
     "high",
-    "xhigh",
-    "max"
+    "xhigh"
   ],
   "modalities": {
     "input": [
-      "image",
       "text"
     ],
     "output": [
@@ -27,13 +25,14 @@
     ]
   },
   "limit": {
-    "context": 250000,
-    "output": 32768
+    "context": 262144,
+    "output": 131072
   },
   "cost": {
     "input": 0.3825,
     "output": 1.275,
-    "cacheRead": 0.2125
+    "cacheRead": 0.2125,
+    "cacheWrite": 2.5
   },
   "scores": {
     "artificialAnalysis": {
@@ -44,8 +43,8 @@
   "providerConfig": {
     "nvidia_nim": {
       "upstream": "google/diffusiongemma-26b-a4b-it",
-      "contextWindow": 250000,
-      "maxOutputTokens": 32768
+      "contextWindow": 262144,
+      "maxOutputTokens": 131072
     }
   }
 }

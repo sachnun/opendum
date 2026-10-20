@@ -36,10 +36,9 @@
     "output": 524288
   },
   "cost": {
-    "input": 0,
-    "output": 0,
-    "cacheRead": 0,
-    "cacheWrite": 0
+    "input": 0.75,
+    "output": 3,
+    "cacheRead": 0.075
   },
   "scores": {
     "artificialAnalysis": {
@@ -51,7 +50,7 @@
     "cline": {
       "upstream": "cline-free/minimax-m3.1-flash",
       "contextWindow": 1000000,
-      "maxOutputTokens": 524288
+      "maxOutputTokens": 512000
     },
     "kilo_code": {
       "upstream": "minimax/minimax-m3.1-flash:free",
@@ -71,7 +70,7 @@
     "perch": {
       "upstream": "minimax-m3.1-flash-starter",
       "contextWindow": 1000000,
-      "maxOutputTokens": 524288
+      "maxOutputTokens": 512000
     }
   }
 }

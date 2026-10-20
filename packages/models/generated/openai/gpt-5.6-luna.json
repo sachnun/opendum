@@ -46,11 +46,11 @@
     },
     "kiro": {
       "contextWindow": 1050000,
-      "maxOutputTokens": 50000
+      "maxOutputTokens": 128000
     },
     "workbuddy": {
       "contextWindow": 1050000,
-      "maxOutputTokens": 50000
+      "maxOutputTokens": 128000
     },
     "zenmux": {
       "upstream": "openai/gpt-5.6-luna",

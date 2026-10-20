@@ -6,7 +6,9 @@
   "reasoning": true,
   "modalities": {
     "input": [
-      "text"
+      "image",
+      "text",
+      "video"
     ],
     "output": [
       "text"

@@ -2,10 +2,13 @@
   "providers": [
     "kilo_code",
     "openrouter",
-    "perch"
+    "perch",
+    "cline"
   ],
   "reasoning": true,
   "reasoning_effort": [
+    "low",
+    "medium",
     "high"
   ],
   "modalities": {
@@ -23,9 +26,15 @@
   "cost": {
     "input": 0.45,
     "output": 0.9,
-    "cacheRead": 0.045
+    "cacheRead": 0.045,
+    "cacheWrite": 0.5
   },
   "providerConfig": {
+    "cline": {
+      "upstream": "poolside/laguna-s-2.1-free",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 131072
+    },
     "kilo_code": {
       "upstream": "poolside/laguna-s-2.1:free",
       "contextWindow": 1048576,
@@ -38,8 +47,8 @@
     },
     "perch": {
       "upstream": "laguna-s",
-      "contextWindow": 1048576,
-      "maxOutputTokens": 32768
+      "contextWindow": 1000000,
+      "maxOutputTokens": 131072
     }
   }
 }
