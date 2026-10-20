@@ -27,6 +27,21 @@ export type Logger = (message: string, meta?: Record<string, unknown>) => void;
 const EGRESS_MAX_TRIES = 3;
 const EGRESS_FORBIDDEN_TRIES = 2;
 
+export type EgressRetryPolicy = {
+  /** Attempts for a 403, each one leaving through a fresh egress address. */
+  forbidden: number;
+  /** Attempts for a 429, which the upstream also scopes per egress address. */
+  limited: number;
+  /** Attempts for transport level failures such as a dropped connection. */
+  transport: number;
+};
+
+const DEFAULT_EGRESS_RETRY: EgressRetryPolicy = {
+  forbidden: EGRESS_FORBIDDEN_TRIES,
+  limited: EGRESS_MAX_TRIES,
+  transport: EGRESS_MAX_TRIES,
+};
+
 export function createTransport(direct: FetchLike): MutableTransport {
   const state: { egress: EgressFetch | null; ready: boolean } = {
     egress: null,
@@ -234,6 +249,7 @@ export function postWithEgressFallback(options: {
   primary: string;
   execute: (fetchFn: FetchLike, url: string) => Effect.Effect<Response, ProviderTransportFailure>;
   logger?: Logger;
+  retry?: Partial<EgressRetryPolicy>;
 }): Effect.Effect<Response, ProviderFallbackFailure> {
   const { transport, provider, primary, execute } = options;
   const router = options.state ?? new NoFallbackState();
@@ -271,11 +287,18 @@ function postEgressWithRotation(
     provider: string;
     execute: (fetchFn: FetchLike, url: string) => Effect.Effect<Response, ProviderTransportFailure>;
     logger?: Logger;
+    retry?: Partial<EgressRetryPolicy>;
   },
   primary: string,
   transport: UpstreamTransport
 ): Effect.Effect<Response, ProviderTransportFailure> {
   const egressFetch = transport.egress as EgressFetch;
+  const policy: EgressRetryPolicy = { ...DEFAULT_EGRESS_RETRY, ...options.retry };
+  const attemptsFor = (status: number): number => {
+    if (status === 403) return Math.max(1, policy.forbidden);
+    if (status === 429) return Math.max(1, policy.limited);
+    return 1;
+  };
 
   const attemptOnce = options.execute(egressFetch, primary);
 
@@ -283,8 +306,7 @@ function postEgressWithRotation(
     attemptOnce.pipe(
       Effect.flatMap((response) => {
         if (!shouldUseFallbackEndpoint(response.status)) return Effect.succeed(response);
-        const maxTries = response.status === 403 ? EGRESS_FORBIDDEN_TRIES : EGRESS_MAX_TRIES;
-        if (attempt + 1 >= maxTries) return Effect.succeed(response);
+        if (attempt + 1 >= attemptsFor(response.status)) return Effect.succeed(response);
         return Effect.promise(() => response.body?.cancel() ?? Promise.resolve()).pipe(
           Effect.flatMap(() =>
             Effect.logDebug("egress retry", {
@@ -298,7 +320,7 @@ function postEgressWithRotation(
         );
       }),
       Effect.catchTag("ProviderTransportFailure", (error) =>
-        attempt + 1 >= EGRESS_MAX_TRIES ? Effect.fail(error) : loop(attempt + 1)
+        attempt + 1 >= Math.max(1, policy.transport) ? Effect.fail(error) : loop(attempt + 1)
       )
     );
 

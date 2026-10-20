@@ -25,7 +25,8 @@ function capture(model: string, body: Record<string, unknown>, streaming = true)
   };
   const registry = {
     upstream: (name: string) => name,
-    config: () => null,
+    config: (_model: string, provider: string) =>
+      provider === "opencode" && model.includes("responses") ? { responses_api: true } : null,
   } as unknown as Registry;
   const transport: UpstreamTransport = { direct, egress: null, egressReady: () => false };
   const provider = new OpencodeProvider({ registry, transport, fallback: null });
@@ -126,5 +127,65 @@ describe("opencode free tier request contract", () => {
   it("targets the inference surface the free tier accepts", async () => {
     const captured = await capture("big-pickle", { model: "big-pickle", messages: [{ role: "user", content: "hi" }] });
     expect(captured.url).toBe("https://opencode.ai/inference/v1/chat/completions");
+  });
+
+  it("drops tool entries the upstream rejects with a 400", async () => {
+    const captured = await capture("big-pickle", {
+      model: "big-pickle",
+      messages: [{ role: "user", content: "hi" }],
+      tools: [null, {}, "read", tool("bash")],
+    });
+    expect(toolNames(captured.body)).toEqual(["read", "bash"]);
+    const tools = captured.body.tools as Array<Record<string, unknown>>;
+    for (const entry of tools) {
+      expect(entry.type).toBe("function");
+      expect(typeof (entry.function as Record<string, unknown>).name).toBe("string");
+    }
+  });
+
+  it("collapses duplicate tool names instead of letting the upstream reject them", async () => {
+    const captured = await capture("big-pickle", {
+      model: "big-pickle",
+      messages: [{ role: "user", content: "hi" }],
+      tools: [tool("read"), tool("bash"), tool("read"), tool("bash")],
+    });
+    expect(toolNames(captured.body)).toEqual(["read", "bash"]);
+  });
+
+  it("rewrites a flat tool into the nested shape the upstream accepts", async () => {
+    const captured = await capture("big-pickle", {
+      model: "big-pickle",
+      messages: [{ role: "user", content: "hi" }],
+      tools: [{ type: "function", name: "bash", parameters: { type: "object", properties: { c: { type: "string" } } } }],
+    });
+    const tools = captured.body.tools as Array<{ function: { name: string; parameters: unknown } }>;
+    expect(tools.map((entry) => entry.function.name)).toEqual(["read", "bash"]);
+    expect(tools[1]?.function.parameters).toEqual({ type: "object", properties: { c: { type: "string" } } });
+  });
+
+  it("keeps a schema supplied through input_schema", async () => {
+    const captured = await capture("big-pickle", {
+      model: "big-pickle",
+      messages: [{ role: "user", content: "hi" }],
+      tools: [{ name: "read", input_schema: { type: "object", properties: { p: { type: "string" } } } }],
+    });
+    const tools = captured.body.tools as Array<{ function: { name: string; parameters: { properties: unknown } } }>;
+    expect(tools[0]?.function.name).toBe("read");
+    expect(tools[0]?.function.parameters.properties).toEqual({ p: { type: "string" } });
+  });
+
+  it("sends the flat tool shape on the Responses surface", async () => {
+    const captured = await capture("big-pickle-responses", {
+      model: "big-pickle-responses",
+      messages: [{ role: "user", content: "hi" }],
+      tools: [tool("bash")],
+    });
+    expect(captured.url).toBe("https://opencode.ai/inference/v1/responses");
+    const tools = captured.body.tools as Array<Record<string, unknown>>;
+    expect(tools.map((entry) => entry.name)).toEqual(["read", "bash"]);
+    for (const entry of tools) {
+      expect(entry.function).toBeUndefined();
+      expect(entry.type).toBe("function");
+    }
   });
 });

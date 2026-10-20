@@ -36,8 +36,6 @@ const PUBLIC_API_KEY = "public";
 const CLIENT = "cli";
 const USER_AGENT = "opencode/1.19.3";
 const ID_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-const FINGERPRINT_TOOL_NAMES = ["bash", "edit", "glob", "grep", "read", "skill", "task", "todowrite", "webfetch", "websearch", "write"];
-const SCHEMA_REQUIRED_TOOL_NAMES = new Set(FINGERPRINT_TOOL_NAMES);
 const REQUIRED_TOOL_NAME = "read";
 const FINGERPRINT_DESCRIPTION =
   "Do not call. Reserved OpenCode fingerprint stub with no implementation; use the host application's own tools instead.";
@@ -131,20 +129,6 @@ function opencodeHeaders(body: Json): Record<string, string> {
   };
 }
 
-function toolName(raw: unknown): string {
-  const tool = (raw ?? {}) as Json;
-  const fn = (tool.function ?? {}) as Json;
-  return stringValue(fn.name) || stringValue(tool.name);
-}
-
-function hasSchema(raw: unknown): boolean {
-  const tool = (raw ?? {}) as Json;
-  const fn = (tool.function ?? {}) as Json;
-  const parameters = (fn.parameters ?? tool.parameters ?? tool.input_schema ?? tool.inputSchema) as Json | undefined;
-  const properties = parameters?.properties;
-  return Boolean(properties && typeof properties === "object" && Object.keys(properties as Json).length > 0);
-}
-
 function fingerprintTool(name: string): Json {
   return {
     type: "function",
@@ -156,20 +140,77 @@ function fingerprintTool(name: string): Json {
   };
 }
 
+function isToolObject(raw: unknown): raw is Json {
+  return raw !== null && typeof raw === "object" && !Array.isArray(raw);
+}
+
+function toolName(raw: unknown): string {
+  if (!isToolObject(raw)) return "";
+  const fn = isToolObject(raw.function) ? raw.function : {};
+  return stringValue(fn.name) || stringValue(raw.name);
+}
+
+function toolDescription(raw: unknown): string {
+  if (!isToolObject(raw)) return "";
+  const fn = isToolObject(raw.function) ? raw.function : {};
+  return stringValue(fn.description) || stringValue(raw.description);
+}
+
+function toolSchema(raw: unknown): Json | null {
+  if (!isToolObject(raw)) return null;
+  const fn = isToolObject(raw.function) ? raw.function : {};
+  for (const candidate of [fn.parameters, raw.parameters, raw.input_schema, raw.inputSchema]) {
+    if (isToolObject(candidate)) return candidate;
+  }
+  return null;
+}
+
+function toolParameters(raw: unknown): Json {
+  const schema = toolSchema(raw);
+  if (!schema) return FINGERPRINT_PARAMETERS;
+  if (!isToolObject(schema.properties) || Object.keys(schema.properties).length === 0) {
+    return FINGERPRINT_PARAMETERS;
+  }
+  return schema;
+}
+
+/**
+ * Rewrites a tool into the canonical Chat Completions shape. The upstream answers 400
+ * `function is not set` for flat or partially formed entries, so every tool the client
+ * sends is rebuilt rather than passed through.
+ */
+function canonicalTool(raw: unknown): Json {
+  const fn: Json = { name: toolName(raw), parameters: toolParameters(raw) };
+  const description = toolDescription(raw);
+  if (description) fn.description = description;
+  return { type: "function", function: fn };
+}
+
+/**
+ * Drops entries the upstream rejects with a 400 and collapses repeated names, which
+ * it rejects with `tools contains duplicate names`. The first tool with a given name
+ * wins, so the client's own declaration is preferred over an injected stub.
+ */
+function sanitizeTools(raw: unknown): Json[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const out: Json[] = [];
+  for (const entry of raw) {
+    const name = toolName(entry);
+    if (!name || seen.has(name)) continue;
+    seen.add(name);
+    out.push(canonicalTool(entry));
+  }
+  return out;
+}
+
 /**
  * Bring a Chat Completions body up to the free tier request contract: the upstream
  * answers 403 FreeTierError unless the request streams, declares at least one tool, and
  * carries a `read` tool whose `parameters.properties` is non-empty.
  */
 function ensureFingerprintTools(body: Json): void {
-  const tools = Array.isArray(body.tools) ? [...body.tools] : [];
-  for (let index = 0; index < tools.length; index += 1) {
-    const name = toolName(tools[index]);
-    if (!SCHEMA_REQUIRED_TOOL_NAMES.has(name) || hasSchema(tools[index])) continue;
-    const existing = (tools[index] ?? {}) as Json;
-    const fn = (existing.function ?? {}) as Json;
-    tools[index] = { ...existing, function: { ...fn, parameters: FINGERPRINT_PARAMETERS } };
-  }
+  const tools = sanitizeTools(body.tools);
   if (!tools.some((tool) => toolName(tool) === REQUIRED_TOOL_NAME)) {
     tools.unshift(fingerprintTool(REQUIRED_TOOL_NAME));
   }
@@ -181,14 +222,19 @@ function ensureFingerprintTools(body: Json): void {
  * streaming plus at least one flat tool with a non-empty parameter object.
  */
 function ensureResponsesFingerprintTools(body: Json): void {
-  const tools = Array.isArray(body.tools) ? [...body.tools] : [];
-  for (let index = 0; index < tools.length; index += 1) {
-    const name = toolName(tools[index]);
-    if (!SCHEMA_REQUIRED_TOOL_NAMES.has(name) || hasSchema(tools[index])) continue;
-    tools[index] = { ...(tools[index] as Json), parameters: FINGERPRINT_PARAMETERS };
-  }
-  if (!tools.some((tool) => toolName(tool) === REQUIRED_TOOL_NAME)) {
-    tools.unshift(fingerprintTool(REQUIRED_TOOL_NAME));
+  const tools = sanitizeTools(body.tools).map((tool) => {
+    const flat: Json = { type: "function", name: toolName(tool), parameters: (tool.function as Json).parameters };
+    const description = toolDescription(tool);
+    if (description) flat.description = description;
+    return flat;
+  });
+  if (!tools.some((tool) => tool.name === REQUIRED_TOOL_NAME)) {
+    tools.unshift({
+      type: "function",
+      name: REQUIRED_TOOL_NAME,
+      description: FINGERPRINT_DESCRIPTION,
+      parameters: FINGERPRINT_PARAMETERS,
+    });
   }
   body.tools = tools;
 }
@@ -339,6 +385,7 @@ export class OpencodeProvider implements Provider {
         primary,
         execute,
         logger: this.logger,
+        retry: { limited: 5 },
       });
     }
     return postExecuteWithFallback(this.transport.direct, this.fallback, "opencode", primary, fallback, execute);
