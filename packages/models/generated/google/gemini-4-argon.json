@@ -18,7 +18,8 @@
       "audio",
       "image",
       "pdf",
-      "text"
+      "text",
+      "video"
     ],
     "output": [
       "text"
@@ -26,7 +27,7 @@
   },
   "limit": {
     "context": 1048576,
-    "output": 65535
+    "output": 943718
   },
   "cost": {
     "input": 10,
@@ -44,7 +45,7 @@
     "antigravity": {
       "upstream": "gemini-4-argon-medium",
       "contextWindow": 1048576,
-      "maxOutputTokens": 65535
+      "maxOutputTokens": 943718
     }
   }
 }

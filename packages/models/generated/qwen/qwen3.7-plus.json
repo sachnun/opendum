@@ -1,6 +1,5 @@
 {
   "providers": [
-    "zenmux",
     "hyper"
   ],
   "reasoning": true,
@@ -12,8 +11,7 @@
   "modalities": {
     "input": [
       "image",
-      "text",
-      "video"
+      "text"
     ],
     "output": [
       "text"
@@ -37,11 +35,6 @@
   },
   "providerConfig": {
     "hyper": {
-      "contextWindow": 1000000,
-      "maxOutputTokens": 64000
-    },
-    "zenmux": {
-      "upstream": "qwen/qwen3.7-plus",
       "contextWindow": 1000000,
       "maxOutputTokens": 64000
     }

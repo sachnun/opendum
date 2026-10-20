@@ -13,7 +13,7 @@ export const MODEL_FAMILY_RANKING: readonly ModelFamilyRankingEntry[] = [
   { name: "Z.AI", anchorId: "z-ai-models", score: 44.8 },
   { name: "StepFun", anchorId: "step-fun-models", score: 43.7 },
   { name: "Moonshot", anchorId: "moonshot-models", score: 43.6 },
-  { name: "MiniMax", anchorId: "minimax-models", score: 42.4 },
+  { name: "MiniMax", anchorId: "minimax-models", score: 42.7 },
   { name: "InclusionAI", anchorId: "inclusion-ai-models", score: 41.1 },
   { name: "DeepSeek", anchorId: "deepseek-models", score: 39.5 },
   { name: "Xiaomi", anchorId: "xiaomi-models", score: 37.9 },

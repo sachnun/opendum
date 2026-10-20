@@ -57,8 +57,8 @@
     },
     "nvidia_nim": {
       "upstream": "google/gemma-4-31b-it",
-      "contextWindow": 262000,
-      "maxOutputTokens": 81920
+      "contextWindow": 262144,
+      "maxOutputTokens": 128000
     },
     "openrouter": {
       "upstream": "google/gemma-4-26b-a4b-it:free",

@@ -1,8 +1,7 @@
 {
   "id": "MiniMax-M3",
   "providers": [
-    "hyper",
-    "zenmux"
+    "hyper"
   ],
   "aliases": [
     "minimax-m3",
@@ -26,7 +25,7 @@
     ]
   },
   "limit": {
-    "context": 1048576,
+    "context": 512000,
     "output": 512000
   },
   "cost": {
@@ -44,11 +43,6 @@
     "hyper": {
       "upstream": "minimax-m3",
       "contextWindow": 512000,
-      "maxOutputTokens": 512000
-    },
-    "zenmux": {
-      "upstream": "minimax/minimax-m3",
-      "contextWindow": 1048576,
       "maxOutputTokens": 512000
     }
   }

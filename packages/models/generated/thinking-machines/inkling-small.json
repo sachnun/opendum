@@ -21,7 +21,7 @@
     ]
   },
   "limit": {
-    "context": 1048576,
+    "context": 524288,
     "output": 262144
   },
   "cost": {
@@ -38,7 +38,7 @@
   "providerConfig": {
     "kilo_code": {
       "upstream": "thinkingmachines/inkling-small:free",
-      "contextWindow": 1048576,
+      "contextWindow": 524288,
       "maxOutputTokens": 262144
     },
     "openrouter": {

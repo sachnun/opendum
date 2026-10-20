@@ -1,6 +1,5 @@
 {
   "providers": [
-    "zenmux",
     "hyper"
   ],
   "reasoning": true,
@@ -12,21 +11,20 @@
   "modalities": {
     "input": [
       "image",
-      "text",
-      "video"
+      "text"
     ],
     "output": [
       "text"
     ]
   },
   "limit": {
-    "context": 262144,
-    "output": 262144
+    "context": 256000,
+    "output": 16000
   },
   "cost": {
-    "input": 3.28,
-    "output": 16.5,
-    "cacheRead": 0.8
+    "input": 3.356,
+    "output": 16.75,
+    "cacheRead": 0.9
   },
   "scores": {
     "artificialAnalysis": {
@@ -38,11 +36,6 @@
     "hyper": {
       "contextWindow": 256000,
       "maxOutputTokens": 16000
-    },
-    "zenmux": {
-      "upstream": "moonshotai/kimi-k2.7-code",
-      "contextWindow": 262144,
-      "maxOutputTokens": 262144
     }
   }
 }

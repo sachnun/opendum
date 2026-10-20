@@ -28,8 +28,8 @@
   "providerConfig": {
     "kilo_code": {
       "upstream": "poolside/laguna-s-2.1:free",
-      "contextWindow": 1048576,
-      "maxOutputTokens": 131072
+      "contextWindow": 262144,
+      "maxOutputTokens": 32768
     },
     "openrouter": {
       "upstream": "poolside/laguna-s-2.1:free",
@@ -38,8 +38,8 @@
     },
     "perch": {
       "upstream": "laguna-s",
-      "contextWindow": 1048576,
-      "maxOutputTokens": 131072
+      "contextWindow": 262144,
+      "maxOutputTokens": 32768
     }
   }
 }

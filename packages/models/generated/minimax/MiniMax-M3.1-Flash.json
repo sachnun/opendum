@@ -6,6 +6,13 @@
     "openrouter",
     "perch"
   ],
+  "aliases": [
+    "cline-free-minimax-m3.1-flash",
+    "cline-free/minimax-m3.1-flash",
+    "minimax-m3.1-flash-free",
+    "minimax-minimax-m3.1-flash:free",
+    "minimax/minimax-m3.1-flash:free"
+  ],
   "reasoning": true,
   "reasoning_effort": [
     "low",
@@ -29,13 +36,13 @@
     "output": 524288
   },
   "cost": {
-    "input": 0,
-    "output": 0,
-    "cacheRead": 0
+    "input": 0.75,
+    "output": 3,
+    "cacheRead": 0.075
   },
   "scores": {
     "artificialAnalysis": {
-      "index": 42.4,
+      "index": 42.7,
       "estimated": false
     }
   },
@@ -43,7 +50,7 @@
     "cline": {
       "upstream": "cline-free/minimax-m3.1-flash",
       "contextWindow": 1000000,
-      "maxOutputTokens": 524288
+      "maxOutputTokens": 512000
     },
     "kilo_code": {
       "upstream": "minimax/minimax-m3.1-flash:free",
@@ -63,7 +70,7 @@
     "perch": {
       "upstream": "minimax-m3.1-flash-starter",
       "contextWindow": 1000000,
-      "maxOutputTokens": 524288
+      "maxOutputTokens": 512000
     }
   }
 }

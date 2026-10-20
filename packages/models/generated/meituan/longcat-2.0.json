@@ -7,6 +7,9 @@
     "longcat-2.0-free"
   ],
   "reasoning": true,
+  "reasoning_effort": [
+    "high"
+  ],
   "modalities": {
     "input": [
       "text"
