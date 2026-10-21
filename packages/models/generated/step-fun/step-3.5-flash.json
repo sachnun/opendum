@@ -2,10 +2,9 @@
   "providers": [
     "zenmux"
   ],
-  "reasoning": false,
+  "reasoning": true,
   "reasoning_effort": [
     "low",
-    "medium",
     "high"
   ],
   "modalities": {
@@ -18,7 +17,7 @@
   },
   "limit": {
     "context": 256000,
-    "output": 64000
+    "output": 256000
   },
   "cost": {
     "input": 0.5,
@@ -34,7 +33,7 @@
     "zenmux": {
       "upstream": "stepfun/step-3.5-flash",
       "contextWindow": 256000,
-      "maxOutputTokens": 64000
+      "maxOutputTokens": 256000
     }
   }
 }

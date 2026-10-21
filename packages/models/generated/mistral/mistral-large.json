@@ -13,6 +13,7 @@
   "reasoning": false,
   "modalities": {
     "input": [
+      "pdf",
       "text"
     ],
     "output": [
@@ -21,7 +22,7 @@
   },
   "limit": {
     "context": 128000,
-    "output": 8192
+    "output": 102400
   },
   "cost": {
     "input": 2.5,
@@ -38,7 +39,7 @@
     "nvidia_nim": {
       "upstream": "mistralai/mistral-large",
       "contextWindow": 128000,
-      "maxOutputTokens": 8192
+      "maxOutputTokens": 102400
     }
   }
 }

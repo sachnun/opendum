@@ -34,7 +34,7 @@
     "nvidia_nim": {
       "upstream": "poolside/laguna-xs-2.1",
       "contextWindow": 262144,
-      "maxOutputTokens": 16384
+      "maxOutputTokens": 32768
     },
     "openrouter": {
       "upstream": "poolside/laguna-xs-2.1:free",

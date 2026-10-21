@@ -20,14 +20,13 @@
     ]
   },
   "limit": {
-    "context": 1048576,
-    "output": 131072
+    "context": 1000000,
+    "output": 65536
   },
   "cost": {
     "input": 0.1705,
-    "output": 20.5,
-    "cacheRead": 0.165,
-    "cacheWrite": 0
+    "output": 22,
+    "cacheRead": 0.165
   },
   "scores": {
     "artificialAnalysis": {
@@ -41,8 +40,8 @@
       "maxOutputTokens": 32768
     },
     "workbuddy": {
-      "contextWindow": 1048576,
-      "maxOutputTokens": 131072
+      "contextWindow": 1000000,
+      "maxOutputTokens": 65536
     }
   }
 }

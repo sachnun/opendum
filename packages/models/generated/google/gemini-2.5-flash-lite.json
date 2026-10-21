@@ -3,10 +3,16 @@
     "antigravity"
   ],
   "reasoning": true,
+  "reasoning_effort": [
+    "high"
+  ],
   "modalities": {
     "input": [
+      "audio",
       "image",
-      "text"
+      "pdf",
+      "text",
+      "video"
     ],
     "output": [
       "text"
@@ -17,10 +23,10 @@
     "output": 65535
   },
   "cost": {
-    "input": 0.5,
-    "output": 2,
-    "cacheRead": 0.05,
-    "cacheWrite": 0.416667
+    "input": 0.25,
+    "output": 1,
+    "cacheRead": 0.025,
+    "cacheWrite": 0.208335
   },
   "scores": {
     "artificialAnalysis": {

@@ -8,6 +8,9 @@
     "minimax-m2.7-free"
   ],
   "reasoning": true,
+  "reasoning_effort": [
+    "high"
+  ],
   "modalities": {
     "input": [
       "text"

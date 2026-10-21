@@ -11,6 +11,9 @@
     "kimi-k2-thinking"
   ],
   "reasoning": true,
+  "reasoning_effort": [
+    "high"
+  ],
   "modalities": {
     "input": [
       "text"
@@ -24,8 +27,8 @@
     "output": 26214
   },
   "cost": {
-    "input": 2.4,
-    "output": 10,
+    "input": 3,
+    "output": 12.5,
     "cacheRead": 0.75
   },
   "scores": {

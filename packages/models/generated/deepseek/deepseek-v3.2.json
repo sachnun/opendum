@@ -8,11 +8,7 @@
   ],
   "reasoning": true,
   "reasoning_effort": [
-    "low",
-    "medium",
-    "high",
-    "xhigh",
-    "max"
+    "high"
   ],
   "modalities": {
     "input": [
@@ -23,14 +19,13 @@
     ]
   },
   "limit": {
-    "context": 163840,
-    "output": 163840
+    "context": 131072,
+    "output": 65536
   },
   "cost": {
     "input": 1.4,
     "output": 2.1,
-    "cacheRead": 0.14,
-    "cacheWrite": 1.875
+    "cacheRead": 0.14
   },
   "scores": {
     "artificialAnalysis": {
@@ -41,8 +36,8 @@
   "providerConfig": {
     "kiro": {
       "upstream": "deepseek-3.2",
-      "contextWindow": 163840,
-      "maxOutputTokens": 163840
+      "contextWindow": 131072,
+      "maxOutputTokens": 65536
     }
   }
 }

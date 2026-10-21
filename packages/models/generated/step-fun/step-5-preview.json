@@ -10,22 +10,21 @@
   "reasoning_effort": [
     "low",
     "medium",
-    "high",
-    "xhigh",
-    "max"
+    "high"
   ],
   "modalities": {
     "input": [
       "image",
-      "text"
+      "text",
+      "video"
     ],
     "output": [
       "text"
     ]
   },
   "limit": {
-    "context": 1048576,
-    "output": 1048576
+    "context": 1000000,
+    "output": 64000
   },
   "cost": {
     "input": 5,
@@ -41,8 +40,8 @@
   "providerConfig": {
     "nvidia_nim": {
       "upstream": "stepfun-ai/step-5-preview",
-      "contextWindow": 1048576,
-      "maxOutputTokens": 1048576
+      "contextWindow": 1000000,
+      "maxOutputTokens": 64000
     }
   }
 }
