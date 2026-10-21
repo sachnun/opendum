@@ -9,15 +9,16 @@
   "modalities": {
     "input": [
       "image",
-      "text"
+      "text",
+      "video"
     ],
     "output": [
       "text"
     ]
   },
   "limit": {
-    "context": 256000,
-    "output": 32000
+    "context": 131072,
+    "output": 32768
   },
   "cost": {
     "input": 0.3,
@@ -33,8 +34,8 @@
   "providerConfig": {
     "zenmux": {
       "upstream": "inclusionai/ling-3.0-flash-vl",
-      "contextWindow": 256000,
-      "maxOutputTokens": 32000
+      "contextWindow": 131072,
+      "maxOutputTokens": 32768
     }
   }
 }

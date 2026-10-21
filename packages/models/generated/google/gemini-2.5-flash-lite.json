@@ -17,13 +17,13 @@
   },
   "limit": {
     "context": 1048576,
-    "output": 65536
+    "output": 65535
   },
   "cost": {
     "input": 0.5,
     "output": 2,
     "cacheRead": 0.05,
-    "cacheWrite": 0.416667
+    "cacheWrite": 0.416665
   },
   "scores": {
     "artificialAnalysis": {
@@ -34,7 +34,7 @@
   "providerConfig": {
     "antigravity": {
       "contextWindow": 1048576,
-      "maxOutputTokens": 65536
+      "maxOutputTokens": 65535
     }
   }
 }

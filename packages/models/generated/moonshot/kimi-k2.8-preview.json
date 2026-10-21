@@ -3,9 +3,24 @@
     "workbuddy"
   ],
   "reasoning": true,
+  "reasoning_effort": [
+    "low",
+    "high",
+    "max"
+  ],
+  "modalities": {
+    "input": [
+      "image",
+      "text",
+      "video"
+    ],
+    "output": [
+      "text"
+    ]
+  },
   "limit": {
-    "context": 1000000,
-    "output": 1000000
+    "context": 1048576,
+    "output": 32768
   },
   "cost": {
     "input": 5,
@@ -15,8 +30,8 @@
   },
   "providerConfig": {
     "workbuddy": {
-      "contextWindow": 1000000,
-      "maxOutputTokens": 1000000
+      "contextWindow": 1048576,
+      "maxOutputTokens": 32768
     }
   }
 }

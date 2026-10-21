@@ -29,7 +29,7 @@
   },
   "limit": {
     "context": 1000000,
-    "output": 128000
+    "output": 50000
   },
   "cost": {
     "input": 20,
@@ -47,12 +47,12 @@
     "antigravity": {
       "upstream": "claude-opus-5-5-medium",
       "contextWindow": 1000000,
-      "maxOutputTokens": 128000
+      "maxOutputTokens": 50000
     },
     "kiro": {
       "upstream": "claude-opus-5.5",
       "contextWindow": 1000000,
-      "maxOutputTokens": 128000
+      "maxOutputTokens": 50000
     }
   }
 }

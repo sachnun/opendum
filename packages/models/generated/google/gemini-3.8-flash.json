@@ -28,7 +28,7 @@
   },
   "limit": {
     "context": 1048576,
-    "output": 65536
+    "output": 50000
   },
   "cost": {
     "input": 3.75,
@@ -46,12 +46,12 @@
     "antigravity": {
       "upstream": "gemini-3.8-flash-tiered",
       "contextWindow": 1048576,
-      "maxOutputTokens": 65536
+      "maxOutputTokens": 50000
     },
     "zenmux": {
       "upstream": "google/gemini-3.8-flash",
       "contextWindow": 1048576,
-      "maxOutputTokens": 65536
+      "maxOutputTokens": 50000
     }
   }
 }

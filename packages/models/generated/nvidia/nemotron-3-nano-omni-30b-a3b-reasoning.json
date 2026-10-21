@@ -31,7 +31,7 @@
     ]
   },
   "limit": {
-    "context": 262144,
+    "context": 256000,
     "output": 65536
   },
   "cost": {
@@ -52,7 +52,7 @@
     },
     "nvidia_nim": {
       "upstream": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
-      "contextWindow": 262144,
+      "contextWindow": 256000,
       "maxOutputTokens": 65536
     },
     "openrouter": {

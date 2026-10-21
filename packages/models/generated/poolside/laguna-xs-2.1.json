@@ -23,8 +23,7 @@
   "cost": {
     "input": 0.3,
     "output": 0.6,
-    "cacheRead": 0.15,
-    "cacheWrite": 0
+    "cacheRead": 0.15
   },
   "providerConfig": {
     "kilo_code": {
