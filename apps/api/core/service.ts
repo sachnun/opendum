@@ -42,6 +42,8 @@ import {
 import { upsertErrorHistory } from "./error-history.js";
 import {
   accountRotations,
+  modelSaturationHolds,
+  modelSaturationWaits,
   proxyRequestFailures,
   proxyRequests,
   requestDuration,
@@ -59,6 +61,13 @@ import {
   type PointReservation,
 } from "./points.js";
 import { Health, MAX_ERROR_LEN } from "./health.js";
+import {
+  ModelSaturation,
+  SATURATION_MAX_RETRIES,
+  SATURATION_MAX_WAIT_MS,
+  isModelSaturated,
+  type ModelSaturationOptions,
+} from "./model-saturation.js";
 import { Rotation } from "./rotation.js";
 import { Playground } from "./playground.js";
 import { Roaming } from "./roaming.js";
@@ -96,6 +105,7 @@ export type ProxyServiceOptions = {
   streamTimeoutMs?: number;
   streamHeartbeatMs?: number;
   events?: ProxyEvents;
+  saturation?: ModelSaturationOptions;
 };
 
 type AccountErrorContext = {
@@ -132,6 +142,7 @@ export class ProxyService implements StreamRecorder {
   private readonly usage: Usage;
   private readonly roaming: Roaming;
   private readonly playground: Playground;
+  private readonly saturation: ModelSaturation;
 
   constructor(options: ProxyServiceOptions) {
     this.redis = options.redis;
@@ -171,6 +182,7 @@ export class ProxyService implements StreamRecorder {
       events: options.events ?? proxyEvents,
     });
     this.playground = new Playground(options.betterAuthSecret);
+    this.saturation = new ModelSaturation(options.redis, options.saturation);
   }
 
   handle(
@@ -602,10 +614,15 @@ export class ProxyService implements StreamRecorder {
       let lastFailure: RouteError | null = null;
       let delayedFinalFailure: { account: ProviderAccount; statusCode: number; message: string } | null = null;
       let accountConfigured = false;
+      let saturationRetries = 0;
+      let retryAccount: ProviderAccount | null = null;
+      let pendingReservation: PointReservation | null = null;
 
       for (;;) {
-        let account: ProviderAccount | null = forced;
-        let roaming: PointReservation | null = null;
+        let account: ProviderAccount | null = retryAccount ?? forced;
+        retryAccount = null;
+        let roaming: PointReservation | null = pendingReservation;
+        pendingReservation = null;
         if (!account) {
           const selection = yield* this.rotation.nextAccount(
             authResult,
@@ -654,7 +671,7 @@ export class ProxyService implements StreamRecorder {
           return { status: 503, message: "No available accounts for this request.", type: "api_error" };
         }
 
-        if (useShared && !forced) {
+        if (useShared && !forced && !roaming) {
           const reserved = yield* Effect.promise(() =>
             this.roaming.reserve(authResult.userId, validation.model)
           );
@@ -669,8 +686,11 @@ export class ProxyService implements StreamRecorder {
           roaming = reserved;
         }
 
-        if (useShared) sharedTried.push(account.id);
-        else tried.push(account.id);
+        if (useShared) {
+          if (!sharedTried.includes(account.id)) sharedTried.push(account.id);
+        } else if (!tried.includes(account.id)) {
+          tried.push(account.id);
+        }
 
         const payload = cfg.build(parsed, validation.model, parsed.stream, sessionId);
         if (validation.vision === null || validation.vision === undefined) {
@@ -681,6 +701,24 @@ export class ProxyService implements StreamRecorder {
 
         const requestStartMs = Date.now();
         let upstreamFirstResponseMs = 0;
+        const gateMs = yield* this.saturation.remaining(account.provider, validation.model);
+        if (gateMs > 0) {
+          if (gateMs <= SATURATION_MAX_WAIT_MS) {
+            yield* Metric.update(modelSaturationWaits, 1);
+            yield* Effect.promise(() => sleep(gateMs));
+          } else {
+            const retry = retryMetadata(gateMs);
+            if (roaming) yield* ignore(() => this.roaming.refund(roaming));
+            return {
+              status: 429,
+              message: `${account.provider} reports model ${validation.model} as saturated. Retry after ${retry.retryAfter ?? "a moment"}.`,
+              type: "rate_limit_error",
+              retryAfter: retry.retryAfter,
+              retryAfterMs: retry.retryAfterMs,
+              accountId: account.id,
+            };
+          }
+        }
         const request = yield* Effect.tryPromise({
           try: () =>
             this.makeProviderRequest(
@@ -739,6 +777,31 @@ export class ProxyService implements StreamRecorder {
             bodyText,
             this.errorContext(cfg, validation, parsed, account.provider)
           );
+          if (isModelSaturated(response.status, bodyText)) {
+            yield* ignore(() =>
+              this.usage.logUsage(authResult, account, validation, response.status, Date.now() - startMs)
+            );
+            yield* Metric.update(upstreamErrors, 1);
+            const holdMs = yield* this.saturation.hold(account.provider, validation.model);
+            yield* Metric.update(modelSaturationHolds, 1);
+            if (!forced && saturationRetries < SATURATION_MAX_RETRIES) {
+              saturationRetries += 1;
+              yield* Effect.promise(() => sleep(holdMs));
+              retryAccount = account;
+              pendingReservation = roaming;
+              continue;
+            }
+            if (roaming) yield* ignore(() => this.roaming.refund(roaming));
+            const retry = retryMetadata(holdMs);
+            return {
+              status: 429,
+              message: `${account.provider} reports model ${validation.model} as saturated. Retry after ${retry.retryAfter ?? "a moment"}.`,
+              type: "rate_limit_error",
+              retryAfter: retry.retryAfter,
+              retryAfterMs: retry.retryAfterMs,
+              accountId: account.id,
+            };
+          }
           if (response.status !== 408 && !badRequestFromProvider) {
             if (!forced && isAntigravityResourceExhausted(account.provider, response.status, bodyText)) {
               delayedFinalFailure = { account, statusCode: response.status, message: detailed };
@@ -798,6 +861,7 @@ export class ProxyService implements StreamRecorder {
         }
 
         if (forced) this.health.bumpRequest(account.id);
+        yield* this.saturation.clear(account.provider, validation.model);
         return {
           account,
           response,

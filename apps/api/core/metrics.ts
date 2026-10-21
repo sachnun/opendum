@@ -43,3 +43,13 @@ export const upstreamTtft = Metric.histogram("opendum_proxy_upstream_ttft_ms", {
 export const providerPerformance = Metric.gauge("opendum_proxy_provider_score", {
   description: "Latest provider routing score",
 });
+
+export const modelSaturationHolds = Metric.counter("opendum_proxy_model_saturation_holds_total", {
+  description: "Total upstream model saturation signals parked behind a shared cooldown",
+  incremental: true,
+});
+
+export const modelSaturationWaits = Metric.counter("opendum_proxy_model_saturation_waits_total", {
+  description: "Total requests that waited on a model saturation cooldown instead of rotating accounts",
+  incremental: true,
+});

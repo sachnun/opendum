@@ -251,7 +251,7 @@ function findMessage(value: unknown, depth: number): string {
   }
   if (typeof value === "object" && !Array.isArray(value)) {
     const record = value as Record<string, unknown>;
-    for (const key of ["message", "detail", "error_description", "error"]) {
+    for (const key of ["message", "msg", "detail", "error_description", "error"]) {
       const message = findMessage(record[key], depth + 1);
       if (message) return message;
     }
