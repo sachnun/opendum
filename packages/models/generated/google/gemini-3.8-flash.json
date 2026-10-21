@@ -16,9 +16,11 @@
   ],
   "modalities": {
     "input": [
+      "audio",
       "image",
       "pdf",
-      "text"
+      "text",
+      "video"
     ],
     "output": [
       "text"

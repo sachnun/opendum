@@ -13,7 +13,6 @@
   "reasoning": false,
   "modalities": {
     "input": [
-      "image",
       "text"
     ],
     "output": [
@@ -21,8 +20,8 @@
     ]
   },
   "limit": {
-    "context": 262144,
-    "output": 209715
+    "context": 128000,
+    "output": 8192
   },
   "cost": {
     "input": 2.5,
@@ -38,8 +37,8 @@
   "providerConfig": {
     "nvidia_nim": {
       "upstream": "mistralai/mistral-large",
-      "contextWindow": 262144,
-      "maxOutputTokens": 209715
+      "contextWindow": 128000,
+      "maxOutputTokens": 8192
     }
   }
 }

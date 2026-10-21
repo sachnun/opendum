@@ -20,7 +20,7 @@
     ]
   },
   "limit": {
-    "context": 1024000,
+    "context": 1048576,
     "output": 64000
   },
   "cost": {
@@ -30,7 +30,7 @@
   },
   "providerConfig": {
     "workbuddy": {
-      "contextWindow": 1024000,
+      "contextWindow": 1048576,
       "maxOutputTokens": 64000
     }
   }

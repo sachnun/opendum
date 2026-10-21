@@ -25,10 +25,10 @@
     "output": 65536
   },
   "cost": {
-    "input": 1.25,
-    "output": 7.5,
-    "cacheRead": 0.125,
-    "cacheWrite": 0.416667
+    "input": 0.625,
+    "output": 3.75,
+    "cacheRead": 0.0625,
+    "cacheWrite": 0.208335
   },
   "providerConfig": {
     "antigravity": {

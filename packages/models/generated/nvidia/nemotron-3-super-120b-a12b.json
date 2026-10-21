@@ -19,9 +19,7 @@
   "reasoning_effort": [
     "low",
     "medium",
-    "high",
-    "xhigh",
-    "max"
+    "high"
   ],
   "modalities": {
     "input": [
@@ -32,13 +30,13 @@
     ]
   },
   "limit": {
-    "context": 1000000,
+    "context": 262144,
     "output": 256000
   },
   "cost": {
     "input": 0.4,
     "output": 2.25,
-    "cacheRead": 0.75
+    "cacheRead": 1.5
   },
   "scores": {
     "artificialAnalysis": {
@@ -54,8 +52,8 @@
     },
     "nvidia_nim": {
       "upstream": "nvidia/nemotron-3-super-120b-a12b",
-      "contextWindow": 1000000,
-      "maxOutputTokens": 32000
+      "contextWindow": 262144,
+      "maxOutputTokens": 32768
     },
     "openrouter": {
       "upstream": "nvidia/nemotron-3-super-120b-a12b:free",
