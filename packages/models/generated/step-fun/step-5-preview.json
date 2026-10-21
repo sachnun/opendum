@@ -10,7 +10,8 @@
   "reasoning_effort": [
     "low",
     "medium",
-    "high"
+    "high",
+    "max"
   ],
   "modalities": {
     "input": [
@@ -23,13 +24,13 @@
     ]
   },
   "limit": {
-    "context": 1000000,
-    "output": 64000
+    "context": 1048576,
+    "output": 65536
   },
   "cost": {
     "input": 5,
     "output": 13.5,
-    "cacheRead": 0.5
+    "cacheRead": 0.25
   },
   "scores": {
     "artificialAnalysis": {
@@ -40,8 +41,8 @@
   "providerConfig": {
     "nvidia_nim": {
       "upstream": "stepfun-ai/step-5-preview",
-      "contextWindow": 1000000,
-      "maxOutputTokens": 64000
+      "contextWindow": 1048576,
+      "maxOutputTokens": 65536
     }
   }
 }

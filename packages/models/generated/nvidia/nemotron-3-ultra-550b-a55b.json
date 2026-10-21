@@ -15,8 +15,10 @@
   ],
   "reasoning": true,
   "reasoning_effort": [
+    "low",
     "medium",
-    "high"
+    "high",
+    "max"
   ],
   "modalities": {
     "input": [
@@ -27,7 +29,7 @@
     ]
   },
   "limit": {
-    "context": 1000000,
+    "context": 1048576,
     "output": 182520
   },
   "cost": {
@@ -49,7 +51,7 @@
     },
     "nvidia_nim": {
       "upstream": "nvidia/nemotron-3-ultra-550b-a55b",
-      "contextWindow": 1000000,
+      "contextWindow": 1048576,
       "maxOutputTokens": 65536
     },
     "openrouter": {

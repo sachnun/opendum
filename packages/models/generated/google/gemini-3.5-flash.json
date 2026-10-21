@@ -13,7 +13,8 @@
   "reasoning_effort": [
     "low",
     "medium",
-    "high"
+    "high",
+    "max"
   ],
   "modalities": {
     "input": [
@@ -29,7 +30,7 @@
   },
   "limit": {
     "context": 1048576,
-    "output": 65536
+    "output": 65535
   },
   "cost": {
     "input": 7.5,
@@ -47,11 +48,11 @@
     "antigravity": {
       "upstream": "gemini-3.5-flash-medium",
       "contextWindow": 1048576,
-      "maxOutputTokens": 65536
+      "maxOutputTokens": 65535
     },
     "workbuddy": {
       "contextWindow": 1048576,
-      "maxOutputTokens": 65536
+      "maxOutputTokens": 65535
     }
   }
 }

@@ -28,7 +28,10 @@
   ],
   "reasoning": true,
   "reasoning_effort": [
-    "high"
+    "low",
+    "medium",
+    "high",
+    "max"
   ],
   "modalities": {
     "input": [
@@ -45,9 +48,9 @@
     "output": 235929
   },
   "cost": {
-    "input": 0.21,
-    "output": 1.1,
-    "cacheRead": 0.105
+    "input": 0.35,
+    "output": 1.275,
+    "cacheRead": 0.2125
   },
   "providerConfig": {
     "hyper": {
@@ -58,7 +61,7 @@
     "nvidia_nim": {
       "upstream": "google/gemma-4-31b-it",
       "contextWindow": 262144,
-      "maxOutputTokens": 235929
+      "maxOutputTokens": 32768
     },
     "openrouter": {
       "upstream": "google/gemma-4-26b-a4b-it:free",

@@ -6,7 +6,7 @@
     "claude-haiku-4.5",
     "claude-haiku4.5"
   ],
-  "reasoning": true,
+  "reasoning": false,
   "reasoning_effort": [
     "low",
     "medium",

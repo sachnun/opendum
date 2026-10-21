@@ -5,8 +5,6 @@
   ],
   "reasoning": true,
   "reasoning_effort": [
-    "low",
-    "medium",
     "high",
     "xhigh",
     "max"
@@ -21,12 +19,13 @@
   },
   "limit": {
     "context": 1000000,
-    "output": 65536
+    "output": 131072
   },
   "cost": {
     "input": 0.1705,
     "output": 22,
-    "cacheRead": 0.165
+    "cacheRead": 0.165,
+    "cacheWrite": 0
   },
   "scores": {
     "artificialAnalysis": {
@@ -41,7 +40,7 @@
     },
     "workbuddy": {
       "contextWindow": 1000000,
-      "maxOutputTokens": 65536
+      "maxOutputTokens": 131072
     }
   }
 }

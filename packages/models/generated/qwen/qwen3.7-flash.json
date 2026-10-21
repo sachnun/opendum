@@ -7,7 +7,9 @@
   "reasoning_effort": [
     "low",
     "medium",
-    "high"
+    "high",
+    "xhigh",
+    "max"
   ],
   "modalities": {
     "input": [
@@ -26,7 +28,7 @@
     "input": 0.15,
     "output": 0.65,
     "cacheRead": 0.03,
-    "cacheWrite": 0.19
+    "cacheWrite": 0.1875
   },
   "providerConfig": {
     "hyper": {
@@ -35,7 +37,7 @@
     },
     "zenmux": {
       "upstream": "qwen/qwen3.7-flash",
-      "contextWindow": 1000000,
+      "contextWindow": 983616,
       "maxOutputTokens": 65536
     }
   }

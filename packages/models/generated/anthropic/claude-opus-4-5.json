@@ -6,7 +6,7 @@
     "claude-opus-4.5",
     "claude-opus4.5"
   ],
-  "reasoning": true,
+  "reasoning": false,
   "reasoning_effort": [
     "low",
     "medium",

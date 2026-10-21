@@ -2,6 +2,10 @@
   "providers": [
     "opencode"
   ],
+  "aliases": [
+    "recursive-flint-v1.0:free",
+    "recursive/flint-v1.0:free"
+  ],
   "reasoning": true,
   "reasoning_effort": [
     "low",
