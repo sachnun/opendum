@@ -2,7 +2,7 @@
   "providers": [
     "kiro"
   ],
-  "reasoning": true,
+  "reasoning": false,
   "modalities": {
     "input": [
       "text"
@@ -13,7 +13,7 @@
   },
   "limit": {
     "context": 262144,
-    "output": 16384
+    "output": 65536
   },
   "cost": {
     "input": 0.6,
@@ -29,7 +29,7 @@
   "providerConfig": {
     "kiro": {
       "contextWindow": 262144,
-      "maxOutputTokens": 16384
+      "maxOutputTokens": 65536
     }
   }
 }
