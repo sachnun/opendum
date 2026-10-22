@@ -17,10 +17,7 @@
   ],
   "reasoning": true,
   "reasoning_effort": [
-    "low",
-    "medium",
-    "high",
-    "max"
+    "high"
   ],
   "modalities": {
     "input": [
@@ -39,7 +36,8 @@
   },
   "cost": {
     "input": 0.3,
-    "output": 1.2
+    "output": 1.2,
+    "cacheRead": 1.5
   },
   "scores": {
     "artificialAnalysis": {
@@ -55,8 +53,8 @@
     },
     "nvidia_nim": {
       "upstream": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
-      "contextWindow": 131072,
-      "maxOutputTokens": 20480
+      "contextWindow": 256000,
+      "maxOutputTokens": 65536
     },
     "openrouter": {
       "upstream": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",

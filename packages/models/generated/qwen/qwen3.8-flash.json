@@ -7,7 +7,8 @@
   "reasoning_effort": [
     "low",
     "medium",
-    "high"
+    "high",
+    "xhigh"
   ],
   "modalities": {
     "input": [
@@ -20,7 +21,7 @@
   },
   "limit": {
     "context": 1000000,
-    "output": 131072
+    "output": 128000
   },
   "cost": {
     "input": 0.75,
@@ -36,7 +37,7 @@
     "zenmux": {
       "upstream": "qwen/qwen3.8-flash",
       "contextWindow": 1000000,
-      "maxOutputTokens": 131072
+      "maxOutputTokens": 50000
     }
   }
 }

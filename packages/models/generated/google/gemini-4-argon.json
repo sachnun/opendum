@@ -27,7 +27,7 @@
   },
   "limit": {
     "context": 1048576,
-    "output": 65536
+    "output": 32768
   },
   "cost": {
     "input": 10,
@@ -45,7 +45,7 @@
     "antigravity": {
       "upstream": "gemini-4-argon-medium",
       "contextWindow": 1048576,
-      "maxOutputTokens": 65536
+      "maxOutputTokens": 32768
     }
   }
 }

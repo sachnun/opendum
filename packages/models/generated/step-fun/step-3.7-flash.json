@@ -10,8 +10,7 @@
   "reasoning_effort": [
     "low",
     "medium",
-    "high",
-    "max"
+    "high"
   ],
   "modalities": {
     "input": [

@@ -39,7 +39,7 @@
   },
   "limit": {
     "context": 131072,
-    "output": 32768
+    "output": 65536
   },
   "cost": {
     "input": 0.75,
@@ -55,8 +55,8 @@
   "providerConfig": {
     "antigravity": {
       "upstream": "gpt-oss-120b-medium",
-      "contextWindow": 131072,
-      "maxOutputTokens": 32768
+      "contextWindow": 65536,
+      "maxOutputTokens": 65536
     },
     "hyper": {
       "upstream": "gpt-oss-120b",
@@ -65,8 +65,8 @@
     },
     "nvidia_nim": {
       "upstream": "openai/gpt-oss-20b",
-      "contextWindow": 131072,
-      "maxOutputTokens": 32768
+      "contextWindow": 65536,
+      "maxOutputTokens": 65536
     },
     "workers_ai": {
       "upstream": "@cf/openai/gpt-oss-120b",

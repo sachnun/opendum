@@ -1,7 +1,5 @@
 {
   "providers": [
-    "cline",
-    "opencode",
     "perch"
   ],
   "aliases": [
@@ -31,12 +29,13 @@
   },
   "limit": {
     "context": 1000000,
-    "output": 512000
+    "output": 524288
   },
   "cost": {
     "input": 0.75,
     "output": 3,
-    "cacheRead": 0.075
+    "cacheRead": 0.075,
+    "cacheWrite": 0
   },
   "scores": {
     "artificialAnalysis": {
@@ -45,20 +44,10 @@
     }
   },
   "providerConfig": {
-    "cline": {
-      "upstream": "cline-free/minimax-m3.1-flash",
-      "contextWindow": 1000000,
-      "maxOutputTokens": 128000
-    },
-    "opencode": {
-      "upstream": "minimax-m3.1-flash-free",
-      "contextWindow": 1000000,
-      "maxOutputTokens": 512000
-    },
     "perch": {
       "upstream": "minimax-m3.1-flash-starter",
       "contextWindow": 1000000,
-      "maxOutputTokens": 128000
+      "maxOutputTokens": 524288
     }
   }
 }
