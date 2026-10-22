@@ -44,7 +44,7 @@
     },
     "workbuddy": {
       "contextWindow": 1050000,
-      "maxOutputTokens": 50000
+      "maxOutputTokens": 128000
     }
   }
 }

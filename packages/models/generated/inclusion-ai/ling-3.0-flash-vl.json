@@ -19,7 +19,7 @@
     ]
   },
   "limit": {
-    "context": 131072,
+    "context": 262144,
     "output": 32768
   },
   "cost": {
@@ -36,7 +36,7 @@
   "providerConfig": {
     "zenmux": {
       "upstream": "inclusionai/ling-3.0-flash-vl",
-      "contextWindow": 131072,
+      "contextWindow": 262144,
       "maxOutputTokens": 32768
     }
   }

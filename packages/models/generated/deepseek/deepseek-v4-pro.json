@@ -33,9 +33,9 @@
     "output": 384000
   },
   "cost": {
-    "input": 3.3,
-    "output": 9.9,
-    "cacheRead": 0.11
+    "input": 2.175,
+    "output": 4.35,
+    "cacheRead": 0.018125
   },
   "scores": {
     "artificialAnalysis": {

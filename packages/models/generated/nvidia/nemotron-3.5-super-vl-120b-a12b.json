@@ -34,7 +34,7 @@
   },
   "limit": {
     "context": 1048576,
-    "output": 1048576
+    "output": 262144
   },
   "cost": {
     "input": 0.3,
@@ -50,8 +50,8 @@
   "providerConfig": {
     "cline": {
       "upstream": "cline-free/nemotron-3.5-super-vl",
-      "contextWindow": 1048576,
-      "maxOutputTokens": 1048576
+      "contextWindow": 262144,
+      "maxOutputTokens": 262144
     },
     "kilo_code": {
       "upstream": "nvidia/nemotron-3.5-super-vl:free",
@@ -60,8 +60,8 @@
     },
     "nvidia_nim": {
       "upstream": "nvidia/nemotron-3.5-super-vl-120b-a12b",
-      "contextWindow": 1048576,
-      "maxOutputTokens": 1048576
+      "contextWindow": 262144,
+      "maxOutputTokens": 262144
     },
     "opencode": {
       "upstream": "nemotron-3.5-super-vl-free",
