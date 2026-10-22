@@ -5,6 +5,7 @@
   "reasoning": true,
   "reasoning_effort": [
     "low",
+    "medium",
     "high"
   ],
   "modalities": {
@@ -22,7 +23,7 @@
   "cost": {
     "input": 0.5,
     "output": 1.5,
-    "cacheRead": 0.1
+    "cacheRead": 0.25
   },
   "scores": {
     "artificialAnalysis": {

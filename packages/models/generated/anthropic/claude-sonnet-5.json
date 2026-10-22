@@ -5,7 +5,7 @@
   "aliases": [
     "claude-sonnet-5.5"
   ],
-  "reasoning": true,
+  "reasoning": false,
   "reasoning_effort": [
     "low",
     "medium",

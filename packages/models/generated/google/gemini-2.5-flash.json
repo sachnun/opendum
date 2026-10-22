@@ -15,7 +15,6 @@
     "input": [
       "audio",
       "image",
-      "pdf",
       "text",
       "video"
     ],
@@ -29,7 +28,7 @@
   },
   "cost": {
     "input": 1.5,
-    "output": 12.495,
+    "output": 12.5,
     "cacheRead": 0.15,
     "cacheWrite": 0.416667
   },

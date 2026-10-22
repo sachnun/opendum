@@ -6,12 +6,13 @@
     "deepseek-ai-DeepSeek-V3.2-Exp",
     "deepseek-ai/DeepSeek-V3.2-Exp"
   ],
-  "reasoning": true,
+  "reasoning": false,
   "reasoning_effort": [
     "high"
   ],
   "modalities": {
     "input": [
+      "pdf",
       "text"
     ],
     "output": [
@@ -19,13 +20,13 @@
     ]
   },
   "limit": {
-    "context": 131072,
+    "context": 163000,
     "output": 65536
   },
   "cost": {
-    "input": 1.4,
-    "output": 2.1,
-    "cacheRead": 0.14
+    "input": 1.044,
+    "output": 1.548,
+    "cacheRead": 0.108
   },
   "scores": {
     "artificialAnalysis": {
@@ -36,7 +37,7 @@
   "providerConfig": {
     "kiro": {
       "upstream": "deepseek-3.2",
-      "contextWindow": 131072,
+      "contextWindow": 163000,
       "maxOutputTokens": 65536
     }
   }

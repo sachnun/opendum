@@ -8,6 +8,7 @@
     "low",
     "medium",
     "high",
+    "xhigh",
     "max"
   ],
   "modalities": {
@@ -25,9 +26,9 @@
     "output": 471859
   },
   "cost": {
-    "input": 5,
+    "input": 4.75,
     "output": 20.25,
-    "cacheRead": 0.85
+    "cacheRead": 0.8
   },
   "scores": {
     "artificialAnalysis": {

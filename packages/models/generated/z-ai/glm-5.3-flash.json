@@ -10,7 +10,6 @@
   "reasoning": true,
   "reasoning_effort": [
     "low",
-    "medium",
     "high",
     "max"
   ],
@@ -27,12 +26,12 @@
   },
   "limit": {
     "context": 1048576,
-    "output": 262144
+    "output": 131072
   },
   "cost": {
-    "input": 0.375,
-    "output": 1.25,
-    "cacheRead": 0.075
+    "input": 0.0395,
+    "output": 0.9125,
+    "cacheRead": 0.0395
   },
   "scores": {
     "artificialAnalysis": {
@@ -47,8 +46,8 @@
     },
     "nvidia_nim": {
       "upstream": "z-ai/glm-5.3-flash",
-      "contextWindow": 1000000,
-      "maxOutputTokens": 262144
+      "contextWindow": 1048576,
+      "maxOutputTokens": 131072
     },
     "opencode": {
       "upstream": "glm-5.3-flash-free",
@@ -57,12 +56,12 @@
     },
     "perch": {
       "upstream": "glm-5.3-flash-starter",
-      "contextWindow": 1000000,
-      "maxOutputTokens": 262144
+      "contextWindow": 1048576,
+      "maxOutputTokens": 131072
     },
     "workbuddy": {
-      "contextWindow": 1000000,
-      "maxOutputTokens": 262144
+      "contextWindow": 1048576,
+      "maxOutputTokens": 131072
     },
     "zenmux": {
       "upstream": "z-ai/glm-5.3-flash",

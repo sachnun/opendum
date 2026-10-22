@@ -11,7 +11,6 @@
   "reasoning": true,
   "reasoning_effort": [
     "low",
-    "medium",
     "high",
     "max"
   ],
@@ -26,11 +25,11 @@
   },
   "limit": {
     "context": 1048576,
-    "output": 262144
+    "output": 999999
   },
   "cost": {
     "input": 1.195,
-    "output": 59.68,
+    "output": 58.8,
     "cacheRead": 1.05
   },
   "scores": {
@@ -46,11 +45,11 @@
     },
     "kiro": {
       "contextWindow": 1048576,
-      "maxOutputTokens": 262144
+      "maxOutputTokens": 999999
     },
     "workbuddy": {
       "contextWindow": 1048576,
-      "maxOutputTokens": 262144
+      "maxOutputTokens": 999999
     }
   }
 }

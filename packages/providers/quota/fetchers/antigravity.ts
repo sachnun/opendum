@@ -41,7 +41,7 @@ export function fetchAntigravityQuota(
       {
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
-        "User-Agent": `antigravity/2.24.0 ${process.platform}/${process.arch}`,
+        "User-Agent": `antigravity/2.25.0 ${process.platform}/${process.arch}`,
       },
       { project: projectId }
     ).pipe(

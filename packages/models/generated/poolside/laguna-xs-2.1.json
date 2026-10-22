@@ -23,8 +23,7 @@
   "cost": {
     "input": 0.3,
     "output": 0.6,
-    "cacheRead": 0.15,
-    "cacheWrite": 0
+    "cacheRead": 0.15
   },
   "providerConfig": {
     "kilo_code": {
@@ -35,7 +34,7 @@
     "nvidia_nim": {
       "upstream": "poolside/laguna-xs-2.1",
       "contextWindow": 262144,
-      "maxOutputTokens": 32768
+      "maxOutputTokens": 16384
     },
     "openrouter": {
       "upstream": "poolside/laguna-xs-2.1:free",
