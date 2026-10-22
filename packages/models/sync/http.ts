@@ -10,6 +10,7 @@ import {
 
 export const MAX_FETCH_ATTEMPTS = 3;
 export const FETCH_TIMEOUT_MS = 20_000;
+export const FETCH_TIMEOUT_GRACE_MS = 1_000;
 export const FETCH_RETRY_BASE_DELAY_MS = 1_000;
 export const FETCH_RETRY_AFTER_CAP_MS = 30_000;
 
@@ -122,6 +123,23 @@ function requestFailure(label: string, cause: unknown, status?: number): ModelFe
   });
 }
 
+function isTimeoutCause(cause: unknown): boolean {
+  const name = (cause as { name?: string } | null)?.name;
+  return name === "TimeoutError" || name === "AbortError";
+}
+
+function timeoutFailure(
+  label: string,
+  timeout: number,
+  phase: "fetching" | "reading"
+): ModelTimeoutFailure {
+  return new ModelTimeoutFailure({
+    message: `Timed out after ${timeout}ms ${phase} ${label}`,
+    label,
+    timeoutMs: timeout,
+  });
+}
+
 export function request<T>(
   url: string,
   options: FetchOptions,
@@ -141,17 +159,8 @@ export function request<T>(
           headers,
           signal: AbortSignal.timeout(timeout),
         }),
-      catch: (cause) => {
-        const name = (cause as { name?: string } | null)?.name;
-        if (name === "TimeoutError" || name === "AbortError") {
-          return new ModelTimeoutFailure({
-            message: `Timed out after ${timeout}ms fetching ${label}`,
-            label,
-            timeoutMs: timeout,
-          });
-        }
-        return requestFailure(label, cause);
-      },
+      catch: (cause) =>
+        isTimeoutCause(cause) ? timeoutFailure(label, timeout, "fetching") : requestFailure(label, cause),
     });
 
     if (!response.ok) {
@@ -168,21 +177,17 @@ export function request<T>(
 
     return yield* Effect.tryPromise({
       try: () => Promise.resolve(decode(response)),
-      catch: (cause) => requestFailure(label, cause, response.status),
+      catch: (cause) =>
+        isTimeoutCause(cause)
+          ? timeoutFailure(label, timeout, "reading")
+          : requestFailure(label, cause, response.status),
     });
   });
 
   const bounded = attempt.pipe(
     Effect.timeoutOrElse({
-      duration: Duration.millis(timeout),
-      orElse: () =>
-        Effect.fail(
-          new ModelTimeoutFailure({
-            message: `Timed out after ${timeout}ms reading ${label}`,
-            label,
-            timeoutMs: timeout,
-          })
-        ),
+      duration: Duration.millis(timeout + FETCH_TIMEOUT_GRACE_MS),
+      orElse: () => Effect.fail(timeoutFailure(label, timeout, "reading")),
     })
   );
 

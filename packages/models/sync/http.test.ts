@@ -105,6 +105,28 @@ test("runFetchJson exposes the status on exhausted rate limits", async () => {
   ).rejects.toThrow(/Failed to fetch example \(429 Too Many Requests\)/);
 });
 
+test("runFetchText retries a body read timeout instead of failing on the status", async () => {
+  let calls = 0;
+  const payload = await withFetch(
+    async () => {
+      calls += 1;
+      if (calls === 1) {
+        const stream = new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode("<html>"));
+            setTimeout(() => controller.error(new DOMException("The operation timed out.", "TimeoutError")), 50);
+          },
+        });
+        return new Response(stream, { status: 200 });
+      }
+      return new Response("complete", { status: 200 });
+    },
+    () => runFetchText("https://example.test/page", { attempts: 2, timeout: 5_000 }),
+  );
+  expect(calls).toBe(2);
+  expect(payload).toBe("complete");
+});
+
 test("MAX_FETCH_ATTEMPTS is a sane default", () => {
   expect(MAX_FETCH_ATTEMPTS >= 2).toBeTruthy();
 });
