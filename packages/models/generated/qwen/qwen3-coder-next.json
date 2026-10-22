@@ -12,8 +12,8 @@
     ]
   },
   "limit": {
-    "context": 256000,
-    "output": 64000
+    "context": 262144,
+    "output": 65536
   },
   "cost": {
     "input": 0.6,
@@ -28,8 +28,8 @@
   },
   "providerConfig": {
     "kiro": {
-      "contextWindow": 256000,
-      "maxOutputTokens": 64000
+      "contextWindow": 262144,
+      "maxOutputTokens": 65536
     }
   }
 }

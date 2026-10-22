@@ -28,7 +28,7 @@
   },
   "limit": {
     "context": 1048576,
-    "output": 943718
+    "output": 131072
   },
   "cost": {
     "input": 1.25,
@@ -39,7 +39,7 @@
     "kilo_code": {
       "upstream": "reflection/beam-free",
       "contextWindow": 1048576,
-      "maxOutputTokens": 943718
+      "maxOutputTokens": 131072
     },
     "opencode": {
       "upstream": "beam-free",

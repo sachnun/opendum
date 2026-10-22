@@ -1,9 +1,7 @@
 {
   "providers": [
     "cline",
-    "kilo_code",
     "opencode",
-    "openrouter",
     "perch"
   ],
   "aliases": [
@@ -33,7 +31,7 @@
   },
   "limit": {
     "context": 1000000,
-    "output": 524288
+    "output": 512000
   },
   "cost": {
     "input": 0.75,
@@ -50,27 +48,17 @@
     "cline": {
       "upstream": "cline-free/minimax-m3.1-flash",
       "contextWindow": 1000000,
-      "maxOutputTokens": 512000
-    },
-    "kilo_code": {
-      "upstream": "minimax/minimax-m3.1-flash:free",
-      "contextWindow": 1000000,
-      "maxOutputTokens": 524288
+      "maxOutputTokens": 128000
     },
     "opencode": {
       "upstream": "minimax-m3.1-flash-free",
       "contextWindow": 1000000,
       "maxOutputTokens": 512000
     },
-    "openrouter": {
-      "upstream": "minimax/minimax-m3.1-flash:free",
-      "contextWindow": 1000000,
-      "maxOutputTokens": 524288
-    },
     "perch": {
       "upstream": "minimax-m3.1-flash-starter",
       "contextWindow": 1000000,
-      "maxOutputTokens": 512000
+      "maxOutputTokens": 128000
     }
   }
 }

@@ -28,7 +28,10 @@
   ],
   "reasoning": true,
   "reasoning_effort": [
-    "high"
+    "low",
+    "medium",
+    "high",
+    "max"
   ],
   "modalities": {
     "input": [
@@ -45,7 +48,7 @@
     "output": 235929
   },
   "cost": {
-    "input": 0.45,
+    "input": 0.35,
     "output": 1.5,
     "cacheRead": 0.245
   },
@@ -57,7 +60,7 @@
     },
     "nvidia_nim": {
       "upstream": "google/gemma-4-31b-it",
-      "contextWindow": 256000,
+      "contextWindow": 262144,
       "maxOutputTokens": 32768
     },
     "openrouter": {

@@ -5,6 +5,7 @@
   ],
   "reasoning": true,
   "reasoning_effort": [
+    "medium",
     "high",
     "xhigh"
   ],
@@ -37,7 +38,7 @@
       "maxOutputTokens": 32768
     },
     "workbuddy": {
-      "contextWindow": 1000000,
+      "contextWindow": 262144,
       "maxOutputTokens": 131072
     }
   }
