@@ -5,7 +5,7 @@
   "aliases": [
     "claude-sonnet-5.5"
   ],
-  "reasoning": false,
+  "reasoning": true,
   "reasoning_effort": [
     "low",
     "medium",
@@ -16,7 +16,6 @@
   "modalities": {
     "input": [
       "image",
-      "pdf",
       "text"
     ],
     "output": [
@@ -25,7 +24,7 @@
   },
   "limit": {
     "context": 1000000,
-    "output": 128000
+    "output": 64000
   },
   "cost": {
     "input": 10,
@@ -42,7 +41,7 @@
   "providerConfig": {
     "kiro": {
       "contextWindow": 1000000,
-      "maxOutputTokens": 128000
+      "maxOutputTokens": 64000
     }
   }
 }

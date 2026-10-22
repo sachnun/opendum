@@ -6,7 +6,7 @@
     "claude-haiku-4.5",
     "claude-haiku4.5"
   ],
-  "reasoning": false,
+  "reasoning": true,
   "reasoning_effort": [
     "low",
     "medium",
@@ -17,7 +17,6 @@
   "modalities": {
     "input": [
       "image",
-      "pdf",
       "text"
     ],
     "output": [

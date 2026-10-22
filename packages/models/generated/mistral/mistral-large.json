@@ -21,7 +21,7 @@
   },
   "limit": {
     "context": 128000,
-    "output": 102400
+    "output": 8192
   },
   "cost": {
     "input": 2.5,
@@ -38,7 +38,7 @@
     "nvidia_nim": {
       "upstream": "mistralai/mistral-large",
       "contextWindow": 128000,
-      "maxOutputTokens": 102400
+      "maxOutputTokens": 8192
     }
   }
 }

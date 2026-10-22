@@ -39,12 +39,12 @@
   },
   "limit": {
     "context": 131072,
-    "output": 16384
+    "output": 32768
   },
   "cost": {
-    "input": 0.75,
-    "output": 3,
-    "cacheRead": 0.375
+    "input": 0.25,
+    "output": 1.25,
+    "cacheRead": 0.25
   },
   "scores": {
     "artificialAnalysis": {
@@ -55,8 +55,8 @@
   "providerConfig": {
     "antigravity": {
       "upstream": "gpt-oss-120b-medium",
-      "contextWindow": 128000,
-      "maxOutputTokens": 16384
+      "contextWindow": 131072,
+      "maxOutputTokens": 32768
     },
     "hyper": {
       "upstream": "gpt-oss-120b",
@@ -65,8 +65,8 @@
     },
     "nvidia_nim": {
       "upstream": "openai/gpt-oss-20b",
-      "contextWindow": 128000,
-      "maxOutputTokens": 16384
+      "contextWindow": 131072,
+      "maxOutputTokens": 32768
     },
     "workers_ai": {
       "upstream": "@cf/openai/gpt-oss-120b",

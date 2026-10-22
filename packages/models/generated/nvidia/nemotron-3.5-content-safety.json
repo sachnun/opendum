@@ -22,14 +22,13 @@
   },
   "cost": {
     "input": 0.25,
-    "output": 0.75,
-    "cacheRead": 0.125
+    "output": 0.75
   },
   "providerConfig": {
     "kilo_code": {
       "upstream": "nvidia/nemotron-3.5-content-safety:free",
-      "contextWindow": 128000,
-      "maxOutputTokens": 8192
+      "contextWindow": 131072,
+      "maxOutputTokens": 117964
     },
     "openrouter": {
       "upstream": "nvidia/nemotron-3.5-content-safety:free",
