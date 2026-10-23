@@ -19,14 +19,14 @@
     "typecheck": "bun check"
   },
   "dependencies": {
-    "effect": "4.0.4",
-    "redis": "^6.1.0",
-    "undici": "^8.11.2",
-    "zod": "^4.4.3"
+    "effect": "4.0.6",
+    "redis": "^6.3.0",
+    "undici": "^8.12.3",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@types/node": "^26.1.1",
-    "tsx": "^4.23.13",
+    "@types/node": "^26.6.5",
+    "tsx": "^4.23.15",
     "typescript": "^6.0.3",
     "@types/bun": "^1.4.4"
   }
