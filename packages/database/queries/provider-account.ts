@@ -1,5 +1,7 @@
 import { and, asc, eq, inArray, isNull, lte, ne, notInArray, or, sql } from "drizzle-orm";
+import { Effect } from "effect";
 import { db, type DbExecutor } from "../client.js";
+import { tryDb } from "../errors.js";
 import {
   providerAccount,
   providerAccountDisabledModel,
@@ -17,7 +19,7 @@ export type EligibleAccountParams = {
   accountIds: string[];
 };
 
-export async function listEligibleAccounts(
+export const listEligibleAccounts = Effect.fn("db.listEligibleAccounts")(function* (
   params: EligibleAccountParams,
   database: DbExecutor = db
 ) {
@@ -37,7 +39,7 @@ export async function listEligibleAccounts(
     conditions.push(notInArray(providerAccount.id, params.accountIds));
   }
 
-  const rows = await database
+  const rows = yield* tryDb("query", () => database
     .select({
       id: providerAccount.id,
       userId: providerAccount.userId,
@@ -55,14 +57,14 @@ export async function listEligibleAccounts(
       asc(providerAccount.status),
       sql`${providerAccount.lastUsedAt} asc nulls first`,
       asc(providerAccount.createdAt)
-    );
+    ));
 
   if (params.excludeIds.length === 0) return rows;
   const excluded = new Set(params.excludeIds);
   return rows.filter((row) => !excluded.has(row.id));
-}
+});
 
-export async function listSharedEligibleAccounts(
+export const listSharedEligibleAccounts = Effect.fn("db.listSharedEligibleAccounts")(function* (
   params: Omit<EligibleAccountParams, "useWhitelist" | "useBlacklist" | "accountIds">,
   database: DbExecutor = db
 ) {
@@ -77,7 +79,7 @@ export async function listSharedEligibleAccounts(
     conditions.push(notInArray(providerAccount.provider, params.excludeProviders));
   }
 
-  const rows = await database
+  const rows = yield* tryDb("query", () => database
     .select({
       id: providerAccount.id,
       userId: providerAccount.userId,
@@ -96,20 +98,20 @@ export async function listSharedEligibleAccounts(
       asc(providerAccount.status),
       sql`${providerAccount.lastUsedAt} asc nulls first`,
       asc(providerAccount.createdAt)
-    );
+    ));
 
   if (params.excludeIds.length === 0) return rows;
   const excluded = new Set(params.excludeIds);
   return rows.filter((row) => !excluded.has(row.id));
-}
+});
 
-export async function getQuotaAccount(
+export const getQuotaAccount = Effect.fn("db.getQuotaAccount")(function* (
   id: string,
   userId: string,
   provider: string,
   database: DbExecutor = db
 ) {
-  const [row] = await database
+  const rows = yield* tryDb("query", () => database
     .select({
       id: providerAccount.id,
       userId: providerAccount.userId,
@@ -134,15 +136,16 @@ export async function getQuotaAccount(
         eq(providerAccount.provider, provider)
       )
     )
-    .limit(1);
-  return row ?? null;
-}
+    .limit(1));
+  return rows[0] ?? null;
+});
 
-export async function listExpiringRefreshableAccounts(
+export const listExpiringRefreshableAccounts = Effect.fn("db.listExpiringRefreshableAccounts")(function* (
   params: { provider: string; now: Date; expiresBefore: Date; batchLimit: number },
   database: DbExecutor = db
 ) {
-  return database
+  return yield* tryDb("query", () =>
+    database
     .select({
       id: providerAccount.id,
       userId: providerAccount.userId,
@@ -167,11 +170,12 @@ export async function listExpiringRefreshableAccounts(
       )
     )
     .orderBy(asc(providerAccount.expiresAt))
-    .limit(params.batchLimit);
-}
+    .limit(params.batchLimit)
+  );
+});
 
-export async function getAccountCredentialsByID(id: string, database: DbExecutor = db) {
-  const [row] = await database
+export const getAccountCredentialsByID = Effect.fn("db.getAccountCredentialsByID")(function* (id: string, database: DbExecutor = db) {
+  const rows = yield* tryDb("query", () => database
     .select({
       id: providerAccount.id,
       userId: providerAccount.userId,
@@ -187,18 +191,18 @@ export async function getAccountCredentialsByID(id: string, database: DbExecutor
     })
     .from(providerAccount)
     .where(eq(providerAccount.id, id))
-    .limit(1);
-  return row ?? null;
-}
+    .limit(1));
+  return rows[0] ?? null;
+});
 
-export async function getAccountOwnerUserID(id: string, database: DbExecutor = db) {
-  const [row] = await database
+export const getAccountOwnerUserID = Effect.fn("db.getAccountOwnerUserID")(function* (id: string, database: DbExecutor = db) {
+  const rows = yield* tryDb("query", () => database
     .select({ userId: providerAccount.userId })
     .from(providerAccount)
     .where(eq(providerAccount.id, id))
-    .limit(1);
-  return row?.userId ?? null;
-}
+    .limit(1));
+  return rows[0]?.userId ?? null;
+});
 
 export type RefreshedCredentials = {
   id: string;
@@ -211,11 +215,11 @@ export type RefreshedCredentials = {
   accountId: string | null;
 };
 
-export async function updateRefreshedCredentials(
+export const updateRefreshedCredentials = Effect.fn("db.updateRefreshedCredentials")(function* (
   params: RefreshedCredentials,
   database: DbExecutor = db
 ) {
-  await database
+  yield* tryDb("query", () => database
     .update(providerAccount)
     .set({
       accessToken: params.accessToken,
@@ -227,14 +231,14 @@ export async function updateRefreshedCredentials(
       accountId: params.accountId,
       updatedAt: new Date(),
     })
-    .where(eq(providerAccount.id, params.id));
-}
+    .where(eq(providerAccount.id, params.id)));
+});
 
-export async function recordAccountError(
+export const recordAccountError = Effect.fn("db.recordAccountError")(function* (
   params: { id: string; at: Date; code: number | null },
   database: DbExecutor = db
 ) {
-  await database
+  yield* tryDb("query", () => database
     .update(providerAccount)
     .set({
       errorCount: sql`${providerAccount.errorCount} + 1`,
@@ -242,43 +246,43 @@ export async function recordAccountError(
       lastErrorCode: params.code,
       updatedAt: params.at,
     })
-    .where(eq(providerAccount.id, params.id));
-}
+    .where(eq(providerAccount.id, params.id)));
+});
 
-export async function disableFailedAccount(
+export const disableFailedAccount = Effect.fn("db.disableFailedAccount")(function* (
   params: { id: string; status: string; at: Date },
   database: DbExecutor = db
 ) {
-  const result = await database
+  const result = yield* tryDb("query", () => database
     .update(providerAccount)
     .set({ isActive: false, status: params.status, statusChangedAt: params.at, updatedAt: params.at })
     .where(and(eq(providerAccount.id, params.id), eq(providerAccount.isActive, true)))
-    .returning({ id: providerAccount.id });
+    .returning({ id: providerAccount.id }));
   return result.length;
-}
+});
 
-export async function updateCodexAccountID(
+export const updateCodexAccountID = Effect.fn("db.updateCodexAccountID")(function* (
   params: { id: string; accountId: string | null },
   database: DbExecutor = db
 ) {
-  await database
+  yield* tryDb("query", () => database
     .update(providerAccount)
     .set({ accountId: params.accountId })
-    .where(eq(providerAccount.id, params.id));
-}
+    .where(eq(providerAccount.id, params.id)));
+});
 
-export async function updateAntigravityAccountInfo(
+export const updateAntigravityAccountInfo = Effect.fn("db.updateAntigravityAccountInfo")(function* (
   params: { id: string; projectId: string | null; tier: string | null; email: string | null },
   database: DbExecutor = db
 ) {
-  await database
+  yield* tryDb("query", () => database
     .update(providerAccount)
     .set({ projectId: params.projectId, tier: params.tier, email: params.email })
-    .where(eq(providerAccount.id, params.id));
-}
+    .where(eq(providerAccount.id, params.id)));
+});
 
-export async function getForcedAccount(id: string, userId: string, database: DbExecutor = db) {
-  const [row] = await database
+export const getForcedAccount = Effect.fn("db.getForcedAccount")(function* (id: string, userId: string, database: DbExecutor = db) {
+  const rows = yield* tryDb("query", () => database
     .select({
       id: providerAccount.id,
       userId: providerAccount.userId,
@@ -293,26 +297,28 @@ export async function getForcedAccount(id: string, userId: string, database: DbE
     })
     .from(providerAccount)
     .where(and(eq(providerAccount.id, id), eq(providerAccount.userId, userId)))
-    .limit(1);
-  return row ?? null;
-}
+    .limit(1));
+  return rows[0] ?? null;
+});
 
-export async function listDisabledAccountIDs(
+export const listDisabledAccountIDs = Effect.fn("db.listDisabledAccountIDs")(function* (
   params: { accountIds: string[]; models: string[] },
   database: DbExecutor = db
 ) {
   if (params.accountIds.length === 0 || params.models.length === 0) return [];
-  return database
-    .select({
-      providerAccountId: providerAccountDisabledModel.providerAccountId,
-      model: providerAccountDisabledModel.model,
-    })
-    .from(providerAccountDisabledModel)
-    .where(
-      and(
-        inArray(providerAccountDisabledModel.providerAccountId, params.accountIds),
-        inArray(providerAccountDisabledModel.model, params.models)
+  return yield* tryDb("query", () =>
+    database
+      .select({
+        providerAccountId: providerAccountDisabledModel.providerAccountId,
+        model: providerAccountDisabledModel.model,
+      })
+      .from(providerAccountDisabledModel)
+      .where(
+        and(
+          inArray(providerAccountDisabledModel.providerAccountId, params.accountIds),
+          inArray(providerAccountDisabledModel.model, params.models)
+        )
       )
-    );
-}
+  );
+});
 

@@ -1,4 +1,5 @@
 import { Effect } from "effect";
+import type { DatabaseFailure } from "@opendum/database";
 import type { UsagePort } from "./repositories.js";
 import type { AuthResult, AuthService, ModelValidationResult } from "@opendum/auth";
 import type { OpendumRedis } from "@opendum/core/redis";
@@ -79,7 +80,7 @@ export class Usage implements StreamRecorder {
   recordSuccess(params: SuccessRecord): void {
     trackWork(
       Effect.gen({ self: this }, function* () {
-        yield* Effect.promise(() => this.health.markAccountSuccess(params.accountId, params.model));
+        yield* this.health.markAccountSuccess(params.accountId, params.model).pipe(Effect.ignore);
         yield* this.performance.record({
           provider: params.provider,
           model: this.models.resolveAlias(params.model),
@@ -128,18 +129,17 @@ export class Usage implements StreamRecorder {
   }
 
   logRaw(params: UsageLog): Promise<void> {
-    return Effect.runPromise(this.writeUsageLog(params));
+    return Effect.runPromise(this.writeUsageLog(params).pipe(Effect.ignore));
   }
 
-  private writeUsageLog(params: UsageLog): Effect.Effect<void> {
+  private writeUsageLog(params: UsageLog): Effect.Effect<void, DatabaseFailure> {
     if (!params.userId || !params.model) return Effect.void;
     const providerAccountId =
       params.providerAccountId && !isSyntheticProviderAccountId(params.providerAccountId)
         ? params.providerAccountId
         : null;
     return Effect.gen({ self: this }, function* () {
-      yield* Effect.promise(() =>
-        this.usage.insertUsageLog({
+      yield* this.usage.insertUsageLog({
           id: crypto.randomUUID(),
           userId: params.userId,
           providerAccountId,
@@ -152,8 +152,7 @@ export class Usage implements StreamRecorder {
           statusCode: params.statusCode,
           duration: params.durationMs,
           createdAt: new Date(),
-        })
-      );
+        });
       this.events?.publishUsageLogged(params.userId);
       yield* this.auth.bumpVersion(params.userId);
     });

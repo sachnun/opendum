@@ -116,8 +116,10 @@ function harness(): Harness {
   } as unknown as AuthService;
 
   const repositories = fakes();
-  repositories.accounts.listEligibleAccounts.mockImplementation(async (params) =>
-    [accountRow("acc-1"), accountRow("acc-2")].filter((row) => !params.excludeIds.includes(row.id))
+  repositories.accounts.listEligibleAccounts.mockImplementation((params) =>
+    Effect.succeed(
+      [accountRow("acc-1"), accountRow("acc-2")].filter((row) => !params.excludeIds.includes(row.id))
+    )
   );
 
   const service = new ProxyService({

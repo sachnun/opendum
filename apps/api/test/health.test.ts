@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "bun:test";
+import { Effect } from "effect";
 import type { OpendumRedis } from "@opendum/core/redis";
 import type { Registry } from "@opendum/models/runtime";
 import { Health, MAX_ERROR_LEN } from "../core/health.js";
@@ -38,7 +39,9 @@ function healthService(options: Partial<Options> = {}): InstanceType<typeof Heal
 
 describe("Health", () => {
   it("inserts a model health row on the first failure", async () => {
-    const failedAt = await healthService().markAccountFailed("acc-1", "gpt-4o", 500, "upstream boom");
+    const failedAt = await Effect.runPromise(
+      healthService().markAccountFailed("acc-1", "gpt-4o", 500, "upstream boom")
+    );
     expect(failedAt).toBeInstanceOf(Date);
     expect(repositories.health.recordRequestError).toHaveBeenCalledTimes(1);
     expect(repositories.health.insertModelHealth).toHaveBeenCalledTimes(1);
@@ -49,7 +52,7 @@ describe("Health", () => {
   });
 
   it("truncates oversized error messages before storing them", async () => {
-    repositories.accounts.getAccountOwnerUserID.mockResolvedValueOnce("owner-1");
+    repositories.accounts.getAccountOwnerUserID.mockReturnValueOnce(Effect.succeed("owner-1"));
     const stored: string[] = [];
     const redis = fakeRedis({
       set: async (_key: string, value: string) => {
@@ -58,7 +61,7 @@ describe("Health", () => {
       },
     });
     const message = "x".repeat(MAX_ERROR_LEN + 50);
-    await healthService({ redis }).markAccountFailed("acc-1", "gpt-4o", 500, message);
+    await Effect.runPromise(healthService({ redis }).markAccountFailed("acc-1", "gpt-4o", 500, message));
     const entryJson = stored.find((value) => value.includes("errorMessage"));
     expect(entryJson).toBeDefined();
     const entry = JSON.parse(entryJson as string) as { errorMessage: string };
@@ -67,12 +70,12 @@ describe("Health", () => {
 
   it("puts an account into cooldown once unhealthy rows reach the threshold", async () => {
     const now = new Date();
-    repositories.health.getAccountHealthState.mockResolvedValueOnce({
+    repositories.health.getAccountHealthState.mockReturnValueOnce(Effect.succeed({
       status: "active",
       consecutiveErrors: 0,
       disabledUntil: null,
-    } as never);
-    repositories.health.listModelHealthByAccount.mockResolvedValueOnce([
+    } as never));
+    repositories.health.listModelHealthByAccount.mockReturnValueOnce(Effect.succeed([
       {
         id: "row-1",
         consecutiveErrors: 10,
@@ -84,9 +87,9 @@ describe("Health", () => {
         updatedAt: now,
         lastErrorCode: 500,
       },
-    ] as never);
+    ] as never));
 
-    const coolingDown = await healthService().refresh("acc-1", now);
+    const coolingDown = await Effect.runPromise(healthService().refresh("acc-1", now));
     expect(coolingDown).toBe(true);
     expect(repositories.health.setAccountCooldown).toHaveBeenCalledTimes(1);
   });
@@ -94,12 +97,12 @@ describe("Health", () => {
   it("marks accounts active again after failures decay", async () => {
     const now = new Date();
     const staleAt = new Date(now.getTime() - 60 * 60 * 1000);
-    repositories.health.getAccountHealthState.mockResolvedValueOnce({
+    repositories.health.getAccountHealthState.mockReturnValueOnce(Effect.succeed({
       status: "failed",
       consecutiveErrors: 2,
       disabledUntil: staleAt,
-    } as never);
-    repositories.health.listModelHealthByAccount.mockResolvedValueOnce([
+    } as never));
+    repositories.health.listModelHealthByAccount.mockReturnValueOnce(Effect.succeed([
       {
         id: "row-1",
         consecutiveErrors: 2,
@@ -111,16 +114,16 @@ describe("Health", () => {
         updatedAt: staleAt,
         lastErrorCode: 500,
       },
-    ] as never);
+    ] as never));
 
-    const coolingDown = await healthService().refresh("acc-1", now);
+    const coolingDown = await Effect.runPromise(healthService().refresh("acc-1", now));
     expect(coolingDown).toBe(false);
     expect(repositories.health.setAccountActive).toHaveBeenCalledTimes(1);
   });
 
   it("recovers a degraded model row on success", async () => {
     const now = new Date();
-    repositories.health.getModelHealth.mockResolvedValueOnce({
+    repositories.health.getModelHealth.mockReturnValueOnce(Effect.succeed({
       id: "row-1",
       consecutiveErrors: 3,
       status: "degraded",
@@ -130,20 +133,20 @@ describe("Health", () => {
       createdAt: now,
       updatedAt: now,
       lastErrorCode: 429,
-    } as never);
+    } as never));
 
-    await healthService().markAccountSuccess("acc-1", "gpt-4o");
+    await Effect.runPromise(healthService().markAccountSuccess("acc-1", "gpt-4o"));
     expect(repositories.health.markAccountSuccess).toHaveBeenCalledTimes(1);
     expect(repositories.health.updateModelHealthSuccess).toHaveBeenCalledTimes(1);
   });
 
   it("skips synthetic accounts", async () => {
-    const failedAt = await healthService().markAccountFailed("opencode", "gpt-4o", 500, "boom");
+    const failedAt = await Effect.runPromise(healthService().markAccountFailed("opencode", "gpt-4o", 500, "boom"));
     expect(failedAt).toBeInstanceOf(Date);
-    await healthService().markAccountSuccess("opencode", "gpt-4o");
+    await Effect.runPromise(healthService().markAccountSuccess("opencode", "gpt-4o"));
     expect(repositories.health.recordRequestError).toHaveBeenCalledTimes(0);
     expect(repositories.health.markAccountSuccess).toHaveBeenCalledTimes(0);
-    expect(await healthService().refresh("opencode", new Date())).toBe(false);
+    expect(await Effect.runPromise(healthService().refresh("opencode", new Date()))).toBe(false);
   });
 
   it("stores account errors in the redis error history", async () => {
@@ -154,7 +157,9 @@ describe("Health", () => {
         return "OK";
       },
     });
-    await healthService({ redis }).logAccountError("acc-1", "user-1", "gpt-4o", 429, "rate limited");
+    await Effect.runPromise(
+      healthService({ redis }).logAccountError("acc-1", "user-1", "gpt-4o", 429, "rate limited")
+    );
     expect(stored.some((value) => value.includes("rate limited"))).toBe(true);
   });
 

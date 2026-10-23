@@ -1,7 +1,9 @@
 import { and, eq, gte, lt, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { createId } from "@paralleldrive/cuid2";
+import { Effect } from "effect";
 import { db, type DbExecutor } from "../client.js";
+import { tryDb } from "../errors.js";
 import { pointTransaction, usageLog, userPointBalance } from "../schema/usage.js";
 
 export type InsertUsageLogParams = {
@@ -19,8 +21,8 @@ export type InsertUsageLogParams = {
   createdAt: Date;
 };
 
-export async function insertUsageLog(params: InsertUsageLogParams, database: DbExecutor = db) {
-  await database.insert(usageLog).values({
+export const insertUsageLog = Effect.fn("db.insertUsageLog")(function* (params: InsertUsageLogParams, database: DbExecutor = db) {
+  yield* tryDb("query", () => database.insert(usageLog).values({
     id: params.id ?? createId(),
     userId: params.userId,
     providerAccountId: params.providerAccountId,
@@ -33,44 +35,44 @@ export async function insertUsageLog(params: InsertUsageLogParams, database: DbE
     statusCode: params.statusCode,
     duration: params.duration,
     createdAt: params.createdAt,
-  });
-}
+  }));
+});
 
-export async function debitPointBalance(
+export const debitPointBalance = Effect.fn("db.debitPointBalance")(function* (
   params: { userId: string; amount: number; at: Date },
   database: DbExecutor = db
 ) {
-  const [row] = await database
+  const rows = yield* tryDb("query", () => database
     .update(userPointBalance)
     .set({ balance: sql`${userPointBalance.balance} - ${params.amount}`, updatedAt: params.at })
     .where(and(eq(userPointBalance.userId, params.userId), gte(userPointBalance.balance, params.amount)))
-    .returning({ balance: userPointBalance.balance });
-  return row?.balance ?? null;
-}
+    .returning({ balance: userPointBalance.balance }));
+  return rows[0]?.balance ?? null;
+});
 
-export async function debitPointBalanceAllowNegative(
+export const debitPointBalanceAllowNegative = Effect.fn("db.debitPointBalanceAllowNegative")(function* (
   params: { userId: string; amount: number; at: Date },
   database: DbExecutor = db
 ) {
-  const [row] = await database
+  const rows = yield* tryDb("query", () => database
     .update(userPointBalance)
     .set({ balance: sql`${userPointBalance.balance} - ${params.amount}`, updatedAt: params.at })
     .where(eq(userPointBalance.userId, params.userId))
-    .returning({ balance: userPointBalance.balance });
-  return row?.balance ?? null;
-}
+    .returning({ balance: userPointBalance.balance }));
+  return rows[0]?.balance ?? null;
+});
 
-export async function creditPointBalance(
+export const creditPointBalance = Effect.fn("db.creditPointBalance")(function* (
   params: { userId: string; amount: number; at: Date },
   database: DbExecutor = db
 ) {
-  const [row] = await database
+  const rows = yield* tryDb("query", () => database
     .update(userPointBalance)
     .set({ balance: sql`${userPointBalance.balance} + ${params.amount}`, updatedAt: params.at })
     .where(eq(userPointBalance.userId, params.userId))
-    .returning({ balance: userPointBalance.balance });
-  return row?.balance ?? null;
-}
+    .returning({ balance: userPointBalance.balance }));
+  return rows[0]?.balance ?? null;
+});
 
 export type InsertPointTransactionParams = {
   id?: string;
@@ -83,11 +85,11 @@ export type InsertPointTransactionParams = {
   createdAt: Date;
 };
 
-export async function insertPointTransaction(
+export const insertPointTransaction = Effect.fn("db.insertPointTransaction")(function* (
   params: InsertPointTransactionParams,
   database: DbExecutor = db
 ) {
-  await database.insert(pointTransaction).values({
+  yield* tryDb("query", () => database.insert(pointTransaction).values({
     id: params.id ?? createId(),
     userId: params.userId,
     amount: params.amount,
@@ -96,14 +98,14 @@ export async function insertPointTransaction(
     idempotencyKey: params.idempotencyKey,
     usageLogId: params.usageLogId,
     createdAt: params.createdAt,
-  });
-}
+  }));
+});
 
-export async function insertPointTransactionOnConflictDoNothing(
+export const insertPointTransactionOnConflictDoNothing = Effect.fn("db.insertPointTransactionOnConflictDoNothing")(function* (
   params: InsertPointTransactionParams,
   database: DbExecutor = db
 ) {
-  const result = await database
+  const result = yield* tryDb("query", () => database
     .insert(pointTransaction)
     .values({
       id: params.id ?? createId(),
@@ -116,19 +118,19 @@ export async function insertPointTransactionOnConflictDoNothing(
       createdAt: params.createdAt,
     })
     .onConflictDoNothing({ target: pointTransaction.idempotencyKey })
-    .returning({ id: pointTransaction.id });
+    .returning({ id: pointTransaction.id }));
   return result.length;
-}
+});
 
-export async function updatePointTransactionBalance(
+export const updatePointTransactionBalance = Effect.fn("db.updatePointTransactionBalance")(function* (
   params: { id: string; balanceAfter: number },
   database: DbExecutor = db
 ) {
-  await database
+  yield* tryDb("query", () => database
     .update(pointTransaction)
     .set({ balanceAfter: params.balanceAfter })
-    .where(eq(pointTransaction.id, params.id));
-}
+    .where(eq(pointTransaction.id, params.id)));
+});
 
 export type OrphanedRoamingDebitParams = {
   olderThan: Date;
@@ -142,12 +144,12 @@ export type OrphanedRoamingDebit = {
   createdAt: Date;
 };
 
-export async function listOrphanedRoamingDebits(
+export const listOrphanedRoamingDebits = Effect.fn("db.listOrphanedRoamingDebits")(function* (
   params: OrphanedRoamingDebitParams,
   database: DbExecutor = db
-): Promise<OrphanedRoamingDebit[]> {
+) {
   const settlement = alias(pointTransaction, "settlement");
-  const rows = await database
+  const rows = yield* tryDb("query", () => database
     .select({
       id: pointTransaction.id,
       userId: pointTransaction.userId,
@@ -170,20 +172,20 @@ export async function listOrphanedRoamingDebits(
       )
     )
     .orderBy(pointTransaction.createdAt)
-    .limit(params.limit);
+    .limit(params.limit));
   return rows.map((row) => ({
     id: row.id,
     userId: row.userId,
     amount: row.amount,
     createdAt: row.createdAt,
   }));
-}
+});
 
-export async function insertPointBalanceOnConflictDoNothing(
+export const insertPointBalanceOnConflictDoNothing = Effect.fn("db.insertPointBalanceOnConflictDoNothing")(function* (
   params: { userId: string; balance: number; createdAt: Date; updatedAt: Date },
   database: DbExecutor = db
 ) {
-  const result = await database
+  const result = yield* tryDb("query", () => database
     .insert(userPointBalance)
     .values({
       userId: params.userId,
@@ -192,6 +194,6 @@ export async function insertPointBalanceOnConflictDoNothing(
       updatedAt: params.updatedAt,
     })
     .onConflictDoNothing({ target: userPointBalance.userId })
-    .returning({ userId: userPointBalance.userId });
+    .returning({ userId: userPointBalance.userId }));
   return result.length;
-}
+});

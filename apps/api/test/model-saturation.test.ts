@@ -143,8 +143,8 @@ function harness(statuses: Reply[]): Harness {
   } as unknown as AuthService;
 
   const repositories = fakes();
-  repositories.accounts.listEligibleAccounts.mockImplementation(async (params) =>
-    [
+  repositories.accounts.listEligibleAccounts.mockImplementation((params) =>
+    Effect.succeed([
       {
         id: "acc-1",
         userId: "user-1",
@@ -167,7 +167,7 @@ function harness(statuses: Reply[]): Harness {
         lastUsedAt: null,
         createdAt: new Date(),
       },
-    ].filter((row) => !params.excludeIds.includes(row.id)) as never
+    ].filter((row) => !params.excludeIds.includes(row.id)) as never)
   );
 
   const service = new ProxyService({

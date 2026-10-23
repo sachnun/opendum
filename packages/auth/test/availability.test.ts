@@ -58,18 +58,18 @@ function queriesOf(options: QueryOptions = {}): {
 } {
   const calls = { disabledByUser: 0, byAccounts: 0 };
   const queries = {
-    listDisabledModelsByUser: async () => {
+    listDisabledModelsByUser: () => {
       calls.disabledByUser += 1;
-      return options.disabledByUser ?? [];
+      return Effect.succeed(options.disabledByUser ?? []);
     },
-    listActiveAccountTiers: async () => options.accounts ?? [],
-    listDisabledModelsByAccounts: async () => {
+    listActiveAccountTiers: () => Effect.succeed(options.accounts ?? []),
+    listDisabledModelsByAccounts: () => {
       calls.byAccounts += 1;
-      return calls.byAccounts === 1
-        ? options.byAccounts ?? []
-        : options.byShared ?? [];
+      return Effect.succeed(
+        calls.byAccounts === 1 ? (options.byAccounts ?? []) : (options.byShared ?? [])
+      );
     },
-    listSharedAccounts: async () => options.sharedAccounts ?? [],
+    listSharedAccounts: () => Effect.succeed(options.sharedAccounts ?? []),
   } as unknown as Queries;
   return { queries, calls };
 }

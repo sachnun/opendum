@@ -10,7 +10,9 @@
     "./schema": "./schema/index.ts",
     "./relations": "./relations.ts",
     "./queries": "./queries/index.ts",
-    "./repositories": "./repositories/index.ts"
+    "./repositories": "./repositories/index.ts",
+    "./errors": "./errors.ts",
+    "./client": "./client.ts"
   },
   "scripts": {
     "db:push": "drizzle-kit push",
@@ -21,7 +23,8 @@
   },
   "dependencies": {
     "@paralleldrive/cuid2": "^3.3.0",
-    "drizzle-orm": "^0.45.4"
+    "drizzle-orm": "^0.45.4",
+    "effect": "4.0.6"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

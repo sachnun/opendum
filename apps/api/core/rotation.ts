@@ -1,4 +1,5 @@
 import { Effect } from "effect";
+import type { DatabaseFailure } from "@opendum/database";
 import type { CustomPort, HealthPort, AccountPort } from "./repositories.js";
 import { OWN_ACCOUNT_SCOPE, SHARED_ACCOUNT_SCOPE, type AccountAffinity } from "@opendum/core/redis";
 import type { AuthResult, ModelValidationResult } from "@opendum/auth";
@@ -61,7 +62,7 @@ export class Rotation {
     sharedTried: string[],
     excludedProviders: string[],
     useShared: boolean
-  ): Effect.Effect<Selection> {
+  ): Effect.Effect<Selection, DatabaseFailure> {
     if (useShared) {
       return this.nextShared(
         authResult.userId,
@@ -95,7 +96,7 @@ export class Rotation {
     exclude: string[],
     excludeProviders: string[],
     accountAccess: { mode: string; accounts: string[] }
-  ): Effect.Effect<Selection> {
+  ): Effect.Effect<Selection, DatabaseFailure> {
     return Effect.gen({ self: this }, function* () {
       const eligible = yield* this.eligible(userId, model, provider, exclude, excludeProviders, accountAccess);
       if (eligible.length === 0) return { account: null, configured: false };
@@ -120,16 +121,18 @@ export class Rotation {
     provider: string | null,
     exclude: string[],
     excludeProviders: string[]
-  ): Effect.Effect<Selection> {
+  ): Effect.Effect<Selection, DatabaseFailure> {
     return Effect.gen({ self: this }, function* () {
       const targetProviders = provider ? [provider] : this.models.providers(model);
       if (targetProviders.length === 0) return { account: null, configured: false };
       const now = new Date();
-      const sharedRows = yield* Effect.promise(() =>
-        this.accounts.listSharedEligibleAccounts(
-          { userId, providers: targetProviders, now, excludeIds: exclude, excludeProviders }
-        )
-      );
+      const sharedRows = yield* this.accounts.listSharedEligibleAccounts({
+        userId,
+        providers: targetProviders,
+        now,
+        excludeIds: exclude,
+        excludeProviders,
+      });
       const rows: ProviderAccount[] = sharedRows.map((row) => ({
         id: row.id,
         userId: row.userId,
@@ -144,9 +147,10 @@ export class Rotation {
       if (rows.length === 0) return { account: null, configured: false };
       const lookupKeys = this.models.lookupKeys(model);
       const ids = rows.map((row) => row.id);
-      const disabled = yield* Effect.promise(() =>
-        this.accounts.listDisabledAccountIDs({ accountIds: ids, models: lookupKeys })
-      );
+      const disabled = yield* this.accounts.listDisabledAccountIDs({
+        accountIds: ids,
+        models: lookupKeys,
+      });
       const disabledSet = new Set(disabled.map((row) => row.providerAccountId));
       const enabled = rows.filter((row) => !disabledSet.has(row.id) && this.canUse(row, model));
       if (enabled.length === 0) return { account: null, configured: true };
@@ -172,7 +176,7 @@ export class Rotation {
     exclude: string[],
     excludeProviders: string[],
     accountAccess: { mode: string; accounts: string[] }
-  ): Effect.Effect<ProviderAccount[]> {
+  ): Effect.Effect<ProviderAccount[], DatabaseFailure> {
     return Effect.gen({ self: this }, function* () {
       const slugs = provider ? [] : (yield* this.customSlugs(userId, model));
       const targetProviders = provider
@@ -204,20 +208,16 @@ export class Rotation {
       const now = new Date();
       const mode = accessMode(accountAccess.mode);
       const accounts = normalizeAccountIds(accountAccess.accounts);
-      const dbRows = yield* Effect.promise(() =>
-        this.accounts.listEligibleAccounts(
-          {
-            userId,
-            providers: targetProviders,
-            now,
-            excludeIds: exclude,
-            excludeProviders,
-            useWhitelist: mode === "whitelist" && accounts.length > 0,
-            accountIds: accounts,
-            useBlacklist: mode === "blacklist" && accounts.length > 0,
-          }
-        )
-      );
+      const dbRows = yield* this.accounts.listEligibleAccounts({
+        userId,
+        providers: targetProviders,
+        now,
+        excludeIds: exclude,
+        excludeProviders,
+        useWhitelist: mode === "whitelist" && accounts.length > 0,
+        accountIds: accounts,
+        useBlacklist: mode === "blacklist" && accounts.length > 0,
+      });
       for (const row of dbRows) {
         rows.push({
           id: row.id,
@@ -235,9 +235,10 @@ export class Rotation {
 
       const lookupKeys = this.models.lookupKeys(model);
       const ids = rows.map((row) => row.id);
-      const disabled = yield* Effect.promise(() =>
-        this.accounts.listDisabledAccountIDs({ accountIds: ids, models: lookupKeys })
-      );
+      const disabled = yield* this.accounts.listDisabledAccountIDs({
+        accountIds: ids,
+        models: lookupKeys,
+      });
       const disabledSet = new Set(disabled.map((row) => row.providerAccountId));
       const enabled = rows.filter(
         (row) => isSyntheticProviderAccountId(row.id) || (!disabledSet.has(row.id) && this.canUse(row, model))
@@ -247,15 +248,15 @@ export class Rotation {
     });
   }
 
-  private customSlugs(userId: string, model: string): Effect.Effect<string[]> {
+  private customSlugs(userId: string, model: string): Effect.Effect<string[], DatabaseFailure> {
     return Effect.gen({ self: this }, function* () {
-      const providers = yield* Effect.promise(() => this.customProviders.listCustomProviders(userId));
+      const providers = yield* this.customProviders.listCustomProviders(userId);
       if (providers.length === 0) return [];
       const canonical = this.models.resolveAlias(model);
       const results = yield* Effect.forEach(
         providers,
         (custom) =>
-          Effect.promise(() => this.customProviders.listCustomProviderModels(custom.id)).pipe(
+          this.customProviders.listCustomProviderModels(custom.id).pipe(
             Effect.map((rows) =>
               rows.some((row) => row.aliased && this.models.resolveAlias(row.modelId) === canonical)
                 ? custom.slug
@@ -281,20 +282,21 @@ export class Rotation {
     prioritized: ProviderAccount[],
     model: string,
     stickyId: string
-  ): Effect.Effect<ProviderAccount | null> {
+  ): Effect.Effect<ProviderAccount | null, DatabaseFailure> {
     return Effect.gen({ self: this }, function* () {
       const now = new Date();
       let degraded: ProviderAccount | null = null;
       let stickyMiss: StickyMissReason | null = null;
       for (const account of prioritized) {
         if (isSyntheticProviderAccountId(account.id)) return account;
-        const coolingDown = yield* Effect.promise(() => this.health.refresh(account.id, now));
+        const coolingDown = yield* this.health.refresh(account.id, now);
         if (coolingDown) {
           if (account.id === stickyId) stickyMiss = "cooldown";
           continue;
         }
-        const health = yield* Effect.promise(() =>
-          this.modelHealth.getModelHealth(account.id, this.models.resolveAlias(model))
+        const health = yield* this.modelHealth.getModelHealth(
+          account.id,
+          this.models.resolveAlias(model)
         );
         if (health && health.status === "degraded") {
           if (account.id === stickyId) stickyMiss = "degraded";

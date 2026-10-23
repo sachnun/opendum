@@ -13,6 +13,13 @@ export function fromPromise<A>(
   });
 }
 
+export function fromEffect<A, E>(
+  effect: Effect.Effect<A, E>,
+  message = "Request failed"
+): Effect.Effect<A, ServiceFailure> {
+  return Effect.mapError(effect, (cause) => asServiceFailure(cause, message));
+}
+
 export function fromSync<A>(
   run: () => A,
   message = "Request failed"

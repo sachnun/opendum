@@ -123,9 +123,9 @@ describe("ProxyService full flow", () => {
     const redis = { get: async () => null, set: async () => "OK", del: async () => 1, zAdd: async () => 1, zRemRangeByRank: async () => 0, expire: async () => true } as unknown as OpendumRedis;
 
     const repositories = fakes();
-    repositories.accounts.listEligibleAccounts.mockImplementation(async (params) => {
-      if (params.excludeIds.includes("acc-1")) return [];
-      return [
+    repositories.accounts.listEligibleAccounts.mockImplementation((params) => {
+      if (params.excludeIds.includes("acc-1")) return Effect.succeed([]);
+      return Effect.succeed([
         {
           id: "acc-1",
           userId: "user-1",
@@ -137,7 +137,7 @@ describe("ProxyService full flow", () => {
           lastUsedAt: null,
           createdAt: new Date(),
         } as never,
-      ];
+      ]);
     });
     const service = new ProxyService({
       database: {} as never,

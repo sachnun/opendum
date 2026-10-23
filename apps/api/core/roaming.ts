@@ -15,8 +15,10 @@ export class Roaming {
     private readonly models: Registry
   ) {}
 
-  reserve(userId: string, model: string): Effect.Effect<PointReservation | null> {
-    return Effect.promise(() => reserveRoamingPoint(this.points, userId, model));
+  reserve(userId: string, model: string) {
+    return reserveRoamingPoint(this.points, userId, model).pipe(
+      Effect.mapError((failure) => new Error(failure.message))
+    );
   }
 
   settle(
@@ -24,13 +26,15 @@ export class Roaming {
     reservation: PointReservation,
     model: string,
     usage: UsageCounts
-  ): Effect.Effect<void> {
-    return Effect.promise(() =>
-      settleRoamingPoint(this.points, this.models, ownerUserId, reservation, model, usage)
+  ) {
+    return settleRoamingPoint(this.points, this.models, ownerUserId, reservation, model, usage).pipe(
+      Effect.mapError((failure) => new Error(failure.message))
     );
   }
 
-  refund(reservation: PointReservation): Effect.Effect<void> {
-    return Effect.promise(() => refundRoamingPoint(this.points, reservation));
+  refund(reservation: PointReservation) {
+    return refundRoamingPoint(this.points, reservation).pipe(
+      Effect.mapError((failure) => new Error(failure.message))
+    );
   }
 }

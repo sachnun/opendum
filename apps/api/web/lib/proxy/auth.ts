@@ -3,7 +3,7 @@ import { AuthService } from "@opendum/auth";
 import type { AccountModelAvailability } from "@opendum/auth";
 import type { OpendumRedis } from "@opendum/core/redis";
 import { getRedisClient } from "../redis.js";
-import { fromPromise } from "../task.js";
+import { fromEffect, fromPromise } from "../task.js";
 import { registry } from "./models.js";
 
 const VALIDATION_PREFIX = "opendum:api-key:validation";
@@ -58,7 +58,10 @@ export const getAccountModelAvailability = Effect.fn("getAccountModelAvailabilit
   options: { includeInactiveAccounts?: boolean } = {}
 ) {
   const service = new AuthService(registry, dummyRedis);
-  return yield* service.availability(userId, false, options);
+  return yield* fromEffect(
+    service.availability(userId, false, options),
+    "Failed to load account availability"
+  );
 });
 
 export function usable(model: string, availability: AccountModelAvailability): boolean {

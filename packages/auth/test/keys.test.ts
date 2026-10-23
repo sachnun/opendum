@@ -84,9 +84,9 @@ function cacheOf(cached: Cached | null = null): {
 
 function queriesOf(row: KeyRow | null, rateLimits: RateLimitRow[] = []): Queries {
   return {
-    getAPIKeyByHash: async () => row,
-    deactivateAPIKey: async () => undefined,
-    listAPIKeyRateLimits: async () => rateLimits,
+    getAPIKeyByHash: () => Effect.succeed(row),
+    deactivateAPIKey: () => Effect.succeed(undefined),
+    listAPIKeyRateLimits: () => Effect.succeed(rateLimits),
   } as unknown as Queries;
 }
 

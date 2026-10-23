@@ -1,4 +1,5 @@
 import { Effect } from "effect";
+import type { DatabaseFailure } from "@opendum/database";
 import type { Registry } from "@opendum/models/runtime";
 import { invalid, valid } from "./results.js";
 import type { CustomProviderModelRecord, CustomProviderReader } from "./store/custom.js";
@@ -10,7 +11,7 @@ export class CustomModels {
     private readonly customProviders: CustomProviderReader
   ) {}
 
-  list(userId: string): Effect.Effect<Array<Record<string, unknown>>> {
+  list(userId: string): Effect.Effect<Array<Record<string, unknown>>, DatabaseFailure> {
     return Effect.gen({ self: this }, function* () {
       const { standalone } = yield* this.modelSets(userId);
       const now = Math.floor(Date.now() / 1000);
@@ -33,11 +34,11 @@ export class CustomModels {
     userId: string,
     slug: string,
     rawModel: string
-  ): Effect.Effect<ModelValidationResult | null> {
+  ): Effect.Effect<ModelValidationResult | null, DatabaseFailure> {
     return Effect.gen({ self: this }, function* () {
-      const custom = yield* Effect.promise(() => this.customProviders.getProvider(userId, slug));
+      const custom = yield* this.customProviders.getProvider(userId, slug);
       if (!custom) return null;
-      const rows = yield* Effect.promise(() => this.customProviders.listModels(custom.id));
+      const rows = yield* this.customProviders.listModels(custom.id);
       for (const row of rows) {
         if (row.modelId !== rawModel) continue;
         const result = valid(slug, `${slug}/${rawModel}`);
@@ -60,13 +61,13 @@ export class CustomModels {
 
   modelSets(
     userId: string
-  ): Effect.Effect<{ aliased: Map<string, Set<string>>; standalone: Map<string, string[]> }> {
+  ): Effect.Effect<{ aliased: Map<string, Set<string>>; standalone: Map<string, string[]> }, DatabaseFailure> {
     return Effect.gen({ self: this }, function* () {
       const aliased = new Map<string, Set<string>>();
       const standalone = new Map<string, string[]>();
-      const providers = yield* Effect.promise(() => this.customProviders.listProviders(userId));
+      const providers = yield* this.customProviders.listProviders(userId);
       for (const custom of providers) {
-        const rows = yield* Effect.promise(() => this.customProviders.listModels(custom.id));
+        const rows = yield* this.customProviders.listModels(custom.id);
         for (const row of rows) {
           const canonical = this.registry.resolveAlias(row.modelId);
           if (row.aliased && this.registry.isSupported(canonical)) {

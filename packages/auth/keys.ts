@@ -1,4 +1,5 @@
 import { Effect } from "effect";
+import type { DatabaseFailure } from "@opendum/database";
 import { hashString } from "@opendum/core/crypto";
 import type { Registry } from "@opendum/models/runtime";
 import {
@@ -44,7 +45,7 @@ export class Keys {
     this.queries = options.queries ?? defaultQueries;
   }
 
-  validate(authHeader: string): Effect.Effect<AuthResult> {
+  validate(authHeader: string): Effect.Effect<AuthResult, DatabaseFailure> {
     return Effect.gen({ self: this }, function* () {
       if (!authHeader.trim()) {
         return emptyAuthResult("Missing Authorization header");
@@ -67,7 +68,7 @@ export class Keys {
         yield* this.invalidate(keyHash, cached.apiKeyId ?? "");
       }
 
-      const apiKey = yield* Effect.promise(() => this.queries.getAPIKeyByHash(keyHash));
+      const apiKey = yield* this.queries.getAPIKeyByHash(keyHash);
       if (!apiKey) {
         yield* this.keyCache.set(
           keyHash,
@@ -87,7 +88,7 @@ export class Keys {
       }
 
       if (apiKey.expiresAt && apiKey.expiresAt.getTime() < Date.now()) {
-        yield* Effect.forkDetach(Effect.promise(() => this.queries.deactivateAPIKey(apiKey.id)));
+        yield* Effect.forkDetach(this.queries.deactivateAPIKey(apiKey.id).pipe(Effect.ignore));
         yield* this.keyCache.set(
           keyHash,
           { valid: false, apiKeyId: apiKey.id, error: "API key has expired" },
@@ -133,8 +134,8 @@ export class Keys {
     return this.keyCache.invalidate(keyHash, apiKeyId);
   }
 
-  private rateLimitRules(apiKeyId: string): Effect.Effect<RateLimitRule[]> {
-    return Effect.promise(() => this.queries.listAPIKeyRateLimits(apiKeyId)).pipe(
+  private rateLimitRules(apiKeyId: string): Effect.Effect<RateLimitRule[], DatabaseFailure> {
+    return this.queries.listAPIKeyRateLimits(apiKeyId).pipe(
       Effect.map((rows) =>
         rows.map((row) => ({
           target: row.target,

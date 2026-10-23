@@ -1,4 +1,6 @@
+import { Effect } from "effect";
 import type { DbExecutor } from "../client.js";
+import { DatabaseFailure, databaseFailure } from "../errors.js";
 import {
   creditPointBalance,
   debitPointBalance,
@@ -13,8 +15,11 @@ import {
 export class Points {
   constructor(private readonly database: DbExecutor) {}
 
-  transaction<T>(run: (points: Points) => Promise<T>): Promise<T> {
-    return this.database.transaction(async (tx) => run(new Points(tx)));
+  transaction<A>(run: (points: Points) => Effect.Effect<A, DatabaseFailure>): Effect.Effect<A, DatabaseFailure> {
+    return Effect.tryPromise({
+      try: () => this.database.transaction((tx) => Effect.runPromise(run(new Points(tx)))),
+      catch: (cause) => databaseFailure("transaction", cause),
+    });
   }
 
   creditPointBalance(params: Parameters<typeof creditPointBalance>[0]) {

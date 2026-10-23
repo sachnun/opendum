@@ -7,7 +7,7 @@ import { getModelStatsByModel } from "#web/lib/model-stats.js";
 import { getAccountModelAvailability, invalidateDisabledModelsCache, usable, type AccountModelAvailability } from "#web/lib/proxy/auth.js";
 import { MODEL_REGISTRY, getAllModels, getModelFamily, getModelLookupKeys, getProvidersForModel, isModelSupported, resolveModelAlias } from "#web/lib/proxy/models.js";
 import { compareModelEntries } from "@opendum/models/sort";
-import { fromPromise } from "#web/lib/task.js";
+import { fromEffect, fromPromise } from "#web/lib/task.js";
 import { internal } from "#web/errors.js";
 
 function modelInfo(model: string) {
@@ -89,7 +89,7 @@ const listModelsInner = Effect.fnUntraced(function* (
   );
   const availableSet = new Set(availableModels);
   const statsByModel = includeStats
-    ? yield* getModelStatsByModel(userId, availableModels)
+    ? yield* fromEffect(getModelStatsByModel(userId, availableModels), "Failed to load model stats")
     : ({} as Record<string, ModelStatsData[string]>);
 
     const result: ModelListItem[] = [
@@ -170,9 +170,10 @@ export const getModelStats = Effect.fn("models.getModelStats")(function* (
 
   if (requestedModels.length === 0) return {} as ModelStatsData;
 
-  return yield* getModelStatsByModel(userId, requestedModels).pipe(
-    Effect.mapError((failure) => internal("Failed to load model stats", failure.cause ?? failure))
-  );
+  return yield* fromEffect(
+    getModelStatsByModel(userId, requestedModels),
+    "Failed to load model stats"
+  ).pipe(Effect.mapError((failure) => internal(failure.message, failure.cause)));
 });
 
 export function getModelFamilyCounts() {

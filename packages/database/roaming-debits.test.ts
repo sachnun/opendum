@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { Effect } from "effect";
 import { drizzle } from "drizzle-orm/bun-sql";
 
 import { listOrphanedRoamingDebits } from "./queries/usage-points.js";
@@ -22,7 +23,7 @@ describe("listOrphanedRoamingDebits", () => {
   it("treats every terminal marker as evidence the reservation closed", async () => {
     const { database, statements } = captureSql();
 
-    await listOrphanedRoamingDebits({ olderThan: new Date(0), limit: 10 }, database);
+    await Effect.runPromise(listOrphanedRoamingDebits({ olderThan: new Date(0), limit: 10 }, database));
 
     expect(statements).toHaveLength(1);
     const statement = statements[0]?.sql ?? "";
@@ -35,7 +36,9 @@ describe("listOrphanedRoamingDebits", () => {
   it("filters by debit type and the grace cutoff", async () => {
     const { database, statements } = captureSql();
 
-    await listOrphanedRoamingDebits({ olderThan: new Date("2025-01-01T00:00:00.000Z"), limit: 5 }, database);
+    await Effect.runPromise(
+      listOrphanedRoamingDebits({ olderThan: new Date("2025-01-01T00:00:00.000Z"), limit: 5 }, database)
+    );
 
     expect(statements[0]?.params[0]).toBe("roaming_debit");
     expect(statements[0]?.params[1]).toBe("2025-01-01T00:00:00.000Z");
@@ -45,19 +48,21 @@ describe("listOrphanedRoamingDebits", () => {
   it("returns the mapped rows", async () => {
     const createdAt = new Date(0);
 
-    const rows = await listOrphanedRoamingDebits(
-      { olderThan: createdAt, limit: 1 },
-      {
-        select: () => ({
-          from: () => ({
-            where: () => ({
-              orderBy: () => ({
-                limit: async () => [{ id: "d1", userId: "u1", amount: -2, createdAt }],
+    const rows = await Effect.runPromise(
+      listOrphanedRoamingDebits(
+        { olderThan: createdAt, limit: 1 },
+        {
+          select: () => ({
+            from: () => ({
+              where: () => ({
+                orderBy: () => ({
+                  limit: async () => [{ id: "d1", userId: "u1", amount: -2, createdAt }],
+                }),
               }),
             }),
           }),
-        }),
-      } as unknown as DbExecutor
+        } as unknown as DbExecutor
+      )
     );
 
     expect(rows).toEqual([{ id: "d1", userId: "u1", amount: -2, createdAt }]);

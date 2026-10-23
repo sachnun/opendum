@@ -4,3 +4,4 @@ export * from "./relations.js";
 export * as relations from "./relations.js";
 export * from "./email.js";
 export * from "./client.js";
+export * from "./errors.js";

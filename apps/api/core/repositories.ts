@@ -1,4 +1,6 @@
+import type { Effect } from "effect";
 import type { Database } from "@opendum/database";
+import type { DatabaseFailure } from "@opendum/database";
 import {
   Accounts,
   Customs,
@@ -13,7 +15,9 @@ export type CustomPort = Pick<Customs, keyof Customs>;
 export type UsagePort = Pick<Usage, keyof Usage>;
 
 export type PointPort = Omit<Pick<Points, keyof Points>, "transaction"> & {
-  transaction<T>(run: (points: PointPort) => Promise<T>): Promise<T>;
+  transaction<A>(
+    run: (points: PointPort) => Effect.Effect<A, DatabaseFailure>
+  ): Effect.Effect<A, DatabaseFailure>;
 };
 
 export type Repositories = {

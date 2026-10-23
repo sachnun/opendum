@@ -72,8 +72,8 @@ describe("AccountAffinity scopes", () => {
 describe("Rotation shared affinity", () => {
   function rotation(affinity: AccountAffinity, accounts: ProviderAccount[], health: Partial<Health>): Rotation {
     const repositories = fakes();
-    repositories.accounts.listSharedEligibleAccounts = mock(async () => accounts as never);
-    repositories.accounts.listDisabledAccountIDs = mock(async () => []);
+    repositories.accounts.listSharedEligibleAccounts = mock(() => Effect.succeed(accounts as never));
+    repositories.accounts.listDisabledAccountIDs = mock(() => Effect.succeed([]));
     return new Rotation({
       accounts: repositories.accounts,
       modelHealth: repositories.health,
@@ -100,7 +100,7 @@ describe("Rotation shared affinity", () => {
       affinity,
       [sharedAccount({ id: "shared-1" }), sharedAccount({ id: "shared-2" })],
       {
-        refresh: async () => false,
+        refresh: () => Effect.succeed(false),
         bumpRequest: (id: string) => seen.push(id),
       }
     );
@@ -124,7 +124,7 @@ describe("Rotation shared affinity", () => {
     const { redis } = memoryRedis();
     const affinity = new AccountAffinity(redis, ["workbuddy"]);
     const engine = rotation(affinity, [sharedAccount({ id: "shared-7" })], {
-      refresh: async () => false,
+      refresh: () => Effect.succeed(false),
       bumpRequest: () => undefined,
     });
 
@@ -151,7 +151,7 @@ describe("Rotation shared affinity", () => {
       affinity,
       [sharedAccount({ id: "shared-1" }), sharedAccount({ id: "shared-2" })],
       {
-        refresh: async (id: string) => id === "shared-1",
+        refresh: (id: string) => Effect.succeed(id === "shared-1"),
         bumpRequest: () => undefined,
       }
     );

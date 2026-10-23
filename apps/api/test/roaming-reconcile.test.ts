@@ -15,11 +15,12 @@ function pointPort(overrides: Partial<PointPort> = {}): PointPort {
 describe("roaming reconciliation", () => {
   it("refunds every orphaned debit", async () => {
     const points = pointPort({
-      listOrphanedRoamingDebits: async () => [
-        { id: "debit-1", userId: "user-1", amount: -1, createdAt: new Date(0) },
-        { id: "debit-2", userId: "user-2", amount: -3, createdAt: new Date(0) },
-      ],
-      insertPointTransactionOnConflictDoNothing: mock(async () => 1),
+      listOrphanedRoamingDebits: () =>
+        Effect.succeed([
+          { id: "debit-1", userId: "user-1", amount: -1, createdAt: new Date(0) },
+          { id: "debit-2", userId: "user-2", amount: -3, createdAt: new Date(0) },
+        ]),
+      insertPointTransactionOnConflictDoNothing: mock(() => Effect.succeed(1)),
     });
 
     const result = await Effect.runPromise(reconcileOrphanedRoaming(points, { now: new Date() }));
@@ -33,9 +34,9 @@ describe("roaming reconciliation", () => {
     const now = new Date("2025-01-01T12:00:00.000Z");
     const calls: Array<{ olderThan: Date; limit: number }> = [];
     const points = pointPort({
-      listOrphanedRoamingDebits: async (params) => {
+      listOrphanedRoamingDebits: (params) => {
         calls.push(params);
-        return [];
+        return Effect.succeed([]);
       },
     });
 
@@ -48,13 +49,14 @@ describe("roaming reconciliation", () => {
 
   it("counts a refund failure without aborting the batch", async () => {
     const points = pointPort({
-      listOrphanedRoamingDebits: async () => [
-        { id: "debit-1", userId: "user-1", amount: -1, createdAt: new Date(0) },
-        { id: "debit-2", userId: "user-2", amount: -1, createdAt: new Date(0) },
-      ],
-      insertPointTransactionOnConflictDoNothing: mock(async () => {
-        throw new Error("database is down");
-      }),
+      listOrphanedRoamingDebits: () =>
+        Effect.succeed([
+          { id: "debit-1", userId: "user-1", amount: -1, createdAt: new Date(0) },
+          { id: "debit-2", userId: "user-2", amount: -1, createdAt: new Date(0) },
+        ]),
+      insertPointTransactionOnConflictDoNothing: mock(() =>
+        Effect.fail(new Error("database is down") as never)
+      ),
     });
 
     const result = await Effect.runPromise(reconcileOrphanedRoaming(points, { now: new Date() }));

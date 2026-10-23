@@ -1,4 +1,5 @@
 import { Effect, Schedule } from "effect";
+import type { DatabaseFailure } from "@opendum/database";
 import { refundRoamingPoint, type PointReservation } from "./points.js";
 import type { PointPort } from "./repositories.js";
 
@@ -21,17 +22,15 @@ export type ReconcileResult = {
 export function reconcileOrphanedRoaming(
   points: PointPort,
   options: ReconcileOptions = {}
-): Effect.Effect<ReconcileResult> {
+): Effect.Effect<ReconcileResult, DatabaseFailure> {
   const now = options.now ?? new Date();
   const olderThanMs = options.olderThanMs ?? ROAMING_ORPHAN_AGE_MS;
   const batchLimit = options.batchLimit ?? ROAMING_RECONCILE_BATCH;
   return Effect.gen(function* () {
-    const orphans = yield* Effect.promise(() =>
-      points.listOrphanedRoamingDebits({
-        olderThan: new Date(now.getTime() - olderThanMs),
-        limit: batchLimit,
-      })
-    );
+    const orphans = yield* points.listOrphanedRoamingDebits({
+      olderThan: new Date(now.getTime() - olderThanMs),
+      limit: batchLimit,
+    });
 
     const outcomes = yield* Effect.forEach(
       orphans,
@@ -42,10 +41,7 @@ export function reconcileOrphanedRoaming(
           amount: Math.abs(orphan.amount),
           debitId: orphan.id,
         };
-        return Effect.tryPromise({
-          try: () => refundRoamingPoint(points, reservation),
-          catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
-        }).pipe(
+        return refundRoamingPoint(points, reservation).pipe(
           Effect.tapError((error) =>
             Effect.logError("roaming refund failed", { debitId: orphan.id, error: error.message })
           ),
@@ -63,7 +59,7 @@ export function reconcileOrphanedRoaming(
 
 export function roamingReconcileLoop(
   intervalMs: number,
-  run: () => Effect.Effect<ReconcileResult>
+  run: () => Effect.Effect<ReconcileResult, DatabaseFailure>
 ): Effect.Effect<void, never> {
   if (intervalMs <= 0) return Effect.void;
   return Effect.repeat(

@@ -1,4 +1,5 @@
 import { Effect } from "effect";
+import type { DatabaseFailure } from "@opendum/database";
 import { ignore } from "@opendum/core/best-effort";
 import type { Registry } from "@opendum/models/runtime";
 import {
@@ -57,7 +58,7 @@ export class AuthService {
     });
   }
 
-  validateKey(authHeader: string): Effect.Effect<AuthResult> {
+  validateKey(authHeader: string): Effect.Effect<AuthResult, DatabaseFailure> {
     return this.apiKeys.validate(authHeader);
   }
 
@@ -65,11 +66,11 @@ export class AuthService {
     return this.apiKeys.invalidate(keyHash, apiKeyId);
   }
 
-  disabledModels(userId: string): Effect.Effect<Set<string>> {
+  disabledModels(userId: string): Effect.Effect<Set<string>, DatabaseFailure> {
     return this.avail.disabledModels(userId);
   }
 
-  isDisabled(userId: string, model: string): Effect.Effect<boolean> {
+  isDisabled(userId: string, model: string): Effect.Effect<boolean, DatabaseFailure> {
     return this.avail.isDisabled(userId, model);
   }
 
@@ -77,7 +78,7 @@ export class AuthService {
     userId: string,
     includeShared: boolean,
     options: { includeInactiveAccounts?: boolean } = {}
-  ): Effect.Effect<AccountModelAvailability> {
+  ): Effect.Effect<AccountModelAvailability, DatabaseFailure> {
     return this.avail.availability(userId, includeShared, options);
   }
 
@@ -100,7 +101,7 @@ export class AuthService {
     userId: string,
     modelParam: string,
     access: ModelAccess
-  ): Effect.Effect<ModelValidationResult> {
+  ): Effect.Effect<ModelValidationResult, DatabaseFailure> {
     return Effect.gen({ self: this }, function* () {
       const [provider, rawModel] = parseModel(modelParam);
       const mode = accessMode(access.mode);
@@ -159,7 +160,7 @@ export class AuthService {
     });
   }
 
-  list(userId: string): Effect.Effect<Array<Record<string, unknown>>> {
+  list(userId: string): Effect.Effect<Array<Record<string, unknown>>, DatabaseFailure> {
     return this.customModels.list(userId);
   }
 

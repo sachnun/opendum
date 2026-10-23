@@ -1,4 +1,5 @@
-import { Effect, Metric, Result, Schedule } from "effect";
+import { Cause, Effect, Metric, Result, Schedule } from "effect";
+import { databaseFailure } from "@opendum/database";
 import type { Database } from "@opendum/database";
 import { decrypt, encrypt } from "@opendum/core/crypto";
 import type { Registry } from "@opendum/models/runtime";
@@ -206,7 +207,7 @@ export class ProxyService implements StreamRecorder {
     authHeader: string,
     sessionId: string,
     request?: Request
-  ): Effect.Effect<Response> {
+  ): Effect.Effect<Response, import("@opendum/database").DatabaseFailure> {
     const startedAt = Date.now();
     return Effect.gen({ self: this }, function* () {
       const startMs = Date.now();
@@ -288,6 +289,14 @@ export class ProxyService implements StreamRecorder {
         forced as ProviderAccount | null,
         startMs,
         sessionId
+      ).pipe(
+        Effect.catch((failure: { message: string }) =>
+          Effect.succeed<RouteError>({
+            status: 500,
+            message: failure.message,
+            type: "api_error",
+          })
+        )
       );
       if (isRouteError(attempt)) {
         return this.routeError(cfg, attempt);
@@ -321,33 +330,38 @@ export class ProxyService implements StreamRecorder {
             startMs,
           });
         };
-        const result = yield* Effect.promise(() => cfg.handleStream(responseCtx, this));
+        const result = yield* Effect.tryPromise({
+          try: () => cfg.handleStream(responseCtx, this),
+          catch: (error) => databaseFailure("handleStream", error),
+        });
         if (!responseCtx.streamHandled) {
           if (roaming) {
             yield* Effect.ignore(
               this.roaming.settle(account.userId, roaming, validation.model, responseCtx.usage)
             );
           }
-          yield* Effect.ignore(Effect.promise(() => this.health.markRecovered(rotationFailures)));
+          yield* Effect.ignore(this.health.markRecovered(rotationFailures));
         }
         return result;
       }
       const result = yield* Effect.tryPromise({
         try: () => cfg.handleNonStream(responseCtx, this),
-        catch: (error) => error,
+        catch: (error) => databaseFailure("handleNonStream", error),
       }).pipe(
-        Effect.catch((error) =>
-          Effect.promise(() =>
-            this.handleNonStreamFailure(cfg, error, {
-              account,
-              authResult,
-              validation,
-              roaming,
-              rotationFailures,
-              usage: responseCtx.usage,
-              startMs,
-            })
-          )
+        Effect.catch((failure) =>
+          Effect.tryPromise({
+            try: () =>
+              this.handleNonStreamFailure(cfg, failure.cause, {
+                account,
+                authResult,
+                validation,
+                roaming,
+                rotationFailures,
+                usage: responseCtx.usage,
+                startMs,
+              }),
+            catch: (error) => databaseFailure("handleNonStreamFailure", error),
+          })
         )
       );
       if (roaming) {
@@ -355,7 +369,7 @@ export class ProxyService implements StreamRecorder {
           this.roaming.settle(account.userId, roaming, validation.model, responseCtx.usage)
         );
       }
-      yield* Effect.ignore(Effect.promise(() => this.health.markRecovered(rotationFailures)));
+      yield* Effect.ignore(this.health.markRecovered(rotationFailures));
       return result;
     }).pipe(
       Effect.tap(() => Metric.update(proxyRequests, 1)),
@@ -379,7 +393,7 @@ export class ProxyService implements StreamRecorder {
       );
     }
     if (reason !== "cancel") {
-      trackWork(Effect.ignore(Effect.promise(() => this.health.markRecovered(rotationFailures))));
+      trackWork(Effect.ignore(this.health.markRecovered(rotationFailures)));
     }
   }
 
@@ -392,7 +406,7 @@ export class ProxyService implements StreamRecorder {
     const message = error instanceof Error ? error.message : String(error);
     if (roaming) await Effect.runPromise(Effect.ignore(this.roaming.refund(roaming)));
     await this.recordResponseHandlerFailure(account, authResult, validation, 500, message, startMs);
-    trackWork(Effect.ignore(Effect.promise(() => this.health.markRecovered(rotationFailures))));
+    trackWork(Effect.ignore(this.health.markRecovered(rotationFailures)));
     return this.routeError(cfg, {
       status: 500,
       message: prefixWithProvider(account.provider, message),
@@ -412,9 +426,7 @@ export class ProxyService implements StreamRecorder {
     await Effect.runPromise(
       Effect.ignore(
         Effect.gen({ self: this }, function* () {
-          yield* Effect.promise(() =>
-            this.health.markAccountFailed(account.id, validation.model, statusCode, message)
-          );
+          yield* this.health.markAccountFailed(account.id, validation.model, statusCode, message);
           yield* Effect.promise(() =>
             this.usage.logUsage(authResult, account, validation, statusCode, Date.now() - startMs)
           );
@@ -480,7 +492,7 @@ export class ProxyService implements StreamRecorder {
       return synthetic;
     }
 
-    const row = await this.repositories.accounts.getForcedAccount(id, userId);
+    const row = await Effect.runPromise(this.repositories.accounts.getForcedAccount(id, userId));
     if (!row) {
       return {
         status: 400,
@@ -502,7 +514,7 @@ export class ProxyService implements StreamRecorder {
       createdAt: row.createdAt,
       isActive: row.isActive,
     };
-    const coolingDown = await this.health.refresh(account.id, new Date());
+    const coolingDown = await Effect.runPromise(this.health.refresh(account.id, new Date()));
     if (coolingDown) {
       return {
         status: 400,
@@ -551,9 +563,13 @@ export class ProxyService implements StreamRecorder {
   }
 
   private async isCustomAccountModel(account: ProviderAccount, model: string): Promise<boolean> {
-    const custom = await this.repositories.customProviders.getCustomProvider(account.userId, account.provider);
+    const custom = await Effect.runPromise(
+      this.repositories.customProviders.getCustomProvider(account.userId, account.provider)
+    );
     if (!custom) return false;
-    const rows = await this.repositories.customProviders.listCustomProviderModels(custom.id);
+    const rows = await Effect.runPromise(
+      this.repositories.customProviders.listCustomProviderModels(custom.id)
+    );
     const target = model.startsWith(`${account.provider}/`)
       ? model.slice(account.provider.length + 1)
       : model;
@@ -613,9 +629,10 @@ export class ProxyService implements StreamRecorder {
         rotationFailures: Failure[];
         roaming: PointReservation | null;
       }
-    | RouteError
+    | RouteError,
+    import("@opendum/database").DatabaseFailure
   > {
-    return Effect.gen({ self: this }, function* () {
+    const program = Effect.gen({ self: this }, function* () {
       const tried: string[] = [];
       const sharedTried: string[] = [];
       const excludedProviders: string[] = [];
@@ -655,13 +672,11 @@ export class ProxyService implements StreamRecorder {
         if (!account) {
           if (lastFailure && delayedFinalFailure) {
             const pending = delayedFinalFailure;
-            yield* Effect.promise(() =>
-              this.health.markAccountFailed(
-                pending.account.id,
-                validation.model,
-                pending.statusCode,
-                pending.message
-              )
+            yield* this.health.markAccountFailed(
+              pending.account.id,
+              validation.model,
+              pending.statusCode,
+              pending.message
             );
           }
           if (tried.length + sharedTried.length === 0) {
@@ -740,7 +755,7 @@ export class ProxyService implements StreamRecorder {
               sessionId,
               turnId
             ),
-          catch: (error) => (error instanceof Error ? error : new Error(String(error))),
+          catch: (error) => databaseFailure("makeProviderRequest", error),
         }).pipe(Effect.result);
 
         if (Result.isFailure(request)) {
@@ -751,9 +766,12 @@ export class ProxyService implements StreamRecorder {
             message,
             this.errorContext(cfg, validation, parsed, account.provider)
           );
-          const failedAt = yield* Effect.promise(() =>
-            this.health.markAccountFailed(account.id, validation.model, status, detailed)
-          );
+          const failedAt = yield* this.health.markAccountFailed(
+            account.id,
+            validation.model,
+            status,
+            detailed
+          ).pipe(Effect.mapError((failure) => databaseFailure("markAccountFailed", failure)));
           yield* Effect.ignore(
             Effect.promise(() =>
               this.usage.logUsage(authResult, account, validation, status, Date.now() - startMs)
@@ -818,16 +836,27 @@ export class ProxyService implements StreamRecorder {
           if (response.status !== 408 && !badRequestFromProvider) {
             if (!forced && isAntigravityResourceExhausted(account.provider, response.status, bodyText)) {
               delayedFinalFailure = { account, statusCode: response.status, message: detailed };
-              yield* Effect.promise(() =>
-                this.health.logAccountError(account.id, account.userId, validation.model, response.status, detailed)
+              yield* this.health.logAccountError(
+                account.id,
+                account.userId,
+                validation.model,
+                response.status,
+                detailed
               );
             } else if (response.status === 404) {
-              yield* Effect.promise(() =>
-                this.health.logAccountError(account.id, account.userId, validation.model, response.status, detailed)
+              yield* this.health.logAccountError(
+                account.id,
+                account.userId,
+                validation.model,
+                response.status,
+                detailed
               );
             } else {
-              failedAt = yield* Effect.promise(() =>
-                this.health.markAccountFailed(account.id, validation.model, response.status, detailed)
+              failedAt = yield* this.health.markAccountFailed(
+                account.id,
+                validation.model,
+                response.status,
+                detailed
               );
               const disabledUntil = codexUsageLimitDisabledUntil(
                 account.provider,
@@ -836,20 +865,30 @@ export class ProxyService implements StreamRecorder {
                 failedAt
               );
               if (disabledUntil) {
-                yield* Effect.promise(() =>
-                  this.health.markAccountUsageLimited(account.id, validation.model, disabledUntil, failedAt as Date)
+                yield* this.health.markAccountUsageLimited(
+                  account.id,
+                  validation.model,
+                  disabledUntil,
+                  failedAt as Date
                 );
               }
             }
           } else {
-            yield* Effect.promise(() =>
-              this.health.logAccountError(account.id, account.userId, validation.model, response.status, detailed)
+            yield* this.health.logAccountError(
+              account.id,
+              account.userId,
+              validation.model,
+              response.status,
+              detailed
             );
           }
           const restrictedUntil = workbuddyRestrictionDisabledUntil(account.provider, bodyText, new Date());
           if (restrictedUntil) {
-            yield* Effect.promise(() =>
-              this.health.markAccountUsageLimited(account.id, validation.model, restrictedUntil, failedAt ?? new Date())
+            yield* this.health.markAccountUsageLimited(
+              account.id,
+              validation.model,
+              restrictedUntil,
+              failedAt ?? new Date()
             );
           }
           yield* Effect.ignore(
@@ -890,7 +929,17 @@ export class ProxyService implements StreamRecorder {
           roaming,
         };
       }
-    }).pipe(Effect.withSpan("ProxyService.rotateAccounts"));
+    });
+    return program.pipe(
+      Effect.catchCause((cause) =>
+        Effect.succeed<RouteError>({
+          status: 500,
+          message: Cause.pretty(cause),
+          type: "api_error",
+        })
+      ),
+      Effect.withSpan("ProxyService.rotateAccounts")
+    );
   }
 
   private errorContext(
@@ -926,7 +975,7 @@ export class ProxyService implements StreamRecorder {
     return resolved.credentials;
   }
 
-  async quotaAccount(accountId: string, userId: string, provider: string) {
+  quotaAccount(accountId: string, userId: string, provider: string) {
     return this.repositories.accounts.getQuotaAccount(accountId, userId, provider);
   }
 
@@ -1049,7 +1098,9 @@ export class ProxyService implements StreamRecorder {
 
   private async loadProviderAccountCredentials(account: ProviderAccount): Promise<ProviderAccount> {
     if (account.accessToken && account.refreshToken) return account;
-    const row = await this.repositories.accounts.getAccountCredentialsByID(account.id);
+    const row = await Effect.runPromise(
+      this.repositories.accounts.getAccountCredentialsByID(account.id)
+    );
     if (!row) return account;
     return {
       id: row.id,
@@ -1129,7 +1180,9 @@ export class ProxyService implements StreamRecorder {
   }
 
   private async loadProviderAccountCredentialsByID(accountId: string): Promise<ProviderAccount> {
-    const row = await this.repositories.accounts.getAccountCredentialsByID(accountId);
+    const row = await Effect.runPromise(
+      this.repositories.accounts.getAccountCredentialsByID(accountId)
+    );
     if (!row) throw new Error("provider account not found");
     return {
       id: row.id,
@@ -1247,15 +1300,22 @@ export class ProxyService implements StreamRecorder {
       await this.redis.expire(`${REFRESH_FAIL_COUNT_PREFIX}${account.id}`, REFRESH_FAIL_COUNT_TTL_SECONDS);
       return count;
     }, 1);
-    await this.repositories.accounts.recordAccountError({ id: account.id, at: now, code: statusCode });
-    const ownerUserId = account.userId || (await this.repositories.accounts.getAccountOwnerUserID(account.id)) || "";
+    await Effect.runPromise(
+      this.repositories.accounts.recordAccountError({ id: account.id, at: now, code: statusCode })
+    );
+    const ownerUserId =
+      account.userId ||
+      (await Effect.runPromise(this.repositories.accounts.getAccountOwnerUserID(account.id))) ||
+      "";
     if (ownerUserId) {
       await Effect.runPromise(
         upsertErrorHistory(this.redis, account.id, ownerUserId, null, statusCode, `Token refresh failed: ${message}`, now)
       );
     }
     if (failCount >= REFRESH_MAX_CONSECUTIVE_FAILURES) {
-      await this.repositories.accounts.disableFailedAccount({ id: account.id, status: "failed", at: now });
+      await Effect.runPromise(
+        this.repositories.accounts.disableFailedAccount({ id: account.id, status: "failed", at: now })
+      );
     }
   }
 
@@ -1304,13 +1364,14 @@ export class ProxyService implements StreamRecorder {
             const providerImpl = this.providers.get(name);
             if (!providerImpl) return;
             const buffer = refreshBufferFor(providerImpl);
-            const accounts = yield* Effect.tryPromise({
-              try: () =>
-                this.repositories.accounts.listExpiringRefreshableAccounts(
-                  { provider: name, now, expiresBefore: new Date(now.getTime() + buffer), batchLimit: 500 }
-                ),
-              catch: (error) => (error instanceof Error ? error : new Error(String(error))),
-            }).pipe(Effect.result);
+            const accounts = yield* this.repositories.accounts
+              .listExpiringRefreshableAccounts({
+                provider: name,
+                now,
+                expiresBefore: new Date(now.getTime() + buffer),
+                batchLimit: 500,
+              })
+              .pipe(Effect.result);
             if (accounts._tag === "Failure") {
               yield* Effect.logError(`token refresh query failed for provider ${name}`, {
                 cause: accounts.failure,
@@ -1348,9 +1409,13 @@ export class ProxyService implements StreamRecorder {
   }
 
   async customProviderForAccount(userId: string, provider: string): Promise<Provider | null> {
-    const custom = await this.repositories.customProviders.getCustomProvider(userId, provider);
+    const custom = await Effect.runPromise(
+      this.repositories.customProviders.getCustomProvider(userId, provider)
+    );
     if (!custom) return null;
-    const rows = await this.repositories.customProviders.listCustomProviderModels(custom.id);
+    const rows = await Effect.runPromise(
+      this.repositories.customProviders.listCustomProviderModels(custom.id)
+    );
     return compileCustomProvider({
       provider: { slug: custom.slug, baseUrl: custom.baseUrl, extraHeaders: custom.extraHeaders ?? null },
       models: rows.map((row) => ({

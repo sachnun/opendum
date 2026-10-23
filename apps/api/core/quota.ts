@@ -34,7 +34,11 @@ export async function fetchAccountQuota(
 ): Promise<AccountQuotaOutcome> {
   if (!isQuota(input.provider)) return { status: "unsupported", provider: input.provider };
 
-  const row = await context.service.quotaAccount(input.accountId, input.userId, input.provider);
+  const row = await Effect.runPromise(
+    context.service
+      .quotaAccount(input.accountId, input.userId, input.provider)
+      .pipe(Effect.catch(() => Effect.succeed(null)))
+  );
   if (!row) return { status: "not-found" };
 
   try {

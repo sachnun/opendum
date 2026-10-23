@@ -26,13 +26,14 @@ function readerOf(
   providers: Array<{ id: string; slug: string; models: CustomProviderModelRecord[] }>
 ): CustomProviderReader {
   return {
-    listProviders: async () => providers.map((provider) => providerOf(provider.id, provider.slug)),
-    getProvider: async (_userId: string, slug: string) => {
+    listProviders: () =>
+      Effect.succeed(providers.map((provider) => providerOf(provider.id, provider.slug))),
+    getProvider: (_userId: string, slug: string) => {
       const provider = providers.find((candidate) => candidate.slug === slug);
-      return provider ? providerOf(provider.id, provider.slug) : null;
+      return Effect.succeed(provider ? providerOf(provider.id, provider.slug) : null);
     },
-    listModels: async (providerId: string) =>
-      providers.find((candidate) => candidate.id === providerId)?.models ?? [],
+    listModels: (providerId: string) =>
+      Effect.succeed(providers.find((candidate) => candidate.id === providerId)?.models ?? []),
   } as unknown as CustomProviderReader;
 }
 

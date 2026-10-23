@@ -1,4 +1,5 @@
 import { Effect } from "effect";
+import type { DatabaseFailure } from "@opendum/database";
 import type { Registry } from "@opendum/models/runtime";
 import { disabledKey, type OpendumRedis } from "@opendum/core/redis";
 import { ignore, tryAsync } from "@opendum/core/best-effort";
@@ -53,18 +54,18 @@ export class Availability {
     this.queries = options.queries ?? defaultQueries;
   }
 
-  disabledModels(userId: string): Effect.Effect<Set<string>> {
+  disabledModels(userId: string): Effect.Effect<Set<string>, DatabaseFailure> {
     return Effect.gen({ self: this }, function* () {
       const cached = yield* this.getCachedDisabledModels(userId);
       if (cached) return new Set(cached);
-      const rows = yield* Effect.promise(() => this.queries.listDisabledModelsByUser(userId));
+      const rows = yield* this.queries.listDisabledModelsByUser(userId);
       const modelList = disabledList(this.registry, rows.map((row) => row.trim()));
       yield* this.setCachedDisabledModels(userId, modelList);
       return new Set(modelList);
     });
   }
 
-  isDisabled(userId: string, model: string): Effect.Effect<boolean> {
+  isDisabled(userId: string, model: string): Effect.Effect<boolean, DatabaseFailure> {
     return Effect.gen({ self: this }, function* () {
       const set = yield* this.disabledModels(userId);
       return set.has(this.registry.resolveAlias(model));
@@ -75,7 +76,7 @@ export class Availability {
     userId: string,
     includeShared: boolean,
     options: { includeInactiveAccounts?: boolean } = {}
-  ): Effect.Effect<AccountModelAvailability> {
+  ): Effect.Effect<AccountModelAvailability, DatabaseFailure> {
     return Effect.gen({ self: this }, function* () {
       const availability = emptyAvailability();
 
@@ -101,8 +102,10 @@ export class Availability {
       }
 
       const now = new Date();
-      const accounts = yield* Effect.promise(() =>
-        this.queries.listActiveAccountTiers(userId, now, options.includeInactiveAccounts === true)
+      const accounts = yield* this.queries.listActiveAccountTiers(
+        userId,
+        now,
+        options.includeInactiveAccounts === true
       );
       const accountProvider = new Map<string, string>();
       const accountIds: string[] = [];
@@ -123,7 +126,7 @@ export class Availability {
       }
 
       if (accountIds.length > 0) {
-        const disabledRows = yield* Effect.promise(() => this.queries.listDisabledModelsByAccounts(accountIds));
+        const disabledRows = yield* this.queries.listDisabledModelsByAccounts(accountIds);
         for (const row of disabledRows) {
           const provider = accountProvider.get(row.providerAccountId);
           if (!provider) continue;
@@ -146,7 +149,7 @@ export class Availability {
 
       if (!includeShared) return availability;
 
-      const sharedAccounts = yield* Effect.promise(() => this.queries.listSharedAccounts(userId, now));
+      const sharedAccounts = yield* this.queries.listSharedAccounts(userId, now);
       const sharedAccountProvider = new Map<string, string>();
       const sharedAccountIds: string[] = [];
       for (const account of sharedAccounts) {
@@ -163,9 +166,7 @@ export class Availability {
         }
       }
       if (sharedAccountIds.length > 0) {
-        const disabledRows = yield* Effect.promise(() =>
-          this.queries.listDisabledModelsByAccounts(sharedAccountIds)
-        );
+        const disabledRows = yield* this.queries.listDisabledModelsByAccounts(sharedAccountIds);
         for (const row of disabledRows) {
           const provider = sharedAccountProvider.get(row.providerAccountId);
           if (!provider) continue;
@@ -187,7 +188,7 @@ export class Availability {
     mode: string,
     modelSet: Set<string>,
     roamingEnabled: boolean
-  ): Effect.Effect<string[]> {
+  ): Effect.Effect<string[], DatabaseFailure> {
     return Effect.gen({ self: this }, function* () {
       const candidates = provider ? this.registry.models(provider) : this.registry.allModels();
       const disabledSet = yield* this.disabledModels(userId);
