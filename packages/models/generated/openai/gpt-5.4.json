@@ -12,7 +12,6 @@
   "modalities": {
     "input": [
       "image",
-      "pdf",
       "text"
     ],
     "output": [
@@ -20,8 +19,8 @@
     ]
   },
   "limit": {
-    "context": 1050000,
-    "output": 128000
+    "context": 1000000,
+    "output": 131072
   },
   "cost": {
     "input": 12.5,
@@ -36,8 +35,8 @@
   },
   "providerConfig": {
     "workbuddy": {
-      "contextWindow": 1050000,
-      "maxOutputTokens": 128000
+      "contextWindow": 1000000,
+      "maxOutputTokens": 131072
     }
   }
 }

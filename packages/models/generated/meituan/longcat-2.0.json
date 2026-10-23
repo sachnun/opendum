@@ -6,7 +6,7 @@
   "aliases": [
     "longcat-2.0-free"
   ],
-  "reasoning": true,
+  "reasoning": false,
   "reasoning_effort": [
     "high"
   ],
@@ -19,7 +19,7 @@
     ]
   },
   "limit": {
-    "context": 1049000,
+    "context": 1000000,
     "output": 131072
   },
   "cost": {
@@ -36,7 +36,7 @@
   "providerConfig": {
     "zenmux": {
       "upstream": "meituan/longcat-2.0",
-      "contextWindow": 1049000,
+      "contextWindow": 1000000,
       "maxOutputTokens": 131072
     }
   }
