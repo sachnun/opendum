@@ -2,7 +2,7 @@
   "providers": [
     "kiro"
   ],
-  "reasoning": false,
+  "reasoning": true,
   "modalities": {
     "input": [
       "text"
@@ -16,9 +16,9 @@
     "output": 65536
   },
   "cost": {
-    "input": 0.6,
+    "input": 0.54,
     "output": 2.74,
-    "cacheRead": 0.35
+    "cacheRead": 0.3
   },
   "scores": {
     "artificialAnalysis": {

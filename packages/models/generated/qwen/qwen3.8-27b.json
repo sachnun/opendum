@@ -35,7 +35,7 @@
   },
   "cost": {
     "input": 1,
-    "output": 7.45,
+    "output": 12.5,
     "cacheRead": 0.25
   },
   "scores": {

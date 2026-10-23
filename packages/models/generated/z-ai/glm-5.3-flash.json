@@ -26,13 +26,12 @@
   },
   "limit": {
     "context": 1048576,
-    "output": 131072
+    "output": 1024000
   },
   "cost": {
     "input": 0.375,
     "output": 1.25,
-    "cacheRead": 0.075,
-    "cacheWrite": 0
+    "cacheRead": 0.075
   },
   "scores": {
     "artificialAnalysis": {
@@ -47,8 +46,8 @@
     },
     "nvidia_nim": {
       "upstream": "z-ai/glm-5.3-flash",
-      "contextWindow": 1000000,
-      "maxOutputTokens": 131072
+      "contextWindow": 1024000,
+      "maxOutputTokens": 1024000
     },
     "opencode": {
       "upstream": "glm-5.3-flash-free",
@@ -57,12 +56,12 @@
     },
     "perch": {
       "upstream": "glm-5.3-flash-starter",
-      "contextWindow": 1000000,
-      "maxOutputTokens": 131072
+      "contextWindow": 1024000,
+      "maxOutputTokens": 1024000
     },
     "workbuddy": {
-      "contextWindow": 1000000,
-      "maxOutputTokens": 131072
+      "contextWindow": 1024000,
+      "maxOutputTokens": 1024000
     },
     "zenmux": {
       "upstream": "z-ai/glm-5.3-flash",

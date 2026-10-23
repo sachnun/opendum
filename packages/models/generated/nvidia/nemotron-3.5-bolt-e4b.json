@@ -1,0 +1,35 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "reasoning": true,
+  "reasoning_effort": [
+    "low",
+    "medium",
+    "high"
+  ],
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 262144,
+    "output": 131072
+  },
+  "cost": {
+    "input": 0.25,
+    "output": 1,
+    "cacheRead": 0.05
+  },
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "nvidia/nemotron-3.5-bolt-e4b",
+      "contextWindow": 262144,
+      "maxOutputTokens": 131072
+    }
+  }
+}

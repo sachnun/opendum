@@ -19,7 +19,9 @@
     "input": [
       "audio",
       "image",
-      "text"
+      "pdf",
+      "text",
+      "video"
     ],
     "output": [
       "text"
