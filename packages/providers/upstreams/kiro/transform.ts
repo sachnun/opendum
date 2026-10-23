@@ -982,9 +982,33 @@ export function kiroThinkingBudget(body: Json): number {
   return 20000;
 }
 
+/**
+ * Kiro keeps server side conversation state per id, so a fresh random id on every
+ * request throws that state away and forces the upstream to reprocess the whole
+ * transcript. Derive it from the client session instead, falling back to the
+ * first user turn so a client that sends no session still stays on one thread.
+ */
+function kiroConversationId(body: Json): string {
+  const session = stringValue(body._sessionId).trim();
+  if (session) return conversationIdFromSeed(session);
+  const messages = Array.isArray(body.messages) ? body.messages : [];
+  for (const raw of messages) {
+    const message = (raw ?? {}) as Json;
+    if (stringValue(message.role) !== "user") continue;
+    const text = contentToText(message.content).trim();
+    if (!text) continue;
+    return conversationIdFromSeed(text);
+  }
+  return randomId("conversation");
+}
+
+function conversationIdFromSeed(seed: string): string {
+  return `conversation_${new Bun.CryptoHasher("sha256").update(seed).digest("hex").slice(0, 32)}`;
+}
+
 export function buildKiroRequest(registry: Registry, body: Json): Json {
   const modelId = normalizeKiroModel(registry, stringValue(body.model));
-  const conversationId = randomId("conversation");
+  const conversationId = kiroConversationId(body);
   const tools = convertKiroTools(body.tools);
   const rawMessages = Array.isArray(body.messages) ? body.messages : [];
   const { systemPrompt: baseSystem, messages: withoutSystem } = splitKiroSystemMessages(rawMessages);

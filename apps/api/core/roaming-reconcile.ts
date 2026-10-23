@@ -4,6 +4,7 @@ import type { PointPort } from "./repositories.js";
 
 export const ROAMING_ORPHAN_AGE_MS = 15 * 60 * 1000;
 export const ROAMING_RECONCILE_BATCH = 200;
+const ROAMING_RECONCILE_CONCURRENCY = 8;
 
 export type ReconcileOptions = {
   olderThanMs?: number;
@@ -22,47 +23,56 @@ export type ReconcileResult = {
  * process died mid-stream. A request older than the grace window can no longer
  * be in flight, so the debit is safe to reverse.
  */
-export async function reconcileOrphanedRoaming(
+export function reconcileOrphanedRoaming(
   points: PointPort,
   options: ReconcileOptions = {}
-): Promise<ReconcileResult> {
+): Effect.Effect<ReconcileResult> {
   const now = options.now ?? new Date();
   const olderThanMs = options.olderThanMs ?? ROAMING_ORPHAN_AGE_MS;
   const batchLimit = options.batchLimit ?? ROAMING_RECONCILE_BATCH;
-  const orphans = await points.listOrphanedRoamingDebits({
-    olderThan: new Date(now.getTime() - olderThanMs),
-    limit: batchLimit,
-  });
-
-  let refunded = 0;
-  let failed = 0;
-  for (const orphan of orphans) {
-    const reservation: PointReservation = {
-      userId: orphan.userId,
-      model: "",
-      amount: Math.abs(orphan.amount),
-      debitId: orphan.id,
-    };
-    const outcome = await Effect.runPromise(
-      Effect.tryPromise({
-        try: () => refundRoamingPoint(points, reservation),
-        catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
-      }).pipe(Effect.result)
+  return Effect.gen(function* () {
+    const orphans = yield* Effect.promise(() =>
+      points.listOrphanedRoamingDebits({
+        olderThan: new Date(now.getTime() - olderThanMs),
+        limit: batchLimit,
+      })
     );
-    if (outcome._tag === "Success") refunded += 1;
-    else failed += 1;
-  }
 
-  return { scanned: orphans.length, refunded, failed };
+    const outcomes = yield* Effect.forEach(
+      orphans,
+      (orphan) => {
+        const reservation: PointReservation = {
+          userId: orphan.userId,
+          model: "",
+          amount: Math.abs(orphan.amount),
+          debitId: orphan.id,
+        };
+        return Effect.tryPromise({
+          try: () => refundRoamingPoint(points, reservation),
+          catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
+        }).pipe(
+          Effect.tapError((error) =>
+            Effect.logError("roaming refund failed", { debitId: orphan.id, error: error.message })
+          ),
+          Effect.as(true),
+          Effect.orElseSucceed(() => false)
+        );
+      },
+      { concurrency: ROAMING_RECONCILE_CONCURRENCY }
+    );
+
+    const refunded = outcomes.filter(Boolean).length;
+    return { scanned: orphans.length, refunded, failed: orphans.length - refunded };
+  });
 }
 
 export function roamingReconcileLoop(
   intervalMs: number,
-  run: () => Promise<ReconcileResult>
+  run: () => Effect.Effect<ReconcileResult>
 ): Effect.Effect<void, never> {
   if (intervalMs <= 0) return Effect.void;
   return Effect.repeat(
-    Effect.promise(run).pipe(
+    Effect.suspend(run).pipe(
       Effect.tap((result) =>
         result.refunded > 0 || result.failed > 0
           ? Effect.logWarning("roaming reconciliation", result)

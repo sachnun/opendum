@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { Effect } from "effect";
 import type { QuotaAccount, QuotaContext } from "./types.js";
 import { QuotaFetchFailure } from "../core/errors.js";
@@ -33,7 +32,7 @@ function rawCacheTtlSeconds(): number {
 }
 
 function rawCacheKey(account: QuotaAccount, cacheName: string, method: string, target: string, encodedBody: string): string {
-  const hash = createHash("sha256")
+  const hash = new Bun.CryptoHasher("sha256")
     .update([account.provider, account.id, cacheName, method.toUpperCase(), target, encodedBody].join("\n"))
     .digest("hex");
   return `${RAW_CACHE_PREFIX}:${account.provider}:${account.id}:${hash}`;

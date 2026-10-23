@@ -816,6 +816,10 @@ export class ProxyService implements StreamRecorder {
               yield* Effect.promise(() =>
                 this.health.logAccountError(account.id, account.userId, validation.model, response.status, detailed)
               );
+            } else if (response.status === 404) {
+              yield* Effect.promise(() =>
+                this.health.logAccountError(account.id, account.userId, validation.model, response.status, detailed)
+              );
             } else {
               failedAt = yield* Effect.promise(() =>
                 this.health.markAccountFailed(account.id, validation.model, response.status, detailed)
@@ -1235,7 +1239,9 @@ export class ProxyService implements StreamRecorder {
     await this.repositories.accounts.recordAccountError({ id: account.id, at: now, code: statusCode });
     const ownerUserId = account.userId || (await this.repositories.accounts.getAccountOwnerUserID(account.id)) || "";
     if (ownerUserId) {
-      await upsertErrorHistory(this.redis, account.id, ownerUserId, null, statusCode, `Token refresh failed: ${message}`, now);
+      await Effect.runPromise(
+        upsertErrorHistory(this.redis, account.id, ownerUserId, null, statusCode, `Token refresh failed: ${message}`, now)
+      );
     }
     if (failCount >= REFRESH_MAX_CONSECUTIVE_FAILURES) {
       await this.repositories.accounts.disableFailedAccount({ id: account.id, status: "failed", at: now });

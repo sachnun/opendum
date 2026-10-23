@@ -1,7 +1,5 @@
 import { Effect } from "effect";
 import type { OpendumRedis } from "@opendum/core/redis";
-import { tryAsync } from "./helpers.js";
-import { ignore } from "./service-helpers.js";
 
 const ERROR_HISTORY_KEY_PREFIX = "opendum:provider-account:error-history";
 const ERROR_HISTORY_ENTRY_PREFIX = "opendum:provider-account:error-history-entry";
@@ -44,7 +42,7 @@ export function errorHistoryDedupeKey(
   return `${ERROR_HISTORY_DEDUPE_PREFIX}:${accountId}:${hash}`;
 }
 
-export async function upsertErrorHistory(
+export function upsertErrorHistory(
   redis: OpendumRedis | null,
   accountId: string,
   userId: string,
@@ -52,31 +50,36 @@ export async function upsertErrorHistory(
   statusCode: number,
   message: string,
   createdAt: Date
-): Promise<void> {
-  if (!redis) return;
+): Effect.Effect<void> {
+  if (!redis) return Effect.void;
   const dedupeKey = errorHistoryDedupeKey(accountId, model, statusCode, message);
-  const cachedEntryId = await tryAsync(() => redis.get(dedupeKey), null);
-  const entryId = cachedEntryId ? cachedEntryId : crypto.randomUUID();
-  const entry: Entry = {
-    id: entryId,
-    providerAccountId: accountId,
-    userId,
-    model,
-    errorCode: statusCode,
-    errorMessage: message,
-    createdAt: createdAt.toISOString(),
-    dedupeKey,
-  };
   const ttl = errorHistoryTtl(statusCode);
-  await Effect.runPromise(
-    ignore(async () => {
-      await redis.set(errorHistoryEntryKey(entryId), JSON.stringify(entry), { EX: ttl });
-      await redis.set(dedupeKey, entryId, { EX: ttl });
-      await redis.zAdd(errorHistoryKey(accountId), {
-        score: createdAt.getTime(),
-        value: entryId,
-      });
-      await redis.expire(errorHistoryKey(accountId), ERROR_HISTORY_DEFAULT_TTL_SECONDS);
-    })
+  return Effect.gen(function* () {
+    const cachedEntryId = yield* redisEffect(() => redis.get(dedupeKey)).pipe(Effect.orElseSucceed(() => null));
+    const entryId = cachedEntryId ? cachedEntryId : crypto.randomUUID();
+    const entry: Entry = {
+      id: entryId,
+      providerAccountId: accountId,
+      userId,
+      model,
+      errorCode: statusCode,
+      errorMessage: message,
+      createdAt: createdAt.toISOString(),
+      dedupeKey,
+    };
+    yield* redisEffect(() => redis.set(errorHistoryEntryKey(entryId), JSON.stringify(entry), { EX: ttl }));
+    yield* redisEffect(() => redis.set(dedupeKey, entryId, { EX: ttl }));
+    yield* redisEffect(() => redis.zAdd(errorHistoryKey(accountId), { score: createdAt.getTime(), value: entryId }));
+    yield* redisEffect(() => redis.expire(errorHistoryKey(accountId), ERROR_HISTORY_DEFAULT_TTL_SECONDS));
+  }).pipe(
+    Effect.tapError((error) => Effect.logDebug("error history write failed", { accountId, error: error.message })),
+    Effect.ignore
   );
+}
+
+function redisEffect<A>(run: () => Promise<A>): Effect.Effect<A, Error> {
+  return Effect.tryPromise({
+    try: run,
+    catch: (error) => (error instanceof Error ? error : new Error(String(error))),
+  });
 }

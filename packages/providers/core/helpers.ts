@@ -1,5 +1,3 @@
-import { createHash, randomBytes } from "node:crypto";
-
 export function stringValue(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
@@ -60,33 +58,29 @@ export function stringSlice(value: unknown): string[] {
 }
 
 export function randomId(prefix: string): string {
-  return `${prefix}_${randomBytes(16).toString("hex")}`;
+  return `${prefix}_${hex(crypto.getRandomValues(new Uint8Array(16)))}`;
 }
 
 export function randomUuid(): string {
-  const buf = randomBytes(16);
-  buf[6] = (buf[6] & 0x0f) | 0x40;
-  buf[8] = (buf[8] & 0x3f) | 0x80;
-  const hex = buf.toString("hex");
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  return crypto.randomUUID();
 }
 
+/** 32 hex characters without dashes, matching the uuid shaped headers upstreams expect. */
 export function randomUuidV7Hex(): string {
-  const buf = randomBytes(16);
-  const ms = BigInt(Date.now());
-  for (let index = 0; index < 6; index += 1) {
-    buf[index] = Number((ms >> BigInt(8 * (5 - index))) & 0xffn);
-  }
-  buf[6] = (buf[6] & 0x0f) | 0x70;
-  buf[8] = (buf[8] & 0x3f) | 0x80;
-  return buf.toString("hex");
+  return Bun.randomUUIDv7("hex").replaceAll("-", "");
 }
 
 export function seededUuidV7Hex(seed: string): string {
-  const chars = createHash("sha256").update(seed).digest("hex").slice(0, 32).split("");
+  const chars = new Bun.CryptoHasher("sha256").update(seed).digest("hex").slice(0, 32).split("");
   chars[12] = "7";
   chars[16] = "8";
   return chars.join("");
+}
+
+export function hex(bytes: Uint8Array): string {
+  let out = "";
+  for (const byte of bytes) out += byte.toString(16).padStart(2, "0");
+  return out;
 }
 
 export function contentToText(content: unknown): string {

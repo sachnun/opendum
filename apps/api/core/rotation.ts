@@ -277,7 +277,7 @@ export class Rotation {
   private routing(model: string, enabled: boolean): Effect.Effect<ProviderRoutingOptions | undefined> {
     if (!enabled) return Effect.succeed(undefined);
     return Effect.gen({ self: this }, function* () {
-      const scores = yield* Effect.promise(() => this.performance.scoresForModel(this.models.resolveAlias(model)));
+      const scores = yield* this.performance.scoresForModel(this.models.resolveAlias(model));
       if (scores.size === 0) return undefined;
       return this.performance.routingOptions(scores);
     });

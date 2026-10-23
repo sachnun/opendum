@@ -1,4 +1,3 @@
-import { randomBytes } from "node:crypto";
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
 import {
@@ -6,6 +5,7 @@ import {
   jsonResponse,
   numberFromAny,
   parseSseDataLines,
+  hex,
   randomUuidV7Hex,
   seededUuidV7Hex,
   stringValue,
@@ -66,9 +66,9 @@ function lastModelSegment(model: string): string {
 }
 
 function traceHeaders(): Record<string, string> {
-  const traceId = randomBytes(16).toString("hex");
-  const spanId = randomBytes(8).toString("hex");
-  const parentSpanId = randomBytes(8).toString("hex");
+  const traceId = hex(crypto.getRandomValues(new Uint8Array(16)));
+  const spanId = hex(crypto.getRandomValues(new Uint8Array(8)));
+  const parentSpanId = hex(crypto.getRandomValues(new Uint8Array(8)));
   return {
     traceparent: `00-${traceId}-${spanId}-01`,
     b3: `${traceId}-${spanId}-1-${parentSpanId}`,

@@ -132,6 +132,10 @@ describe("errors", () => {
     expect(shouldRotate(400)).toBe(false);
   });
 
+  it("rotates on 404 so a missing model can move to another account", () => {
+    expect(shouldRotate(404)).toBe(true);
+  });
+
   it("extracts nested provider message", () => {
     const result = sanitizedProxyError(400, JSON.stringify({ error: { message: "bad  input" } }));
     expect(result.message).toBe("bad input");

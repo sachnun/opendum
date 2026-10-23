@@ -86,7 +86,7 @@ describe("Rotation shared affinity", () => {
       } as unknown as Registry,
       providers: { isAuthless: () => false } as unknown as ProviderRegistry,
       health: health as Health,
-      performance: { scoresForModel: async () => new Map() } as unknown as ProviderPerformance,
+      performance: { scoresForModel: () => Effect.succeed(new Map()) } as unknown as ProviderPerformance,
       affinity,
     });
   }

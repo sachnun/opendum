@@ -1,4 +1,3 @@
-import { randomBytes } from "node:crypto";
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
 import {
@@ -6,6 +5,7 @@ import {
   defaultStringValue,
   jsonResponse,
   numberFromAny,
+  hex,
   randomId,
   stringValue,
 } from "../core/helpers.js";
@@ -95,7 +95,7 @@ function perchUserAgent(): string {
 }
 
 function perchRunId(): string {
-  return `cli-turn-${Date.now()}-${randomBytes(4).toString("hex")}`;
+  return `cli-turn-${Date.now()}-${hex(crypto.getRandomValues(new Uint8Array(4)))}`;
 }
 
 async function sessionIdsForAccount(

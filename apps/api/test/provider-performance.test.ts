@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { Effect } from "effect";
 import type { OpendumRedis } from "@opendum/core/redis";
 import type { ProviderAccount } from "@opendum/providers";
 import {
@@ -113,10 +114,14 @@ function fakeHashRedis(): OpendumRedis {
 describe("ProviderPerformance store", () => {
   it("records samples and exposes scores for a model", async () => {
     const store = new ProviderPerformance(fakeHashRedis(), { ...config, cacheTtlSeconds: 0 });
-    await store.record({ provider: "fast", model: "gpt-4o", ttftMs: 200, outputTokens: 500, durationMs: 1200 });
-    await store.record({ provider: "slow", model: "gpt-4o", ttftMs: 2000, outputTokens: 50, durationMs: 3000 });
+    await Effect.runPromise(
+      store.record({ provider: "fast", model: "gpt-4o", ttftMs: 200, outputTokens: 500, durationMs: 1200 })
+    );
+    await Effect.runPromise(
+      store.record({ provider: "slow", model: "gpt-4o", ttftMs: 2000, outputTokens: 50, durationMs: 3000 })
+    );
 
-    const result = await store.scoresForModel("gpt-4o");
+    const result = await Effect.runPromise(store.scoresForModel("gpt-4o"));
     expect(result.size).toBe(2);
     expect((result.get("fast")?.score ?? Infinity) < (result.get("slow")?.score ?? Infinity)).toBeTruthy();
     expect(result.get("fast")?.tokensPerSecond).toBe(500);
@@ -124,6 +129,6 @@ describe("ProviderPerformance store", () => {
 
   it("returns an empty map when there is nothing recorded", async () => {
     const store = new ProviderPerformance(fakeHashRedis(), config);
-    expect((await store.scoresForModel("missing")).size).toBe(0);
+    expect((await Effect.runPromise(store.scoresForModel("missing"))).size).toBe(0);
   });
 });

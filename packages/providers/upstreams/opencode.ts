@@ -1,4 +1,3 @@
-import { randomBytes, createHash } from "node:crypto";
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
 import {
@@ -11,7 +10,7 @@ import {
   anthropicMessagesSseToChatStream,
   buildAnthropicMessagesPayload,
 } from "../transform/anthropic.js";
-import { defaultStringValue, jsonResponse, sseResponse, stringValue } from "../core/helpers.js";
+import { defaultStringValue, hex, jsonResponse, sseResponse, stringValue } from "../core/helpers.js";
 import { providerConfigBool } from "../core/model-config.js";
 import {
   postExecuteWithFallback,
@@ -65,12 +64,12 @@ function opencodeId(prefix: string, descending: boolean): string {
   idCounter += 1;
   let value = BigInt(now) * 0x1000n + BigInt(idCounter);
   if (descending) value = ~value & 0xffffffffffffffffn;
-  const timeBytes = Buffer.alloc(6);
+  const timeBytes = new Uint8Array(6);
   for (let index = 0; index < 6; index += 1) {
     timeBytes[index] = Number((value >> BigInt(40 - 8 * index)) & 0xffn);
   }
-  const random = randomBytes(14);
-  let out = `${prefix}_${timeBytes.toString("hex")}`;
+  const random = crypto.getRandomValues(new Uint8Array(14));
+  let out = `${prefix}_${hex(timeBytes)}`;
   for (const byte of random) out += ID_ALPHABET[byte % ID_ALPHABET.length];
   return out;
 }
@@ -96,8 +95,8 @@ function isCanonicalSession(seed: string): boolean {
  * the counter the official client sends while the rest is derived from the seed.
  */
 function canonicalId(prefix: string, seed: string): string {
-  const hash = createHash("sha256").update(`${prefix}\u0000${seed}`).digest();
-  const time = `${hash.subarray(0, 6).toString("hex").slice(0, 9)}${SESSION_COUNTER_HEX}`;
+  const hash = new Bun.CryptoHasher("sha256").update(`${prefix}\u0000${seed}`).digest();
+  const time = `${hex(hash.subarray(0, 6)).slice(0, 9)}${SESSION_COUNTER_HEX}`;
   let out = `${prefix}_${time}`;
   for (const byte of hash.subarray(6, 20)) out += ID_ALPHABET[byte % ID_ALPHABET.length];
   return out;

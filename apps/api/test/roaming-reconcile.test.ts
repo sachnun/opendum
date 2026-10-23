@@ -1,4 +1,5 @@
 import { describe, expect, it, mock } from "bun:test";
+import { Effect } from "effect";
 
 import type { PointPort } from "../core/repositories.js";
 import { reconcileOrphanedRoaming, ROAMING_ORPHAN_AGE_MS } from "../core/roaming-reconcile.js";
@@ -21,7 +22,7 @@ describe("roaming reconciliation", () => {
       insertPointTransactionOnConflictDoNothing: mock(async () => 1),
     });
 
-    const result = await reconcileOrphanedRoaming(points, { now: new Date() });
+    const result = await Effect.runPromise(reconcileOrphanedRoaming(points, { now: new Date() }));
 
     expect(result).toEqual({ scanned: 2, refunded: 2, failed: 0 });
     expect(points.insertPointTransactionOnConflictDoNothing).toHaveBeenCalledTimes(2);
@@ -38,7 +39,7 @@ describe("roaming reconciliation", () => {
       },
     });
 
-    await reconcileOrphanedRoaming(points, { now, batchLimit: 7 });
+    await Effect.runPromise(reconcileOrphanedRoaming(points, { now, batchLimit: 7 }));
 
     expect(calls).toHaveLength(1);
     expect(calls[0]?.limit).toBe(7);
@@ -56,7 +57,7 @@ describe("roaming reconciliation", () => {
       }),
     });
 
-    const result = await reconcileOrphanedRoaming(points, { now: new Date() });
+    const result = await Effect.runPromise(reconcileOrphanedRoaming(points, { now: new Date() }));
 
     expect(result).toEqual({ scanned: 2, refunded: 0, failed: 2 });
   });
@@ -64,7 +65,7 @@ describe("roaming reconciliation", () => {
   it("does nothing when no debit is orphaned", async () => {
     const points = pointPort();
 
-    const result = await reconcileOrphanedRoaming(points, { now: new Date() });
+    const result = await Effect.runPromise(reconcileOrphanedRoaming(points, { now: new Date() }));
 
     expect(result).toEqual({ scanned: 0, refunded: 0, failed: 0 });
     expect(points.creditPointBalance).not.toHaveBeenCalled();

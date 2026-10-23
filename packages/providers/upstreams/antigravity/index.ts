@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { Duration, Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
 import type { OpendumRedis } from "@opendum/core/redis";
@@ -78,7 +77,7 @@ function toNumericSessionId(sessionId: string): string {
   const value = sessionId.trim();
   if (!value) return "";
   if (/^-?\d+$/.test(value)) return value;
-  const hash = createHash("sha256").update(value).digest();
+  const hash = new Bun.CryptoHasher("sha256").update(value).digest();
   const n = hash.readBigUInt64BE(0) & 0x7fffffffffffffffn;
   return `-${n.toString()}`;
 }
@@ -90,7 +89,7 @@ function stableSessionId(body: Json): string {
     if (stringValue(msg.role) !== "user") continue;
     const text = contentToText(msg.content);
     if (!text.trim()) continue;
-    const hex = createHash("sha256").update(text).digest("hex").slice(0, 32);
+    const hex = new Bun.CryptoHasher("sha256").update(text).digest("hex").slice(0, 32);
     return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
   }
   return randomId("session");
@@ -900,7 +899,7 @@ export class AntigravityProvider implements Provider, CredentialRefresher, Refre
   }
 
   private signatureCacheKey(model: string, sessionId: string, thoughtText: string): string {
-    const hash = createHash("sha256")
+    const hash = new Bun.CryptoHasher("sha256")
       .update(`${this.signatureFamily(model)}:${sessionId}:${thoughtText.trim()}`)
       .digest("hex");
     return `${SIGNATURE_CACHE_PREFIX}:${hash}`;

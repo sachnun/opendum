@@ -1,7 +1,6 @@
 import { Cache, Duration, Effect, Result } from "effect";
 import type { OpendumRedis } from "@opendum/core/redis";
-import { parseJson, tryAsync } from "./helpers.js";
-import { ignore } from "./service-helpers.js";
+import { parseJson } from "./helpers.js";
 
 export type ProviderPerformanceConfig = {
   sampleTtlSeconds: number;
@@ -113,25 +112,18 @@ export function blendMetrics(previous: ProviderMetrics | null, sample: { ttftMs:
 export class ProviderPerformance {
   private readonly redis: OpendumRedis;
   private readonly config: ProviderPerformanceConfig;
-  private effectCache: Cache.Cache<string, Map<string, ProviderScore>> | null = null;
+  private readonly scoresCache: Cache.Cache<string, Map<string, ProviderScore>>;
 
   constructor(redis: OpendumRedis, config: ProviderPerformanceConfig = DEFAULT_PROVIDER_PERFORMANCE_CONFIG) {
     this.redis = redis;
     this.config = config;
-  }
-
-  private getScoresCache(): Cache.Cache<string, Map<string, ProviderScore>> {
-    if (this.effectCache) return this.effectCache;
-    const ttl = this.config.cacheTtlSeconds > 0 ? Duration.seconds(this.config.cacheTtlSeconds) : Duration.zero;
-    const built = Effect.runSync(
+    this.scoresCache = Effect.runSync(
       Cache.make({
         capacity: 1024,
-        timeToLive: ttl,
-        lookup: (key: string) => Effect.promise(() => this.loadScores(key)),
+        timeToLive: config.cacheTtlSeconds > 0 ? Duration.seconds(config.cacheTtlSeconds) : Duration.zero,
+        lookup: (key: string) => this.loadScores(key),
       })
     );
-    this.effectCache = built;
-    return built;
   }
 
   routingOptions(scores: Map<string, ProviderScore>): ProviderRoutingOptions {
@@ -142,42 +134,53 @@ export class ProviderPerformance {
     };
   }
 
-  async record(sample: ProviderPerformanceSample): Promise<void> {
+  /** Folds one sample into the EWMA stored in Redis and drops the cached scores. */
+  record(sample: ProviderPerformanceSample): Effect.Effect<void> {
     const ttftMs = Math.max(0, sample.ttftMs);
     const tokensPerSecond = sampleTokensPerSecond(ttftMs, sample.durationMs, sample.outputTokens);
-    if (ttftMs <= 0 && tokensPerSecond <= 0) return;
+    if (ttftMs <= 0 && tokensPerSecond <= 0) return Effect.void;
     const key = providerPerformanceKey(sample.model);
-    await Effect.runPromise(
-      ignore(async () => {
-        const previous = parseMetrics(await this.redis.hGet(key, sample.provider));
-        const next = blendMetrics(previous, { ttftMs, tokensPerSecond }, this.config.ewmaAlpha);
-        await this.redis.hSet(key, sample.provider, JSON.stringify(next));
-        await this.redis.expire(key, this.config.sampleTtlSeconds);
-        await Effect.runPromise(Cache.invalidate(this.getScoresCache(), key));
-      })
+    return Effect.gen({ self: this }, function* () {
+      const raw = yield* this.redisEffect(() => this.redis.hGet(key, sample.provider));
+      const next = blendMetrics(parseMetrics(raw ?? null), { ttftMs, tokensPerSecond }, this.config.ewmaAlpha);
+      yield* this.redisEffect(() => this.redis.hSet(key, sample.provider, JSON.stringify(next)));
+      yield* this.redisEffect(() => this.redis.expire(key, this.config.sampleTtlSeconds));
+      yield* Cache.invalidate(this.scoresCache, key);
+    }).pipe(
+      Effect.tapError((error) => Effect.logDebug("provider performance sample dropped", { error, provider: sample.provider })),
+      Effect.ignore
     );
   }
 
-  async scoresForModel(model: string): Promise<Map<string, ProviderScore>> {
-    const key = providerPerformanceKey(model);
-    return Effect.runPromise(Cache.get(this.getScoresCache(), key));
+  scoresForModel(model: string): Effect.Effect<Map<string, ProviderScore>> {
+    return Cache.get(this.scoresCache, providerPerformanceKey(model)).pipe(
+      Effect.orElseSucceed(() => new Map<string, ProviderScore>())
+    );
   }
 
-  private async loadScores(key: string): Promise<Map<string, ProviderScore>> {
-    const scores = new Map<string, ProviderScore>();
-    const entries = await tryAsync(() => this.redis.hGetAll(key), null);
-    if (!entries) return scores;
-    for (const [provider, raw] of Object.entries(entries)) {
-      const metrics = parseMetrics(raw);
-      if (!metrics) continue;
-      scores.set(provider, {
-        provider,
-        score: scoreProviderMetrics(metrics, this.config),
-        ttftMs: metrics.ttftMs,
-        tokensPerSecond: metrics.tokensPerSecond,
-        samples: metrics.samples,
-      });
-    }
-    return scores;
+  private loadScores(key: string): Effect.Effect<Map<string, ProviderScore>> {
+    return Effect.gen({ self: this }, function* () {
+      const entries = yield* this.redisEffect(() => this.redis.hGetAll(key)).pipe(Effect.orElseSucceed(() => ({})));
+      const scores = new Map<string, ProviderScore>();
+      for (const [provider, raw] of Object.entries(entries ?? {})) {
+        const metrics = parseMetrics(raw);
+        if (!metrics) continue;
+        scores.set(provider, {
+          provider,
+          score: scoreProviderMetrics(metrics, this.config),
+          ttftMs: metrics.ttftMs,
+          tokensPerSecond: metrics.tokensPerSecond,
+          samples: metrics.samples,
+        });
+      }
+      return scores;
+    });
+  }
+
+  private redisEffect<A>(run: () => Promise<A>): Effect.Effect<A, Error> {
+    return Effect.tryPromise({
+      try: run,
+      catch: (error) => (error instanceof Error ? error : new Error(String(error))),
+    });
   }
 }

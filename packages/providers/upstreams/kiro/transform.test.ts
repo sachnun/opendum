@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { Parser, convertKiroEventsToCompletion } from "./transform.js";
+import { Parser, buildKiroRequest, convertKiroEventsToCompletion } from "./transform.js";
 
 type Json = Record<string, unknown>;
 
@@ -93,5 +93,46 @@ describe("Parser", () => {
     const parser = new Parser();
     expect(parser.processContent("0123456789abc")).toEqual(["01", ""]);
     expect(parser.flushContent()).toEqual(["23456789abc", ""]);
+  });
+});
+
+describe("buildKiroRequest conversation identity", () => {
+  const registry = {
+    isSupportedByProvider: () => false,
+    isReasoningModel: () => false,
+    upstream: () => "",
+  } as never;
+
+  function conversationIdOf(body: Json): string {
+    const payload = buildKiroRequest(registry, body) as Json;
+    const state = payload.conversationState as Json;
+    return state.conversationId as string;
+  }
+
+  it("derives the same conversation id from the same session", () => {
+    const body = { model: "claude-sonnet-4.5", messages: [{ role: "user", content: "hi" }] };
+
+    const first = conversationIdOf({ ...body, _sessionId: "sess-1" });
+    const second = conversationIdOf({ ...body, _sessionId: "sess-1" });
+
+    expect(first).toBe(second);
+    expect(first.startsWith("conversation_")).toBe(true);
+  });
+
+  it("gives different sessions different conversation ids", () => {
+    const body = { model: "claude-sonnet-4.5", messages: [{ role: "user", content: "hi" }] };
+
+    expect(conversationIdOf({ ...body, _sessionId: "sess-1" })).not.toBe(
+      conversationIdOf({ ...body, _sessionId: "sess-2" })
+    );
+  });
+
+  it("falls back to the first user turn when the client sends no session", () => {
+    const body = { model: "claude-sonnet-4.5", messages: [{ role: "user", content: "hello there" }] };
+
+    const first = conversationIdOf(body);
+    const second = conversationIdOf({ ...body, messages: [...(body.messages as Json[])] });
+
+    expect(first).toBe(second);
   });
 });

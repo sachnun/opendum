@@ -262,7 +262,6 @@ export function extractSessionId(request: Request, body: Record<string, unknown>
     "x-session-id",
     "session-id",
     "x-session-affinity",
-    "x-client-request-id",
   ]) {
     const value = request.headers.get(header)?.trim();
     if (value) return value;

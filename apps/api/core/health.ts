@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 import type { HealthPort, AccountPort } from "./repositories.js";
 import type { OpendumRedis } from "@opendum/core/redis";
 import type { Registry } from "@opendum/models/runtime";
@@ -5,7 +6,6 @@ import { upsertErrorHistory } from "./error-history.js";
 import {
   cooldownRecoveryCount,
   effectiveUnhealthyCount,
-  ignore,
   isSyntheticProviderAccountId,
   modelHealthStatus,
   successRecoveryCount,
@@ -191,7 +191,7 @@ export class Health {
     await this.refresh(accountId, now);
     const ownerUserId = await this.accounts.getAccountOwnerUserID(accountId);
     if (ownerUserId) {
-      await upsertErrorHistory(this.redis, accountId, ownerUserId, resolved, statusCode, stored, now);
+      await Effect.runPromise(upsertErrorHistory(this.redis, accountId, ownerUserId, resolved, statusCode, stored, now));
     }
     return now;
   }
@@ -232,11 +232,17 @@ export class Health {
     if (isSyntheticProviderAccountId(accountId)) return;
     const stored = message.length > MAX_ERROR_LEN ? message.slice(0, MAX_ERROR_LEN) : message;
     const resolved = this.models.resolveAlias(model);
-    await upsertErrorHistory(this.redis, accountId, userId, resolved, statusCode, stored, new Date());
+    await Effect.runPromise(upsertErrorHistory(this.redis, accountId, userId, resolved, statusCode, stored, new Date()));
   }
 
   bumpRequest(accountId: string): void {
     if (isSyntheticProviderAccountId(accountId)) return;
-    trackWork(ignore(() => this.health.bumpAccountRequestCount({ id: accountId, at: new Date() })));
+    const at = new Date();
+    trackWork(
+      Effect.tryPromise({
+        try: () => this.health.bumpAccountRequestCount({ id: accountId, at }),
+        catch: (error) => (error instanceof Error ? error : new Error(String(error))),
+      }).pipe(Effect.ignore)
+    );
   }
 }
