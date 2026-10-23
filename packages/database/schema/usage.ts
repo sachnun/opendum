@@ -109,6 +109,9 @@ export const pointTransaction = pgTable(
       table.userId,
       table.createdAt,
     ),
-
+    index("point_transaction_type_createdAt_idx").on(
+      table.type,
+      table.createdAt,
+    ),
   ],
 );

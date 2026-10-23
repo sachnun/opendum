@@ -8,6 +8,7 @@ import { Fetcher, UnroxyEgress, type Fetch } from "@opendum/core/egress";
 import { ProviderRegistry, RedisFallbackRouter, type EgressFetch } from "@opendum/providers";
 import { db, closeDatabase } from "@opendum/database";
 import { ProxyService } from "./service.js";
+import { reconcileOrphanedRoaming, roamingReconcileLoop } from "./roaming-reconcile.js";
 import { proxyConfig } from "../config.js";
 import { ProxyContextTag, type ProxyContext } from "./services.js";
 
@@ -86,6 +87,14 @@ export const ProxyContextLayer = Layer.effect(
     if (config.tokenRefreshIntervalMs > 0) {
       yield* Effect.forkScoped(
         service.refreshTokenLoop(config.tokenRefreshIntervalMs).pipe(Effect.catchCause(() => Effect.void))
+      );
+    }
+
+    if (config.roamingReconcileIntervalMs > 0) {
+      yield* Effect.forkScoped(
+        roamingReconcileLoop(config.roamingReconcileIntervalMs, () =>
+          reconcileOrphanedRoaming(service.points)
+        ).pipe(Effect.catchCause(() => Effect.void))
       );
     }
 

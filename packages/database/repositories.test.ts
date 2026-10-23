@@ -50,6 +50,7 @@ const queries = {
   insertPointTransaction: noop(),
   insertPointTransactionOnConflictDoNothing: mock(async () => 0),
   updatePointTransactionBalance: noop(),
+  listOrphanedRoamingDebits: mock(async () => []),
 };
 
 mock.module("./queries/index.js", () => queries);

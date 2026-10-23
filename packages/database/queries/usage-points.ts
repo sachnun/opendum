@@ -1,4 +1,5 @@
-import { and, eq, gte, sql } from "drizzle-orm";
+import { and, eq, gte, lt, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { createId } from "@paralleldrive/cuid2";
 import { db, type DbExecutor } from "../client.js";
 import { pointTransaction, usageLog, userPointBalance } from "../schema/usage.js";
@@ -127,6 +128,62 @@ export async function updatePointTransactionBalance(
     .update(pointTransaction)
     .set({ balanceAfter: params.balanceAfter })
     .where(eq(pointTransaction.id, params.id));
+}
+
+export type OrphanedRoamingDebitParams = {
+  olderThan: Date;
+  limit: number;
+};
+
+export type OrphanedRoamingDebit = {
+  id: string;
+  userId: string;
+  amount: number;
+  createdAt: Date;
+};
+
+/**
+ * Finds `roaming_debit` rows whose reservation never settled or refunded, which
+ * happens when the process dies mid-stream. Every terminal outcome writes a row
+ * keyed by the debit id: `roaming_refund:<id>`, `roaming_settle:<id>`, or
+ * `sharing_credit:<id>`. Rows written before settle markers existed only have
+ * the sharing credit, so all three count as evidence that the reservation closed.
+ */
+export async function listOrphanedRoamingDebits(
+  params: OrphanedRoamingDebitParams,
+  database: DbExecutor = db
+): Promise<OrphanedRoamingDebit[]> {
+  const settlement = alias(pointTransaction, "settlement");
+  const rows = await database
+    .select({
+      id: pointTransaction.id,
+      userId: pointTransaction.userId,
+      amount: pointTransaction.amount,
+      createdAt: pointTransaction.createdAt,
+    })
+    .from(pointTransaction)
+    .where(
+      and(
+        eq(pointTransaction.type, "roaming_debit"),
+        lt(pointTransaction.createdAt, params.olderThan),
+        sql`not exists (
+          select 1 from ${settlement}
+          where ${settlement.idempotencyKey} in (
+            'roaming_refund:' || ${pointTransaction.id},
+            'roaming_settle:' || ${pointTransaction.id},
+            'sharing_credit:' || ${pointTransaction.id}
+          )
+        )`,
+      )
+    )
+    .orderBy(pointTransaction.createdAt)
+    .limit(params.limit);
+  return rows.map((row) => ({
+    id: row.id,
+    userId: row.userId,
+    amount: row.amount,
+    createdAt: row.createdAt,
+  }));
 }
 
 export async function insertPointBalanceOnConflictDoNothing(

@@ -132,7 +132,6 @@ export async function adjustRoamingPoints(
 ): Promise<void> {
   if (!reservation || !reservation.userId) return;
   const delta = amount - reservation.amount;
-  if (delta === 0) return;
   const now = new Date();
   const idempotencyKey = `roaming_settle:${reservation.debitId}`;
   await points.transaction(async (tx) =>
@@ -153,6 +152,7 @@ export async function adjustRoamingPoints(
           })
         );
         if (affected === 0) return;
+        if (delta === 0) return;
         const balanceAfter = yield* Effect.promise(() =>
           delta > 0
             ? tx.debitPointBalanceAllowNegative({ userId: reservation.userId, amount: delta, at: now })

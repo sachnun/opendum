@@ -1,4 +1,3 @@
-import { Effect } from "effect";
 import type { HealthPort, AccountPort } from "./repositories.js";
 import type { OpendumRedis } from "@opendum/core/redis";
 import type { Registry } from "@opendum/models/runtime";
@@ -12,6 +11,7 @@ import {
   successRecoveryCount,
 } from "./service-helpers.js";
 import type { Failure } from "./types.js";
+import { trackWork } from "./pending.js";
 
 export const MAX_ERROR_LEN = 10000;
 
@@ -237,6 +237,6 @@ export class Health {
 
   bumpRequest(accountId: string): void {
     if (isSyntheticProviderAccountId(accountId)) return;
-    void Effect.runFork(ignore(() => this.health.bumpAccountRequestCount({ id: accountId, at: new Date() })));
+    trackWork(ignore(() => this.health.bumpAccountRequestCount({ id: accountId, at: new Date() })));
   }
 }

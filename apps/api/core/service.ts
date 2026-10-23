@@ -71,9 +71,10 @@ import {
 import { Rotation } from "./rotation.js";
 import { Playground } from "./playground.js";
 import { Roaming } from "./roaming.js";
+import { trackPending, trackWork } from "./pending.js";
 import { Usage } from "./usage-log.js";
 import { proxyEvents, type ProxyEvents } from "./events.js";
-import { repositories, type Repositories } from "./repositories.js";
+import { repositories, type PointPort, type Repositories } from "./repositories.js";
 import type { Adapter } from "./endpoints.js";
 import type {
   Failure,
@@ -92,6 +93,7 @@ const TOKEN_REFRESH_LOCK_TTL_SECONDS = 120;
 const REFRESH_FAIL_COUNT_PREFIX = "opendum:provider-account:refresh-fail-count:";
 const REFRESH_FAIL_COUNT_TTL_SECONDS = 30 * 24 * 60 * 60;
 const REFRESH_MAX_CONSECUTIVE_FAILURES = 5;
+const RELEASE_REFRESH_LOCK_SCRIPT = `if redis.call("GET", KEYS[1]) == ARGV[1] then return redis.call("DEL", KEYS[1]) end return 0`;
 
 export type ProxyServiceOptions = {
   database: Database;
@@ -183,6 +185,10 @@ export class ProxyService implements StreamRecorder {
     });
     this.playground = new Playground(options.betterAuthSecret);
     this.saturation = new ModelSaturation(options.redis, options.saturation);
+  }
+
+  get points(): PointPort {
+    return this.repositories.points;
   }
 
   handle(
@@ -365,16 +371,18 @@ export class ProxyService implements StreamRecorder {
     const { account, authResult, validation, roaming, rotationFailures, usage, startMs } = context;
     if (roaming) {
       if (reason === "success") {
-        void Effect.runFork(ignore(() => this.roaming.settle(account.userId, roaming, validation.model, usage)));
+        trackWork(ignore(() => this.roaming.settle(account.userId, roaming, validation.model, usage)));
       } else {
-        void Effect.runFork(ignore(() => this.roaming.refund(roaming)));
+        trackWork(ignore(() => this.roaming.refund(roaming)));
       }
     }
     if (reason === "error") {
-      void this.recordResponseHandlerFailure(account, authResult, validation, 500, "upstream stream failed", startMs);
+      trackPending(
+        this.recordResponseHandlerFailure(account, authResult, validation, 500, "upstream stream failed", startMs)
+      );
     }
     if (reason !== "cancel") {
-      void Effect.runFork(ignore(() => this.health.markRecovered(rotationFailures)));
+      trackWork(ignore(() => this.health.markRecovered(rotationFailures)));
     }
   }
 
@@ -387,7 +395,7 @@ export class ProxyService implements StreamRecorder {
     const message = error instanceof Error ? error.message : String(error);
     if (roaming) await Effect.runPromise(ignore(() => this.roaming.refund(roaming)));
     await this.recordResponseHandlerFailure(account, authResult, validation, 500, message, startMs);
-    void Effect.runFork(ignore(() => this.health.markRecovered(rotationFailures)));
+    trackWork(ignore(() => this.health.markRecovered(rotationFailures)));
     return this.routeError(cfg, {
       status: 500,
       message: prefixWithProvider(account.provider, message),
@@ -1180,8 +1188,15 @@ export class ProxyService implements StreamRecorder {
   }
 
   private async releaseRefreshLock(accountId: string, value: string): Promise<void> {
-    void value;
-    await Effect.runPromise(ignore(() => this.redis.del(`${TOKEN_REFRESH_LOCK_PREFIX}${accountId}`)));
+    if (!value) return;
+    await Effect.runPromise(
+      ignore(() =>
+        this.redis.eval(RELEASE_REFRESH_LOCK_SCRIPT, {
+          keys: [`${TOKEN_REFRESH_LOCK_PREFIX}${accountId}`],
+          arguments: [value],
+        })
+      )
+    );
   }
 
   private async waitForRefreshedAccount(

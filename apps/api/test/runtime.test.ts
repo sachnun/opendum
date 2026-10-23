@@ -42,6 +42,18 @@ describe("proxy config", () => {
     expect(config.tokenRefreshIntervalMs).toBe(600 * 1000);
   });
 
+  it("disables roaming reconciliation outside production", async () => {
+    const provider = ConfigProvider.fromEnv({ env: { ...env, NODE_ENV: "development" } });
+    const config = await Effect.runPromise(proxyConfig.parse(provider));
+    expect(config.roamingReconcileIntervalMs).toBe(0);
+  });
+
+  it("enables roaming reconciliation in production", async () => {
+    const provider = ConfigProvider.fromEnv({ env: { ...env, NODE_ENV: "production" } });
+    const config = await Effect.runPromise(proxyConfig.parse(provider));
+    expect(config.roamingReconcileIntervalMs).toBe(5 * 60 * 1000);
+  });
+
   it("fails when a required value is missing", async () => {
     const provider = ConfigProvider.fromEnv({ env: { REDIS_URL: "redis://x", BETTER_AUTH_SECRET: "s" } });
     const exit = await Effect.runPromiseExit(proxyConfig.parse(provider));

@@ -3,6 +3,7 @@ import { EventPublisher } from "@orpc/server";
 import { Effect, Match } from "effect";
 
 import { proxyEvents } from "../../core/events.js";
+import { trackWork } from "../../core/pending.js";
 
 const POINTS_DEBOUNCE_MS = 1_500;
 const SNAPSHOT_DEBOUNCE_MS = 400;
@@ -53,7 +54,7 @@ function toUpdateEvent(topic: LiveTopic, snapshots: Partial<EventSnapshots>): Se
 function publishTopic(userId: string, topic: LiveTopic): void {
   if (!activeUserIds.has(userId)) return;
 
-  void Effect.runPromise(
+  trackWork(
     Effect.tryPromise(() => buildSnapshots(userId, [topic])).pipe(
       Effect.map((snapshots) => toUpdateEvent(topic, snapshots)),
       Effect.tap((event) => Effect.sync(() => {

@@ -71,6 +71,13 @@
       "when": 1792164235316,
       "tag": "0009_postgres_performance",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792200000000,
+      "tag": "0010_roaming_debit_index",
+      "breakpoints": true
     }
   ]
 }

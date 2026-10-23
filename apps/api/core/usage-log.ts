@@ -8,6 +8,7 @@ import type { Health } from "./health.js";
 import type { ProviderPerformance } from "./provider-performance.js";
 import type { ProxyEvents } from "./events.js";
 import { ignore, isSyntheticProviderAccountId } from "./service-helpers.js";
+import { trackWork } from "./pending.js";
 import type { StreamRecorder, SuccessRecord } from "./types.js";
 
 const BALANCE_PREFIX = "opendum:hypercredits:balance:";
@@ -62,7 +63,7 @@ export class Usage implements StreamRecorder {
 
   storeCredits(accountId: string, remaining: number | null, cost: number): void {
     if (!accountId) return;
-    void Effect.runFork(
+    trackWork(
       ignore(async () => {
         const key = BALANCE_PREFIX + accountId;
         if (remaining !== null && remaining > 0) {
@@ -82,7 +83,7 @@ export class Usage implements StreamRecorder {
   }
 
   recordSuccess(params: SuccessRecord): void {
-    void Effect.runFork(
+    trackWork(
       ignore(async () => {
         await this.health.markAccountSuccess(params.accountId, params.model);
         await this.performance.record({

@@ -86,6 +86,7 @@ function points(): Fakes["points"] {
     insertPointTransaction: mock<PointPort["insertPointTransaction"]>(async () => undefined),
     insertPointTransactionOnConflictDoNothing: mock<PointPort["insertPointTransactionOnConflictDoNothing"]>(async () => 0),
     updatePointTransactionBalance: mock<PointPort["updatePointTransactionBalance"]>(async () => undefined),
+    listOrphanedRoamingDebits: mock<PointPort["listOrphanedRoamingDebits"]>(async () => []),
     transaction: (run) => run(points),
   };
   return points;

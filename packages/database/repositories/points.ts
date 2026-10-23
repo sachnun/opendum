@@ -4,6 +4,7 @@ import {
   debitPointBalance,
   debitPointBalanceAllowNegative,
   insertPointBalanceOnConflictDoNothing,
+  listOrphanedRoamingDebits,
   insertPointTransaction,
   insertPointTransactionOnConflictDoNothing,
   updatePointTransactionBalance,
@@ -50,5 +51,9 @@ export class Points {
 
   updatePointTransactionBalance(params: Parameters<typeof updatePointTransactionBalance>[0]) {
     return updatePointTransactionBalance(params, this.database);
+  }
+
+  listOrphanedRoamingDebits(params: Parameters<typeof listOrphanedRoamingDebits>[0]) {
+    return listOrphanedRoamingDebits(params, this.database);
   }
 }
