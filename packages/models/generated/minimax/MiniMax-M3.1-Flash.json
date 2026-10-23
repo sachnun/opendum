@@ -31,13 +31,13 @@
     ]
   },
   "limit": {
-    "context": 1000000,
-    "output": 524288
+    "context": 262144,
+    "output": 262144
   },
   "cost": {
-    "input": 0.747,
-    "output": 2.988,
-    "cacheRead": 0.0745
+    "input": 0.75,
+    "output": 3,
+    "cacheRead": 0.075
   },
   "scores": {
     "artificialAnalysis": {
@@ -48,13 +48,13 @@
   "providerConfig": {
     "nvidia_nim": {
       "upstream": "minimaxai/minimax-m3.1-flash",
-      "contextWindow": 1000000,
-      "maxOutputTokens": 524288
+      "contextWindow": 262144,
+      "maxOutputTokens": 262144
     },
     "perch": {
       "upstream": "minimax-m3.1-flash-starter",
-      "contextWindow": 1000000,
-      "maxOutputTokens": 524288
+      "contextWindow": 262144,
+      "maxOutputTokens": 262144
     }
   }
 }

@@ -31,7 +31,8 @@
   "cost": {
     "input": 0.375,
     "output": 1.25,
-    "cacheRead": 0.075
+    "cacheRead": 0.075,
+    "cacheWrite": 0
   },
   "scores": {
     "artificialAnalysis": {

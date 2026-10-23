@@ -20,7 +20,6 @@
   "modalities": {
     "input": [
       "image",
-      "pdf",
       "text"
     ],
     "output": [
@@ -28,7 +27,7 @@
     ]
   },
   "limit": {
-    "context": 1000000,
+    "context": 409600,
     "output": 128000
   },
   "cost": {
@@ -46,12 +45,12 @@
   "providerConfig": {
     "antigravity": {
       "upstream": "claude-opus-4-6-thinking",
-      "contextWindow": 1000000,
+      "contextWindow": 409600,
       "maxOutputTokens": 128000
     },
     "kiro": {
       "upstream": "claude-opus-4.6-1m",
-      "contextWindow": 1000000,
+      "contextWindow": 409600,
       "maxOutputTokens": 128000
     }
   }

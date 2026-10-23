@@ -19,7 +19,6 @@
   "modalities": {
     "input": [
       "image",
-      "pdf",
       "text"
     ],
     "output": [
@@ -27,7 +26,7 @@
     ]
   },
   "limit": {
-    "context": 1000000,
+    "context": 409600,
     "output": 64000
   },
   "cost": {
@@ -45,12 +44,12 @@
   "providerConfig": {
     "antigravity": {
       "upstream": "claude-sonnet-4-6",
-      "contextWindow": 1000000,
+      "contextWindow": 409600,
       "maxOutputTokens": 64000
     },
     "kiro": {
       "upstream": "claude-sonnet-4.6-1m",
-      "contextWindow": 1000000,
+      "contextWindow": 409600,
       "maxOutputTokens": 64000
     }
   }
