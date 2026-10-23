@@ -4,7 +4,6 @@ import type { Database } from "./client.js";
 const noop = () => mock(async () => undefined);
 
 const queries = {
-  // provider account
   listEligibleAccounts: mock(async () => []),
   listSharedEligibleAccounts: mock(async () => []),
   listDisabledAccountIDs: mock(async () => []),
@@ -16,7 +15,6 @@ const queries = {
   updateRefreshedCredentials: noop(),
   recordAccountError: noop(),
   disableFailedAccount: mock(async () => 0),
-  // model health
   bumpAccountRequestCount: noop(),
   getAccountHealthState: mock(async () => null),
   setAccountHealthFailed: noop(),
@@ -36,13 +34,10 @@ const queries = {
   updateModelHealthSuccessWithStatus: noop(),
   updateModelHealthFailure: noop(),
   updateModelHealthFailureWithStatus: noop(),
-  // custom provider
   getCustomProvider: mock(async () => null),
   listCustomProviders: mock(async () => []),
   listCustomProviderModels: mock(async () => []),
-  // usage
   insertUsageLog: noop(),
-  // points
   creditPointBalance: mock(async () => 10),
   debitPointBalance: mock(async () => 10),
   debitPointBalanceAllowNegative: mock(async () => 10),

@@ -8,19 +8,6 @@ const FAILURE_LOG_INTERVAL_MS = 30_000;
 export const OWN_ACCOUNT_SCOPE = "";
 export const SHARED_ACCOUNT_SCOPE = "shared";
 
-/**
- * Remembers the last account a user was routed to, so the next turn lands on the
- * same upstream credential and keeps the provider prompt cache warm. State lives
- * in Redis, so a replica restart does not drop the affinity.
- *
- * Own and shared pools are stored under separate scopes: a shared account is
- * never a candidate for the personal pool, and a stale shared choice must not
- * outrank the user's own account. The own scope keeps the empty prefix so keys
- * written before scopes existed stay valid.
- *
- * Failures stay non-fatal, but they are logged: a silent miss routes the user to
- * a different account and quietly throws away the upstream prompt cache.
- */
 export class AccountAffinity {
   private readonly redis: OpendumRedis;
   private readonly providers: Set<string>;

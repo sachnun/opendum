@@ -48,11 +48,6 @@ function reasoningRequested(body: Json): boolean {
   return body.thinking_budget !== undefined && body.thinking_budget !== null;
 }
 
-/**
- * Shared skeleton for the three HTTP endpoints: `parse` extracts the required
- * model and delegates the rest to `toParsed`; `build` delegates the payload
- * shape to `toPayload` and appends the session hint.
- */
 export abstract class Adapter {
   abstract readonly endpoint: string;
   abstract readonly format: ErrorFormat;

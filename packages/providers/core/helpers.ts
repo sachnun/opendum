@@ -65,7 +65,6 @@ export function randomUuid(): string {
   return crypto.randomUUID();
 }
 
-/** 32 hex characters without dashes, matching the uuid shaped headers upstreams expect. */
 export function randomUuidV7Hex(): string {
   return Bun.randomUUIDv7("hex").replaceAll("-", "");
 }

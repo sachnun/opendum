@@ -193,9 +193,7 @@ async function fetchWorkbuddyIdentity(accessToken: string, state: string): Promi
         }
       }
     }
-  } catch {
-    // Fall through to the accounts snapshot.
-  }
+  } catch {}
 
   const fallback = await fetchWorkbuddyAccounts(accessToken, "");
   if (fallback && accountUid(fallback)) return { uid: accountUid(fallback), email: accountEmail(fallback) };

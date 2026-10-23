@@ -13,11 +13,6 @@ export const SATURATION_MAX_DELAY_MS = 30_000;
 export const SATURATION_MAX_WAIT_MS = 5000;
 export const SATURATION_MAX_RETRIES = 2;
 
-/**
- * Model saturation is a capacity signal from the upstream for one model, not a
- * credential or account problem. Rotating accounts cannot fix it and throws
- * away the upstream prompt cache, so callers retry the same account instead.
- */
 export function isModelSaturated(status: number, body: string): boolean {
   const parsed = parseJson(body.trim());
   if (Result.isSuccess(parsed)) {
@@ -48,11 +43,6 @@ export type ModelSaturationOptions = {
   random?: () => number;
 };
 
-/**
- * Shared cooldown for one provider and model pair. Every replica reads the same
- * key, so a saturated model parks the whole fleet instead of spending one
- * account after another on a capacity problem.
- */
 export class ModelSaturation {
   private readonly redis: OpendumRedis;
   private readonly baseDelayMs: number;

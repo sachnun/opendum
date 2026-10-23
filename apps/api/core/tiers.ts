@@ -1,9 +1,4 @@
-/**
- * Per-provider paid-tier classification used for routing priority.
- * Adding a provider means adding one policy entry instead of editing a switch.
- */
 export interface TierPolicy {
-  /** True when the tier counts as a paid plan for routing priority. */
   isPaid(tier: string | null): boolean;
 }
 

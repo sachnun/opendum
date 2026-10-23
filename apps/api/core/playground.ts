@@ -8,11 +8,6 @@ export type Outcome = {
   result: AuthResult;
 };
 
-/**
- * Validates signed playground session headers before the regular API key flow.
- * `handled` is false only when the request carries no playground headers at
- * all, so the caller knows to fall back to API key authentication.
- */
 export class Playground {
   constructor(private readonly secret: string) {}
 

@@ -6,11 +6,6 @@ export const SSE_KEEPALIVE = encoder.encode(": keep-alive\n\n");
 
 type ReadResult = { done: boolean; value?: Uint8Array };
 
-/**
- * Emits an SSE comment whenever the source stays silent for `intervalMs`.
- * Comments are ignored by SSE clients but still count as bytes for proxy
- * read timeouts, so long upstream gaps survive Cloudflare and nginx.
- */
 export function withHeartbeat(
   source: ReadableStream<Uint8Array>,
   intervalMs: number

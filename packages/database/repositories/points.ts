@@ -10,17 +10,9 @@ import {
   updatePointTransactionBalance,
 } from "../queries/index.js";
 
-/**
- * Point balances and transactions. Delegates to the query layer with the
- * database bound.
- */
 export class Points {
   constructor(private readonly database: DbExecutor) {}
 
-  /**
-   * Runs `run` inside a database transaction with a transaction-bound
-   * repository, so balance and transaction writes stay atomic.
-   */
   transaction<T>(run: (points: Points) => Promise<T>): Promise<T> {
     return this.database.transaction(async (tx) => run(new Points(tx)));
   }

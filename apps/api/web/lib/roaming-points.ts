@@ -14,7 +14,6 @@ interface RoamingTokenUsage {
   cacheWriteTokens: number;
 }
 
-/** Convert roaming token usage into points using the model's price (points per million tokens). */
 export function roamingPointsForUsage(model: string, usage: RoamingTokenUsage): number {
   const cost = MODEL_REGISTRY[resolveModelAlias(model)]?.cost;
   let points = 0;
@@ -32,7 +31,6 @@ export function roamingPointsForUsage(model: string, usage: RoamingTokenUsage): 
   return Math.max(ROAMING_MINIMUM_POINTS, Math.ceil(points));
 }
 
-/** Total roaming points a user's API keys consumed from other users' shared accounts. */
 export async function roamingUsagePointsByApiKey(userId: string, apiKeyIds: string[]): Promise<Map<string, number>> {
   const pointsByKey = new Map<string, number>();
   if (apiKeyIds.length === 0) return pointsByKey;

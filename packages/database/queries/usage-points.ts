@@ -142,13 +142,6 @@ export type OrphanedRoamingDebit = {
   createdAt: Date;
 };
 
-/**
- * Finds `roaming_debit` rows whose reservation never settled or refunded, which
- * happens when the process dies mid-stream. Every terminal outcome writes a row
- * keyed by the debit id: `roaming_refund:<id>`, `roaming_settle:<id>`, or
- * `sharing_credit:<id>`. Rows written before settle markers existed only have
- * the sharing credit, so all three count as evidence that the reservation closed.
- */
 export async function listOrphanedRoamingDebits(
   params: OrphanedRoamingDebitParams,
   database: DbExecutor = db

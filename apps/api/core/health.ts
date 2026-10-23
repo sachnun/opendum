@@ -25,10 +25,6 @@ export type Options = {
   redis: OpendumRedis;
 };
 
-/**
- * Owns every provider-account health transition: per-model health counters,
- * account cooldowns, rotation recovery, request counts and error history.
- */
 export class Health {
   private readonly accounts: AccountPort;
   private readonly health: HealthPort;

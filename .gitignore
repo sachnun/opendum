@@ -1,10 +1,7 @@
-# dependencies
 node_modules/
 
-# logs
 *.log
 
-# build outputs
 dist/
 build/
 out/
@@ -16,24 +13,19 @@ out/
 .cache/
 .vite/
 
-# generated data
 .data/
 .fallow/
 
-# test outputs
 coverage/
 coverage.out
 
-# Go
 *.test
 
-# env files (can opt-in for committing examples)
 .env
 .env.*
 !.env.example
 !**/.env.example
 
-# local databases
 *.db
 *.sqlite
 *.sqlite3
@@ -41,19 +33,14 @@ coverage.out
 *.rdb
 backups/
 
-# misc
 .DS_Store
 Thumbs.db
 *.pem
 
-# vercel
 .vercel/
 
-# local plan notes
 PLAN.md
 
-# typescript
 *.tsbuildinfo
 
-# nuxt test-utils generated
 apps/web/.nuxtrc

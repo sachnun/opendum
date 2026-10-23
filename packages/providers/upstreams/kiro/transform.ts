@@ -982,12 +982,6 @@ export function kiroThinkingBudget(body: Json): number {
   return 20000;
 }
 
-/**
- * Kiro keeps server side conversation state per id, so a fresh random id on every
- * request throws that state away and forces the upstream to reprocess the whole
- * transcript. Derive it from the client session instead, falling back to the
- * first user turn so a client that sends no session still stays on one thread.
- */
 function kiroConversationId(body: Json): string {
   const session = stringValue(body._sessionId).trim();
   if (session) return conversationIdFromSeed(session);

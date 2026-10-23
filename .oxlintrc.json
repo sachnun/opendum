@@ -4,5 +4,9 @@
   "categories": {
     "correctness": "error"
   },
+  "jsPlugins": ["eslint-plugin-no-comments"],
+  "rules": {
+    "no-comments/disallowComments": ["error", { "allow": ["eslint", "global"] }]
+  },
   "ignorePatterns": ["**/.nuxt/**", "**/.output/**", "**/.edgeone/**", "**/dist/**", "**/coverage/**"]
 }

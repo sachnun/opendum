@@ -54,12 +54,6 @@ const FETCHERS: QuotaFetcher[] = [
   },
 ];
 
-/**
- * Registry of provider quota fetchers. Owns provider lookup, the set of
- * providers that need no access token, and the shared credential-resolution
- * flow: credential failures are represented as an `expired` quota result
- * rather than a failure so callers can render a re-authenticate prompt.
- */
 export class Quotas {
   private readonly fetchers: Map<string, QuotaFetcher>;
 

@@ -72,11 +72,6 @@ function quotaFetchFailure(provider: string, target: string, cause: unknown): Qu
   });
 }
 
-/**
- * Effect-native quota request with an optional journal backed read-through
- * cache. Cache misses and cache failures fall through to a live request, so a
- * broken journal can never fail a quota fetch.
- */
 export function getQuotaJson(
   ctx: QuotaContext,
   account: QuotaAccount,

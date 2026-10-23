@@ -21,10 +21,6 @@ import {
   updateModelHealthSuccessWithStatus,
 } from "../queries/index.js";
 
-/**
- * Account- and model-level health state: cooldowns, failure counters, and
- * recovery markers. Delegates to the query layer with the database bound.
- */
 export class Health {
   constructor(private readonly database: DbExecutor) {}
 

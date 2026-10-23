@@ -3,33 +3,23 @@ import { randomId } from "../core/helpers.js";
 type Json = Record<string, unknown>;
 
 export type ToolCallDelta = {
-  /** Groups fragments that belong to the same tool call. */
   key: number | string;
   id?: string;
   type?: string;
-  /** Name fragment; `append` concatenates fragments, `first` (default) keeps the first non-empty name. */
   name?: string;
   nameMode?: "append" | "first";
   arguments?: string;
-  /** Replaces accumulated arguments instead of appending (sealed tool calls). */
   replaceArgs?: boolean;
 };
 
 export type Options = {
   model: string;
-  /** Completion id, defaults to a random `chatcmpl` id. */
   id?: string;
-  /** Id used for tool calls that never carried one, defaults to `call_<key>`. */
   toolIdFallback?: (key: number | string) => string;
-  /** Emit accumulated reasoning as `reasoning_content`, defaults to true. */
   includeReasoning?: boolean;
-  /** Emit `content: null` instead of an empty string when no text arrived. */
   nullContent?: boolean;
-  /** Normalizes accumulated tool arguments before emitting, defaults to identity. */
   normalizeArgs?: (args: string) => string;
-  /** Forces `tool_calls` as the finish reason whenever tool calls exist, instead of upgrading only a `stop`. */
   forceFinish?: boolean;
-  /** Usage emitted when the stream never carried any, defaults to `{}`. */
   usageFallback?: Json;
 };
 
@@ -40,11 +30,6 @@ type ToolCall = {
   arguments: string;
 };
 
-/**
- * Accumulates streamed deltas into a single `chat.completion` payload.
- * Providers feed whatever their stream yields (text, reasoning text,
- * tool-call fragments) and read the synthesized completion at the end.
- */
 export class Collector {
   private content = "";
   private reasoning = "";

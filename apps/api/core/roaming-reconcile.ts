@@ -18,11 +18,6 @@ export type ReconcileResult = {
   failed: number;
 };
 
-/**
- * Refunds roaming reservations whose settle or refund never landed because the
- * process died mid-stream. A request older than the grace window can no longer
- * be in flight, so the debit is safe to reverse.
- */
 export function reconcileOrphanedRoaming(
   points: PointPort,
   options: ReconcileOptions = {}

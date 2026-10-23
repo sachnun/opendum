@@ -244,9 +244,7 @@ async function fetchAccountInfo(
       const userInfo = (await userInfoResponse.json()) as { email?: string };
       email = userInfo.email ?? "";
     }
-  } catch {
-    // Email is best-effort metadata for web display.
-  }
+  } catch {}
 
   if (errors.length && !projectId) {
     projectId = DEFAULT_PROJECT_ID;

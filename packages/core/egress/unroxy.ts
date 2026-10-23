@@ -40,10 +40,6 @@ export class UnroxyEgress implements Egress {
   }
 }
 
-/**
- * Aborts only the wait for response headers, so a slow body keeps streaming
- * after the timeout has been cleared.
- */
 async function fetchWithHeadersTimeout(
   url: string,
   init: RequestInit | undefined,

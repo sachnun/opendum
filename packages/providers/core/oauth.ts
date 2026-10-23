@@ -3,27 +3,14 @@ import type { ProviderAccount, RefreshedCredentials } from "../types.js";
 import { ProviderCredentialFailure, asError } from "./errors.js";
 import type { UpstreamTransport } from "./http.js";
 
-/** Per-provider differences of a token refresh POST. */
 export type Spec = {
-  /** Provider id attached to credential failures. */
   provider: string;
-  /** Token endpoint; a function resolves it lazily when config discovery is async. */
   tokenUrl: string | ((refreshToken: string) => string | Promise<string>);
-  /** Headers and body for the refresh POST; may resolve asynchronously. */
   request: (refreshToken: string) => RequestInit | Promise<RequestInit>;
-  /**
-   * Decodes the payload into credentials. Providers with extra lookups behind
-   * the token (tier, account info) may return a promise.
-   */
   parse: (payload: unknown, refreshToken: string) => RefreshedCredentials | Promise<RefreshedCredentials>;
-  /** Transport used for the refresh call. */
   transport: UpstreamTransport;
 };
 
-/**
- * Shared skeleton of a token refresh: POST the endpoint, reject non-2xx
- * responses, decode JSON, and report every failure as ProviderCredentialFailure.
- */
 export class OAuth {
   private readonly spec: Spec;
 

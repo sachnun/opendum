@@ -11,7 +11,6 @@ export const SCOPES: readonly string[] = [
   "https://www.googleapis.com/auth/experimentsandconfigs",
 ];
 
-// OAuth callback on localhost (user copies URL manually)
 export const REDIRECT_URI = "http://localhost:1/oauth2callback";
 
 const CLIENT_METADATA =
@@ -19,25 +18,20 @@ const CLIENT_METADATA =
 const AUTH_USER_AGENT = "google-api-nodejs-client/10.3.0";
 const AUTH_API_CLIENT = "gl-node/22.18.0";
 
-// Endpoint fallbacks for account discovery and quota.
 const CODE_ASSIST_ENDPOINT_DAILY =
   "https://daily-cloudcode-pa.googleapis.com";
 const CODE_ASSIST_ENDPOINT_PROD = "https://cloudcode-pa.googleapis.com";
 
-// Endpoint order for loadCodeAssist (project discovery)
-// Production FIRST for better project resolution, then fallback to sandbox
 export const LOAD_CODE_ASSIST_ENDPOINTS = [
   CODE_ASSIST_ENDPOINT_PROD,
   CODE_ASSIST_ENDPOINT_DAILY,
 ] as const;
 
-// Endpoint order for onboardUser (daily first, then prod)
 export const ONBOARD_USER_ENDPOINTS = [
   CODE_ASSIST_ENDPOINT_DAILY,
   CODE_ASSIST_ENDPOINT_PROD,
 ] as const;
 
-// Headers for auth/discovery calls (loadCodeAssist, onboardUser)
 export const AUTH_HEADERS = {
   "User-Agent": AUTH_USER_AGENT,
   "X-Goog-Api-Client": AUTH_API_CLIENT,

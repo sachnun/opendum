@@ -134,7 +134,6 @@ export class ProviderPerformance {
     };
   }
 
-  /** Folds one sample into the EWMA stored in Redis and drops the cached scores. */
   record(sample: ProviderPerformanceSample): Effect.Effect<void> {
     const ttftMs = Math.max(0, sample.ttftMs);
     const tokensPerSecond = sampleTokensPerSecond(ttftMs, sample.durationMs, sample.outputTokens);

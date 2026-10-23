@@ -30,13 +30,6 @@ export const userSharingSetting = pgTable("user_sharing_setting", {
     .$onUpdate(() => new Date()),
 });
 
-/**
- * Append-only request log.
- *
- * `id` is deliberately not a primary key: nothing looks rows up by id, and the
- * unique index cost 11 MB plus an index write on every insert. The covering
- * index below serves every dashboard query as an index-only scan.
- */
 export const usageLog = pgTable(
   "usage_log",
   {
@@ -60,7 +53,6 @@ export const usageLog = pgTable(
     cachedTokens: integer("cachedTokens").notNull().default(0),
     cacheWriteTokens: integer("cacheWriteTokens").notNull().default(0),
 
-    // Request metadata
     statusCode: integer("statusCode"),
     duration: integer("duration"),
 
@@ -96,8 +88,6 @@ export const pointTransaction = pgTable(
     type: text("type").notNull(),
     balanceAfter: integer("balanceAfter").notNull(),
     idempotencyKey: text("idempotencyKey"),
-    // No foreign key: the column is never written and a FK here would force
-    // the dropped usage_log primary key index to stay alive.
     usageLogId: text("usageLogId"),
     createdAt: timestamp("createdAt").notNull().defaultNow(),
   },

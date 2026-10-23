@@ -95,8 +95,6 @@ function stableSessionId(body: Json): string {
   return randomId("session");
 }
 
-// Level based thinking starts at Gemini 3. Newer majors (Gemini 4 Argon) keep
-// the same wire convention, so the check is version based instead of literal.
 function isGemini3ModelName(model: string): boolean {
   const match = /^gemini-(\d+)/.exec(lastModelSegment(model).toLowerCase());
   return match !== null && Number(match[1]) >= 3;
@@ -181,9 +179,6 @@ function normalizeAntigravityTieredModel(model: string): string {
   return value;
 }
 
-// Antigravity request shaping is fixed per model family, so it is derived from
-// the model name rather than stored in the registry. Registry values still win
-// when an authored model config provides them.
 function antigravityConfigValue(model: string, key: string): { found: boolean; value: unknown } {
   const name = normalizeAntigravityTieredModel(model);
   if (name.startsWith("gemini-")) {
@@ -634,8 +629,6 @@ export class AntigravityProvider implements Provider, CredentialRefresher, Refre
     return this.registry.upstream(value, this.name);
   }
 
-  // Every leveled Gemini wire is addressed as <base>-<level>. Tiered wires and
-  // lite/image variants pick their own effort, so they are left untouched.
   private resolveAntigravityGemini3ModelVariant(model: string, body: Json): string {
     if (!isGemini3ModelName(model)) return model;
     const lower = model.toLowerCase();

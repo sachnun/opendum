@@ -15,6 +15,7 @@
     "models:refresh": "bun run --filter @opendum/models refresh && bun run --filter @opendum/models family-ranking"
   },
   "devDependencies": {
+    "eslint-plugin-no-comments": "^1.2.1",
     "oxlint": "^1.89.0",
     "wrangler": "^4.152.0"
   },

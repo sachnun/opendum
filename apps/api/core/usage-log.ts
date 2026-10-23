@@ -37,11 +37,6 @@ export type Options = {
   events?: ProxyEvents;
 };
 
-/**
- * Records every terminal outcome of a proxy attempt: success feeds account
- * health and provider performance, failures only write usage logs. Also owns
- * the Hypercredits balance snapshot kept in Redis.
- */
 export class Usage implements StreamRecorder {
   private readonly usage: UsagePort;
   private readonly redis: OpendumRedis;

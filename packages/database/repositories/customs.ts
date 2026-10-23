@@ -5,10 +5,6 @@ import {
   listCustomProviders,
 } from "../queries/index.js";
 
-/**
- * User-defined custom providers and their model catalogs.
- * Delegates to the query layer with the database bound.
- */
 export class Customs {
   constructor(private readonly database: DbExecutor) {}
 

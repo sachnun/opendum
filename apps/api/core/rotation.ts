@@ -18,10 +18,8 @@ import {
   sortAccountsByProviderPriority,
 } from "./service-helpers.js";
 
-/** Why a healthy sticky account was not selected, for cache-miss debugging. */
 export type StickyMissReason = "cooldown" | "degraded" | "ineligible";
 
-/** Result of one account-selection pass. */
 export type Selection = { account: ProviderAccount | null; configured: boolean };
 
 export type Options = {
@@ -35,10 +33,6 @@ export type Options = {
   affinity: AccountAffinity;
 };
 
-/**
- * Account selection and rotation: eligibility lookup, provider-priority and
- * sticky ordering, health filtering, and account-affinity bookkeeping.
- */
 export class Rotation {
   private readonly accounts: AccountPort;
   private readonly modelHealth: HealthPort;

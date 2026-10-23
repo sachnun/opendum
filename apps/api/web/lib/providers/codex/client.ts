@@ -393,9 +393,7 @@ export const codexProvider = {
           .set({ accountId: resolvedAccountId })
           .where(eq(providerAccount.id, account.id));
         account.accountId = resolvedAccountId;
-      } catch {
-        // Ignore account ID sync failures.
-      }
+      } catch {}
     }
 
     if (isTokenExpired(account.expiresAt)) {

@@ -28,11 +28,8 @@ const EGRESS_MAX_TRIES = 3;
 const EGRESS_FORBIDDEN_TRIES = 2;
 
 export type EgressRetryPolicy = {
-  /** Attempts for a 403, each one leaving through a fresh egress address. */
   forbidden: number;
-  /** Attempts for a 429, which the upstream also scopes per egress address. */
   limited: number;
-  /** Attempts for transport level failures such as a dropped connection. */
   transport: number;
 };
 
@@ -61,10 +58,6 @@ export function createTransport(direct: FetchLike): MutableTransport {
   };
 }
 
-/**
- * Normalizes any provider failure into the tagged `ProviderFailure` channel so
- * Promise rejections and ad hoc errors cannot leak past the Effect boundary.
- */
 export function normalizeProviderFailure<A>(
   provider: string,
   effect: Effect.Effect<A, unknown>
@@ -80,10 +73,6 @@ export function normalizeProviderFailure<A>(
   );
 }
 
-/**
- * Retries a transient Effect according to an exponential, jittered schedule.
- * The source is always evaluated once, so `attempts` counts total evaluations.
- */
 export function retryTransient<A, E, R>(
   self: Effect.Effect<A, E, R>,
   options: { attempts: number; baseDelayMs: number; factor?: number }

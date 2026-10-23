@@ -7,12 +7,10 @@ import type {
   UsagePort,
 } from "../core/repositories.js";
 
-/** Turns a port into its mock shape, preserving each method signature. */
 type Stub<T> = {
   [K in keyof T]: T[K] extends (...args: infer A) => infer R ? Mock<(...args: A) => R> : never;
 };
 
-/** Default implementation for lookups that find nothing. */
 const absent = async () => null as never;
 
 export type Fakes = {
@@ -92,7 +90,6 @@ function points(): Fakes["points"] {
   return points;
 }
 
-/** In-memory doubles for the proxy's database ports, with call recording. */
 export function fakes(): Fakes {
   return {
     accounts: accounts(),

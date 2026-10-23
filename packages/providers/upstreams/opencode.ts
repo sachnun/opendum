@@ -78,22 +78,12 @@ const SESSION_PATTERN = /^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$/;
 const REQUEST_PATTERN = /^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$/;
 const SESSION_COUNTER_HEX = "ffe";
 
-/**
- * Whether a session id carries the shape the free tier accepts. The upstream validates the
- * last 12 bits as an inverted per-millisecond counter and refuses anything outside
- * `0xfc0..0xfff`; the remaining 36 bits are not inspected.
- */
 function isCanonicalSession(seed: string): boolean {
   if (!SESSION_PATTERN.test(seed)) return false;
   const counter = Number.parseInt(seed.slice(13, 16), 16);
   return counter >= 0xfc0;
 }
 
-/**
- * Render an id the free tier accepts, deterministically from a seed so one conversation
- * keeps one upstream session. Only the last 12 bits are constrained, so they are pinned to
- * the counter the official client sends while the rest is derived from the seed.
- */
 function canonicalId(prefix: string, seed: string): string {
   const hash = new Bun.CryptoHasher("sha256").update(`${prefix}\u0000${seed}`).digest();
   const time = `${hex(hash.subarray(0, 6)).slice(0, 9)}${SESSION_COUNTER_HEX}`;
@@ -173,11 +163,6 @@ function toolParameters(raw: unknown): Json {
   return schema;
 }
 
-/**
- * Rewrites a tool into the canonical Chat Completions shape. The upstream answers 400
- * `function is not set` for flat or partially formed entries, so every tool the client
- * sends is rebuilt rather than passed through.
- */
 function canonicalTool(raw: unknown): Json {
   const fn: Json = { name: toolName(raw), parameters: toolParameters(raw) };
   const description = toolDescription(raw);
@@ -185,11 +170,6 @@ function canonicalTool(raw: unknown): Json {
   return { type: "function", function: fn };
 }
 
-/**
- * Drops entries the upstream rejects with a 400 and collapses repeated names, which
- * it rejects with `tools contains duplicate names`. The first tool with a given name
- * wins, so the client's own declaration is preferred over an injected stub.
- */
 function sanitizeTools(raw: unknown): Json[] {
   if (!Array.isArray(raw)) return [];
   const seen = new Set<string>();
@@ -203,11 +183,6 @@ function sanitizeTools(raw: unknown): Json[] {
   return out;
 }
 
-/**
- * Bring a Chat Completions body up to the free tier request contract: the upstream
- * answers 403 FreeTierError unless the request streams, declares at least one tool, and
- * carries a `read` tool whose `parameters.properties` is non-empty.
- */
 function ensureFingerprintTools(body: Json): void {
   const tools = sanitizeTools(body.tools);
   if (!tools.some((tool) => toolName(tool) === REQUIRED_TOOL_NAME)) {
@@ -216,10 +191,6 @@ function ensureFingerprintTools(body: Json): void {
   body.tools = tools;
 }
 
-/**
- * The Responses surface takes the flat tool shape, so it needs its own contract pass:
- * streaming plus at least one flat tool with a non-empty parameter object.
- */
 function ensureResponsesFingerprintTools(body: Json): void {
   const tools = sanitizeTools(body.tools).map((tool) => {
     const flat: Json = { type: "function", name: toolName(tool), parameters: (tool.function as Json).parameters };

@@ -13,11 +13,6 @@ import {
   updateRefreshedCredentials,
 } from "../queries/index.js";
 
-/**
- * Provider account rows, credentials, and availability reads/writes.
- * Delegates to the query layer with the database bound, so callers depend on
- * this port instead of the raw query functions.
- */
 export class Accounts {
   constructor(private readonly database: DbExecutor) {}
 

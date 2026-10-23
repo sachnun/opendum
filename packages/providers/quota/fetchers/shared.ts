@@ -14,10 +14,6 @@ export type QuotaAttempt =
   | { readonly ok: true; readonly result: QuotaJsonResult }
   | { readonly ok: false; readonly message: string };
 
-/**
- * Runs a quota request and turns the typed transport failure into a value, so
- * fetchers can render an error status without juggling two error channels.
- */
 export function quotaAttempt(
   ctx: QuotaContext,
   account: QuotaAccount,

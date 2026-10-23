@@ -10,11 +10,6 @@ export function jsonResponse(value: unknown, status = 200, extraHeaders?: Record
 
 export type ErrorExtras = { param?: string | null; code?: string | null; requestId?: string | null };
 
-/**
- * Formats an error body following the provider conventions:
- * OpenAI `{ error: { message, type, param, code } }` and Anthropic
- * `{ type: "error", error: { type, message }, request_id }`.
- */
 export function errorEnvelope(
   format: ErrorFormat,
   message: string,
