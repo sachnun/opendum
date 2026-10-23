@@ -161,9 +161,11 @@ jobs:
 
       - name: Prune stale image versions
         continue-on-error: true
-        uses: actions/delete-package-versions@v5
+        uses: snok/container-retention-policy@v3.1.0
         with:
-          package-name: opendum
-          package-type: container
-          delete-only-untagged-versions: "true"
-          min-versions-to-keep: 2
+          account: user
+          token: ${{ secrets.PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
+          image-names: opendum
+          cut-off: 0
+          keep-n-most-recent: 5
+          timestamp-to-use: created_at
