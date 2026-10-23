@@ -29,7 +29,7 @@
   },
   "limit": {
     "context": 1048576,
-    "output": 50000
+    "output": 65536
   },
   "cost": {
     "input": 10,
@@ -47,7 +47,7 @@
     "antigravity": {
       "upstream": "gemini-3.1-pro",
       "contextWindow": 1048576,
-      "maxOutputTokens": 50000
+      "maxOutputTokens": 65536
     }
   }
 }

@@ -6,7 +6,8 @@
   "reasoning": true,
   "reasoning_effort": [
     "high",
-    "xhigh"
+    "xhigh",
+    "max"
   ],
   "modalities": {
     "input": [
@@ -18,12 +19,13 @@
   },
   "limit": {
     "context": 1000000,
-    "output": 50000
+    "output": 131072
   },
   "cost": {
     "input": 0.1705,
-    "output": 9,
-    "cacheRead": 0.165
+    "output": 22,
+    "cacheRead": 0.165,
+    "cacheWrite": 0
   },
   "scores": {
     "artificialAnalysis": {
@@ -38,7 +40,7 @@
     },
     "workbuddy": {
       "contextWindow": 1000000,
-      "maxOutputTokens": 50000
+      "maxOutputTokens": 131072
     }
   }
 }

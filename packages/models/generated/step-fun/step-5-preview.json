@@ -24,7 +24,7 @@
   },
   "limit": {
     "context": 1000000,
-    "output": 64000
+    "output": 65536
   },
   "cost": {
     "input": 5,
@@ -41,7 +41,7 @@
     "nvidia_nim": {
       "upstream": "stepfun-ai/step-5-preview",
       "contextWindow": 1000000,
-      "maxOutputTokens": 64000
+      "maxOutputTokens": 65536
     }
   }
 }

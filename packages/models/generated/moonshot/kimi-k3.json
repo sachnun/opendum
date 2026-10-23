@@ -25,7 +25,7 @@
   },
   "limit": {
     "context": 1048576,
-    "output": 50000
+    "output": 131072
   },
   "cost": {
     "input": 1.195,
@@ -44,12 +44,12 @@
       "maxOutputTokens": 16000
     },
     "kiro": {
-      "contextWindow": 1048576,
-      "maxOutputTokens": 50000
+      "contextWindow": 262144,
+      "maxOutputTokens": 131072
     },
     "workbuddy": {
-      "contextWindow": 1048576,
-      "maxOutputTokens": 50000
+      "contextWindow": 262144,
+      "maxOutputTokens": 131072
     }
   }
 }
