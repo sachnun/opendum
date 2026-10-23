@@ -148,6 +148,7 @@
   },
   "trustedDependencies": [
     "esbuild",
+    "workerd",
   ],
   "overrides": {
     "postcss": "^8.5.28",

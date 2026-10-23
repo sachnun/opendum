@@ -21,7 +21,8 @@
   "trustedDependencies": [
     "esbuild",
     "unrs-resolver",
-    "vue-demi"
+    "vue-demi",
+    "workerd"
   ],
   "workspaces": [
     "apps/*",
