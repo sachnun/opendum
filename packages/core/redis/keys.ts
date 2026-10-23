@@ -23,8 +23,11 @@ export function refreshFailCountKey(accountId: string): string {
   return `${REFRESH_FAIL_COUNT_PREFIX}:${accountId}`;
 }
 
-export function accountAffinityKey(userId: string): string {
-  return `${ACCOUNT_AFFINITY_PREFIX}:${userId}`;
+export function accountAffinityKey(userId: string, scope = ""): string {
+  const normalized = scope.trim();
+  return normalized
+    ? `${ACCOUNT_AFFINITY_PREFIX}:${normalized}:${userId}`
+    : `${ACCOUNT_AFFINITY_PREFIX}:${userId}`;
 }
 
 export function modelSaturationKey(provider: string, model: string): string {

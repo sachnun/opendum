@@ -110,12 +110,9 @@ export function blendMetrics(previous: ProviderMetrics | null, sample: { ttftMs:
   };
 }
 
-type CacheEntry = { at: number; scores: Map<string, ProviderScore> };
-
 export class ProviderPerformance {
   private readonly redis: OpendumRedis;
   private readonly config: ProviderPerformanceConfig;
-  private readonly cache = new Map<string, CacheEntry>();
   private effectCache: Cache.Cache<string, Map<string, ProviderScore>> | null = null;
 
   constructor(redis: OpendumRedis, config: ProviderPerformanceConfig = DEFAULT_PROVIDER_PERFORMANCE_CONFIG) {

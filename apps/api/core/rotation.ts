@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 import type { CustomPort, HealthPort, AccountPort } from "./repositories.js";
-import type { AccountAffinity } from "@opendum/core/redis";
+import { OWN_ACCOUNT_SCOPE, SHARED_ACCOUNT_SCOPE, type AccountAffinity } from "@opendum/core/redis";
 import type { AuthResult, ModelValidationResult } from "@opendum/auth";
 import type { ProviderAccount, ProviderRegistry } from "@opendum/providers";
 import type { Registry } from "@opendum/models/runtime";
@@ -17,6 +17,9 @@ import {
   quotaFallbackTierLocal,
   sortAccountsByProviderPriority,
 } from "./service-helpers.js";
+
+/** Why a healthy sticky account was not selected, for cache-miss debugging. */
+export type StickyMissReason = "cooldown" | "degraded" | "ineligible";
 
 /** Result of one account-selection pass. */
 export type Selection = { account: ProviderAccount | null; configured: boolean };
@@ -103,22 +106,22 @@ export class Rotation {
       const eligible = yield* this.eligible(userId, model, provider, exclude, excludeProviders, accountAccess);
       if (eligible.length === 0) return { account: null, configured: false };
       const routing = yield* this.routing(model, provider === null);
-      const stickyId = yield* this.affinity.lookup(userId);
+      const stickyId = yield* this.affinity.lookup(userId, OWN_ACCOUNT_SCOPE);
       const strategy = compose(new Priority(), new Sticky(stickyId));
       const prioritized = strategy.order(eligible, {
         crossProvider: provider === null,
         priority: this.models.providers(model),
         routingOptions: routing,
       });
-      const selected = yield* this.pickHealthy(prioritized, model);
+      const selected = yield* this.pickHealthy(prioritized, model, stickyId);
       if (!selected) return { account: null, configured: true };
-      yield* this.remember(userId, selected);
+      yield* this.remember(userId, selected, OWN_ACCOUNT_SCOPE);
       return { account: selected, configured: true };
     });
   }
 
   private nextShared(
-    _userId: string,
+    userId: string,
     model: string,
     provider: string | null,
     exclude: string[],
@@ -130,7 +133,7 @@ export class Rotation {
       const now = new Date();
       const sharedRows = yield* Effect.promise(() =>
         this.accounts.listSharedEligibleAccounts(
-          { userId: _userId, providers: targetProviders, now, excludeIds: exclude, excludeProviders }
+          { userId, providers: targetProviders, now, excludeIds: exclude, excludeProviders }
         )
       );
       const rows: ProviderAccount[] = sharedRows.map((row) => ({
@@ -154,12 +157,16 @@ export class Rotation {
       const enabled = rows.filter((row) => !disabledSet.has(row.id) && this.canUse(row, model));
       if (enabled.length === 0) return { account: null, configured: true };
       const routing = yield* this.routing(model, provider === null);
-      const prioritized = new Priority().order(enabled, {
+      const stickyId = yield* this.affinity.lookup(userId, SHARED_ACCOUNT_SCOPE);
+      const strategy = compose(new Priority(), new Sticky(stickyId));
+      const prioritized = strategy.order(enabled, {
         crossProvider: provider === null,
         priority: targetProviders,
         routingOptions: routing,
       });
-      const account = yield* this.pickHealthy(prioritized, model);
+      const account = yield* this.pickHealthy(prioritized, model, stickyId);
+      if (!account) return { account: null, configured: true };
+      yield* this.remember(userId, account, SHARED_ACCOUNT_SCOPE);
       return { account, configured: true };
     });
   }
@@ -278,25 +285,32 @@ export class Rotation {
 
   private pickHealthy(
     prioritized: ProviderAccount[],
-    model: string
+    model: string,
+    stickyId: string
   ): Effect.Effect<ProviderAccount | null> {
     return Effect.gen({ self: this }, function* () {
       const now = new Date();
-      const lookupKeys = this.models.lookupKeys(model);
       let degraded: ProviderAccount | null = null;
+      let stickyMiss: StickyMissReason | null = null;
       for (const account of prioritized) {
         if (isSyntheticProviderAccountId(account.id)) return account;
         const coolingDown = yield* Effect.promise(() => this.health.refresh(account.id, now));
-        if (coolingDown) continue;
+        if (coolingDown) {
+          if (account.id === stickyId) stickyMiss = "cooldown";
+          continue;
+        }
         const health = yield* Effect.promise(() =>
           this.modelHealth.getModelHealth(account.id, this.models.resolveAlias(model))
         );
         if (health && health.status === "degraded") {
+          if (account.id === stickyId) stickyMiss = "degraded";
           if (!degraded) degraded = account;
           continue;
         }
-        void lookupKeys;
         this.health.bumpRequest(account.id);
+        if (stickyId && account.id !== stickyId) {
+          yield* this.logStickyMiss(stickyId, stickyMiss ?? "ineligible", account.id);
+        }
         return account;
       }
       if (degraded) this.health.bumpRequest(degraded.id);
@@ -304,9 +318,17 @@ export class Rotation {
     });
   }
 
-  private remember(userId: string, account: ProviderAccount): Effect.Effect<void> {
+  private logStickyMiss(
+    stickyId: string,
+    reason: StickyMissReason,
+    selectedId: string
+  ): Effect.Effect<void> {
+    return Effect.logDebug("account affinity miss", { stickyId, reason, selectedId });
+  }
+
+  private remember(userId: string, account: ProviderAccount, scope: string): Effect.Effect<void> {
     if (isSyntheticProviderAccountId(account.id)) return Effect.void;
     if (!this.affinity.enabled(account.provider)) return Effect.void;
-    return this.affinity.store(userId, account.id);
+    return this.affinity.store(userId, account.id, scope);
   }
 }
