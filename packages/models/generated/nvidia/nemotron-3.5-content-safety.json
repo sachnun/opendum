@@ -5,10 +5,7 @@
   ],
   "reasoning": true,
   "reasoning_effort": [
-    "low",
-    "medium",
-    "high",
-    "max"
+    "high"
   ],
   "modalities": {
     "input": [
@@ -30,8 +27,8 @@
   "providerConfig": {
     "kilo_code": {
       "upstream": "nvidia/nemotron-3.5-content-safety:free",
-      "contextWindow": 128000,
-      "maxOutputTokens": 8192
+      "contextWindow": 131072,
+      "maxOutputTokens": 117964
     },
     "openrouter": {
       "upstream": "nvidia/nemotron-3.5-content-safety:free",

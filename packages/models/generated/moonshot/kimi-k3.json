@@ -44,11 +44,11 @@
       "maxOutputTokens": 16000
     },
     "kiro": {
-      "contextWindow": 262144,
+      "contextWindow": 1048576,
       "maxOutputTokens": 131072
     },
     "workbuddy": {
-      "contextWindow": 262144,
+      "contextWindow": 1048576,
       "maxOutputTokens": 131072
     }
   }

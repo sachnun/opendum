@@ -1,10 +1,13 @@
 {
+  "id": "MiniMax-M3.1-Flash",
   "providers": [
+    "nvidia_nim",
     "perch"
   ],
   "aliases": [
     "cline-free-minimax-m3.1-flash",
     "cline-free/minimax-m3.1-flash",
+    "minimax-m3.1-flash",
     "minimax-m3.1-flash-free",
     "minimax-minimax-m3.1-flash:free",
     "minimax/minimax-m3.1-flash:free"
@@ -29,12 +32,12 @@
   },
   "limit": {
     "context": 1000000,
-    "output": 512000
+    "output": 524288
   },
   "cost": {
-    "input": 0.75,
-    "output": 3,
-    "cacheRead": 0.075
+    "input": 0.747,
+    "output": 2.988,
+    "cacheRead": 0.0745
   },
   "scores": {
     "artificialAnalysis": {
@@ -43,10 +46,15 @@
     }
   },
   "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "minimaxai/minimax-m3.1-flash",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 524288
+    },
     "perch": {
       "upstream": "minimax-m3.1-flash-starter",
       "contextWindow": 1000000,
-      "maxOutputTokens": 512000
+      "maxOutputTokens": 524288
     }
   }
 }

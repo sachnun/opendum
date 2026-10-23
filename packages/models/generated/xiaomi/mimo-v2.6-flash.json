@@ -5,10 +5,7 @@
   ],
   "reasoning": true,
   "reasoning_effort": [
-    "low",
-    "medium",
-    "high",
-    "max"
+    "high"
   ],
   "modalities": {
     "input": [
@@ -26,7 +23,7 @@
     "output": 131072
   },
   "cost": {
-    "input": 0.7,
+    "input": 0.5,
     "output": 1.4,
     "cacheRead": 0.014
   },

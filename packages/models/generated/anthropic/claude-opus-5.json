@@ -31,7 +31,7 @@
     "input": 25,
     "output": 125,
     "cacheRead": 2.5,
-    "cacheWrite": 28.571429
+    "cacheWrite": 31.25
   },
   "scores": {
     "artificialAnalysis": {

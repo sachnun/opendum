@@ -27,13 +27,13 @@
     ]
   },
   "limit": {
-    "context": 1000000,
-    "output": 182520
+    "context": 1048576,
+    "output": 1048576
   },
   "cost": {
-    "input": 3,
-    "output": 12,
-    "cacheRead": 0.342857
+    "input": 2,
+    "output": 8.8,
+    "cacheRead": 0.4
   },
   "scores": {
     "artificialAnalysis": {
@@ -44,13 +44,13 @@
   "providerConfig": {
     "kilo_code": {
       "upstream": "nvidia/nemotron-3-ultra-550b-a55b:free",
-      "contextWindow": 1000000,
-      "maxOutputTokens": 65536
+      "contextWindow": 202800,
+      "maxOutputTokens": 182520
     },
     "nvidia_nim": {
       "upstream": "nvidia/nemotron-3-ultra-550b-a55b",
-      "contextWindow": 1000000,
-      "maxOutputTokens": 128000
+      "contextWindow": 1048576,
+      "maxOutputTokens": 1048576
     },
     "openrouter": {
       "upstream": "nvidia/nemotron-3-ultra-550b-a55b:free",
