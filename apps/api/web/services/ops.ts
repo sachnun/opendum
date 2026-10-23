@@ -1,11 +1,12 @@
 import { ORPCError } from "@orpc/server";
 import { assertPublicHost, PrivateHostError } from "@opendum/core/egress";
-import { Result } from "effect";
+import { Effect, Result } from "effect";
 
-import type { QuotaInput, QuotaResult, RelayInput, RelayResult } from "@opendum/providers/contract";
+import type { QuotaInput, RelayInput, RelayResult } from "@opendum/providers/contract";
 import type { ProxyContext } from "../../core/context.js";
 import { trySyncResult } from "../../core/helpers.js";
 import { fetchAccountQuota } from "../../core/quota.js";
+import { fromPromise } from "#web/lib/task.js";
 
 const RELAY_TIMEOUT_MS = 20 * 1000;
 
@@ -20,49 +21,73 @@ const BLOCKED_RELAY_RESPONSE_HEADERS = new Set([
   "transfer-encoding", "upgrade", "content-length", "set-cookie",
 ]);
 
-export async function runOpsAccountQuota(context: ProxyContext, input: QuotaInput): Promise<QuotaResult> {
+export const runOpsAccountQuota = Effect.fn("ops.runAccountQuota")(function* (
+  context: ProxyContext,
+  input: QuotaInput
+) {
   const userId = (input.userId ?? "").trim();
   const provider = (input.provider ?? "").trim();
   const accountId = (input.accountId ?? "").trim();
   if (!userId || !provider || !accountId) {
-    return { success: false, error: "userId, provider, and accountId are required" };
+    return { success: false as const, error: "userId, provider, and accountId are required" };
   }
 
-  const outcome = await fetchAccountQuota(context, { userId, provider, accountId, forceRefresh: Boolean(input.forceRefresh) });
-  if (outcome.status === "unsupported") return { success: false, error: `provider ${outcome.provider} is not supported for quota` };
-  if (outcome.status === "not-found") return { success: false, error: "Account not found" };
-  if (outcome.status === "error") return { success: false, error: outcome.message };
+  const outcome = yield* fromPromise(
+    () =>
+      fetchAccountQuota(context, {
+        userId,
+        provider,
+        accountId,
+        forceRefresh: Boolean(input.forceRefresh),
+      }),
+    "Failed to fetch quota data"
+  );
+  if (outcome.status === "unsupported") {
+    return { success: false as const, error: `provider ${outcome.provider} is not supported for quota` };
+  }
+  if (outcome.status === "not-found") return { success: false as const, error: "Account not found" };
+  if (outcome.status === "error") return { success: false as const, error: outcome.message };
 
-  return { success: true, data: outcome.data };
-}
+  return { success: true as const, data: outcome.data };
+});
 
-function resolveRelayTarget(url: string, method: string): { method: string; target: string } {
+function resolveRelayTarget(
+  url: string,
+  method: string
+): { method: string; target: string } | { error: string } {
   const normalizedMethod = (method || "GET").toUpperCase();
   if (!["GET", "POST", "PUT", "PATCH", "DELETE"].includes(normalizedMethod)) {
-    throw new Error(`unsupported relay method: ${normalizedMethod}`);
+    return { error: `unsupported relay method: ${normalizedMethod}` };
   }
-  if (!URL.canParse(url)) throw new Error("url is invalid");
+  if (!URL.canParse(url)) return { error: "url is invalid" };
   const target = new URL(url);
   if (target.protocol !== "https:" || !target.hostname || target.username || target.password) {
-    throw new Error("url must be an https provider URL");
+    return { error: "url must be an https provider URL" };
   }
   const hostCheck = trySyncResult(() => assertPublicHost(target.hostname));
   if (Result.isFailure(hostCheck)) {
-    if (hostCheck.failure instanceof PrivateHostError) throw new Error("url must not target a private network address");
-    throw hostCheck.failure;
+    return {
+      error:
+        hostCheck.failure instanceof PrivateHostError
+          ? "url must not target a private network address"
+          : hostCheck.failure instanceof Error
+            ? hostCheck.failure.message
+            : "Invalid target",
+    };
   }
   return { method: normalizedMethod, target: target.toString() };
 }
 
-export async function runOpsRelay(context: ProxyContext, input: RelayInput): Promise<RelayResult> {
+export const runOpsRelay = Effect.fn("ops.runRelay")(function* (
+  context: ProxyContext,
+  input: RelayInput
+) {
   const url = (input.url ?? "").trim();
-  if (!url) throw new ORPCError("BAD_REQUEST", { message: "url is required" });
+  if (!url) return yield* Effect.fail(new ORPCError("BAD_REQUEST", { message: "url is required" }));
 
-  let resolved: { method: string; target: string };
-  try {
-    resolved = resolveRelayTarget(url, input.method ?? "");
-  } catch (error) {
-    throw new ORPCError("BAD_REQUEST", { message: error instanceof Error ? error.message : "Invalid target" });
+  const resolved = resolveRelayTarget(url, input.method ?? "");
+  if ("error" in resolved) {
+    return yield* Effect.fail(new ORPCError("BAD_REQUEST", { message: resolved.error }));
   }
 
   const headers = new Headers();
@@ -79,19 +104,19 @@ export async function runOpsRelay(context: ProxyContext, input: RelayInput): Pro
     body = typeof input.body === "string" ? input.body : JSON.stringify(input.body);
   }
 
-  let upstream: Response;
-  try {
-    upstream = await context.guardedFetch(resolved.target, {
-      method: resolved.method,
-      headers,
-      body,
-      signal: AbortSignal.timeout(RELAY_TIMEOUT_MS),
-    });
-  } catch (error) {
-    throw new ORPCError("BAD_GATEWAY", {
-      message: `Relay upstream request failed: ${error instanceof Error ? error.message : String(error)}`,
-    });
-  }
+  const upstream = yield* Effect.tryPromise({
+    try: () =>
+      context.guardedFetch(resolved.target, {
+        method: resolved.method,
+        headers,
+        body,
+        signal: AbortSignal.timeout(RELAY_TIMEOUT_MS),
+      }),
+    catch: (error) =>
+      new ORPCError("BAD_GATEWAY", {
+        message: `Relay upstream request failed: ${error instanceof Error ? error.message : String(error)}`,
+      }),
+  });
 
   const responseHeaders: Record<string, string> = {};
   upstream.headers.forEach((value, key) => {
@@ -101,5 +126,9 @@ export async function runOpsRelay(context: ProxyContext, input: RelayInput): Pro
     responseHeaders[key] = value;
   });
 
-  return { status: upstream.status, headers: responseHeaders, body: await upstream.text() };
-}
+  const responseBody = yield* fromPromise(
+    () => upstream.text(),
+    "Relay upstream response failed"
+  );
+  return { status: upstream.status, headers: responseHeaders, body: responseBody } satisfies RelayResult;
+});

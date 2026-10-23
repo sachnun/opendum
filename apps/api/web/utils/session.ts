@@ -1,12 +1,9 @@
 import { Effect } from "effect";
-import { HTTPError, type H3Event } from "h3";
+import type { H3Event } from "h3";
 
-import { claimsFromPayload, toAuthUser, type AccessTokenClaims, type AuthUser } from "#web/lib/claims.js";
+import { claimsFromPayload, toAuthUser, type AccessTokenClaims } from "#web/lib/claims.js";
+import { unauthorized } from "#web/errors.js";
 import { getIdentity, type IdentityService } from "#web/identity.js";
-
-function unauthorized(): HTTPError {
-  return new HTTPError({ status: 401, statusText: "Unauthorized" });
-}
 
 function bearerToken(headers: Headers): string | null {
   const header = headers.get("authorization");
@@ -23,40 +20,44 @@ function bearerHeaders(token: string): Headers {
   return new Headers({ authorization: `Bearer ${token}` });
 }
 
-export async function identityService(): Promise<IdentityService> {
-  return await getIdentity();
-}
+export const identityService = Effect.fn("identityService")(function* () {
+  return yield* getIdentity();
+});
 
-export async function getSessionFromEvent(event: H3Event) {
-  const identity = await identityService();
-  return await Effect.runPromise(identity.sessionFromHeaders(event.req.headers));
-}
+export const getSessionFromEvent = Effect.fn("getSessionFromEvent")(function* (event: H3Event) {
+  const identity = yield* identityService();
+  return yield* identity.sessionFromHeaders(event.req.headers);
+});
 
-export async function mintAccessToken(event: H3Event): Promise<string | null> {
-  const identity = await identityService();
-  return await Effect.runPromise(identity.accessTokenFromHeaders(event.req.headers));
-}
+export const mintAccessToken = Effect.fn("mintAccessToken")(function* (event: H3Event) {
+  const identity = yield* identityService();
+  return yield* identity.accessTokenFromHeaders(event.req.headers);
+});
 
-export async function requireSessionToken(event: H3Event): Promise<{ user: AuthUser; sessionToken: string }> {
+export const requireSessionToken = Effect.fn("requireSessionToken")(function* (event: H3Event) {
   const token = bearerToken(event.req.headers);
-  if (!token) throw unauthorized();
+  if (!token) return yield* unauthorized();
 
-  const identity = await identityService();
-  const session = await Effect.runPromise(identity.sessionFromHeaders(bearerHeaders(token)));
-  if (!session?.user?.id) throw unauthorized();
+  const identity = yield* identityService();
+  const session = yield* identity.sessionFromHeaders(bearerHeaders(token));
+  if (!session?.user?.id) return yield* unauthorized();
 
   return { user: toAuthUser(session.user), sessionToken: token };
-}
+});
 
-export async function requireSessionFromHeaders(headers: Headers): Promise<AccessTokenClaims> {
+export const requireSessionFromHeaders = Effect.fn("requireSessionFromHeaders")(function* (
+  headers: Headers
+) {
   const token = bearerToken(headers);
-  if (!token) throw unauthorized();
+  if (!token) return yield* unauthorized();
 
-  const identity = await identityService();
-  const payload = await Effect.runPromise(identity.verifyAccessToken(token));
+  const identity = yield* identityService();
+  const payload = yield* identity.verifyAccessToken(token);
   const claims = claimsFromPayload(payload);
 
-  if (!claims) throw unauthorized();
+  if (!claims) return yield* unauthorized();
 
-  return claims;
-}
+  return claims satisfies AccessTokenClaims;
+}) as (headers: Headers) => Effect.Effect<AccessTokenClaims, import("#web/errors.js").ServiceFailure>;
+
+export type { IdentityService };

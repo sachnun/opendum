@@ -3,7 +3,10 @@ import { eq } from "drizzle-orm";
 
 import { db, providerAccount, type ProviderAccount } from "@opendum/database";
 import { decrypt, encrypt } from "#web/lib/encryption.js";
-import { fetchExternal } from "#web/lib/external.js";
+import { Effect } from "effect";
+import { fetchExternalEffect } from "#web/lib/external.js";
+import { fromPromise } from "#web/lib/task.js";
+import { badRequest, unavailable } from "#web/errors.js";
 import type { OAuthResult } from "../types.js";
 import { formatProviderHttpError } from "../provider-http-errors.js";
 import {
@@ -62,13 +65,17 @@ export function generateCodeVerifier(): string {
     .replace(/=+$/, "");
 }
 
-export async function generateCodeChallenge(verifier: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(verifier);
-  const digest = await crypto.subtle.digest("SHA-256", data);
+export const generateCodeChallenge = Effect.fn("codex.generateCodeChallenge")(function* (
+  verifier: string
+) {
+  const data = new TextEncoder().encode(verifier);
+  const digest = yield* fromPromise(
+    () => crypto.subtle.digest("SHA-256", data),
+    "Failed to build Codex code challenge"
+  );
   const base64 = btoa(String.fromCharCode(...new Uint8Array(digest)));
   return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
+});
 
 function toNonEmptyString(value: unknown): string | null {
   if (typeof value !== "string") {
@@ -317,126 +324,143 @@ export function buildOAuthResultFromChatGPTSession(sessionJson: string): OAuthRe
   };
 }
 
-export const codexProvider = {
-  async exchangeCode(
-    code: string,
-    redirectUri: string,
-    codeVerifier?: string
-  ): Promise<OAuthResult> {
-    const body: Record<string, string> = {
-      grant_type: "authorization_code",
-      code,
+const exchangeCodexCode = Effect.fn("codex.exchangeCode")(function* (
+  code: string,
+  redirectUri: string,
+  codeVerifier?: string
+) {
+  const body: Record<string, string> = {
+    grant_type: "authorization_code",
+    code,
+    client_id: CLIENT_ID,
+    redirect_uri: redirectUri || BROWSER_REDIRECT_URI,
+  };
+
+  if (codeVerifier) {
+    body.code_verifier = codeVerifier;
+  }
+
+  const response = yield* fetchExternalEffect(TOKEN_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Accept: "application/json",
+    },
+    body: new URLSearchParams(body),
+  });
+
+  if (!response.ok) {
+    const error = yield* readText(response);
+    return yield* unavailable(
+      formatProviderHttpError("Codex", response, error, {
+        endpointLabel: "token exchange endpoint",
+      })
+    );
+  }
+
+  return buildOAuthResult(yield* readJson<CodexTokenResponse>(response));
+});
+
+const refreshCodexToken = Effect.fn("codex.refreshToken")(function* (refreshToken: string) {
+  const response = yield* fetchExternalEffect(TOKEN_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Accept: "application/json",
+    },
+    body: new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: refreshToken,
       client_id: CLIENT_ID,
-      redirect_uri: redirectUri || BROWSER_REDIRECT_URI,
-    };
+    }),
+  });
 
-    if (codeVerifier) {
-      body.code_verifier = codeVerifier;
-    }
+  if (!response.ok) {
+    const error = yield* readText(response);
+    return yield* unavailable(
+      formatProviderHttpError("Codex", response, error, {
+        endpointLabel: "token refresh endpoint",
+      })
+    );
+  }
 
-    const response = await fetchExternal(TOKEN_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Accept: "application/json",
-      },
-      body: new URLSearchParams(body),
-    });
+  return buildOAuthResult(yield* readJson<CodexTokenResponse>(response), refreshToken);
+});
 
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(
-        formatProviderHttpError("Codex", response, error, {
-          endpointLabel: "token exchange endpoint",
-        })
-      );
-    }
+const getValidCodexCredentials = Effect.fn("codex.getValidCredentials")(function* (
+  account: CredentialAccount
+) {
+  let accessToken = decrypt(account.accessToken);
+  const refreshTokenValue = account.refreshToken ? decrypt(account.refreshToken) : "";
 
-    return buildOAuthResult((await response.json()) as CodexTokenResponse);
-  },
-
-  async refreshToken(refreshToken: string): Promise<OAuthResult> {
-    const response = await fetchExternal(TOKEN_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Accept: "application/json",
-      },
-      body: new URLSearchParams({
-        grant_type: "refresh_token",
-        refresh_token: refreshToken,
-        client_id: CLIENT_ID,
-      }),
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(
-        formatProviderHttpError("Codex", response, error, {
-          endpointLabel: "token refresh endpoint",
-        })
-      );
-    }
-
-    return buildOAuthResult((await response.json()) as CodexTokenResponse, refreshToken);
-  },
-
-  async getValidCredentials(account: CredentialAccount): Promise<string> {
-    let accessToken = decrypt(account.accessToken);
-    const refreshTokenValue = account.refreshToken ? decrypt(account.refreshToken) : "";
-
-    const resolvedAccountId = extractAccountIdFromJwt(accessToken);
-    if (resolvedAccountId && resolvedAccountId !== account.accountId) {
-      try {
-        await db
+  const resolvedAccountId = extractAccountIdFromJwt(accessToken);
+  if (resolvedAccountId && resolvedAccountId !== account.accountId) {
+    yield* fromPromise(
+      () =>
+        db
           .update(providerAccount)
           .set({ accountId: resolvedAccountId })
-          .where(eq(providerAccount.id, account.id));
-        account.accountId = resolvedAccountId;
-      } catch {}
-    }
+          .where(eq(providerAccount.id, account.id)),
+      "Failed to persist Codex account id"
+    ).pipe(
+      Effect.tap(() =>
+        Effect.sync(() => {
+          account.accountId = resolvedAccountId;
+        })
+      ),
+      Effect.ignore
+    );
+  }
 
-    if (isTokenExpired(account.expiresAt)) {
-      if (!refreshTokenValue.trim()) {
-        throw new Error("Codex ChatGPT session has expired. Reconnect this account with a fresh session JSON.");
-      }
+  if (!isTokenExpired(account.expiresAt)) return accessToken;
 
-      try {
-        const newTokens = await codexProvider.refreshToken(refreshTokenValue);
-        const updateData: Record<string, unknown> = {
-          accessToken: encrypt(newTokens.accessToken),
-          refreshToken: encrypt(newTokens.refreshToken ?? ""),
-          expiresAt: newTokens.expiresAt,
-        };
+  if (!refreshTokenValue.trim()) {
+    return yield* badRequest(
+      "Codex ChatGPT session has expired. Reconnect this account with a fresh session JSON."
+    );
+  }
 
-        if (newTokens.accountId) {
-          updateData.accountId = newTokens.accountId;
-          account.accountId = newTokens.accountId;
-        }
-        if (newTokens.tier) {
-          updateData.tier = newTokens.tier;
-        }
+  const refreshed = yield* refreshCodexToken(refreshTokenValue).pipe(
+    Effect.catch((error) =>
+      new Date() >= account.expiresAt ? Effect.fail(error) : Effect.succeed(null)
+    )
+  );
+  if (!refreshed) return accessToken;
 
-        await db
-          .update(providerAccount)
-          .set(updateData)
-          .where(eq(providerAccount.id, account.id));
+  const updateData: Record<string, unknown> = {
+    accessToken: encrypt(refreshed.accessToken),
+    refreshToken: encrypt(refreshed.refreshToken ?? ""),
+    expiresAt: refreshed.expiresAt,
+  };
 
-        accessToken = newTokens.accessToken;
-      } catch (error) {
-        console.error(`Failed to refresh token for Codex account ${account.id}:`, error);
-        if (new Date() >= account.expiresAt) {
-          throw error;
-        }
-      }
-    }
+  if (refreshed.accountId) {
+    updateData.accountId = refreshed.accountId;
+    account.accountId = refreshed.accountId;
+  }
+  if (refreshed.tier) {
+    updateData.tier = refreshed.tier;
+  }
 
-    return accessToken;
-  },
+  yield* fromPromise(
+    () =>
+      db
+        .update(providerAccount)
+        .set(updateData)
+        .where(eq(providerAccount.id, account.id)),
+    "Failed to persist refreshed Codex credentials"
+  );
+
+  return refreshed.accessToken;
+});
+
+export const codexProvider = {
+  exchangeCode: exchangeCodexCode,
+  refreshToken: refreshCodexToken,
+  getValidCredentials: getValidCodexCredentials,
 };
 
-export async function initiateCodexDeviceCodeFlow() {
-  const response = await fetchExternal(DEVICE_CODE_ENDPOINT, {
+export const initiateCodexDeviceCodeFlow = Effect.fn("codex.initiateDeviceCodeFlow")(function* () {
+  const response = yield* fetchExternalEffect(DEVICE_CODE_ENDPOINT, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -447,15 +471,15 @@ export async function initiateCodexDeviceCodeFlow() {
   });
 
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(
+    const error = yield* readText(response);
+    return yield* unavailable(
       formatProviderHttpError("Codex", response, error, {
         endpointLabel: "device code endpoint",
       })
     );
   }
 
-  const data = (await response.json()) as CodexDeviceCodeResponse;
+  const data = yield* readJson<CodexDeviceCodeResponse>(response);
   return {
     deviceCode: data.device_auth_id,
     userCode: data.user_code,
@@ -464,35 +488,48 @@ export async function initiateCodexDeviceCodeFlow() {
     expiresIn: data.expires_in ?? 900,
     interval: Number(data.interval) || 5,
   };
+});
+
+export const pollCodexDeviceCodeAuthorization = Effect.fn("codex.pollDeviceCodeAuthorization")(
+  function* (deviceAuthId: string, userCode: string) {
+    const response = yield* fetchExternalEffect(DEVICE_TOKEN_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "User-Agent": CODEX_CHAT_USER_AGENT,
+      },
+      body: JSON.stringify({ device_auth_id: deviceAuthId, user_code: userCode }),
+    });
+
+    if (response.ok) {
+      const data = yield* readJson<CodexDeviceTokenResponse>(response);
+      if (!data.authorization_code || !data.code_verifier) {
+        return { error: "Codex device auth polling endpoint returned incomplete authorization data" };
+      }
+      return yield* codexProvider.exchangeCode(
+        data.authorization_code,
+        DEVICE_REDIRECT_URI,
+        data.code_verifier
+      );
+    }
+
+    if (response.status === 403 || response.status === 404) {
+      return { pending: true as const, retryAfterSeconds: 8 };
+    }
+
+    const error = yield* readText(response);
+    return {
+      error: formatProviderHttpError("Codex", response, error, {
+        endpointLabel: "device auth polling endpoint",
+      }),
+    };
+});
+
+function readText(response: Response) {
+  return fromPromise(() => response.text(), "Failed to read Codex response");
 }
 
-export async function pollCodexDeviceCodeAuthorization(deviceAuthId: string, userCode: string) {
-  const response = await fetchExternal(DEVICE_TOKEN_ENDPOINT, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      "User-Agent": CODEX_CHAT_USER_AGENT,
-    },
-    body: JSON.stringify({ device_auth_id: deviceAuthId, user_code: userCode }),
-  });
-
-  if (response.ok) {
-    const data = (await response.json()) as CodexDeviceTokenResponse;
-    if (!data.authorization_code || !data.code_verifier) {
-      return { error: "Codex device auth polling endpoint returned incomplete authorization data" };
-    }
-    return codexProvider.exchangeCode(data.authorization_code, DEVICE_REDIRECT_URI, data.code_verifier);
-  }
-
-  if (response.status === 403 || response.status === 404) {
-    return { pending: true, retryAfterSeconds: 8 };
-  }
-
-  const error = await response.text();
-  return {
-    error: formatProviderHttpError("Codex", response, error, {
-      endpointLabel: "device auth polling endpoint",
-    }),
-  };
+function readJson<T>(response: Response) {
+  return fromPromise(async () => ((await response.json()) as T), "Failed to read Codex response");
 }

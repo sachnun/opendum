@@ -1,8 +1,9 @@
+import { Effect } from "effect";
 import { AuthService } from "@opendum/auth";
 import type { AccountModelAvailability } from "@opendum/auth";
-import { Effect } from "effect";
 import type { OpendumRedis } from "@opendum/core/redis";
 import { getRedisClient } from "../redis.js";
+import { fromPromise } from "../task.js";
 import { registry } from "./models.js";
 
 const VALIDATION_PREFIX = "opendum:api-key:validation";
@@ -26,50 +27,41 @@ export type { AccountModelAvailability };
 
 const dummyRedis = {} as OpendumRedis;
 
-export async function invalidateDisabledModelsCache(userId: string): Promise<void> {
-  try {
-    const redis = await getRedisClient();
-    await redis.del(getDisabledModelsCacheKey(userId));
-  } catch {
-    return;
-  }
+function deleteKeys(build: (redis: OpendumRedis) => Promise<unknown>) {
+  return Effect.gen(function* () {
+    const redis = yield* getRedisClient();
+    yield* fromPromise(() => build(redis), "Failed to invalidate cache");
+  }).pipe(Effect.ignore);
 }
 
-export async function clearRefreshFailCount(accountId: string): Promise<void> {
-  try {
-    const redis = await getRedisClient();
-    await redis.del(`${REFRESH_FAIL_COUNT_PREFIX}:${accountId}`);
-  } catch {
-    return;
-  }
-}
+export const invalidateDisabledModelsCache = Effect.fn("invalidateDisabledModelsCache")(function* (
+  userId: string
+) {
+  yield* deleteKeys((redis) => redis.del(getDisabledModelsCacheKey(userId)));
+});
 
-export async function invalidateApiKeyValidationCache(
+export const clearRefreshFailCount = Effect.fn("clearRefreshFailCount")(function* (accountId: string) {
+  yield* deleteKeys((redis) => redis.del(`${REFRESH_FAIL_COUNT_PREFIX}:${accountId}`));
+});
+
+export const invalidateApiKeyValidationCache = Effect.fn("invalidateApiKeyValidationCache")(function* (
   keyHash: string,
   apiKeyId?: string
-): Promise<void> {
-  try {
-    const redis = await getRedisClient();
-    const keys = [getApiKeyValidationCacheKey(keyHash)];
-    if (apiKeyId) keys.push(getApiKeyLastUsedThrottleKey(apiKeyId));
-    await redis.del(keys);
-  } catch {
-    return;
-  }
-}
+) {
+  const keys = [getApiKeyValidationCacheKey(keyHash)];
+  if (apiKeyId) keys.push(getApiKeyLastUsedThrottleKey(apiKeyId));
+  yield* deleteKeys((redis) => redis.del(keys));
+});
 
-export async function getAccountModelAvailability(
+export const getAccountModelAvailability = Effect.fn("getAccountModelAvailability")(function* (
   userId: string,
   options: { includeInactiveAccounts?: boolean } = {}
-): Promise<AccountModelAvailability> {
+) {
   const service = new AuthService(registry, dummyRedis);
-  return Effect.runPromise(service.availability(userId, false, options));
-}
+  return yield* service.availability(userId, false, options);
+});
 
-export function usable(
-  model: string,
-  availability: AccountModelAvailability
-): boolean {
+export function usable(model: string, availability: AccountModelAvailability): boolean {
   const service = new AuthService(registry, dummyRedis);
   return service.usable(model, availability);
 }

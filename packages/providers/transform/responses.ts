@@ -6,6 +6,7 @@ import {
   jsonResponse,
   normalizeToolChoice,
   numberFromAny,
+  parseJsonRecord,
   randomId,
   stringSlice,
   stringValue,
@@ -315,12 +316,8 @@ async function* transformResponsesSseToChat(
 
   for await (const data of sseDataLines(source)) {
     if (!data || data === "[DONE]") continue;
-    let event: Json;
-    try {
-      event = JSON.parse(data) as Json;
-    } catch {
-      continue;
-    }
+    const event = parseJsonRecord(data);
+    if (!event) continue;
     const type = stringValue(event.type);
     switch (type) {
       case "response.output_text.delta": {
@@ -827,12 +824,8 @@ async function* transformChatSseToResponses(
   for await (const data of sseDataLines(source)) {
     if (!data) continue;
     if (data === "[DONE]") break;
-    let chunk: Json;
-    try {
-      chunk = JSON.parse(data) as Json;
-    } catch {
-      continue;
-    }
+    const chunk = parseJsonRecord(data);
+    if (!chunk) continue;
     const usage = chunk.usage;
     if (usage !== null && typeof usage === "object" && Object.keys(usage as Json).length > 0) {
       state.usage = usage as Json;
@@ -895,19 +888,15 @@ export async function responsesSseToResponsesJson(source: ReadableStream<Uint8Ar
     reader.releaseLock();
   }
   const trimmed = raw.trim();
-  if (trimmed.startsWith("{")) return JSON.parse(trimmed) as Json;
+  if (trimmed.startsWith("{")) return parseJsonRecord(trimmed) ?? {};
   let result: Json | null = null;
   for (const line of trimmed.split("\n")) {
     const text = line.trim();
     if (!text.startsWith("data:")) continue;
     const data = text.slice("data:".length).trim();
     if (!data || data === "[DONE]") continue;
-    let event: Json;
-    try {
-      event = JSON.parse(data) as Json;
-    } catch {
-      continue;
-    }
+    const event = parseJsonRecord(data);
+    if (!event) continue;
     const type = stringValue(event.type);
     if (
       type === "response.completed" ||
@@ -940,7 +929,7 @@ export async function chatSseToChatCompletion(
     reader.releaseLock();
   }
   const trimmed = raw.trim();
-  if (trimmed.startsWith("{")) return JSON.parse(trimmed) as Json;
+  if (trimmed.startsWith("{")) return parseJsonRecord(trimmed) ?? {};
 
   let content = "";
   let reasoning = "";
@@ -954,12 +943,8 @@ export async function chatSseToChatCompletion(
     if (!text.startsWith("data:")) continue;
     const data = text.slice("data:".length).trim();
     if (!data || data === "[DONE]") continue;
-    let chunk: Json;
-    try {
-      chunk = JSON.parse(data) as Json;
-    } catch {
-      continue;
-    }
+    const chunk = parseJsonRecord(data);
+    if (!chunk) continue;
     const usageValue = chunk.usage;
     if (usageValue !== null && typeof usageValue === "object" && Object.keys(usageValue as Json).length > 0) {
       usage = usageValue as Json;

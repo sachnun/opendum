@@ -21,7 +21,6 @@ import { HeadersTimeout, HEADERS_TIMEOUT_MESSAGE } from "./upstream-timeout.js";
 import {
   accountAccessDenial,
   accountNeedsCredentialRefresh,
-  ignore,
   isSyntheticProviderAccountId,
   parseRefreshErrorStatusCode,
   refreshBufferFor,
@@ -248,15 +247,13 @@ export class ProxyService implements StreamRecorder {
       }
 
       if (authResult.apiKeyId && authResult.rateLimitRules.length > 0) {
-        const rl = yield* Effect.promise(() =>
-          checkAndIncrementAPIKeyRateLimit(
-            this.redis,
-            this.models,
-            authResult.apiKeyId,
-            validation.model,
-            validation.alias,
-            authResult.rateLimitRules
-          )
+        const rl = yield* checkAndIncrementAPIKeyRateLimit(
+          this.redis,
+          this.models,
+          authResult.apiKeyId,
+          validation.model,
+          validation.alias,
+          authResult.rateLimitRules
         );
         if (!rl.allowed) {
           const retry = retryMetadata(rl.retryAfterSeconds * 1000);
@@ -327,11 +324,11 @@ export class ProxyService implements StreamRecorder {
         const result = yield* Effect.promise(() => cfg.handleStream(responseCtx, this));
         if (!responseCtx.streamHandled) {
           if (roaming) {
-            yield* ignore(() =>
+            yield* Effect.ignore(
               this.roaming.settle(account.userId, roaming, validation.model, responseCtx.usage)
             );
           }
-          yield* ignore(() => this.health.markRecovered(rotationFailures));
+          yield* Effect.ignore(Effect.promise(() => this.health.markRecovered(rotationFailures)));
         }
         return result;
       }
@@ -354,11 +351,11 @@ export class ProxyService implements StreamRecorder {
         )
       );
       if (roaming) {
-        yield* ignore(() =>
+        yield* Effect.ignore(
           this.roaming.settle(account.userId, roaming, validation.model, responseCtx.usage)
         );
       }
-      yield* ignore(() => this.health.markRecovered(rotationFailures));
+      yield* Effect.ignore(Effect.promise(() => this.health.markRecovered(rotationFailures)));
       return result;
     }).pipe(
       Effect.tap(() => Metric.update(proxyRequests, 1)),
@@ -371,9 +368,9 @@ export class ProxyService implements StreamRecorder {
     const { account, authResult, validation, roaming, rotationFailures, usage, startMs } = context;
     if (roaming) {
       if (reason === "success") {
-        trackWork(ignore(() => this.roaming.settle(account.userId, roaming, validation.model, usage)));
+        trackWork(Effect.ignore(this.roaming.settle(account.userId, roaming, validation.model, usage)));
       } else {
-        trackWork(ignore(() => this.roaming.refund(roaming)));
+        trackWork(Effect.ignore(this.roaming.refund(roaming)));
       }
     }
     if (reason === "error") {
@@ -382,7 +379,7 @@ export class ProxyService implements StreamRecorder {
       );
     }
     if (reason !== "cancel") {
-      trackWork(ignore(() => this.health.markRecovered(rotationFailures)));
+      trackWork(Effect.ignore(Effect.promise(() => this.health.markRecovered(rotationFailures))));
     }
   }
 
@@ -393,9 +390,9 @@ export class ProxyService implements StreamRecorder {
   ): Promise<Response> {
     const { account, authResult, validation, roaming, rotationFailures, startMs } = context;
     const message = error instanceof Error ? error.message : String(error);
-    if (roaming) await Effect.runPromise(ignore(() => this.roaming.refund(roaming)));
+    if (roaming) await Effect.runPromise(Effect.ignore(this.roaming.refund(roaming)));
     await this.recordResponseHandlerFailure(account, authResult, validation, 500, message, startMs);
-    trackWork(ignore(() => this.health.markRecovered(rotationFailures)));
+    trackWork(Effect.ignore(Effect.promise(() => this.health.markRecovered(rotationFailures))));
     return this.routeError(cfg, {
       status: 500,
       message: prefixWithProvider(account.provider, message),
@@ -413,10 +410,16 @@ export class ProxyService implements StreamRecorder {
     startMs: number
   ): Promise<void> {
     await Effect.runPromise(
-      ignore(async () => {
-        await this.health.markAccountFailed(account.id, validation.model, statusCode, message);
-        await this.usage.logUsage(authResult, account, validation, statusCode, Date.now() - startMs);
-      })
+      Effect.ignore(
+        Effect.gen({ self: this }, function* () {
+          yield* Effect.promise(() =>
+            this.health.markAccountFailed(account.id, validation.model, statusCode, message)
+          );
+          yield* Effect.promise(() =>
+            this.usage.logUsage(authResult, account, validation, statusCode, Date.now() - startMs)
+          );
+        })
+      )
     );
   }
 
@@ -680,9 +683,7 @@ export class ProxyService implements StreamRecorder {
         }
 
         if (useShared && !forced && !roaming) {
-          const reserved = yield* Effect.promise(() =>
-            this.roaming.reserve(authResult.userId, validation.model)
-          );
+          const reserved = yield* this.roaming.reserve(authResult.userId, validation.model);
           if (!reserved) {
             return {
               status: 402,
@@ -716,7 +717,7 @@ export class ProxyService implements StreamRecorder {
             yield* Effect.promise(() => sleep(gateMs));
           } else {
             const retry = retryMetadata(gateMs);
-            if (roaming) yield* ignore(() => this.roaming.refund(roaming));
+            if (roaming) yield* Effect.ignore(this.roaming.refund(roaming));
             return {
               status: 429,
               message: `${account.provider} reports model ${validation.model} as saturated. Retry after ${retry.retryAfter ?? "a moment"}.`,
@@ -753,8 +754,10 @@ export class ProxyService implements StreamRecorder {
           const failedAt = yield* Effect.promise(() =>
             this.health.markAccountFailed(account.id, validation.model, status, detailed)
           );
-          yield* ignore(() =>
-            this.usage.logUsage(authResult, account, validation, status, Date.now() - startMs)
+          yield* Effect.ignore(
+            Effect.promise(() =>
+              this.usage.logUsage(authResult, account, validation, status, Date.now() - startMs)
+            )
           );
           lastFailure = {
             status,
@@ -763,7 +766,7 @@ export class ProxyService implements StreamRecorder {
             accountId: account.id,
           };
           yield* Metric.update(upstreamErrors, 1);
-          if (roaming) yield* ignore(() => this.roaming.refund(roaming));
+          if (roaming) yield* Effect.ignore(this.roaming.refund(roaming));
           if (!forced) {
             recoverableFailures.push({ accountId: account.id, failedAt });
             yield* Metric.update(accountRotations, 1);
@@ -786,8 +789,10 @@ export class ProxyService implements StreamRecorder {
             this.errorContext(cfg, validation, parsed, account.provider)
           );
           if (isModelSaturated(response.status, bodyText)) {
-            yield* ignore(() =>
-              this.usage.logUsage(authResult, account, validation, response.status, Date.now() - startMs)
+            yield* Effect.ignore(
+              Effect.promise(() =>
+                this.usage.logUsage(authResult, account, validation, response.status, Date.now() - startMs)
+              )
             );
             yield* Metric.update(upstreamErrors, 1);
             const holdMs = yield* this.saturation.hold(account.provider, validation.model);
@@ -799,7 +804,7 @@ export class ProxyService implements StreamRecorder {
               pendingReservation = roaming;
               continue;
             }
-            if (roaming) yield* ignore(() => this.roaming.refund(roaming));
+            if (roaming) yield* Effect.ignore(this.roaming.refund(roaming));
             const retry = retryMetadata(holdMs);
             return {
               status: 429,
@@ -847,8 +852,10 @@ export class ProxyService implements StreamRecorder {
               this.health.markAccountUsageLimited(account.id, validation.model, restrictedUntil, failedAt ?? new Date())
             );
           }
-          yield* ignore(() =>
-            this.usage.logUsage(authResult, account, validation, response.status, Date.now() - startMs)
+          yield* Effect.ignore(
+            Effect.promise(() =>
+              this.usage.logUsage(authResult, account, validation, response.status, Date.now() - startMs)
+            )
           );
           const sanitized = sanitizedProxyError(response.status, bodyText);
           lastFailure = {
@@ -859,7 +866,7 @@ export class ProxyService implements StreamRecorder {
           };
           yield* Metric.update(upstreamErrors, 1);
           yield* Metric.update(upstreamTtft, upstreamFirstResponseMs - requestStartMs);
-          if (roaming) yield* ignore(() => this.roaming.refund(roaming));
+          if (roaming) yield* Effect.ignore(this.roaming.refund(roaming));
           if (fallbackAcrossProviders) {
             if (!excludedProviders.includes(account.provider)) excludedProviders.push(account.provider);
             continue;
@@ -1194,10 +1201,14 @@ export class ProxyService implements StreamRecorder {
   private async releaseRefreshLock(accountId: string, value: string): Promise<void> {
     if (!value) return;
     await Effect.runPromise(
-      ignore(() =>
-        this.redis.eval(RELEASE_REFRESH_LOCK_SCRIPT, {
-          keys: [`${TOKEN_REFRESH_LOCK_PREFIX}${accountId}`],
-          arguments: [value],
+      Effect.ignore(
+        Effect.tryPromise({
+          try: () =>
+            this.redis.eval(RELEASE_REFRESH_LOCK_SCRIPT, {
+              keys: [`${TOKEN_REFRESH_LOCK_PREFIX}${accountId}`],
+              arguments: [value],
+            }),
+          catch: (cause) => cause,
         })
       )
     );
@@ -1249,7 +1260,14 @@ export class ProxyService implements StreamRecorder {
   }
 
   private async clearRefreshFailures(accountId: string): Promise<void> {
-    await Effect.runPromise(ignore(() => this.redis.del(`${REFRESH_FAIL_COUNT_PREFIX}${accountId}`)));
+    await Effect.runPromise(
+      Effect.ignore(
+        Effect.tryPromise({
+          try: () => this.redis.del(`${REFRESH_FAIL_COUNT_PREFIX}${accountId}`),
+          catch: (cause) => cause,
+        })
+      )
+    );
   }
 
   refreshTokenLoop(intervalMs: number): Effect.Effect<void, never> {

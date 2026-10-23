@@ -3,8 +3,15 @@ import { Effect } from "effect";
 import { aliasesFromUpstream, isDateToken } from "./model/clean-key.ts";
 import { inferModelFolder } from "./model/families.ts";
 import { mergeModelData, splitModelData } from "./model/merge.ts";
-import { ModelParseFailure, asError } from "./errors.ts";
-import { exists, listJsonFiles, readJson, remove, rename, writeText } from "./fs.ts";
+import { ModelParseFailure, ModelWriteFailure, asError } from "./errors.ts";
+import {
+  exists,
+  listJsonFiles,
+  readJson,
+  tryRemove,
+  tryRename,
+  tryWriteText,
+} from "./fs.ts";
 import { basename, dirname, join, relative, sep } from "./paths.ts";
 import type { JsonValue, ModelData, ModelIndex, ModelIndexEntry } from "./types.ts";
 
@@ -118,39 +125,64 @@ function publicId(data: ModelData, fileId: string): string {
   return id || fileId;
 }
 
-export async function write(filePath: string, data: ModelData): Promise<void> {
+export function tryWrite(
+  filePath: string,
+  data: ModelData
+): Effect.Effect<void, ModelWriteFailure> {
   const content = JSON.stringify(normalizeData(data), null, 2);
-  await writeText(filePath, `${content}\n`);
+  return tryWriteText(filePath, `${content}\n`);
 }
 
-export async function writeGenerated(filePath: string, data: ModelData): Promise<void> {
-  await write(filePath, data);
+export function tryWriteGenerated(
+  filePath: string,
+  data: ModelData
+): Effect.Effect<void, ModelWriteFailure> {
+  return tryWrite(filePath, data);
 }
 
-export async function writeSplit(
+export function write(filePath: string, data: ModelData): Promise<void> {
+  return Effect.runPromise(tryWrite(filePath, data));
+}
+
+export function writeGenerated(filePath: string, data: ModelData): Promise<void> {
+  return Effect.runPromise(tryWriteGenerated(filePath, data));
+}
+
+export function tryWriteSplit(
+  modelsDir: string,
+  fileId: string,
+  data: ModelData,
+  options: { generatedDir?: string } = {},
+): Effect.Effect<{ authoredPath: string; generatedPath: string }, ModelWriteFailure> {
+  return Effect.gen(function* () {
+    const dir = options.generatedDir ?? generatedDir(modelsDir);
+    const { generated, authored } = splitModelData(data);
+    const authoredPath = join(modelsDir, fileId + MODEL_EXT);
+    const generatedPath = join(dir, fileId + MODEL_EXT);
+
+    if (Object.keys(authored).length > 0) {
+      yield* tryWrite(authoredPath, authored);
+    } else if (exists(authoredPath)) {
+      yield* tryRemove(authoredPath);
+    }
+
+    if (Object.keys(generated).length > 0) {
+      yield* tryWriteGenerated(generatedPath, generated);
+    } else if (exists(generatedPath)) {
+      yield* tryRemove(generatedPath);
+    }
+
+    return { authoredPath, generatedPath };
+  });
+}
+
+export function writeSplit(
   modelsDir: string,
   fileId: string,
   data: ModelData,
   options: { generatedDir?: string } = {},
 ): Promise<{ authoredPath: string; generatedPath: string }> {
-  const dir = options.generatedDir ?? generatedDir(modelsDir);
-  const { generated, authored } = splitModelData(data);
-  const authoredPath = join(modelsDir, fileId + MODEL_EXT);
-  const generatedPath = join(dir, fileId + MODEL_EXT);
-
-  if (Object.keys(authored).length > 0) {
-    await write(authoredPath, authored);
-  } else if (exists(authoredPath)) {
-    await remove(authoredPath);
-  }
-
-  if (Object.keys(generated).length > 0) {
-    await writeGenerated(generatedPath, generated);
-  } else if (exists(generatedPath)) {
-    await remove(generatedPath);
-  }
-
-  return { authoredPath, generatedPath };
+  return Effect.runPromise(tryWriteSplit(modelsDir, fileId, data, options));
 }
 
 export function collectFiles(modelsDir: string): string[] {
@@ -271,25 +303,40 @@ export function persist(
   return writeSplit(entry.modelsDir, entry.relativeId, data);
 }
 
-export async function renameFiles(
+export function tryRenameFiles(
+  entry: Pick<ModelIndexEntry, "modelsDir" | "generatedDir" | "relativeId">,
+  nextFileId: string,
+): Effect.Effect<string, ModelWriteFailure> {
+  return Effect.gen(function* () {
+    const folder = dirname(entry.relativeId);
+    const nextRelativeId = folder === "." ? nextFileId : join(folder, nextFileId);
+    if (nextRelativeId === entry.relativeId) return entry.relativeId;
+
+    const pairs = [entry.modelsDir, entry.generatedDir].map((base) => ({
+      from: join(base, entry.relativeId + MODEL_EXT),
+      to: join(base, nextRelativeId + MODEL_EXT),
+    }));
+    if (pairs.some(({ to }) => exists(to))) return entry.relativeId;
+
+    for (const { from, to } of pairs) {
+      if (!exists(from)) continue;
+      yield* tryRename(from, to).pipe(
+        Effect.mapError((cause) =>
+          cause._tag === "ModelWriteFailure"
+            ? cause
+            : new ModelWriteFailure({ message: cause.message, path: from, cause })
+        )
+      );
+    }
+    return nextRelativeId;
+  });
+}
+
+export function renameFiles(
   entry: Pick<ModelIndexEntry, "modelsDir" | "generatedDir" | "relativeId">,
   nextFileId: string,
 ): Promise<string> {
-  const folder = dirname(entry.relativeId);
-  const nextRelativeId = folder === "." ? nextFileId : join(folder, nextFileId);
-  if (nextRelativeId === entry.relativeId) return entry.relativeId;
-
-  const pairs = [entry.modelsDir, entry.generatedDir].map((base) => ({
-    from: join(base, entry.relativeId + MODEL_EXT),
-    to: join(base, nextRelativeId + MODEL_EXT),
-  }));
-  if (pairs.some(({ to }) => exists(to))) return entry.relativeId;
-
-  for (const { from, to } of pairs) {
-    if (!exists(from)) continue;
-    await rename(from, to);
-  }
-  return nextRelativeId;
+  return Effect.runPromise(tryRenameFiles(entry, nextFileId));
 }
 
 function isCurated(data: ModelData): boolean {
@@ -298,18 +345,24 @@ function isCurated(data: ModelData): boolean {
   return Object.keys(authored).length > 0;
 }
 
-export async function prune(modelsDir: string): Promise<string[]> {
-  const index = buildIndex(modelsDir);
-  const removed: string[] = [];
+export function tryPrune(modelsDir: string): Effect.Effect<string[], ModelWriteFailure> {
+  return Effect.gen(function* () {
+    const index = buildIndex(modelsDir);
+    const removed: string[] = [];
 
-  for (const entry of Object.values(index)) {
-    if ((entry.data.providers ?? []).length > 0) continue;
-    if (isCurated(entry.data)) continue;
-    await writeSplit(entry.modelsDir, entry.relativeId, {});
-    removed.push(entry.id);
-  }
+    for (const entry of Object.values(index)) {
+      if ((entry.data.providers ?? []).length > 0) continue;
+      if (isCurated(entry.data)) continue;
+      yield* tryWriteSplit(entry.modelsDir, entry.relativeId, {});
+      removed.push(entry.id);
+    }
 
-  return removed.sort();
+    return removed.sort();
+  });
+}
+
+export function prune(modelsDir: string): Promise<string[]> {
+  return Effect.runPromise(tryPrune(modelsDir));
 }
 
 export interface Options {

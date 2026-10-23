@@ -1,7 +1,10 @@
 import { and, eq, gt, gte, inArray, ne, sql } from "drizzle-orm";
 
 import { db, normalizeEmail, pointTransaction, providerEmailRegistry, proxyApiKey, user, userPointBalance, type Database } from "@opendum/database";
+import { Effect } from "effect";
 import { publishPointsBalance } from "#web/events/bus.js";
+import { fromPromise } from "#web/lib/task.js";
+import { badRequest } from "#web/errors.js";
 import { roamingUsagePointsByApiKey } from "#web/lib/roaming-points.js";
 
 export const API_KEY_UPDATE_POINT_COST = 20;
@@ -29,86 +32,129 @@ export function dailyAccessDateKey(now: Date = new Date()): string {
   }).format(now);
 }
 
-async function isUserRewardExcluded(client: PointDatabase, userId: string): Promise<boolean> {
-  const [row] = await client.select({ email: user.email }).from(user).where(eq(user.id, userId)).limit(1);
-  const normalized = row?.email ? normalizeEmail(row.email) : "";
+const isUserRewardExcluded = Effect.fn("points.isUserRewardExcluded")(function* (
+  client: PointDatabase,
+  userId: string
+) {
+  const rows = yield* fromPromise(
+    () => client.select({ email: user.email }).from(user).where(eq(user.id, userId)).limit(1),
+    "Failed to load user email"
+  );
+  const normalized = rows[0]?.email ? normalizeEmail(rows[0].email) : "";
   if (!normalized) return false;
 
-  const [match] = await client
-    .select({ email: providerEmailRegistry.email })
-    .from(providerEmailRegistry)
-    .where(and(
-      eq(providerEmailRegistry.email, normalized),
-      ne(providerEmailRegistry.userId, userId),
-    ))
-    .limit(1);
+  const matches = yield* fromPromise(
+    () =>
+      client
+        .select({ email: providerEmailRegistry.email })
+        .from(providerEmailRegistry)
+        .where(
+          and(eq(providerEmailRegistry.email, normalized), ne(providerEmailRegistry.userId, userId))
+        )
+        .limit(1),
+    "Failed to load provider email registry"
+  );
 
-  return Boolean(match);
-}
+  return matches.length > 0;
+});
 
-async function applyPointTransactionWithClient(client: PointDatabase, input: PointTransactionInput): Promise<{ applied: boolean; balance: number | null }> {
-  const [inserted] = await client
-    .insert(pointTransaction)
-    .values({
-      userId: input.userId,
-      amount: input.amount,
-      type: input.type,
-      balanceAfter: 0,
-      idempotencyKey: input.idempotencyKey,
-    })
-    .onConflictDoNothing({ target: pointTransaction.idempotencyKey })
-    .returning({ id: pointTransaction.id });
+const applyPointTransactionWithClient = Effect.fn("points.applyPointTransaction")(function* (
+  client: PointDatabase,
+  input: PointTransactionInput
+) {
+  const inserted = yield* fromPromise(
+    () =>
+      client
+        .insert(pointTransaction)
+        .values({
+          userId: input.userId,
+          amount: input.amount,
+          type: input.type,
+          balanceAfter: 0,
+          idempotencyKey: input.idempotencyKey,
+        })
+        .onConflictDoNothing({ target: pointTransaction.idempotencyKey })
+        .returning({ id: pointTransaction.id }),
+    "Failed to insert point transaction"
+  );
 
-  if (!inserted) return { applied: false, balance: null };
+  if (!inserted[0]) return { applied: false, balance: null };
 
-  const [updated] = await client
-    .update(userPointBalance)
-    .set({
-      balance: sql`greatest(${userPointBalance.balance} + ${input.amount}, 0)`,
-      updatedAt: new Date(),
-    })
-    .where(eq(userPointBalance.userId, input.userId))
-    .returning({ balance: userPointBalance.balance });
+  const updated = yield* fromPromise(
+    () =>
+      client
+        .update(userPointBalance)
+        .set({
+          balance: sql`greatest(${userPointBalance.balance} + ${input.amount}, 0)`,
+          updatedAt: new Date(),
+        })
+        .where(eq(userPointBalance.userId, input.userId))
+        .returning({ balance: userPointBalance.balance }),
+    "Failed to update point balance"
+  );
 
-  await client
-    .update(pointTransaction)
-    .set({ balanceAfter: updated!.balance })
-    .where(eq(pointTransaction.id, inserted.id));
+  const balance = updated[0]!.balance;
 
-  publishPointsBalance(input.userId, updated!.balance);
+  yield* fromPromise(
+    () =>
+      client
+        .update(pointTransaction)
+        .set({ balanceAfter: balance })
+        .where(eq(pointTransaction.id, inserted[0]!.id)),
+    "Failed to update point transaction balance"
+  );
 
-  return { applied: true, balance: updated!.balance };
-}
+  publishPointsBalance(input.userId, balance);
 
-async function revokeUserBonusWithClient(client: PointDatabase, userId: string): Promise<number> {
-  const [row] = await client
-    .select({ balance: userPointBalance.balance, rewardsExcluded: userPointBalance.rewardsExcluded })
-    .from(userPointBalance)
-    .where(eq(userPointBalance.userId, userId))
-    .limit(1);
+  return { applied: true, balance };
+});
 
+const revokeUserBonusWithClient = Effect.fn("points.revokeUserBonus")(function* (
+  client: PointDatabase,
+  userId: string
+) {
+  const rows = yield* fromPromise(
+    () =>
+      client
+        .select({ balance: userPointBalance.balance, rewardsExcluded: userPointBalance.rewardsExcluded })
+        .from(userPointBalance)
+        .where(eq(userPointBalance.userId, userId))
+        .limit(1),
+    "Failed to load point balance"
+  );
+  const row = rows[0];
   if (!row || row.rewardsExcluded) return row?.balance ?? 0;
 
-  const [bonusRow] = await client
-    .select({ bonus: sql<number>`coalesce(sum(${pointTransaction.amount}), 0)` })
-    .from(pointTransaction)
-    .where(and(
-      eq(pointTransaction.userId, userId),
-      inArray(pointTransaction.type, BONUS_TRANSACTION_TYPES),
-      gt(pointTransaction.amount, 0),
-    ));
+  const bonusRows = yield* fromPromise(
+    () =>
+      client
+        .select({ bonus: sql<number>`coalesce(sum(${pointTransaction.amount}), 0)` })
+        .from(pointTransaction)
+        .where(
+          and(
+            eq(pointTransaction.userId, userId),
+            inArray(pointTransaction.type, BONUS_TRANSACTION_TYPES),
+            gt(pointTransaction.amount, 0)
+          )
+        ),
+    "Failed to sum bonus transactions"
+  );
 
-  const bonus = Number(bonusRow?.bonus ?? 0);
+  const bonus = Number(bonusRows[0]?.bonus ?? 0);
   const deduction = Math.min(bonus, row.balance);
 
-  await client
-    .update(userPointBalance)
-    .set({ rewardsExcluded: true, rewardsExcludedReason: EXCLUDED_REASON, updatedAt: new Date() })
-    .where(eq(userPointBalance.userId, userId));
+  yield* fromPromise(
+    () =>
+      client
+        .update(userPointBalance)
+        .set({ rewardsExcluded: true, rewardsExcludedReason: EXCLUDED_REASON, updatedAt: new Date() })
+        .where(eq(userPointBalance.userId, userId)),
+    "Failed to mark rewards excluded"
+  );
 
   if (deduction <= 0) return row.balance;
 
-  const result = await applyPointTransactionWithClient(client, {
+  const result = yield* applyPointTransactionWithClient(client, {
     userId,
     amount: -deduction,
     type: "reward_revoke",
@@ -116,144 +162,206 @@ async function revokeUserBonusWithClient(client: PointDatabase, userId: string):
   });
 
   return result.balance ?? row.balance;
-}
+});
 
-async function ensureUserPointBalanceWithClient(client: PointDatabase, userId: string): Promise<number> {
-  const [existing] = await client
-    .select({ balance: userPointBalance.balance, rewardsExcluded: userPointBalance.rewardsExcluded })
-    .from(userPointBalance)
-    .where(eq(userPointBalance.userId, userId))
-    .limit(1);
+const ensureUserPointBalanceWithClient = Effect.fn("points.ensureUserPointBalance")(function* (
+  client: PointDatabase,
+  userId: string
+) {
+  const rows = yield* fromPromise(
+    () =>
+      client
+        .select({ balance: userPointBalance.balance, rewardsExcluded: userPointBalance.rewardsExcluded })
+        .from(userPointBalance)
+        .where(eq(userPointBalance.userId, userId))
+        .limit(1),
+    "Failed to load point balance"
+  );
+  const existing = rows[0];
 
   if (existing) {
-    if (!existing.rewardsExcluded && (await isUserRewardExcluded(client, userId))) {
-      return revokeUserBonusWithClient(client, userId);
+    if (!existing.rewardsExcluded && (yield* isUserRewardExcluded(client, userId))) {
+      return yield* revokeUserBonusWithClient(client, userId);
     }
 
     return existing.balance;
   }
 
-  const excluded = await isUserRewardExcluded(client, userId);
+  const excluded = yield* isUserRewardExcluded(client, userId);
   const balance = excluded ? 0 : INITIAL_POINT_BALANCE;
 
-  await client
-    .insert(userPointBalance)
-    .values({
-      userId,
-      balance,
-      rewardsExcluded: excluded,
-      rewardsExcludedReason: excluded ? EXCLUDED_REASON : null,
-    })
-    .onConflictDoNothing({ target: userPointBalance.userId });
+  yield* fromPromise(
+    () =>
+      client
+        .insert(userPointBalance)
+        .values({
+          userId,
+          balance,
+          rewardsExcluded: excluded,
+          rewardsExcludedReason: excluded ? EXCLUDED_REASON : null,
+        })
+        .onConflictDoNothing({ target: userPointBalance.userId }),
+    "Failed to create point balance"
+  );
 
   if (excluded) return balance;
 
-  await client
-    .insert(pointTransaction)
-    .values({
-      userId,
-      amount: INITIAL_POINT_BALANCE,
-      type: "initial_grant",
-      balanceAfter: INITIAL_POINT_BALANCE,
-      idempotencyKey: `initial:${userId}`,
-    })
-    .onConflictDoNothing({ target: pointTransaction.idempotencyKey });
+  yield* fromPromise(
+    () =>
+      client
+        .insert(pointTransaction)
+        .values({
+          userId,
+          amount: INITIAL_POINT_BALANCE,
+          type: "initial_grant",
+          balanceAfter: INITIAL_POINT_BALANCE,
+          idempotencyKey: `initial:${userId}`,
+        })
+        .onConflictDoNothing({ target: pointTransaction.idempotencyKey }),
+    "Failed to grant initial points"
+  );
 
   return balance;
-}
+});
 
-export async function ensureUserPointBalance(userId: string): Promise<number> {
-  return db.transaction((tx) => ensureUserPointBalanceWithClient(tx, userId));
-}
+export const ensureUserPointBalance = Effect.fn("points.ensureUserPointBalance")(function* (
+  userId: string
+) {
+  return yield* fromPromise(
+    () => db.transaction((tx) => Effect.runPromise(ensureUserPointBalanceWithClient(tx, userId))),
+    "Failed to ensure point balance"
+  );
+});
 
-export async function trackProviderEmail(userId: string, email: string): Promise<void> {
+export const trackProviderEmail = Effect.fn("points.trackProviderEmail")(function* (
+  userId: string,
+  email: string
+) {
   const normalized = normalizeEmail(email);
   if (!normalized.includes("@")) return;
 
-  await db
-    .insert(providerEmailRegistry)
-    .values({ email: normalized, userId })
-    .onConflictDoNothing({ target: [providerEmailRegistry.email, providerEmailRegistry.userId] });
-}
+  yield* fromPromise(
+    () =>
+      db
+        .insert(providerEmailRegistry)
+        .values({ email: normalized, userId })
+        .onConflictDoNothing({ target: [providerEmailRegistry.email, providerEmailRegistry.userId] }),
+    "Failed to track provider email"
+  );
+});
 
-export async function claimDailyAccessPoints(userId: string): Promise<boolean> {
+export const claimDailyAccessPoints = Effect.fn("points.claimDailyAccessPoints")(function* (
+  userId: string
+) {
   const idempotencyKey = `daily:${userId}:${dailyAccessDateKey()}`;
 
-  const [existing] = await db
-    .select({ id: pointTransaction.id })
-    .from(pointTransaction)
-    .where(eq(pointTransaction.idempotencyKey, idempotencyKey))
-    .limit(1);
-  if (existing) return false;
+  const existing = yield* fromPromise(
+    () =>
+      db
+        .select({ id: pointTransaction.id })
+        .from(pointTransaction)
+        .where(eq(pointTransaction.idempotencyKey, idempotencyKey))
+        .limit(1),
+    "Failed to load daily access transaction"
+  );
+  if (existing[0]) return false;
 
-  return db.transaction(async (tx) => {
-    await ensureUserPointBalanceWithClient(tx, userId);
+  return yield* fromPromise(
+    () =>
+      db.transaction(async (tx) => {
+        await Effect.runPromise(ensureUserPointBalanceWithClient(tx, userId));
 
-    const [row] = await tx
-      .select({ rewardsExcluded: userPointBalance.rewardsExcluded })
-      .from(userPointBalance)
-      .where(eq(userPointBalance.userId, userId))
-      .limit(1);
-    if (!row || row.rewardsExcluded) return false;
+        const rows = await tx
+          .select({ rewardsExcluded: userPointBalance.rewardsExcluded })
+          .from(userPointBalance)
+          .where(eq(userPointBalance.userId, userId))
+          .limit(1);
+        const row = rows[0];
+        if (!row || row.rewardsExcluded) return false;
 
-    const result = await applyPointTransactionWithClient(tx, {
-      userId,
-      amount: DAILY_ACCESS_POINTS,
-      type: "daily_access",
-      idempotencyKey,
-    });
+        const result = await Effect.runPromise(
+          applyPointTransactionWithClient(tx, {
+            userId,
+            amount: DAILY_ACCESS_POINTS,
+            type: "daily_access",
+            idempotencyKey,
+          })
+        );
 
-    return result.applied;
-  });
-}
+        return result.applied;
+      }),
+    "Failed to claim daily access points"
+  );
+});
 
-export async function getUserPointStatus(userId: string): Promise<{ balance: number; roamingPointsByApiKeyId: Record<string, number> }> {
-  const [balance, roamingApiKeys] = await Promise.all([
-    ensureUserPointBalance(userId),
-    db
-      .select({ id: proxyApiKey.id })
-      .from(proxyApiKey)
-      .where(and(eq(proxyApiKey.userId, userId), eq(proxyApiKey.roamingEnabled, true))),
-  ]);
+export const getUserPointStatus = Effect.fn("points.getUserPointStatus")(function* (userId: string) {
+  const balance = yield* ensureUserPointBalance(userId);
+  const roamingApiKeys = yield* fromPromise(
+    () =>
+      db
+        .select({ id: proxyApiKey.id })
+        .from(proxyApiKey)
+        .where(and(eq(proxyApiKey.userId, userId), eq(proxyApiKey.roamingEnabled, true))),
+    "Failed to load roaming api keys"
+  );
   const apiKeyIds = roamingApiKeys.map((apiKey) => apiKey.id);
-  const pointsByApiKeyId = await roamingUsagePointsByApiKey(userId, apiKeyIds);
-  const roamingPointsByApiKeyId: Record<string, number> = Object.fromEntries(apiKeyIds.map((id) => [id, pointsByApiKeyId.get(id) ?? 0]));
+  const pointsByApiKeyId = yield* roamingUsagePointsByApiKey(userId, apiKeyIds);
+  const roamingPointsByApiKeyId: Record<string, number> = Object.fromEntries(
+    apiKeyIds.map((id) => [id, pointsByApiKeyId.get(id) ?? 0])
+  );
 
   return { balance, roamingPointsByApiKeyId };
-}
+});
 
-export async function debitUserPoints(client: PointDatabase, userId: string, amount: number, type: string): Promise<{ success: true; balance: number } | { success: false; balance: number }> {
-  if (amount <= 0) throw new Error("Point debit amount must be positive");
+export const debitUserPoints = Effect.fn("points.debitUserPoints")(function* (
+  client: PointDatabase,
+  userId: string,
+  amount: number,
+  type: string
+) {
+  if (amount <= 0) return yield* badRequest("Point debit amount must be positive");
 
-  await ensureUserPointBalanceWithClient(client, userId);
+  yield* ensureUserPointBalanceWithClient(client, userId);
 
-  const [debited] = await client
-    .update(userPointBalance)
-    .set({
-      balance: sql`${userPointBalance.balance} - ${amount}`,
-      updatedAt: new Date(),
-    })
-    .where(and(eq(userPointBalance.userId, userId), gte(userPointBalance.balance, amount)))
-    .returning({ balance: userPointBalance.balance });
+  const debited = yield* fromPromise(
+    () =>
+      client
+        .update(userPointBalance)
+        .set({
+          balance: sql`${userPointBalance.balance} - ${amount}`,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(userPointBalance.userId, userId), gte(userPointBalance.balance, amount)))
+        .returning({ balance: userPointBalance.balance }),
+    "Failed to debit point balance"
+  );
 
-  if (!debited) {
-    const [existing] = await client
-      .select({ balance: userPointBalance.balance })
-      .from(userPointBalance)
-      .where(eq(userPointBalance.userId, userId))
-      .limit(1);
+  if (!debited[0]) {
+    const existing = yield* fromPromise(
+      () =>
+        client
+          .select({ balance: userPointBalance.balance })
+          .from(userPointBalance)
+          .where(eq(userPointBalance.userId, userId))
+          .limit(1),
+      "Failed to load point balance"
+    );
 
-    return { success: false, balance: existing?.balance ?? 0 };
+    return { success: false as const, balance: existing[0]?.balance ?? 0 };
   }
 
-  await client.insert(pointTransaction).values({
-    userId,
-    amount: -amount,
-    type,
-    balanceAfter: debited.balance,
-  });
+  yield* fromPromise(
+    () =>
+      client.insert(pointTransaction).values({
+        userId,
+        amount: -amount,
+        type,
+        balanceAfter: debited[0]!.balance,
+      }),
+    "Failed to record point transaction"
+  );
 
-  publishPointsBalance(userId, debited.balance);
+  publishPointsBalance(userId, debited[0].balance);
 
-  return { success: true, balance: debited.balance };
-}
+  return { success: true as const, balance: debited[0].balance };
+});

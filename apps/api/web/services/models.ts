@@ -7,18 +7,8 @@ import { getModelStatsByModel } from "#web/lib/model-stats.js";
 import { getAccountModelAvailability, invalidateDisabledModelsCache, usable, type AccountModelAvailability } from "#web/lib/proxy/auth.js";
 import { MODEL_REGISTRY, getAllModels, getModelFamily, getModelLookupKeys, getProvidersForModel, isModelSupported, resolveModelAlias } from "#web/lib/proxy/models.js";
 import { compareModelEntries } from "@opendum/models/sort";
-
-function withModelErrors<A>(message: string, run: () => Promise<A>): Promise<A> {
-  return Effect.runPromise(
-    Effect.tryPromise({
-      try: run,
-      catch: (cause) => {
-        console.error(`${message}:`, cause);
-        return new Error(message, { cause });
-      },
-    })
-  );
-}
+import { fromPromise } from "#web/lib/task.js";
+import { internal } from "#web/errors.js";
 
 function modelInfo(model: string) {
   const info = MODEL_REGISTRY[model];
@@ -29,11 +19,23 @@ function modelInfo(model: string) {
   };
 }
 
-async function getAvailableModelsForUser(userId: string) {
-  const [disabledModels, availability] = await Promise.all([
-    db.select({ model: disabledModel.model }).from(disabledModel).where(eq(disabledModel.userId, userId)),
-    getAccountModelAvailability(userId),
-  ]);
+const getAvailableModelsForUser = Effect.fn("models.getAvailableModelsForUser")(function* (
+  userId: string
+) {
+  const [disabledModels, availability] = yield* Effect.all(
+    [
+      fromPromise(
+        () =>
+          db
+            .select({ model: disabledModel.model })
+            .from(disabledModel)
+            .where(eq(disabledModel.userId, userId)),
+        "Failed to load disabled models"
+      ),
+      getAccountModelAvailability(userId),
+    ],
+    { concurrency: "unbounded" }
+  );
 
   return {
     availability,
@@ -46,7 +48,7 @@ async function getAvailableModelsForUser(userId: string) {
       .filter((model) => usable(model, availability))
       .sort((a, b) => compareModelEntries({ id: a, family: getModelFamily(a) }, { id: b, family: getModelFamily(b) })),
   };
-}
+});
 
 function modelProviders(model: string, availability: AccountModelAvailability, options: { all?: boolean } = {}): string[] {
   const canonical = resolveModelAlias(model);
@@ -68,12 +70,27 @@ function customModelEntries(availability: AccountModelAvailability): Array<{ id:
   return entries;
 }
 
-export function listModels(userId: string, options: { includeStats?: boolean } = {}): Promise<ModelListItem[]> {
-  return withModelErrors("Failed to list models", async () => {
-    const includeStats = options.includeStats ?? true;
-    const { availability, disabledModelSet, models: availableModels } = await getAvailableModelsForUser(userId);
-    const availableSet = new Set(availableModels);
-    const statsByModel = includeStats ? await getModelStatsByModel(userId, availableModels) : {};
+export const listModels = Effect.fn("models.listModels")(function* (
+  userId: string,
+  options: { includeStats?: boolean } = {}
+) {
+  return yield* listModelsInner(userId, options).pipe(
+    Effect.mapError((failure) => internal("Failed to list models", failure.cause ?? failure))
+  );
+});
+
+const listModelsInner = Effect.fnUntraced(function* (
+  userId: string,
+  options: { includeStats?: boolean } = {}
+) {
+  const includeStats = options.includeStats ?? true;
+  const { availability, disabledModelSet, models: availableModels } = yield* getAvailableModelsForUser(
+    userId
+  );
+  const availableSet = new Set(availableModels);
+  const statsByModel = includeStats
+    ? yield* getModelStatsByModel(userId, availableModels)
+    : ({} as Record<string, ModelStatsData[string]>);
 
     const result: ModelListItem[] = [
       ...getAllModels()
@@ -106,16 +123,20 @@ export function listModels(userId: string, options: { includeStats?: boolean } =
       }),
     ];
     return result;
-  });
-}
+});
 
 export function listKnownModels(): string[] {
   return getAllModels().sort((left, right) => compareModelEntries({ id: left, family: getModelFamily(left) }, { id: right, family: getModelFamily(right) }));
 }
 
-export function searchModels(userId: string): Promise<ModelSearchItem[]> {
-  return withModelErrors("Failed to search models", async () => {
-    const { availability, disabledModelSet, models } = await getAvailableModelsForUser(userId);
+export const searchModels = Effect.fn("models.searchModels")(function* (userId: string) {
+  return yield* searchModelsInner(userId).pipe(
+    Effect.mapError((failure) => internal("Failed to search models", failure.cause ?? failure))
+  );
+});
+
+const searchModelsInner = Effect.fnUntraced(function* (userId: string) {
+    const { availability, disabledModelSet, models } = yield* getAvailableModelsForUser(userId);
 
     return [
       ...models.map((model): ModelSearchItem => ({
@@ -130,28 +151,29 @@ export function searchModels(userId: string): Promise<ModelSearchItem[]> {
         isEnabled: !disabledModelSet.has(entry.id),
         custom: true,
       })),
-    ];
-  });
-}
+    ] satisfies ModelSearchItem[];
+});
 
-export async function getModelStats(userId: string, input: ModelStatsInput): Promise<ModelStatsData> {
-  try {
-    const { models } = await getAvailableModelsForUser(userId);
-    const availableModelSet = new Set(models);
-    const requestedModels = Array.from(new Set(
+export const getModelStats = Effect.fn("models.getModelStats")(function* (
+  userId: string,
+  input: ModelStatsInput
+) {
+  const { models } = yield* getAvailableModelsForUser(userId);
+  const availableModelSet = new Set(models);
+  const requestedModels = Array.from(
+    new Set(
       input.models
         .map((model) => resolveModelAlias(model.trim()))
         .filter((model) => model && isModelSupported(model) && availableModelSet.has(model))
-    ));
+    )
+  );
 
-    if (requestedModels.length === 0) return {};
+  if (requestedModels.length === 0) return {} as ModelStatsData;
 
-    return await getModelStatsByModel(userId, requestedModels);
-  } catch (error) {
-    console.error("Failed to load model stats:", error);
-    throw new Error("Failed to load model stats", { cause: error });
-  }
-}
+  return yield* getModelStatsByModel(userId, requestedModels).pipe(
+    Effect.mapError((failure) => internal("Failed to load model stats", failure.cause ?? failure))
+  );
+});
 
 export function getModelFamilyCounts() {
   return getAllModels().reduce<Record<string, number>>((counts, model) => {
@@ -161,25 +183,58 @@ export function getModelFamilyCounts() {
   }, {});
 }
 
-export async function setModelEnabled(userId: string, input: SetModelEnabledInput): Promise<SetModelEnabledResult> {
+export const setModelEnabled = Effect.fn("models.setModelEnabled")(function* (
+  userId: string,
+  input: SetModelEnabledInput
+) {
+  return yield* setModelEnabledInner(userId, input).pipe(
+    Effect.catch((failure) =>
+      Effect.succeed({
+        success: false,
+        error: failure.message === "Model not found" ? failure.message : "Failed to update model status",
+      } as const satisfies SetModelEnabledResult)
+    )
+  );
+});
+
+const setModelEnabledInner = Effect.fnUntraced(function* (
+  userId: string,
+  input: SetModelEnabledInput
+) {
   const modelId = input.modelId.trim();
 
-  try {
-    const canonical = resolveModelAlias(modelId);
-    const normalizedModel = isModelSupported(canonical)
-      ? canonical
-      : customModelEntries((await getAccountModelAvailability(userId))).find((entry) => entry.id === modelId)?.id;
-    if (!normalizedModel) return { success: false, error: "Model not found" } as const;
-
-    const lookupKeys = isModelSupported(canonical) ? getModelLookupKeys(normalizedModel) : [normalizedModel];
-    await db.delete(disabledModel).where(and(eq(disabledModel.userId, userId), inArray(disabledModel.model, lookupKeys)));
-    if (!input.enabled) await db.insert(disabledModel).values({ userId, model: normalizedModel }).onConflictDoNothing({ target: [disabledModel.userId, disabledModel.model] });
-
-    await invalidateDisabledModelsCache(userId);
-
-    return { success: true, data: { model: normalizedModel, enabled: input.enabled } } as const;
-  } catch (error) {
-    console.error("Failed to update model status:", error);
-    return { success: false, error: "Failed to update model status" } as const;
+  const canonical = resolveModelAlias(modelId);
+  const normalizedModel = isModelSupported(canonical)
+    ? canonical
+    : customModelEntries(yield* getAccountModelAvailability(userId)).find((entry) => entry.id === modelId)
+        ?.id;
+  if (!normalizedModel) {
+    return { success: false, error: "Model not found" } as const satisfies SetModelEnabledResult;
   }
-}
+
+  const lookupKeys = isModelSupported(canonical) ? getModelLookupKeys(normalizedModel) : [normalizedModel];
+  yield* fromPromise(
+    () =>
+      db
+        .delete(disabledModel)
+        .where(and(eq(disabledModel.userId, userId), inArray(disabledModel.model, lookupKeys))),
+    "Failed to update model status"
+  );
+  if (!input.enabled) {
+    yield* fromPromise(
+      () =>
+        db
+          .insert(disabledModel)
+          .values({ userId, model: normalizedModel })
+          .onConflictDoNothing({ target: [disabledModel.userId, disabledModel.model] }),
+      "Failed to update model status"
+    );
+  }
+
+  yield* invalidateDisabledModelsCache(userId);
+
+  return {
+    success: true,
+    data: { model: normalizedModel, enabled: input.enabled },
+  } as const satisfies SetModelEnabledResult;
+});

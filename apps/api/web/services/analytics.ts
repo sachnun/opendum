@@ -1,7 +1,9 @@
+import { Effect } from "effect";
 import { db, providerAccount, proxyApiKey, usageLog } from "@opendum/database";
 import { and, eq, gte, lte, sql } from "drizzle-orm";
 
-import type { ActionResult } from "#web/utils/api.js";
+import { fromPromise } from "#web/lib/task.js";
+import { internal } from "#web/errors.js";
 
 import type { AnalyticsDataInput, AnalyticsFilterInput, AnalyticsPeriod, AnalyticsSeriesInput, AnalyticsUsageInput } from "@opendum/providers/contract";
 
@@ -68,7 +70,11 @@ const GRANULARITY_ROUNDERS: Record<Granularity, (date: Date) => string | undefin
   },
 };
 
-function resolveFilterConfig(filter: AnalyticsFilter): ActionResult<{ startDate: Date; endDate: Date; config: PeriodConfig }> {
+function resolveFilterConfig(
+  filter: AnalyticsFilter
+):
+  | { success: true; data: { startDate: Date; endDate: Date; config: PeriodConfig } }
+  | { success: false; error: string } {
   if (typeof filter === "string") {
     const config = PERIOD_CONFIG[filter];
     return { success: true, data: { startDate: new Date(Date.now() - config.duration), endDate: new Date(), config } };
@@ -124,12 +130,25 @@ function toDateValue(value: Date | string | null): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-async function getAnalyticsDataForUser(
+const getAnalyticsDataForUser = Effect.fn("analytics.getDataForUser")(function* (
   userId: string,
   filter: AnalyticsFilter,
   apiKeyId?: string,
   options: { includeSummary?: boolean; includeSeries?: boolean } = {}
-): Promise<ActionResult<AnalyticsData>> {
+) {
+  return yield* buildAnalyticsData(userId, filter, apiKeyId, options).pipe(
+    Effect.catch(() =>
+      Effect.succeed({ success: false as const, error: "Failed to fetch analytics data" })
+    )
+  );
+});
+
+const buildAnalyticsData = Effect.fnUntraced(function* (
+  userId: string,
+  filter: AnalyticsFilter,
+  apiKeyId?: string,
+  options: { includeSummary?: boolean; includeSeries?: boolean } = {}
+) {
   const resolvedFilter = resolveFilterConfig(filter);
   if (!resolvedFilter.success) return resolvedFilter;
 
@@ -137,11 +156,18 @@ async function getAnalyticsDataForUser(
   const includeSummary = options.includeSummary ?? true;
   const includeSeries = options.includeSeries ?? true;
 
-  try {
-    if (apiKeyId) {
-      const [ownedApiKey] = await db.select({ id: proxyApiKey.id }).from(proxyApiKey).where(and(eq(proxyApiKey.id, apiKeyId), eq(proxyApiKey.userId, userId))).limit(1);
-      if (!ownedApiKey) return { success: false, error: "API key not found" };
-    }
+  if (apiKeyId) {
+    const ownedApiKey = yield* fromPromise(
+      () =>
+        db
+          .select({ id: proxyApiKey.id })
+          .from(proxyApiKey)
+          .where(and(eq(proxyApiKey.id, apiKeyId), eq(proxyApiKey.userId, userId)))
+          .limit(1),
+      "Failed to fetch analytics data"
+    );
+    if (!ownedApiKey[0]) return { success: false as const, error: "API key not found" };
+  }
 
     const conditions = [eq(usageLog.userId, userId), gte(usageLog.createdAt, startDate), lte(usageLog.createdAt, endDate)];
     if (apiKeyId) conditions.push(eq(usageLog.proxyApiKeyId, apiKeyId));
@@ -149,17 +175,24 @@ async function getAnalyticsDataForUser(
     const bucketSeconds = sql.raw(String(getGranularityBucketSeconds(config.granularity)));
     const bucketExpression = sql<Date>`to_timestamp(floor(extract(epoch from ${usageLog.createdAt}) / ${bucketSeconds}) * ${bucketSeconds})`;
 
-    const [timeSeriesRows, topModelRows, totalsRow] = await Promise.all([
-      includeSeries
-        ? db.select({ bucket: bucketExpression, requestCount: sql<number>`count(*)`, inputTokens: sql<number>`coalesce(sum(${usageLog.inputTokens}), 0)`, outputTokens: sql<number>`coalesce(sum(${usageLog.outputTokens}), 0)`, cachedTokens: sql<number>`coalesce(sum(${usageLog.cachedTokens}), 0)`, cacheWriteTokens: sql<number>`coalesce(sum(${usageLog.cacheWriteTokens}), 0)`, successCount: sql<number>`count(*) filter (where ${usageLog.statusCode} >= 200 and ${usageLog.statusCode} < 400)`, errorCount: sql<number>`count(*) filter (where ${usageLog.statusCode} is null or ${usageLog.statusCode} < 200 or ${usageLog.statusCode} >= 400)`, avgDuration: sql<number | null>`avg(${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p30: sql<number | null>`percentile_cont(0.30) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p50: sql<number | null>`percentile_cont(0.50) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p60: sql<number | null>`percentile_cont(0.60) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p75: sql<number | null>`percentile_cont(0.75) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p90: sql<number | null>`percentile_cont(0.90) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p95: sql<number | null>`percentile_cont(0.95) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p99: sql<number | null>`percentile_cont(0.99) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)` }).from(usageLog).where(whereCondition).groupBy(bucketExpression).orderBy(bucketExpression)
-        : Promise.resolve([]),
-      includeSummary
-        ? db.select({ model: usageLog.model, count: sql<number>`count(*)` }).from(usageLog).where(whereCondition).groupBy(usageLog.model).orderBy(sql`count(*) desc`).limit(10)
-        : Promise.resolve([]),
-      includeSummary
-        ? db.select({ totalRequests: sql<number>`count(*)`, totalInputTokens: sql<number>`coalesce(sum(${usageLog.inputTokens}), 0)`, totalOutputTokens: sql<number>`coalesce(sum(${usageLog.outputTokens}), 0)`, totalCachedTokens: sql<number>`coalesce(sum(${usageLog.cachedTokens}), 0)`, totalCacheWriteTokens: sql<number>`coalesce(sum(${usageLog.cacheWriteTokens}), 0)`, avgDuration: sql<number | null>`avg(${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p30: sql<number | null>`percentile_cont(0.30) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p50: sql<number | null>`percentile_cont(0.50) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p60: sql<number | null>`percentile_cont(0.60) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p75: sql<number | null>`percentile_cont(0.75) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p90: sql<number | null>`percentile_cont(0.90) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p95: sql<number | null>`percentile_cont(0.95) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p99: sql<number | null>`percentile_cont(0.99) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, successfulRequests: sql<number>`count(*) filter (where ${usageLog.statusCode} >= 200 and ${usageLog.statusCode} < 400)` }).from(usageLog).where(whereCondition).then((rows) => rows[0])
-        : Promise.resolve(undefined),
-    ]);
+    const timeSeriesRows = includeSeries
+      ? yield* fromPromise(
+          () => db.select({ bucket: bucketExpression, requestCount: sql<number>`count(*)`, inputTokens: sql<number>`coalesce(sum(${usageLog.inputTokens}), 0)`, outputTokens: sql<number>`coalesce(sum(${usageLog.outputTokens}), 0)`, cachedTokens: sql<number>`coalesce(sum(${usageLog.cachedTokens}), 0)`, cacheWriteTokens: sql<number>`coalesce(sum(${usageLog.cacheWriteTokens}), 0)`, successCount: sql<number>`count(*) filter (where ${usageLog.statusCode} >= 200 and ${usageLog.statusCode} < 400)`, errorCount: sql<number>`count(*) filter (where ${usageLog.statusCode} is null or ${usageLog.statusCode} < 200 or ${usageLog.statusCode} >= 400)`, avgDuration: sql<number | null>`avg(${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p30: sql<number | null>`percentile_cont(0.30) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p50: sql<number | null>`percentile_cont(0.50) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p60: sql<number | null>`percentile_cont(0.60) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p75: sql<number | null>`percentile_cont(0.75) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p90: sql<number | null>`percentile_cont(0.90) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p95: sql<number | null>`percentile_cont(0.95) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p99: sql<number | null>`percentile_cont(0.99) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)` }).from(usageLog).where(whereCondition).groupBy(bucketExpression).orderBy(bucketExpression),
+          "Failed to fetch analytics series"
+        )
+      : [];
+    const topModelRows = includeSummary
+      ? yield* fromPromise(
+          () => db.select({ model: usageLog.model, count: sql<number>`count(*)` }).from(usageLog).where(whereCondition).groupBy(usageLog.model).orderBy(sql`count(*) desc`).limit(10),
+          "Failed to fetch analytics models"
+        )
+      : [];
+    const totalsRow = includeSummary
+      ? yield* fromPromise(
+          () => db.select({ totalRequests: sql<number>`count(*)`, totalInputTokens: sql<number>`coalesce(sum(${usageLog.inputTokens}), 0)`, totalOutputTokens: sql<number>`coalesce(sum(${usageLog.outputTokens}), 0)`, totalCachedTokens: sql<number>`coalesce(sum(${usageLog.cachedTokens}), 0)`, totalCacheWriteTokens: sql<number>`coalesce(sum(${usageLog.cacheWriteTokens}), 0)`, avgDuration: sql<number | null>`avg(${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p30: sql<number | null>`percentile_cont(0.30) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p50: sql<number | null>`percentile_cont(0.50) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p60: sql<number | null>`percentile_cont(0.60) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p75: sql<number | null>`percentile_cont(0.75) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p90: sql<number | null>`percentile_cont(0.90) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p95: sql<number | null>`percentile_cont(0.95) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p99: sql<number | null>`percentile_cont(0.99) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, successfulRequests: sql<number>`count(*) filter (where ${usageLog.statusCode} >= 200 and ${usageLog.statusCode} < 400)` }).from(usageLog).where(whereCondition).then((rows) => rows[0]),
+          "Failed to fetch analytics totals"
+        )
+      : undefined;
 
     const timeSeriesBySlot = new Map<string, { requestCount: number; inputTokens: number; outputTokens: number; cachedTokens: number; cacheWriteTokens: number; successCount: number; errorCount: number; avgDuration: number | null; p30: number | null; p50: number | null; p60: number | null; p75: number | null; p90: number | null; p95: number | null; p99: number | null }>();
     for (const row of timeSeriesRows) {
@@ -188,22 +221,29 @@ async function getAnalyticsDataForUser(
       totals: { totalRequests, totalInputTokens: toRoundedValue(totalsRow?.totalInputTokens), totalOutputTokens: toRoundedValue(totalsRow?.totalOutputTokens), totalCachedTokens: toRoundedValue(totalsRow?.totalCachedTokens), totalCacheWriteTokens: toRoundedValue(totalsRow?.totalCacheWriteTokens), avgDuration: toRoundedNullableValue(totalsRow?.avgDuration) ?? 0, durationPercentiles: { p30: toRoundedValue(totalsRow?.p30), p50: toRoundedValue(totalsRow?.p50), p60: toRoundedValue(totalsRow?.p60), p75: toRoundedValue(totalsRow?.p75), p90: toRoundedValue(totalsRow?.p90), p95: toRoundedValue(totalsRow?.p95), p99: toRoundedValue(totalsRow?.p99) }, successRate: totalRequests > 0 ? Math.round((successfulRequests / totalRequests) * 100) : 0 },
     };
 
-    return { success: true, data: analyticsData };
-  } catch (error) {
-    console.error("Failed to fetch analytics:", error);
-    return { success: false, error: "Failed to fetch analytics data" };
-  }
-}
+    return { success: true as const, data: analyticsData };
+});
 
-export async function getAnalyticsData(userId: string, input?: AnalyticsDataInput) {
-  const result = await getAnalyticsDataForUser(userId, input?.filter ?? "30d", input?.apiKeyId, { includeSeries: input?.includeSeries ?? true });
-  if (!result.success) throw new Error(result.error);
+export const getAnalyticsData = Effect.fn("analytics.data")(function* (
+  userId: string,
+  input?: AnalyticsDataInput
+) {
+  const result = yield* getAnalyticsDataForUser(userId, input?.filter ?? "30d", input?.apiKeyId, {
+    includeSeries: input?.includeSeries ?? true,
+  });
+  if (!result.success) return yield* internal(result.error);
   return result.data;
-}
+});
 
-export async function getAnalyticsSeries(userId: string, input?: AnalyticsSeriesInput): Promise<AnalyticsSeriesData> {
-  const result = await getAnalyticsDataForUser(userId, input?.filter ?? "30d", input?.apiKeyId, { includeSummary: false, includeSeries: true });
-  if (!result.success) throw new Error(result.error);
+export const getAnalyticsSeries = Effect.fn("analytics.series")(function* (
+  userId: string,
+  input?: AnalyticsSeriesInput
+) {
+  const result = yield* getAnalyticsDataForUser(userId, input?.filter ?? "30d", input?.apiKeyId, {
+    includeSummary: false,
+    includeSeries: true,
+  });
+  if (!result.success) return yield* internal(result.error);
 
   return {
     requestsOverTime: result.data.requestsOverTime,
@@ -211,12 +251,12 @@ export async function getAnalyticsSeries(userId: string, input?: AnalyticsSeries
     successRate: result.data.successRate,
     durationOverTime: result.data.durationOverTime,
     granularity: result.data.granularity,
-  };
-}
+  } satisfies AnalyticsSeriesData;
+});
 
-export async function getAnalyticsOverview(userId: string) {
-  const result = await getAnalyticsDataForUser(userId, "24h", undefined, { includeSeries: false });
-  if (!result.success) throw new Error(result.error);
+export const getAnalyticsOverview = Effect.fn("analytics.overview")(function* (userId: string) {
+  const result = yield* getAnalyticsDataForUser(userId, "24h", undefined, { includeSeries: false });
+  if (!result.success) return yield* internal(result.error);
 
   const totals = result.data.totals;
   return {
@@ -228,14 +268,18 @@ export async function getAnalyticsOverview(userId: string) {
     successRate: totals.successRate,
     avgDuration: totals.avgDuration,
   };
-}
+});
 
-export async function getUsageRows(userId: string, input?: AnalyticsUsageInput) {
+export const getUsageRows = Effect.fn("analytics.usageRows")(function* (
+  userId: string,
+  input?: AnalyticsUsageInput
+) {
   const resolvedFilter = resolveFilterConfig(input?.range ?? "30d");
-  if (!resolvedFilter.success) throw new Error(resolvedFilter.error);
+  if (!resolvedFilter.success) return yield* internal(resolvedFilter.error);
 
-  try {
-    return await db
+  return yield* fromPromise(
+    () =>
+      db
       .select({
         id: usageLog.id,
         createdAt: usageLog.createdAt,
@@ -253,9 +297,7 @@ export async function getUsageRows(userId: string, input?: AnalyticsUsageInput) 
       .leftJoin(providerAccount, eq(usageLog.providerAccountId, providerAccount.id))
       .where(and(eq(usageLog.userId, userId), gte(usageLog.createdAt, resolvedFilter.data.startDate), lte(usageLog.createdAt, resolvedFilter.data.endDate)))
       .orderBy(sql`${usageLog.createdAt} desc`)
-      .limit(100);
-  } catch (error) {
-    console.error("Failed to fetch usage rows:", error);
-    throw new Error("Failed to fetch usage rows", { cause: error });
-  }
-}
+      .limit(100),
+    "Failed to fetch usage rows"
+  );
+});

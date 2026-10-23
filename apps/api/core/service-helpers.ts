@@ -12,7 +12,6 @@ export function isSyntheticProviderAccountId(accountId: string): boolean {
   return accountId === "opencode" || accountId.startsWith(AUTHLESS_ACCOUNT_PREFIX);
 }
 
-export { ignore } from "@opendum/core/best-effort";
 
 export function accessMode(mode: string): string {
   return mode === "whitelist" || mode === "blacklist" ? mode : "all";

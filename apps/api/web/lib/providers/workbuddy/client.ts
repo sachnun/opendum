@@ -1,4 +1,7 @@
-import { fetchExternal } from "#web/lib/external.js";
+import { Effect } from "effect";
+import { fetchExternalEffect } from "#web/lib/external.js";
+import { fromPromise } from "#web/lib/task.js";
+import { unavailable } from "#web/errors.js";
 import { formatProviderHttpError } from "../provider-http-errors.js";
 import type { OAuthResult } from "../types.js";
 import {
@@ -102,9 +105,9 @@ function firstAccount(value: WorkbuddyAccountResponse["data"]): WorkbuddyAccount
   return value as WorkbuddyAccount;
 }
 
-export async function initiateWorkbuddyDeviceCodeFlow(): Promise<WorkbuddyInitiateResult> {
+export const initiateWorkbuddyDeviceCodeFlow = Effect.fn("workbuddy.initiateDeviceCodeFlow")(function* () {
   const url = `${WORKBUDDY_BASE_URL}${AUTH_STATE_PATH}?platform=${encodeURIComponent(WORKBUDDY_PLATFORM)}`;
-  const response = await fetchExternal(url, {
+  const response = yield* fetchExternalEffect(url, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({}),
@@ -112,14 +115,16 @@ export async function initiateWorkbuddyDeviceCodeFlow(): Promise<WorkbuddyInitia
   });
 
   if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new Error(formatProviderHttpError("WorkBuddy", response, body, { endpointLabel: "auth state endpoint" }));
+    const body = yield* readText(response);
+    return yield* unavailable(formatProviderHttpError("WorkBuddy", response, body, { endpointLabel: "auth state endpoint" }));
   }
 
-  const data = (await response.json().catch(() => ({}))) as WorkbuddyStateResponse;
+  const data = yield* readJson<WorkbuddyStateResponse>(response, {});
   const state = data.data?.state?.trim() ?? "";
   const authUrl = data.data?.authUrl?.trim() ?? "";
-  if (!state || !authUrl) throw new Error("WorkBuddy auth state response is missing required fields");
+  if (!state || !authUrl) {
+    return yield* unavailable("WorkBuddy auth state response is missing required fields");
+  }
 
   return {
     deviceCode: state,
@@ -128,97 +133,109 @@ export async function initiateWorkbuddyDeviceCodeFlow(): Promise<WorkbuddyInitia
     verificationUrlComplete: authUrl,
     expiresIn: DEVICE_CODE_EXPIRY_SECONDS,
     interval: POLLING_INTERVAL_SECONDS,
-  };
-}
+  } satisfies WorkbuddyInitiateResult;
+});
 
-export async function pollWorkbuddyDeviceCodeAuthorization(
-  deviceCode: string
-): Promise<OAuthResult | { pending: true; retryAfterSeconds?: number } | { error: string }> {
-  const state = deviceCode.trim();
-  if (!state) return { error: "WorkBuddy device code is missing. Please try again." };
+export const pollWorkbuddyDeviceCodeAuthorization = Effect.fn("workbuddy.pollDeviceCodeAuthorization")(
+  function* (deviceCode: string) {
+    const state = deviceCode.trim();
+    if (!state) return { error: "WorkBuddy device code is missing. Please try again." };
 
-  const url = `${WORKBUDDY_BASE_URL}${AUTH_TOKEN_PATH}?state=${encodeURIComponent(state)}`;
-  const response = await fetchExternal(url, {
-    method: "GET",
-    headers: { Accept: "application/json" },
-    cache: "no-store",
-  });
+    const url = `${WORKBUDDY_BASE_URL}${AUTH_TOKEN_PATH}?state=${encodeURIComponent(state)}`;
+    const response = yield* fetchExternalEffect(url, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    });
 
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
+    if (!response.ok) {
+      const body = yield* readText(response);
+      return {
+        error: formatProviderHttpError("WorkBuddy", response, body, { endpointLabel: "device token polling endpoint" }),
+      };
+    }
+
+    const data = yield* readJson<WorkbuddyTokenResponse>(response, {});
+    if (data.code === PENDING_TOKEN_CODE) return { pending: true as const };
+    if (data.code !== 0 || !data.data) {
+      if (!data.data) return { pending: true as const };
+      const detail = typeof data.msg === "string" && data.msg ? `: ${data.msg}` : "";
+      return { error: `WorkBuddy authorization failed (${data.code ?? "unknown"}${detail}). Please try again.` };
+    }
+
+    const accessToken = data.data.accessToken?.trim() ?? "";
+    if (!accessToken) return { pending: true as const };
+
+    const identity = yield* fetchWorkbuddyIdentity(accessToken, state);
+    if (!identity) return { pending: true as const };
+
     return {
-      error: formatProviderHttpError("WorkBuddy", response, body, { endpointLabel: "device token polling endpoint" }),
-    };
+      accessToken,
+      refreshToken: data.data.refreshToken?.trim() || accessToken,
+      expiresAt: calculateExpiresAt(data.data, 31536000),
+      email: identity.email,
+      accountId: identity.uid,
+    } satisfies OAuthResult;
   }
+);
 
-  const data = (await response.json().catch(() => ({}))) as WorkbuddyTokenResponse;
-  if (data.code === PENDING_TOKEN_CODE) return { pending: true };
-  if (data.code !== 0 || !data.data) {
-    if (!data.data) return { pending: true };
-    const detail = typeof data.msg === "string" && data.msg ? `: ${data.msg}` : "";
-    return { error: `WorkBuddy authorization failed (${data.code ?? "unknown"}${detail}). Please try again.` };
-  }
-
-  const accessToken = data.data.accessToken?.trim() ?? "";
-  if (!accessToken) return { pending: true };
-
-  const identity = await fetchWorkbuddyIdentity(accessToken, state);
-  if (!identity) return { pending: true };
-
-  return {
-    accessToken,
-    refreshToken: data.data.refreshToken?.trim() || accessToken,
-    expiresAt: calculateExpiresAt(data.data, 31536000),
-    email: identity.email,
-    accountId: identity.uid,
-  };
-}
-
-async function fetchWorkbuddyIdentity(accessToken: string, state: string): Promise<{ uid: string; email: string } | null> {
+const fetchWorkbuddyIdentity = Effect.fn("workbuddy.fetchIdentity")(function* (
+  accessToken: string,
+  state: string
+) {
   const baseHeaders = { Authorization: `Bearer ${accessToken}`, "X-Domain": WORKBUDDY_DOMAIN, Accept: "application/json" };
 
-  try {
-    const loginResponse = await fetchExternal(
+  const loginAccount = yield* Effect.gen(function* () {
+    const loginResponse = yield* fetchExternalEffect(
       `${WORKBUDDY_BASE_URL}${LOGIN_ACCOUNT_PATH}?state=${encodeURIComponent(state)}`,
       { method: "GET", headers: baseHeaders, cache: "no-store" }
     );
-    if (loginResponse.ok) {
-      const loginData = (await loginResponse.json().catch(() => ({}))) as WorkbuddyAccountResponse;
-      if (loginData.code !== PENDING_ACCOUNT_CODE) {
-        const account = firstAccount(loginData.data);
-        if (account && accountUid(account)) {
-          const withAccounts = await fetchWorkbuddyAccounts(accessToken, accountUid(account));
-          const resolved = withAccounts ?? account;
-          return { uid: accountUid(resolved), email: accountEmail(resolved) };
-        }
-      }
-    }
-  } catch {}
+    if (!loginResponse.ok) return null;
+    const loginData = yield* readJson<WorkbuddyAccountResponse>(loginResponse, {});
+    if (loginData.code === PENDING_ACCOUNT_CODE) return null;
+    return firstAccount(loginData.data);
+  }).pipe(Effect.catch(() => Effect.succeed(null)));
 
-  const fallback = await fetchWorkbuddyAccounts(accessToken, "");
+  if (loginAccount && accountUid(loginAccount)) {
+    const withAccounts = yield* fetchWorkbuddyAccounts(accessToken, accountUid(loginAccount));
+    const resolved = withAccounts ?? loginAccount;
+    return { uid: accountUid(resolved), email: accountEmail(resolved) };
+  }
+
+  const fallback = yield* fetchWorkbuddyAccounts(accessToken, "");
   if (fallback && accountUid(fallback)) return { uid: accountUid(fallback), email: accountEmail(fallback) };
   return null;
+});
+
+const fetchWorkbuddyAccounts = Effect.fn("workbuddy.fetchAccounts")(function* (
+  accessToken: string,
+  uid: string
+) {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${accessToken}`,
+    "X-Domain": WORKBUDDY_DOMAIN,
+    Accept: "application/json",
+  };
+  if (uid) headers["X-User-Id"] = uid;
+  const response = yield* fetchExternalEffect(`${WORKBUDDY_BASE_URL}${ACCOUNTS_PATH}`, {
+    method: "GET",
+    headers,
+    cache: "no-store",
+  }).pipe(Effect.catch(() => Effect.succeed(null)));
+  if (!response || !response.ok) return null;
+  const data = yield* readJson<WorkbuddyAccountsResponse>(response, {});
+  if (data.code !== 0 || !data.data) return null;
+  const accounts = data.data.accounts ?? (data.data.account ? [data.data.account] : []);
+  return accounts.find((entry) => entry && accountUid(entry)) ?? null;
+});
+
+function readText(response: Response) {
+  return fromPromise(() => response.text().catch(() => ""), "Failed to read WorkBuddy response");
 }
 
-async function fetchWorkbuddyAccounts(accessToken: string, uid: string): Promise<WorkbuddyAccount | null> {
-  try {
-    const headers: Record<string, string> = {
-      Authorization: `Bearer ${accessToken}`,
-      "X-Domain": WORKBUDDY_DOMAIN,
-      Accept: "application/json",
-    };
-    if (uid) headers["X-User-Id"] = uid;
-    const response = await fetchExternal(`${WORKBUDDY_BASE_URL}${ACCOUNTS_PATH}`, {
-      method: "GET",
-      headers,
-      cache: "no-store",
-    });
-    if (!response.ok) return null;
-    const data = (await response.json().catch(() => ({}))) as WorkbuddyAccountsResponse;
-    if (data.code !== 0 || !data.data) return null;
-    const accounts = data.data.accounts ?? (data.data.account ? [data.data.account] : []);
-    return accounts.find((entry) => entry && accountUid(entry)) ?? null;
-  } catch {
-    return null;
-  }
+function readJson<T>(response: Response, fallback: T) {
+  return fromPromise(
+    async () => ((await response.json().catch(() => fallback)) as T),
+    "Failed to read WorkBuddy response"
+  );
 }

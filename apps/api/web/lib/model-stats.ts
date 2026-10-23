@@ -2,6 +2,8 @@ import { and, eq, gte, inArray, sql } from "drizzle-orm";
 
 import { buildDayKeys, buildEmptyModelStats, buildHourKeys, MODEL_DURATION_LOOKBACK_HOURS, MODEL_STATS_DAYS, type ModelStats } from "@opendum/models/stats";
 import { db, usageLog } from "@opendum/database";
+import { Effect } from "effect";
+import { fromPromise } from "./task.js";
 import { getModelLookupKeys, resolveModelAlias } from "./proxy/models.js";
 
 interface RawModelStats {
@@ -32,8 +34,8 @@ function normalizeLoggedModel(model: string): string {
   return resolveModelAlias(baseModel);
 }
 
-export async function getModelStatsByModel(userId: string, allModels: string[]): Promise<Record<string, ModelStats>> {
-  if (allModels.length === 0) return {};
+export const getModelStatsByModel = Effect.fn("getModelStatsByModel")(function* (userId: string, allModels: string[]) {
+  if (allModels.length === 0) return {} as Record<string, ModelStats>;
 
   const dayKeys = buildDayKeys(MODEL_STATS_DAYS);
   const dayKeySet = new Set(dayKeys);
@@ -52,8 +54,9 @@ export async function getModelStatsByModel(userId: string, allModels: string[]):
   const hourBucketExpression = sql<Date>`date_trunc('hour', ${usageLog.createdAt})`;
   const modelWhere = and(eq(usageLog.userId, userId), inArray(normalizedModelExpression, lookupKeys));
 
-  const [allTimeRows, dailyRows, durationRows] = await Promise.all([
-    db
+  const allTimeRows = yield* fromPromise(
+    () =>
+      db
       .select({
         model: normalizedModelExpression,
         requestCount: sql<number>`count(*)`,
@@ -65,7 +68,12 @@ export async function getModelStatsByModel(userId: string, allModels: string[]):
       .from(usageLog)
       .where(modelWhere)
       .groupBy(normalizedModelExpression),
-    db
+    "Failed to load model usage"
+  );
+
+  const dailyRows = yield* fromPromise(
+    () =>
+      db
       .select({
         model: normalizedModelExpression,
         dayBucket: dayBucketExpression,
@@ -75,7 +83,12 @@ export async function getModelStatsByModel(userId: string, allModels: string[]):
       .from(usageLog)
       .where(and(modelWhere, gte(usageLog.createdAt, statsStartDate)))
       .groupBy(normalizedModelExpression, dayBucketExpression),
-    db
+    "Failed to load daily model usage"
+  );
+
+  const durationRows = yield* fromPromise(
+    () =>
+      db
       .select({
         model: normalizedModelExpression,
         hourBucket: hourBucketExpression,
@@ -85,7 +98,8 @@ export async function getModelStatsByModel(userId: string, allModels: string[]):
       .from(usageLog)
       .where(and(modelWhere, gte(usageLog.createdAt, durationStartDate)))
       .groupBy(normalizedModelExpression, hourBucketExpression),
-  ]);
+    "Failed to load model durations"
+  );
 
   const rawStatsByModel = new Map<string, RawModelStats>();
 
@@ -168,4 +182,4 @@ export async function getModelStatsByModel(userId: string, allModels: string[]):
       } satisfies ModelStats];
     })
   );
-}
+});

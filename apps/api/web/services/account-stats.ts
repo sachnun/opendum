@@ -1,6 +1,8 @@
+import { Effect } from "effect";
 import { and, eq, gte, inArray, sql } from "drizzle-orm";
 
 import { db, providerAccount, usageLog } from "@opendum/database";
+import { fromPromise } from "#web/lib/task.js";
 
 const PROVIDER_STATS_DAYS = 30;
 const PROVIDER_DURATION_LOOKBACK_HOURS = 24;
@@ -99,7 +101,10 @@ export function getAccountIndicator(lastErrorAt: Date | string | null, lastSucce
   return "warning";
 }
 
-async function buildProviderStats(userId: string, provider?: string): Promise<{ dayKeys: string[]; hourKeys: string[]; statsByProvider: Map<string, RawProviderStats> }> {
+const buildProviderStats = Effect.fn("accountStats.buildProviderStats")(function* (
+  userId: string,
+  provider?: string
+) {
   const dayKeys = buildDayKeys(PROVIDER_STATS_DAYS);
   const dayKeySet = new Set(dayKeys);
   const hourKeys = buildHourKeys(PROVIDER_DURATION_LOOKBACK_HOURS);
@@ -118,11 +123,11 @@ async function buildProviderStats(userId: string, provider?: string): Promise<{ 
     durationConditions.push(eq(providerAccount.provider, provider));
   }
 
-  const [allTimeRows, dailyUsageRows, durationRows] = await Promise.all([
-    db.select({ provider: providerAccount.provider, requestCount: sql<number>`count(*)`, totalTokens: sql<number>`coalesce(sum(${usageLog.inputTokens} + ${usageLog.outputTokens}), 0)`, successCount: sql<number>`count(*) filter (where ${usageLog.statusCode} >= 200 and ${usageLog.statusCode} < 400)`, durationTotal: sql<number>`coalesce(sum(${usageLog.duration}), 0)`, durationCount: sql<number>`count(${usageLog.duration})` }).from(usageLog).innerJoin(providerAccount, eq(usageLog.providerAccountId, providerAccount.id)).where(and(...allTimeConditions)).groupBy(providerAccount.provider),
-    db.select({ provider: providerAccount.provider, dayBucket: dayBucketExpression, requestCount: sql<number>`count(*)`, successCount: sql<number>`count(*) filter (where ${usageLog.statusCode} >= 200 and ${usageLog.statusCode} < 400)` }).from(usageLog).innerJoin(providerAccount, eq(usageLog.providerAccountId, providerAccount.id)).where(and(...dailyConditions)).groupBy(providerAccount.provider, dayBucketExpression),
-    db.select({ provider: providerAccount.provider, hourBucket: hourBucketExpression, durationTotal: sql<number>`coalesce(sum(${usageLog.duration}), 0)`, durationCount: sql<number>`count(${usageLog.duration})` }).from(usageLog).innerJoin(providerAccount, eq(usageLog.providerAccountId, providerAccount.id)).where(and(...durationConditions)).groupBy(providerAccount.provider, hourBucketExpression),
-  ]);
+  const allTimeRows = yield* fromPromise(() => db.select({ provider: providerAccount.provider, requestCount: sql<number>`count(*)`, totalTokens: sql<number>`coalesce(sum(${usageLog.inputTokens} + ${usageLog.outputTokens}), 0)`, successCount: sql<number>`count(*) filter (where ${usageLog.statusCode} >= 200 and ${usageLog.statusCode} < 400)`, durationTotal: sql<number>`coalesce(sum(${usageLog.duration}), 0)`, durationCount: sql<number>`count(${usageLog.duration})` }).from(usageLog).innerJoin(providerAccount, eq(usageLog.providerAccountId, providerAccount.id)).where(and(...allTimeConditions)).groupBy(providerAccount.provider), "Failed to load provider usage");
+
+  const dailyUsageRows = yield* fromPromise(() => db.select({ provider: providerAccount.provider, dayBucket: dayBucketExpression, requestCount: sql<number>`count(*)`, successCount: sql<number>`count(*) filter (where ${usageLog.statusCode} >= 200 and ${usageLog.statusCode} < 400)` }).from(usageLog).innerJoin(providerAccount, eq(usageLog.providerAccountId, providerAccount.id)).where(and(...dailyConditions)).groupBy(providerAccount.provider, dayBucketExpression), "Failed to load provider daily usage");
+
+  const durationRows = yield* fromPromise(() => db.select({ provider: providerAccount.provider, hourBucket: hourBucketExpression, durationTotal: sql<number>`coalesce(sum(${usageLog.duration}), 0)`, durationCount: sql<number>`count(${usageLog.duration})` }).from(usageLog).innerJoin(providerAccount, eq(usageLog.providerAccountId, providerAccount.id)).where(and(...durationConditions)).groupBy(providerAccount.provider, hourBucketExpression), "Failed to load provider durations");
 
   const statsByProvider = new Map<string, RawProviderStats>();
   for (const row of allTimeRows) {
@@ -148,7 +153,7 @@ async function buildProviderStats(userId: string, provider?: string): Promise<{ 
     addDurationBucket(statsByProvider, row.provider, row.hourBucket, row.durationTotal, row.durationCount, hourKeySet);
   }
   return { dayKeys, hourKeys, statsByProvider };
-}
+});
 
 function addDurationBucket(stats: Map<string, RawProviderStats>, key: string, rawHour: Date | string | null, rawTotal: number | string | null, rawCount: number | string | null, hourKeySet: Set<string>) {
   const date = toDate(rawHour);
@@ -165,14 +170,19 @@ function addDurationBucket(stats: Map<string, RawProviderStats>, key: string, ra
   stats.set(key, current);
 }
 
-export async function getProviderSummaryStats(userId: string): Promise<Record<string, ProviderStats>> {
-  const providerUsage = await buildProviderStats(userId);
+export const getProviderSummaryStats = Effect.fn("accountStats.getProviderSummaryStats")(function* (
+  userId: string
+) {
+  const providerUsage = yield* buildProviderStats(userId);
   return Object.fromEntries(
     [...providerUsage.statsByProvider].map(([provider, raw]) => [provider, buildStatsFromRaw(raw, providerUsage.dayKeys, providerUsage.hourKeys)])
   );
-}
+});
 
-export async function buildAccountStats(userId: string, accountIds: string[]): Promise<Record<string, ProviderStats>> {
+export const buildAccountStats = Effect.fn("accountStats.buildAccountStats")(function* (
+  userId: string,
+  accountIds: string[]
+) {
   const dayKeys = buildDayKeys(PROVIDER_STATS_DAYS);
   const dayKeySet = new Set(dayKeys);
   const hourKeys = buildHourKeys(PROVIDER_DURATION_LOOKBACK_HOURS);
@@ -184,11 +194,21 @@ export async function buildAccountStats(userId: string, accountIds: string[]): P
   const durationStartDate = new Date(hourKeys[0] ?? Date.now());
   const dayBucketExpression = sql<Date>`date_trunc('day', ${usageLog.createdAt})`;
   const hourBucketExpression = sql<Date>`date_trunc('hour', ${usageLog.createdAt})`;
-  const [allTimeRows, dailyUsageRows, durationRows] = await Promise.all([
-    db.select({ providerAccountId: usageLog.providerAccountId, requestCount: sql<number>`count(*)`, totalTokens: sql<number>`coalesce(sum(${usageLog.inputTokens} + ${usageLog.outputTokens}), 0)`, successCount: sql<number>`count(*) filter (where ${usageLog.statusCode} >= 200 and ${usageLog.statusCode} < 400)`, durationTotal: sql<number>`coalesce(sum(${usageLog.duration}), 0)`, durationCount: sql<number>`count(${usageLog.duration})` }).from(usageLog).where(and(eq(usageLog.userId, userId), inArray(usageLog.providerAccountId, accountIds))).groupBy(usageLog.providerAccountId),
-    db.select({ providerAccountId: usageLog.providerAccountId, dayBucket: dayBucketExpression, requestCount: sql<number>`count(*)`, successCount: sql<number>`count(*) filter (where ${usageLog.statusCode} >= 200 and ${usageLog.statusCode} < 400)` }).from(usageLog).where(and(eq(usageLog.userId, userId), inArray(usageLog.providerAccountId, accountIds), gte(usageLog.createdAt, statsStartDate))).groupBy(usageLog.providerAccountId, dayBucketExpression),
-    db.select({ providerAccountId: usageLog.providerAccountId, hourBucket: hourBucketExpression, durationTotal: sql<number>`coalesce(sum(${usageLog.duration}), 0)`, durationCount: sql<number>`count(${usageLog.duration})` }).from(usageLog).where(and(eq(usageLog.userId, userId), inArray(usageLog.providerAccountId, accountIds), gte(usageLog.createdAt, durationStartDate))).groupBy(usageLog.providerAccountId, hourBucketExpression),
-  ]);
+  const allTimeRows = yield* fromPromise(
+    () =>
+      db.select({ providerAccountId: usageLog.providerAccountId, requestCount: sql<number>`count(*)`, totalTokens: sql<number>`coalesce(sum(${usageLog.inputTokens} + ${usageLog.outputTokens}), 0)`, successCount: sql<number>`count(*) filter (where ${usageLog.statusCode} >= 200 and ${usageLog.statusCode} < 400)`, durationTotal: sql<number>`coalesce(sum(${usageLog.duration}), 0)`, durationCount: sql<number>`count(${usageLog.duration})` }).from(usageLog).where(and(eq(usageLog.userId, userId), inArray(usageLog.providerAccountId, accountIds))).groupBy(usageLog.providerAccountId),
+    "Failed to load account usage"
+  );
+  const dailyUsageRows = yield* fromPromise(
+    () =>
+      db.select({ providerAccountId: usageLog.providerAccountId, dayBucket: dayBucketExpression, requestCount: sql<number>`count(*)`, successCount: sql<number>`count(*) filter (where ${usageLog.statusCode} >= 200 and ${usageLog.statusCode} < 400)` }).from(usageLog).where(and(eq(usageLog.userId, userId), inArray(usageLog.providerAccountId, accountIds), gte(usageLog.createdAt, statsStartDate))).groupBy(usageLog.providerAccountId, dayBucketExpression),
+    "Failed to load account daily usage"
+  );
+  const durationRows = yield* fromPromise(
+    () =>
+      db.select({ providerAccountId: usageLog.providerAccountId, hourBucket: hourBucketExpression, durationTotal: sql<number>`coalesce(sum(${usageLog.duration}), 0)`, durationCount: sql<number>`count(${usageLog.duration})` }).from(usageLog).where(and(eq(usageLog.userId, userId), inArray(usageLog.providerAccountId, accountIds), gte(usageLog.createdAt, durationStartDate))).groupBy(usageLog.providerAccountId, hourBucketExpression),
+    "Failed to load account durations"
+  );
 
   for (const row of allTimeRows) {
     if (!row.providerAccountId) continue;
@@ -216,4 +236,4 @@ export async function buildAccountStats(userId: string, accountIds: string[]): P
     if (row.providerAccountId) addDurationBucket(rawStatsByAccountId, row.providerAccountId, row.hourBucket, row.durationTotal, row.durationCount, hourKeySet);
   }
   return Object.fromEntries(accountIds.map((accountId) => [accountId, buildStatsFromRaw(rawStatsByAccountId.get(accountId), dayKeys, hourKeys)]));
-}
+});

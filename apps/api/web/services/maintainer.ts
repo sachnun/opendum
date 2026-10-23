@@ -1,6 +1,8 @@
+import { Effect } from "effect";
 import { and, asc, eq, ilike, inArray, ne, or, sql } from "drizzle-orm";
 
 import { db, providerAccount, proxyApiKey, user } from "@opendum/database";
+import { fromPromise } from "#web/lib/task.js";
 import { PROVIDER_ACCOUNT_KEYS } from "./account-providers.js";
 import { getAccountIndicator } from "./account-stats.js";
 
@@ -18,7 +20,10 @@ function accountIsEffectivelyActive(account: { isActive: boolean; disabledUntil:
   return Number.isNaN(disabledUntil.getTime()) || disabledUntil <= now;
 }
 
-export async function searchAuditUsers(actorId: string, input: UserSearchInput) {
+export const searchAuditUsers = Effect.fn("maintainer.searchAuditUsers")(function* (
+  actorId: string,
+  input: UserSearchInput
+) {
   const query = input.q?.trim() ?? "";
   const offset = input.offset;
   const limit = input.limit;
@@ -33,7 +38,9 @@ export async function searchAuditUsers(actorId: string, input: UserSearchInput) 
     conditions.push(or(ilike(user.name, pattern), ilike(user.email, pattern))!);
   }
 
-  const rows = await db
+  const rows = yield* fromPromise(
+    () =>
+      db
     .select({ id: user.id, name: user.name, email: user.email, image: user.image, lastUsedAt })
     .from(user)
     .leftJoin(proxyApiKey, eq(proxyApiKey.userId, user.id))
@@ -41,7 +48,9 @@ export async function searchAuditUsers(actorId: string, input: UserSearchInput) 
     .groupBy(user.id)
     .orderBy(sql`${lastUsedAt} desc nulls last`, asc(user.name), asc(user.email), asc(user.id))
     .limit(limit + 1)
-    .offset(offset);
+    .offset(offset),
+    "Failed to search audit users"
+  );
 
   const users = rows.slice(0, limit);
   const userIds = users.map((item) => item.id);
@@ -49,7 +58,9 @@ export async function searchAuditUsers(actorId: string, input: UserSearchInput) 
 
   if (userIds.length > 0) {
     const now = new Date();
-    const accountRows = await db
+    const accountRows = yield* fromPromise(
+      () =>
+        db
       .select({
         userId: providerAccount.userId,
         isActive: providerAccount.isActive,
@@ -65,7 +76,9 @@ export async function searchAuditUsers(actorId: string, input: UserSearchInput) 
         inArray(providerAccount.provider, PROVIDER_ACCOUNT_KEYS),
         eq(providerAccount.isActive, true),
         sql`${providerAccount.lastErrorAt} is not null`,
-      ));
+      )),
+      "Failed to load provider issues"
+    );
 
     for (const account of accountRows) {
       if (!accountIsEffectivelyActive(account, now)) continue;
@@ -80,4 +93,4 @@ export async function searchAuditUsers(actorId: string, input: UserSearchInput) 
     hasMore: rows.length > limit,
     nextOffset: offset + users.length,
   };
-}
+});

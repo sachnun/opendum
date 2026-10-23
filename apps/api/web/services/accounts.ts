@@ -1,4 +1,7 @@
+import { Effect } from "effect";
 import { db, pinnedProvider, providerAccount, providerAccountDisabledModel, providerAccountModelHealth } from "@opendum/database";
+import { fromPromise } from "#web/lib/task.js";
+import { internal } from "#web/errors.js";
 import type { AccountSessionInput, AccountStatsInput, DeleteAccountInput, ErrorHistoryBatchInput, ErrorHistoryInput, ProviderDetailInput, ProviderInput, ResolveErrorsInput, SetAccountModelEnabledInput, TogglePinnedProviderInput, UpdateAccountInput } from "@opendum/providers/contract";
 import { publishAccountsChanged } from "#web/events/bus.js";
 import { getModelLookupKeys, getProviderModelSet, resolveModelAlias } from "#web/lib/proxy/models.js";
@@ -75,33 +78,77 @@ const providerAccountListColumns = {
 
 const providerAccountLastUsedOrder = [sql`${providerAccount.lastUsedAt} desc nulls last`, desc(providerAccount.createdAt), desc(providerAccount.id)] as const;
 
-export async function listAccounts(userId: string) {
-  try {
-    const now = new Date();
-    const accounts = await db.select(providerAccountListColumns).from(providerAccount).where(eq(providerAccount.userId, userId)).orderBy(asc(providerAccount.createdAt));
-    return accounts.map((account) => ({ ...withEffectiveActive(account, now), unhealthyCount: account.consecutiveErrors }));
-  } catch (error) {
-    console.error("Failed to list accounts:", error);
-    throw new Error("Failed to list accounts", { cause: error });
-  }
-}
+export const listAccounts = Effect.fn("accounts.list")(function* (userId: string) {
+  return yield* listAccountsInner(userId).pipe(
+    Effect.mapError((failure) => internal("Failed to list accounts", failure.cause ?? failure))
+  );
+});
 
-export async function listAccountsByProvider(userId: string, input: ProviderInput) {
-  try {
-    const now = new Date();
-    const accounts = await db.select(providerAccountListColumns).from(providerAccount).where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, input.provider))).orderBy(...providerAccountLastUsedOrder);
-    return accounts.map((account) => ({ ...withEffectiveActive(account, now), unhealthyCount: account.consecutiveErrors }));
-  } catch (error) {
-    console.error("Failed to list provider accounts:", error);
-    throw new Error("Failed to list provider accounts", { cause: error });
-  }
-}
-
-export async function getAccountOverview(userId: string, options: AccountOverviewReadOptions = {}) {
-  try {
-    const now = new Date();
-    const [accounts, providerStats] = await Promise.all([
+const listAccountsInner = Effect.fnUntraced(function* (userId: string) {
+  const now = new Date();
+  const accounts = yield* fromPromise(
+    () =>
       db
+        .select(providerAccountListColumns)
+        .from(providerAccount)
+        .where(eq(providerAccount.userId, userId))
+        .orderBy(asc(providerAccount.createdAt)),
+    "Failed to list accounts"
+  );
+  return accounts.map((account) => ({
+    ...withEffectiveActive(account, now),
+    unhealthyCount: account.consecutiveErrors,
+  }));
+});
+
+export const listAccountsByProvider = Effect.fn("accounts.listByProvider")(function* (
+  userId: string,
+  input: ProviderInput
+) {
+  return yield* listAccountsByProviderInner(userId, input).pipe(
+    Effect.mapError((failure) => internal("Failed to list provider accounts", failure.cause ?? failure))
+  );
+});
+
+const listAccountsByProviderInner = Effect.fnUntraced(function* (
+  userId: string,
+  input: ProviderInput
+) {
+  const now = new Date();
+  const accounts = yield* fromPromise(
+    () =>
+      db
+        .select(providerAccountListColumns)
+        .from(providerAccount)
+        .where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, input.provider)))
+        .orderBy(...providerAccountLastUsedOrder),
+    "Failed to list provider accounts"
+  );
+  return accounts.map((account) => ({
+    ...withEffectiveActive(account, now),
+    unhealthyCount: account.consecutiveErrors,
+  }));
+});
+
+export const getAccountOverview = Effect.fn("accounts.overview")(function* (
+  userId: string,
+  options: AccountOverviewReadOptions = {}
+) {
+  return yield* buildAccountOverview(userId, options).pipe(
+    Effect.mapError((failure) => internal("Failed to load account summaries", failure.cause ?? failure))
+  );
+});
+
+const buildAccountOverview = Effect.fnUntraced(function* (
+  userId: string,
+  options: AccountOverviewReadOptions = {}
+) {
+  {
+    const now = new Date();
+    const [accounts, providerStats] = yield* Effect.all([
+      fromPromise(
+        () =>
+          db
         .select({
           id: providerAccount.id,
           provider: providerAccount.provider,
@@ -117,13 +164,15 @@ export async function getAccountOverview(userId: string, options: AccountOvervie
           lastRecoveredByRotationAt: providerAccount.lastRecoveredByRotationAt,
         })
         .from(providerAccount)
-        .where(eq(providerAccount.userId, userId)),
+            .where(eq(providerAccount.userId, userId)),
+        "Failed to load accounts"
+      ),
       getProviderSummaryStats(userId),
-    ]);
-    const [pinnedProviders, healthRows] = await Promise.all([
+    ], { concurrency: "unbounded" });
+    const [pinnedProviders, healthRows] = yield* Effect.all([
       getPinnedProviderKeys(userId, accounts.map((account) => account.provider), options),
       getAccountSummaryHealthRows(accounts.map((account) => account.id)),
-    ]);
+    ], { concurrency: "unbounded" });
 
     const pingSummaries = buildAccountPingSummaries(accounts, buildAccountHealthByAccountId(healthRows, now, getCooldownRecoveryAccountIds(accounts, now)), now);
 
@@ -139,16 +188,25 @@ export async function getAccountOverview(userId: string, options: AccountOvervie
     ) as Record<string, AccountOverviewSummary>;
 
     return { summaries, pinnedProviders };
-  } catch (error) {
-    console.error("Failed to load account summaries:", error);
-    throw new Error("Failed to load account summaries", { cause: error });
   }
-}
+});
 
-export async function getAccountPing(userId: string, options: AccountReadOptions = {}) {
-  try {
+export const getAccountPing = Effect.fn("accounts.ping")(function* (
+  userId: string,
+  options: AccountReadOptions = {}
+) {
+  return yield* buildAccountPing(userId, options).pipe(
+    Effect.mapError((failure) => internal("Failed to ping account summaries", failure.cause ?? failure))
+  );
+});
+
+const buildAccountPing = Effect.fnUntraced(function* (
+  userId: string,
+  options: AccountReadOptions = {}
+) {
+  {
     const now = new Date();
-    const accounts = await db
+    const accounts = yield* fromPromise(() => db
       .select({
         id: providerAccount.id,
         provider: providerAccount.provider,
@@ -164,11 +222,11 @@ export async function getAccountPing(userId: string, options: AccountReadOptions
         lastRecoveredByRotationAt: providerAccount.lastRecoveredByRotationAt,
       })
       .from(providerAccount)
-      .where(eq(providerAccount.userId, userId));
-    const [pinnedProviders, healthRows] = await Promise.all([
+      .where(eq(providerAccount.userId, userId)), "Failed to load accounts");
+    const [pinnedProviders, healthRows] = yield* Effect.all([
       getPinnedProviderKeys(userId, accounts.map((account) => account.provider), options),
       getAccountSummaryHealthRows(accounts.map((account) => account.id)),
-    ]);
+    ], { concurrency: "unbounded" });
 
     const pingSummaries = buildAccountPingSummaries(accounts, buildAccountHealthByAccountId(healthRows, now, getCooldownRecoveryAccountIds(accounts, now)), now);
 
@@ -177,24 +235,35 @@ export async function getAccountPing(userId: string, options: AccountReadOptions
       pinnedProviders,
       hasConnectedAccounts: accounts.length > 0,
     };
-  } catch (error) {
-    console.error("Failed to ping account summaries:", error);
-    throw new Error("Failed to ping account summaries", { cause: error });
   }
-}
+});
 
-export async function getAccountsByProviderDetailed(userId: string, input: ProviderDetailInput) {
-  try {
+export const getAccountsByProviderDetailed = Effect.fn("accounts.detail")(function* (
+  userId: string,
+  input: ProviderDetailInput
+) {
+  return yield* buildAccountDetail(userId, input).pipe(
+    Effect.mapError((failure: { cause?: unknown }) =>
+      internal("Failed to load provider account detail", failure.cause ?? failure)
+    )
+  );
+});
+
+const buildAccountDetail = Effect.fnUntraced(function* (
+  userId: string,
+  input: ProviderDetailInput
+) {
+  {
     const now = new Date();
-    const accounts = await db
+    const accounts = yield* fromPromise(() => db
       .select(providerAccountListColumns)
       .from(providerAccount)
       .where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, input.provider)))
-      .orderBy(...providerAccountLastUsedOrder);
+      .orderBy(...providerAccountLastUsedOrder), "Failed to load provider accounts");
 
     const accountIds = accounts.map((account) => account.id);
     const isBuiltin = isKnownProvider(input.provider);
-    const customModels = isBuiltin ? [] : await customProviderModels(userId, input.provider);
+    const customModels = isBuiltin ? [] : yield* customProviderModels(userId, input.provider);
     const providerModels = isBuiltin ? Array.from(getProviderModelSet(input.provider)) : customModels;
     const supportedModelsByAccountId = Object.fromEntries(accounts.map((account) => [
       account.id,
@@ -211,15 +280,19 @@ export async function getAccountsByProviderDetailed(userId: string, input: Provi
     );
     const freeSupportedModels = isBuiltin ? getProviderModelsForAccountTier(input.provider, "free") : customModels;
     const healthModelKeys = Array.from(new Set(supportedModels.flatMap((model) => getModelLookupKeys(model))));
-    const [disabledModelRows, healthRows, pinnedProviders] = await Promise.all([
+    const [disabledModelRows, healthRows, pinnedProviders] = yield* Effect.all([
       accountIds.length > 0
-        ? db
-            .select({ providerAccountId: providerAccountDisabledModel.providerAccountId, model: providerAccountDisabledModel.model })
-            .from(providerAccountDisabledModel)
-            .where(inArray(providerAccountDisabledModel.providerAccountId, accountIds))
-        : Promise.resolve([]),
+        ? fromPromise(
+            () =>
+              db
+                .select({ providerAccountId: providerAccountDisabledModel.providerAccountId, model: providerAccountDisabledModel.model })
+                .from(providerAccountDisabledModel)
+                .where(inArray(providerAccountDisabledModel.providerAccountId, accountIds)),
+            "Failed to load disabled account models"
+          )
+        : Effect.succeed([]),
       accountIds.length > 0 && healthModelKeys.length > 0
-        ? db
+        ? fromPromise(() => db
             .select({
               providerAccountId: providerAccountModelHealth.providerAccountId,
               model: providerAccountModelHealth.model,
@@ -232,10 +305,10 @@ export async function getAccountsByProviderDetailed(userId: string, input: Provi
               unhealthyCountUpdatedAt: providerAccountModelHealth.unhealthyCountUpdatedAt,
             })
             .from(providerAccountModelHealth)
-            .where(and(inArray(providerAccountModelHealth.providerAccountId, accountIds), inArray(providerAccountModelHealth.model, healthModelKeys)))
-        : Promise.resolve([]),
+            .where(and(inArray(providerAccountModelHealth.providerAccountId, accountIds), inArray(providerAccountModelHealth.model, healthModelKeys))), "Failed to load account model health")
+        : Effect.succeed([]),
       getPinnedProviderKeys(userId),
-    ]);
+    ], { concurrency: "unbounded" });
 
     const disabledModelsByAccountId = disabledModelRows.reduce<Record<string, string[]>>((acc, row) => {
       acc[row.providerAccountId] = [...(acc[row.providerAccountId] ?? []), row.model];
@@ -294,274 +367,442 @@ export async function getAccountsByProviderDetailed(userId: string, input: Provi
       modelHealthByAccountId,
       pinnedProviders,
     };
-  } catch (error) {
-    console.error("Failed to load provider account detail:", error);
-    throw new Error("Failed to load provider account detail", { cause: error });
   }
-}
+});
 
-export async function getAccountStats(userId: string, input: AccountStatsInput): Promise<Record<string, ProviderStats>> {
-  try {
-    const accountIds = Array.from(new Set(input.accountIds));
-    if (accountIds.length === 0) return {};
+export const getAccountStats = Effect.fn("accounts.stats")(function* (
+  userId: string,
+  input: AccountStatsInput
+) {
+  const accountIds = Array.from(new Set(input.accountIds));
+  if (accountIds.length === 0) return {} as Record<string, ProviderStats>;
 
-    const ownedAccounts = await db
-      .select({ id: providerAccount.id })
-      .from(providerAccount)
-      .where(and(eq(providerAccount.userId, userId), inArray(providerAccount.id, accountIds)));
-    const ownedAccountIds = ownedAccounts.map((account) => account.id);
-    return buildAccountStats(userId, ownedAccountIds);
-  } catch (error) {
-    console.error("Failed to load account stats:", error);
-    throw new Error("Failed to load account stats", { cause: error });
+  const ownedAccounts = yield* fromPromise(
+    () =>
+      db
+        .select({ id: providerAccount.id })
+        .from(providerAccount)
+        .where(and(eq(providerAccount.userId, userId), inArray(providerAccount.id, accountIds))),
+    "Failed to load account stats"
+  );
+  const ownedAccountIds = ownedAccounts.map((account) => account.id);
+  return yield* buildAccountStats(userId, ownedAccountIds).pipe(
+    Effect.mapError((failure) => internal("Failed to load account stats", failure.cause ?? failure))
+  );
+});
+
+const failWith = (message: string) => Effect.succeed({ success: false as const, error: message });
+
+export const updateAccount = Effect.fn("accounts.update")(function* (
+  userId: string,
+  input: UpdateAccountInput
+) {
+  return yield* updateAccountInner(userId, input).pipe(
+    Effect.catch((failure: { message: string }) => failWith(failure.message))
+  );
+});
+
+const updateAccountInner = Effect.fnUntraced(function* (
+  userId: string,
+  input: UpdateAccountInput
+) {
+  const accountRows = yield* fromPromise(
+    () =>
+      db
+        .select({ id: providerAccount.id, status: providerAccount.status })
+        .from(providerAccount)
+        .where(and(eq(providerAccount.id, input.id), eq(providerAccount.userId, userId)))
+        .limit(1),
+    "Failed to load account"
+  );
+  const account = accountRows[0];
+  if (!account) return yield* Effect.fail(internal("Account not found"));
+
+  const updates: { name?: string; isActive?: boolean; disabledUntil?: Date | null } = {};
+  const manuallyReenabled = input.isActive === true || input.disabledUntil === null;
+  const now = new Date();
+  if (input.name !== undefined) {
+    const name = input.name.trim();
+    if (!name) return yield* Effect.fail(internal("Please enter a name"));
+    updates.name = name;
   }
-}
 
-export async function updateAccount(userId: string, input: UpdateAccountInput) {
-    try {
-      const [account] = await db.select({ id: providerAccount.id, status: providerAccount.status }).from(providerAccount).where(and(eq(providerAccount.id, input.id), eq(providerAccount.userId, userId))).limit(1);
-      if (!account) return { success: false, error: "Account not found" } as const;
+  if (input.disabledUntil instanceof Date) {
+    if (input.disabledUntil <= now) return yield* Effect.fail(internal("Please choose a future time"));
+    updates.isActive = true;
+    updates.disabledUntil = input.disabledUntil;
+  } else {
+    if (input.isActive !== undefined) {
+      updates.isActive = input.isActive;
+      updates.disabledUntil = null;
+    } else if (input.disabledUntil === null) {
+      updates.disabledUntil = null;
+    }
+  }
 
-      const updates: { name?: string; isActive?: boolean; disabledUntil?: Date | null } = {};
-      const manuallyReenabled = input.isActive === true || input.disabledUntil === null;
-      const now = new Date();
-      if (input.name !== undefined) {
-        const name = input.name.trim();
-        if (!name) return { success: false, error: "Please enter a name" } as const;
-        updates.name = name;
-      }
+  if (Object.keys(updates).length > 0) {
+    yield* fromPromise(
+      () => db.update(providerAccount).set(updates).where(eq(providerAccount.id, input.id)),
+      "Failed to update account"
+    );
+    if (manuallyReenabled) yield* clearRefreshFailCount(input.id);
+    if (manuallyReenabled && account.status === "failed") {
+      yield* accelerateAccountCooldownForManualEnable(input.id, now);
+    }
+    if (updates.isActive !== undefined || updates.disabledUntil !== undefined) {
+      yield* invalidateDisabledModelsCache(userId);
+    }
+  }
 
-      if (input.disabledUntil instanceof Date) {
-        if (input.disabledUntil <= now) return { success: false, error: "Please choose a future time" } as const;
-        updates.isActive = true;
-        updates.disabledUntil = input.disabledUntil;
-      } else {
-        if (input.isActive !== undefined) {
-          updates.isActive = input.isActive;
-          updates.disabledUntil = null;
-        } else if (input.disabledUntil === null) {
-          updates.disabledUntil = null;
-        }
-      }
-
-      if (Object.keys(updates).length > 0) {
-        await db.update(providerAccount).set(updates).where(eq(providerAccount.id, input.id));
-        if (manuallyReenabled) await clearRefreshFailCount(input.id);
-        if (manuallyReenabled && account.status === "failed") await accelerateAccountCooldownForManualEnable(input.id, now);
-        if (updates.isActive !== undefined || updates.disabledUntil !== undefined) await invalidateDisabledModelsCache(userId);
-      }
-
-      const [updated] = await db
+  const updatedRows = yield* fromPromise(
+    () =>
+      db
         .select({ id: providerAccount.id, name: providerAccount.name, isActive: providerAccount.isActive, disabledUntil: providerAccount.disabledUntil, status: providerAccount.status, statusChangedAt: providerAccount.statusChangedAt, consecutiveErrors: providerAccount.consecutiveErrors })
         .from(providerAccount)
         .where(eq(providerAccount.id, input.id))
-        .limit(1);
-      if (!updated) return { success: false, error: "Account not found" } as const;
+        .limit(1),
+    "Failed to update account"
+  );
+  const updated = updatedRows[0];
+  if (!updated) return yield* Effect.fail(internal("Account not found"));
 
-      publishAccountsChanged(userId);
-      return { success: true, data: { ...withEffectiveActive(updated, now), unhealthyCount: updated.consecutiveErrors } } as const;
-    } catch (error) {
-      console.error("Failed to update account:", error);
-      return { success: false, error: "Failed to update account" } as const;
-    }
-}
+  publishAccountsChanged(userId);
+  return { ...withEffectiveActive(updated, now), unhealthyCount: updated.consecutiveErrors };
+});
 
-async function accelerateAccountCooldownForManualEnable(accountId: string, now = new Date()): Promise<void> {
-  await db.transaction(async (tx) => {
-    const rows: AccountModelHealthRecoveryRow[] = await tx
-      .select({
-        id: providerAccountModelHealth.id,
-        providerAccountId: providerAccountModelHealth.providerAccountId,
-        status: providerAccountModelHealth.status,
-        statusChangedAt: providerAccountModelHealth.statusChangedAt,
-        consecutiveErrors: providerAccountModelHealth.consecutiveErrors,
-        lastErrorAt: providerAccountModelHealth.lastErrorAt,
-        lastErrorCode: providerAccountModelHealth.lastErrorCode,
-        lastSuccessAt: providerAccountModelHealth.lastSuccessAt,
-        unhealthyCountUpdatedAt: providerAccountModelHealth.unhealthyCountUpdatedAt,
-        updatedAt: providerAccountModelHealth.updatedAt,
-        createdAt: providerAccountModelHealth.createdAt,
-      })
-      .from(providerAccountModelHealth)
-      .where(eq(providerAccountModelHealth.providerAccountId, accountId));
+const accelerateAccountCooldownForManualEnable = Effect.fn("accounts.accelerateCooldown")(function* (
+  accountId: string,
+  now = new Date()
+) {
+  yield* fromPromise(
+    () =>
+      db.transaction(async (tx) => {
+        const rows: AccountModelHealthRecoveryRow[] = await tx
+          .select({
+            id: providerAccountModelHealth.id,
+            providerAccountId: providerAccountModelHealth.providerAccountId,
+            status: providerAccountModelHealth.status,
+            statusChangedAt: providerAccountModelHealth.statusChangedAt,
+            consecutiveErrors: providerAccountModelHealth.consecutiveErrors,
+            lastErrorAt: providerAccountModelHealth.lastErrorAt,
+            lastErrorCode: providerAccountModelHealth.lastErrorCode,
+            lastSuccessAt: providerAccountModelHealth.lastSuccessAt,
+            unhealthyCountUpdatedAt: providerAccountModelHealth.unhealthyCountUpdatedAt,
+            updatedAt: providerAccountModelHealth.updatedAt,
+            createdAt: providerAccountModelHealth.createdAt,
+          })
+          .from(providerAccountModelHealth)
+          .where(eq(providerAccountModelHealth.providerAccountId, accountId));
 
-    let total = 0;
-    for (const row of rows) {
-      const recovered = withEffectiveModelHealth(row, now, true);
-      total += recovered.consecutiveErrors;
-      const patch: { consecutiveErrors: number; unhealthyCountUpdatedAt: Date; status?: string; statusChangedAt?: Date } = {
-        consecutiveErrors: recovered.consecutiveErrors,
-        unhealthyCountUpdatedAt: now,
-      };
-      if (row.status === "failed" || recovered.status !== row.status) {
-        patch.status = recovered.status;
-        patch.statusChangedAt = now;
-      }
-      await tx.update(providerAccountModelHealth).set(patch).where(eq(providerAccountModelHealth.id, row.id));
-    }
+        let total = 0;
+        for (const row of rows) {
+          const recovered = withEffectiveModelHealth(row, now, true);
+          total += recovered.consecutiveErrors;
+          const patch: { consecutiveErrors: number; unhealthyCountUpdatedAt: Date; status?: string; statusChangedAt?: Date } = {
+            consecutiveErrors: recovered.consecutiveErrors,
+            unhealthyCountUpdatedAt: now,
+          };
+          if (row.status === "failed" || recovered.status !== row.status) {
+            patch.status = recovered.status;
+            patch.statusChangedAt = now;
+          }
+          await tx.update(providerAccountModelHealth).set(patch).where(eq(providerAccountModelHealth.id, row.id));
+        }
 
-    const stillCoolingDown = total >= UNHEALTHY_THRESHOLD;
-    await tx
-      .update(providerAccount)
-      .set({
-        status: stillCoolingDown ? "failed" : "active",
-        statusChangedAt: now,
-        consecutiveErrors: total,
-        disabledUntil: stillCoolingDown ? new Date(now.getTime() + ACCOUNT_COOLDOWN_MS) : null,
-      })
-      .where(eq(providerAccount.id, accountId));
-  });
-}
+        const stillCoolingDown = total >= UNHEALTHY_THRESHOLD;
+        await tx
+          .update(providerAccount)
+          .set({
+            status: stillCoolingDown ? "failed" : "active",
+            statusChangedAt: now,
+            consecutiveErrors: total,
+            disabledUntil: stillCoolingDown ? new Date(now.getTime() + ACCOUNT_COOLDOWN_MS) : null,
+          })
+          .where(eq(providerAccount.id, accountId));
+      }),
+    "Failed to update account cooldown"
+  );
+});
 
-export async function deleteAccount(userId: string, input: DeleteAccountInput) {
-  try {
-    const [account] = await db.select({ id: providerAccount.id, email: providerAccount.email }).from(providerAccount).where(and(eq(providerAccount.id, input.id), eq(providerAccount.userId, userId))).limit(1);
-    if (!account) return { success: false, error: "Account not found" } as const;
+export const deleteAccount = Effect.fn("accounts.delete")(function* (
+  userId: string,
+  input: DeleteAccountInput
+) {
+  return yield* deleteAccountInner(userId, input).pipe(
+    Effect.map(() => ({ success: true as const, data: undefined })),
+    Effect.catch((failure: { message: string }) => failWith(failure.message))
+  );
+});
 
-    if (account.email) await trackProviderEmail(userId, account.email);
-    await db.delete(providerAccount).where(eq(providerAccount.id, input.id));
-    await invalidateDisabledModelsCache(userId);
-    await clearRefreshFailCount(input.id);
+const deleteAccountInner = Effect.fnUntraced(function* (
+  userId: string,
+  input: DeleteAccountInput
+) {
+  const accountRows = yield* fromPromise(
+    () =>
+      db
+        .select({ id: providerAccount.id, email: providerAccount.email })
+        .from(providerAccount)
+        .where(and(eq(providerAccount.id, input.id), eq(providerAccount.userId, userId)))
+        .limit(1),
+    "Failed to load account"
+  );
+  const account = accountRows[0];
+  if (!account) return yield* Effect.fail(internal("Account not found"));
+
+  if (account.email) yield* trackProviderEmail(userId, account.email);
+  yield* fromPromise(
+    () => db.delete(providerAccount).where(eq(providerAccount.id, input.id)),
+    "Failed to delete account"
+  );
+  yield* invalidateDisabledModelsCache(userId);
+  yield* clearRefreshFailCount(input.id);
+  publishAccountsChanged(userId);
+  return undefined;
+});
+
+export const togglePinnedProvider = Effect.fn("accounts.togglePinned")(function* (
+  userId: string,
+  input: TogglePinnedProviderInput
+) {
+  if (!PROVIDER_KEY_PATTERN.test(input.providerKey)) return failWith("Invalid provider");
+
+  return yield* togglePinnedProviderInner(userId, input).pipe(
+    Effect.map((data) => ({ success: true as const, data })),
+    Effect.catch((failure: { message: string }) => failWith(failure.message))
+  );
+});
+
+const togglePinnedProviderInner = Effect.fnUntraced(function* (
+  userId: string,
+  input: TogglePinnedProviderInput
+) {
+  const existing = yield* fromPromise(
+    () =>
+      db
+        .select({ id: pinnedProvider.id })
+        .from(pinnedProvider)
+        .where(and(eq(pinnedProvider.userId, userId), eq(pinnedProvider.providerKey, input.providerKey)))
+        .limit(1),
+    "Failed to load pinned provider"
+  );
+
+  if (existing[0]) {
+    yield* fromPromise(
+      () => db.delete(pinnedProvider).where(eq(pinnedProvider.id, existing[0]!.id)),
+      "Failed to update pinned provider"
+    );
     publishAccountsChanged(userId);
-    return { success: true, data: undefined } as const;
-  } catch (error) {
-    console.error("Failed to delete account:", error);
-    return { success: false, error: "Failed to delete account" } as const;
+    return { providerKey: input.providerKey, pinned: false };
   }
-}
 
-export async function togglePinnedProvider(userId: string, input: TogglePinnedProviderInput) {
-  if (!PROVIDER_KEY_PATTERN.test(input.providerKey)) return { success: false, error: "Invalid provider" } as const;
+  yield* fromPromise(
+    () =>
+      db
+        .insert(pinnedProvider)
+        .values({ userId, providerKey: input.providerKey })
+        .onConflictDoNothing({ target: [pinnedProvider.userId, pinnedProvider.providerKey] }),
+    "Failed to update pinned provider"
+  );
+  publishAccountsChanged(userId);
+  return { providerKey: input.providerKey, pinned: true };
+});
 
-  try {
-    const [existing] = await db
-      .select({ id: pinnedProvider.id })
-      .from(pinnedProvider)
-      .where(and(eq(pinnedProvider.userId, userId), eq(pinnedProvider.providerKey, input.providerKey)))
-      .limit(1);
+export const setAccountModelEnabled = Effect.fn("accounts.setModelEnabled")(function* (
+  userId: string,
+  input: SetAccountModelEnabledInput
+) {
+  return yield* setAccountModelEnabledInner(userId, input).pipe(
+    Effect.map((data) => ({ success: true as const, data })),
+    Effect.catch((failure: { message: string }) => failWith(failure.message))
+  );
+});
 
-    if (existing) {
-      await db.delete(pinnedProvider).where(eq(pinnedProvider.id, existing.id));
-      publishAccountsChanged(userId);
-      return { success: true, data: { providerKey: input.providerKey, pinned: false } } as const;
-    }
+const setAccountModelEnabledInner = Effect.fnUntraced(function* (
+  userId: string,
+  input: SetAccountModelEnabledInput
+) {
+  const accountRows = yield* fromPromise(
+    () =>
+      db
+        .select({ id: providerAccount.id, provider: providerAccount.provider, tier: providerAccount.tier })
+        .from(providerAccount)
+        .where(and(eq(providerAccount.id, input.accountId), eq(providerAccount.userId, userId)))
+        .limit(1),
+    "Failed to load account"
+  );
+  const account = accountRows[0];
+  if (!account) return yield* Effect.fail(internal("Account not found"));
 
-    await db.insert(pinnedProvider).values({ userId, providerKey: input.providerKey }).onConflictDoNothing({ target: [pinnedProvider.userId, pinnedProvider.providerKey] });
-    publishAccountsChanged(userId);
-    return { success: true, data: { providerKey: input.providerKey, pinned: true } } as const;
-  } catch (error) {
-    console.error("Failed to toggle pinned provider:", error);
-    return { success: false, error: "Failed to update pinned provider" } as const;
+  const normalizedModel = resolveModelAlias(input.modelId.trim());
+  if (!normalizedModel || !getProviderModelSet(account.provider).has(normalizedModel)) {
+    return yield* Effect.fail(
+      internal(`Model "${normalizedModel || input.modelId}" is not supported by provider "${account.provider}"`)
+    );
   }
-}
-
-export async function setAccountModelEnabled(userId: string, input: SetAccountModelEnabledInput) {
-  try {
-    const [account] = await db
-      .select({ id: providerAccount.id, provider: providerAccount.provider, tier: providerAccount.tier })
-      .from(providerAccount)
-      .where(and(eq(providerAccount.id, input.accountId), eq(providerAccount.userId, userId)))
-      .limit(1);
-    if (!account) return { success: false, error: "Account not found" } as const;
-
-    const normalizedModel = resolveModelAlias(input.modelId.trim());
-    if (!normalizedModel || !getProviderModelSet(account.provider).has(normalizedModel)) {
-      return { success: false, error: `Model "${normalizedModel || input.modelId}" is not supported by provider "${account.provider}"` } as const;
-    }
-    if (!accountTierCanAccessModel(account.tier, normalizedModel, account.provider)) {
-      return { success: false, error: `Model "${normalizedModel}" is not available for this account tier` } as const;
-    }
-
-    const lookupKeys = getModelLookupKeys(normalizedModel);
-    await db.delete(providerAccountDisabledModel).where(and(eq(providerAccountDisabledModel.providerAccountId, account.id), inArray(providerAccountDisabledModel.model, lookupKeys)));
-    if (!input.enabled) await db.insert(providerAccountDisabledModel).values({ providerAccountId: account.id, model: normalizedModel }).onConflictDoNothing({ target: [providerAccountDisabledModel.providerAccountId, providerAccountDisabledModel.model] });
-
-    await invalidateDisabledModelsCache(userId);
-    publishAccountsChanged(userId);
-    return { success: true, data: { model: normalizedModel, enabled: input.enabled } } as const;
-  } catch (error) {
-    console.error("Failed to update account model status:", error);
-    return { success: false, error: "Failed to update model status" } as const;
+  if (!accountTierCanAccessModel(account.tier, normalizedModel, account.provider)) {
+    return yield* Effect.fail(
+      internal(`Model "${normalizedModel}" is not available for this account tier`)
+    );
   }
-}
 
-export async function getAccountErrorHistory(userId: string, input: ErrorHistoryInput) {
-  try {
-    const [account] = await db.select({ id: providerAccount.id }).from(providerAccount).where(and(eq(providerAccount.id, input.accountId), eq(providerAccount.userId, userId))).limit(1);
-    if (!account) return { success: false, error: "Account not found" } as const;
-
-    const entries = await readRedisErrorHistory(input.accountId, Math.min(input.limit ?? DEFAULT_ERROR_HISTORY_ROWS, MAX_ERROR_HISTORY_ROWS));
-
-    return { success: true, data: { entries } } as const;
-  } catch (error) {
-    console.error("Failed to read provider account error history:", error);
-    return { success: true, data: { entries: [] } } as const;
+  const lookupKeys = getModelLookupKeys(normalizedModel);
+  yield* fromPromise(
+    () =>
+      db
+        .delete(providerAccountDisabledModel)
+        .where(
+          and(
+            eq(providerAccountDisabledModel.providerAccountId, account.id),
+            inArray(providerAccountDisabledModel.model, lookupKeys)
+          )
+        ),
+    "Failed to update model status"
+  );
+  if (!input.enabled) {
+    yield* fromPromise(
+      () =>
+        db
+          .insert(providerAccountDisabledModel)
+          .values({ providerAccountId: account.id, model: normalizedModel })
+          .onConflictDoNothing({
+            target: [providerAccountDisabledModel.providerAccountId, providerAccountDisabledModel.model],
+          }),
+      "Failed to update model status"
+    );
   }
-}
 
-export async function getAccountErrorHistories(userId: string, input: ErrorHistoryBatchInput) {
+  yield* invalidateDisabledModelsCache(userId);
+  publishAccountsChanged(userId);
+  return { model: normalizedModel, enabled: input.enabled };
+});
+
+export const getAccountErrorHistory = Effect.fn("accounts.errorHistory")(function* (
+  userId: string,
+  input: ErrorHistoryInput
+) {
+  const accountRows = yield* fromPromise(
+    () =>
+      db
+        .select({ id: providerAccount.id })
+        .from(providerAccount)
+        .where(and(eq(providerAccount.id, input.accountId), eq(providerAccount.userId, userId)))
+        .limit(1),
+    "Failed to load account"
+  ).pipe(Effect.catch(() => Effect.succeed([])));
+  if (!accountRows[0]) return { success: true as const, data: { entries: [] } };
+
+  const entries = yield* readRedisErrorHistory(
+    input.accountId,
+    Math.min(input.limit ?? DEFAULT_ERROR_HISTORY_ROWS, MAX_ERROR_HISTORY_ROWS)
+  ).pipe(Effect.catch(() => Effect.succeed([])));
+
+  return { success: true as const, data: { entries } };
+});
+
+export const getAccountErrorHistories = Effect.fn("accounts.errorHistories")(function* (
+  userId: string,
+  input: ErrorHistoryBatchInput
+) {
   const accountIds = Array.from(new Set(input.accountIds));
-  if (accountIds.length === 0) return { success: true, data: {} } as const;
+  if (accountIds.length === 0) return { success: true as const, data: {} };
 
-  try {
-    const ownedAccounts = await db
-      .select({ id: providerAccount.id })
-      .from(providerAccount)
-      .where(and(eq(providerAccount.userId, userId), inArray(providerAccount.id, accountIds)));
-    const ownedAccountIds = ownedAccounts.map((account) => account.id);
-    const entriesByAccountId = await readRedisErrorHistories(ownedAccountIds, Math.min(input.limit ?? DEFAULT_ERROR_HISTORY_ROWS, MAX_ERROR_HISTORY_ROWS));
-    const results = Object.fromEntries(accountIds.map((accountId) => {
-      if (!entriesByAccountId[accountId]) return [accountId, { success: false, error: "Account not found" }];
-      return [accountId, { success: true, data: { entries: entriesByAccountId[accountId] } }];
-    }));
+  const ownedAccounts = yield* fromPromise(
+    () =>
+      db
+        .select({ id: providerAccount.id })
+        .from(providerAccount)
+        .where(and(eq(providerAccount.userId, userId), inArray(providerAccount.id, accountIds))),
+    "Failed to load accounts"
+  ).pipe(Effect.catch(() => Effect.succeed([])));
+  const ownedAccountIds = ownedAccounts.map((account) => account.id);
+  const entriesByAccountId = yield* readRedisErrorHistories(
+    ownedAccountIds,
+    Math.min(input.limit ?? DEFAULT_ERROR_HISTORY_ROWS, MAX_ERROR_HISTORY_ROWS)
+  ).pipe(Effect.catch(() => Effect.succeed({} as Record<string, never[]>)));
+  const results = Object.fromEntries(
+    accountIds.map((accountId) => {
+      const entries = entriesByAccountId[accountId];
+      if (!entries) return [accountId, { success: false, error: "Account not found" }];
+      return [accountId, { success: true, data: { entries } }];
+    })
+  );
 
-    return { success: true, data: results } as const;
-  } catch (error) {
-    console.error("Failed to read provider account error histories:", error);
-    return { success: true, data: Object.fromEntries(accountIds.map((accountId) => [accountId, { success: true, data: { entries: [] } }])) } as const;
-  }
-}
+  return { success: true as const, data: results };
+});
 
-export async function getAccountSession(userId: string, input: AccountSessionInput) {
-  try {
-    const [account] = await db
-      .select({ accessToken: providerAccount.accessToken, refreshToken: providerAccount.refreshToken, apiKey: providerAccount.apiKey, accountId: providerAccount.accountId, provider: providerAccount.provider, email: providerAccount.email })
-      .from(providerAccount)
-      .where(and(eq(providerAccount.id, input.id), eq(providerAccount.userId, userId)))
-      .limit(1);
-    if (!account) return { success: false, error: "Account not found" } as const;
+export const getAccountSession = Effect.fn("accounts.session")(function* (
+  userId: string,
+  input: AccountSessionInput
+) {
+  const accountRows = yield* fromPromise(
+    () =>
+      db
+        .select({ accessToken: providerAccount.accessToken, refreshToken: providerAccount.refreshToken, apiKey: providerAccount.apiKey, accountId: providerAccount.accountId, provider: providerAccount.provider, email: providerAccount.email })
+        .from(providerAccount)
+        .where(and(eq(providerAccount.id, input.id), eq(providerAccount.userId, userId)))
+        .limit(1),
+    "Failed to read account session"
+  ).pipe(Effect.catch(() => Effect.succeed([])));
+  const account = accountRows[0];
+  if (!account) return failWith("Account not found");
 
-    const session = decrypt(account.accessToken);
-    return { success: true, data: { session } } as const;
-  } catch (error) {
-    console.error("Failed to read account session:", error);
-    return { success: false, error: "Failed to read account session" } as const;
-  }
-}
+  return yield* Effect.try({
+    try: () => ({ success: true as const, data: { session: decrypt(account.accessToken) } }),
+    catch: () => internal("Failed to read account session"),
+  }).pipe(Effect.catch(() => failWith("Failed to read account session")));
+});
 
-export async function resolveAccountErrors(userId: string, input: ResolveErrorsInput) {
-  try {
-    const [account] = await db.select({ id: providerAccount.id, status: providerAccount.status }).from(providerAccount).where(and(eq(providerAccount.id, input.accountId), eq(providerAccount.userId, userId))).limit(1);
-    if (!account) return { success: false, error: "Account not found" } as const;
+export const resolveAccountErrors = Effect.fn("accounts.resolveErrors")(function* (
+  userId: string,
+  input: ResolveErrorsInput
+) {
+  return yield* resolveAccountErrorsInner(userId, input).pipe(
+    Effect.map(() => ({ success: true as const, data: undefined })),
+    Effect.catch((failure: { message: string }) => failWith(failure.message))
+  );
+});
 
-    await db
-      .update(providerAccount)
-      .set({
-        errorCount: 0,
-        consecutiveErrors: 0,
-        lastErrorAt: null,
-        lastErrorCode: null,
-        lastRecoveredByRotationAt: null,
-        ...(account.status === "failed" ? { status: "active", statusChangedAt: new Date(), disabledUntil: null } : {}),
-      })
-      .where(eq(providerAccount.id, input.accountId));
-    await deleteRedisErrorHistory(input.accountId);
-    await db.delete(providerAccountModelHealth).where(eq(providerAccountModelHealth.providerAccountId, input.accountId));
-    await clearRefreshFailCount(input.accountId);
-    publishAccountsChanged(userId);
-    return { success: true, data: undefined } as const;
-  } catch (error) {
-    console.error("Failed to resolve provider account errors:", error);
-    return { success: false, error: "Failed to resolve account errors" } as const;
-  }
-}
+const resolveAccountErrorsInner = Effect.fnUntraced(function* (
+  userId: string,
+  input: ResolveErrorsInput
+) {
+  const accountRows = yield* fromPromise(
+    () =>
+      db
+        .select({ id: providerAccount.id, status: providerAccount.status })
+        .from(providerAccount)
+        .where(and(eq(providerAccount.id, input.accountId), eq(providerAccount.userId, userId)))
+        .limit(1),
+    "Failed to load account"
+  );
+  const account = accountRows[0];
+  if (!account) return yield* Effect.fail(internal("Account not found"));
+
+  yield* fromPromise(
+    () =>
+      db
+        .update(providerAccount)
+        .set({
+          errorCount: 0,
+          consecutiveErrors: 0,
+          lastErrorAt: null,
+          lastErrorCode: null,
+          lastRecoveredByRotationAt: null,
+          ...(account.status === "failed" ? { status: "active", statusChangedAt: new Date(), disabledUntil: null } : {}),
+        })
+        .where(eq(providerAccount.id, input.accountId)),
+    "Failed to resolve account errors"
+  );
+  yield* deleteRedisErrorHistory(input.accountId);
+  yield* fromPromise(
+    () =>
+      db
+        .delete(providerAccountModelHealth)
+        .where(eq(providerAccountModelHealth.providerAccountId, input.accountId)),
+    "Failed to resolve account errors"
+  );
+  yield* clearRefreshFailCount(input.accountId);
+  publishAccountsChanged(userId);
+  return undefined;
+});

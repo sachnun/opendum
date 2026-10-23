@@ -9,35 +9,30 @@ export class IdentityService {
   }
 
   verifyAccessToken(token: string): Effect.Effect<unknown | null> {
-    return Effect.promise(async () => {
-      try {
-        const { payload } = await this.auth.api.verifyJWT({ body: { token } });
-        return payload ?? null;
-      } catch {
-        return null;
-      }
-    });
+    return Effect.tryPromise({
+      try: () => this.auth.api.verifyJWT({ body: { token } }),
+      catch: (cause) => cause,
+    }).pipe(
+      Effect.map((result) => result.payload ?? null),
+      Effect.catch(() => Effect.succeed(null))
+    );
   }
 
   sessionFromHeaders(headers: Headers): Effect.Effect<AuthSession | null> {
-    return Effect.promise(async () => {
-      try {
-        return await this.auth.api.getSession({ headers });
-      } catch {
-        return null;
-      }
-    });
+    return Effect.tryPromise({
+      try: () => this.auth.api.getSession({ headers }),
+      catch: (cause) => cause,
+    }).pipe(Effect.catch(() => Effect.succeed(null)));
   }
 
   accessTokenFromHeaders(headers: Headers): Effect.Effect<string | null> {
-    return Effect.promise(async () => {
-      try {
-        const result = await this.auth.api.getToken({ headers });
-        return result?.token ?? null;
-      } catch {
-        return null;
-      }
-    });
+    return Effect.tryPromise({
+      try: () => this.auth.api.getToken({ headers }),
+      catch: (cause) => cause,
+    }).pipe(
+      Effect.map((result) => result?.token ?? null),
+      Effect.catch(() => Effect.succeed(null))
+    );
   }
 }
 
@@ -52,11 +47,18 @@ type Runtime = ManagedRuntime.ManagedRuntime<Layer.Success<typeof IdentityLayer>
 
 let runtime: Runtime | undefined;
 
-export function getIdentity(): Promise<IdentityService> {
-  runtime ??= ManagedRuntime.make(IdentityLayer);
-  return runtime.runPromise(
-    Effect.gen(function* () {
-      return yield* IdentityTag;
-    })
-  );
+export function getIdentity(): Effect.Effect<IdentityService> {
+  return Effect.gen(function* () {
+    const active = yield* Effect.sync(() => {
+      runtime ??= ManagedRuntime.make(IdentityLayer);
+      return runtime;
+    });
+    return yield* Effect.promise(() =>
+      active.runPromise(
+        Effect.gen(function* () {
+          return yield* IdentityTag;
+        })
+      )
+    );
+  });
 }

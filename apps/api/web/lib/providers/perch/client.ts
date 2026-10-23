@@ -1,4 +1,7 @@
-import { fetchExternal } from "#web/lib/external.js";
+import { Effect } from "effect";
+import { fetchExternalEffect } from "#web/lib/external.js";
+import { fromPromise } from "#web/lib/task.js";
+import { unavailable } from "#web/errors.js";
 import { formatProviderHttpError } from "../provider-http-errors.js";
 import type { OAuthResult } from "../types.js";
 import {
@@ -42,37 +45,52 @@ function formatPerchError(response: Response, body: string, endpointLabel: strin
   return formatProviderHttpError("Perch", response, body, { endpointLabel });
 }
 
-async function fetchPerchAuthConfig(): Promise<PerchAuthConfig> {
-  const response = await fetchExternal(`${PERCH_APP_URL}${PERCH_AUTH_CONFIG_PATH}`, {
+function readText(response: Response) {
+  return fromPromise(() => response.text().catch(() => ""), "Failed to read Perch response");
+}
+
+function readJson<T>(response: Response, fallback: T) {
+  return fromPromise(
+    async () => ((await response.json().catch(() => fallback)) as T),
+    "Failed to read Perch response"
+  );
+}
+
+const fetchPerchAuthConfig = Effect.fn("perch.authConfig")(function* () {
+  const response = yield* fetchExternalEffect(`${PERCH_APP_URL}${PERCH_AUTH_CONFIG_PATH}`, {
     method: "GET",
     headers: { Accept: "application/json" },
     cache: "no-store",
   });
   if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new Error(formatPerchError(response, body, "auth config endpoint"));
+    const body = yield* readText(response);
+    return yield* unavailable(formatPerchError(response, body, "auth config endpoint"));
   }
-  const config = (await response.json().catch(() => ({}))) as PerchAuthConfig;
+  const config = yield* readJson<Partial<PerchAuthConfig>>(response, {});
   if (!config.supabaseUrl || !config.supabaseAnonKey) {
-    throw new Error("Perch auth config is incomplete. Please try again later.");
+    return yield* unavailable("Perch auth config is incomplete. Please try again later.");
   }
-  return config;
-}
+  return config as PerchAuthConfig;
+});
 
-function perchProviderId(config: PerchAuthConfig): string {
+function perchProviderId(config: PerchAuthConfig) {
   const enabled = (config.providers ?? []).filter((provider) => provider === "google" || provider === "github");
-  if (enabled.length === 0) throw new Error("No supported Perch OAuth provider is enabled right now.");
-  if (enabled.includes("google")) return "google";
-  return "github";
+  if (enabled.length === 0) {
+    return Effect.fail(unavailable("No supported Perch OAuth provider is enabled right now."));
+  }
+  return Effect.succeed(enabled.includes("google") ? "google" : "github");
 }
 
-async function pkcePair(): Promise<{ verifier: string; challenge: string }> {
+const pkcePair = Effect.fn("perch.pkcePair")(function* () {
   const verifierBytes = new Uint8Array(32);
   crypto.getRandomValues(verifierBytes);
   const verifier = base64UrlEncode(verifierBytes);
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
+  const digest = yield* fromPromise(
+    () => crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)),
+    "Failed to build Perch PKCE challenge"
+  );
   return { verifier, challenge: base64UrlEncode(new Uint8Array(digest)) };
-}
+});
 
 function base64UrlEncode(bytes: Uint8Array): string {
   let binary = "";
@@ -99,73 +117,84 @@ export interface PerchInitiateResult {
   verificationUrl: string;
 }
 
-export async function initiatePerchOAuth(): Promise<PerchInitiateResult> {
-  const config = await fetchPerchAuthConfig();
-  const { verifier, challenge } = await pkcePair();
+export const initiatePerchOAuth = Effect.fn("perch.initiateOAuth")(function* () {
+  const config = yield* fetchPerchAuthConfig();
+  const { verifier, challenge } = yield* pkcePair();
+  const provider = yield* perchProviderId(config);
   const params = new URLSearchParams({
-    provider: perchProviderId(config),
+    provider,
     code_challenge: challenge,
     code_challenge_method: "s256",
     redirect_to: PERCH_REDIRECT_URI,
   });
   const authUrl = `${perchSupabaseUrl(config)}/auth/v1/authorize?${params.toString()}`;
-  return { authUrl, codeVerifier: verifier, verificationUrl: authUrl };
-}
+  return { authUrl, codeVerifier: verifier, verificationUrl: authUrl } satisfies PerchInitiateResult;
+});
 
-async function selectPerchStarterPlan(config: PerchAuthConfig, accessToken: string): Promise<void> {
-  const response = await fetchExternal(`${perchSupabaseUrl(config)}/rest/v1/rpc/perch_ai_select_plan`, {
+const selectPerchStarterPlan = Effect.fn("perch.selectStarterPlan")(function* (
+  config: PerchAuthConfig,
+  accessToken: string
+) {
+  const response = yield* fetchExternalEffect(`${perchSupabaseUrl(config)}/rest/v1/rpc/perch_ai_select_plan`, {
     method: "POST",
     headers: { ...perchAuthHeaders(config), Authorization: `Bearer ${accessToken}` },
     body: JSON.stringify({ p_plan_code: PERCH_STARTER_PLAN_CODE }),
     cache: "no-store",
   });
-  const payload = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string; reason?: string };
+  const payload = yield* readJson<{ ok?: boolean; error?: string; reason?: string }>(response, {});
   if (!response.ok || payload.ok === false) {
-    throw new Error(
+    return yield* unavailable(
       payload.error === "banned"
         ? `Perch sign-in blocked: ${payload.reason ?? "account banned"}. Contact hello@perchai.app.`
         : "Could not select the Perch Starter plan. Pick a plan at https://chat.perchai.app/perchai."
     );
   }
-}
+});
 
-async function ensurePerchSessionReady(accessToken: string): Promise<void> {
-  const accountResponse = await fetchExternal(`${PERCH_APP_URL}${PERCH_ACCOUNT_PATH}`, {
+const ensurePerchSessionReady = Effect.fn("perch.ensureSessionReady")(function* (accessToken: string) {
+  const accountResponse = yield* fetchExternalEffect(`${PERCH_APP_URL}${PERCH_ACCOUNT_PATH}`, {
     method: "GET",
     headers: { Accept: "application/json", Authorization: `Bearer ${accessToken}` },
     cache: "no-store",
   });
   if (!accountResponse.ok) return;
-  const account = (await accountResponse.json().catch(() => ({}))) as PerchAccountResponse;
+  const account = yield* readJson<PerchAccountResponse>(accountResponse, {});
   if (account.ok !== true || !account.session?.tierSelectionRequired) return;
-  const config = await fetchPerchAuthConfig();
-  await selectPerchStarterPlan(config, accessToken);
-}
+  const config = yield* fetchPerchAuthConfig();
+  yield* selectPerchStarterPlan(config, accessToken);
+});
 
-export async function exchangePerchOAuthCode(code: string, codeVerifier: string): Promise<OAuthResult> {
-  const config = await fetchPerchAuthConfig();
-  const response = await fetchExternal(`${perchSupabaseUrl(config)}${PERCH_AUTH_TOKEN_PATH}?grant_type=pkce`, {
+export const exchangePerchOAuthCode = Effect.fn("perch.exchangeOAuthCode")(function* (
+  code: string,
+  codeVerifier: string
+) {
+  const config = yield* fetchPerchAuthConfig();
+  const response = yield* fetchExternalEffect(`${perchSupabaseUrl(config)}${PERCH_AUTH_TOKEN_PATH}?grant_type=pkce`, {
     method: "POST",
     headers: perchAuthHeaders(config),
     body: JSON.stringify({ auth_code: code, code_verifier: codeVerifier }),
     cache: "no-store",
   });
   if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new Error(formatPerchError(response, body, "token exchange endpoint"));
+    const body = yield* readText(response);
+    return yield* unavailable(formatPerchError(response, body, "token exchange endpoint"));
   }
-  const tokens = (await response.json().catch(() => ({}))) as PerchTokenResponse;
+  const tokens = yield* readJson<PerchTokenResponse>(response, {});
   if (!tokens.access_token) {
-    throw new Error("Perch token exchange returned an incomplete session.");
+    return yield* unavailable("Perch token exchange returned an incomplete session.");
   }
-  await ensurePerchSessionReady(tokens.access_token);
-  const expiresAt = typeof tokens.expires_at === "number" && tokens.expires_at > 0
-    ? new Date(tokens.expires_at * 1000)
-    : new Date(Date.now() + (typeof tokens.expires_in === "number" && tokens.expires_in > 0 ? tokens.expires_in : 3600) * 1000);
+  yield* ensurePerchSessionReady(tokens.access_token);
+  const expiresAt =
+    typeof tokens.expires_at === "number" && tokens.expires_at > 0
+      ? new Date(tokens.expires_at * 1000)
+      : new Date(
+          Date.now() +
+            (typeof tokens.expires_in === "number" && tokens.expires_in > 0 ? tokens.expires_in : 3600) * 1000
+        );
   return {
     accessToken: tokens.access_token,
     refreshToken: tokens.refresh_token ?? "",
     expiresAt,
     email: tokens.user?.email ?? "",
-  };
-}
+  } satisfies OAuthResult;
+});

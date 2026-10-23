@@ -1,14 +1,13 @@
 import type { AccountsData, LiveTopic, ModelsData, ServerEvent, UsageData } from "@opendum/providers/contract";
 import { EventPublisher } from "@orpc/server";
-import { Effect, Match } from "effect";
+import { Duration, Effect, Match, Queue, Ref, Stream } from "effect";
 
 import { proxyEvents } from "../../core/events.js";
-import { trackWork } from "../../core/pending.js";
 
-const POINTS_DEBOUNCE_MS = 1_500;
-const SNAPSHOT_DEBOUNCE_MS = 400;
-const USAGE_THROTTLE_MS = 10_000;
-const HEARTBEAT_MS = 20_000;
+const POINTS_DEBOUNCE = Duration.millis(1_500);
+const SNAPSHOT_DEBOUNCE = Duration.millis(400);
+const USAGE_THROTTLE = Duration.millis(10_000);
+const HEARTBEAT_INTERVAL = Duration.millis(20_000);
 
 export interface EventSnapshots {
   accounts: AccountsData;
@@ -16,19 +15,26 @@ export interface EventSnapshots {
   usage: UsageData;
 }
 
-export type SnapshotBuilder = (userId: string, topics: LiveTopic[]) => Promise<Partial<EventSnapshots>>;
+export type SnapshotBuilder = (
+  userId: string,
+  topics: LiveTopic[]
+) => Effect.Effect<Partial<EventSnapshots>, import("#web/errors.js").ServiceFailure>;
+
+type TopicSignal = { userId: string; topic: LiveTopic };
+type UsageSignal = { userId: string };
+type PointsSignal = { userId: string; balance: number };
 
 const publisher = new EventPublisher<Record<string, ServerEvent>>({ maxBufferedEvents: 32 });
 
 const activeUserIds = new Set<string>();
-const pointsBalances = new Map<string, number>();
-const pointsTimers = new Map<string, ReturnType<typeof setTimeout>>();
-const snapshotTimers = new Map<string, ReturnType<typeof setTimeout>>();
-const usagePublishedAt = new Map<string, number>();
-const usagePendingUserIds = new Set<string>();
-const usageTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
-let buildSnapshots: SnapshotBuilder = async () => ({});
+const topicSignals = Effect.runSync(Queue.unbounded<TopicSignal>());
+const usageSignals = Effect.runSync(Queue.unbounded<UsageSignal>());
+const pointsSignals = Effect.runSync(Queue.unbounded<PointsSignal>());
+
+const usageLastPublishedAt = Effect.runSync(Ref.make(new Map<string, number>()));
+
+let buildSnapshots: SnapshotBuilder = () => Effect.succeed({});
 
 export function configureEventSnapshots(builder: SnapshotBuilder): void {
   buildSnapshots = builder;
@@ -51,19 +57,119 @@ function toUpdateEvent(topic: LiveTopic, snapshots: Partial<EventSnapshots>): Se
   );
 }
 
-function publishTopic(userId: string, topic: LiveTopic): void {
+const publishTopic = Effect.fn("events.publishTopic")(function* (userId: string, topic: LiveTopic) {
   if (!activeUserIds.has(userId)) return;
+  const snapshots = yield* buildSnapshots(userId, [topic]);
+  const event = toUpdateEvent(topic, snapshots);
+  if (event) publishToUser(userId, event);
+});
 
-  trackWork(
-    Effect.tryPromise(() => buildSnapshots(userId, [topic])).pipe(
-      Effect.map((snapshots) => toUpdateEvent(topic, snapshots)),
-      Effect.tap((event) => Effect.sync(() => {
-        if (event) publishToUser(userId, event);
-      })),
-      Effect.catch((cause) => Effect.logError(`Failed to publish ${topic} event for ${userId}`, cause)),
+const publishUsage = Effect.fn("events.publishUsage")(function* (userId: string) {
+  if (!activeUserIds.has(userId)) return;
+  yield* Ref.update(usageLastPublishedAt, (current) => {
+    const next = new Map(current);
+    next.set(userId, Date.now());
+    return next;
+  });
+  yield* publishTopic(userId, "usage");
+});
+
+const publishPoints = Effect.fn("events.publishPoints")(function* (userId: string, balance: number) {
+  if (!activeUserIds.has(userId)) return;
+  yield* Effect.sync(() => {
+    publishToUser(userId, { type: "update", topic: "points", at: now(), data: { balance } });
+  });
+});
+
+function runBackground(effect: Effect.Effect<unknown>): void {
+  Effect.runFork(Effect.ignore(effect));
+}
+
+function runTopicStream(): void {
+  runBackground(
+    Stream.fromQueue(topicSignals).pipe(
+      Stream.groupByKey((signal) => `${signal.userId}:${signal.topic}`, {
+        idleTimeToLive: Duration.seconds(30),
+      }),
+      Stream.map(([key, stream]) =>
+        stream.pipe(
+          Stream.debounce(SNAPSHOT_DEBOUNCE),
+          Stream.runForEach((signal) => publishTopic(signal.userId, signal.topic)),
+          Effect.catchCause((cause) =>
+            Effect.logError(`Failed to publish ${key} event`, cause)
+          )
+        )
+      ),
+      Stream.runForEach((run) => run),
+      Effect.catchCause(() => Effect.void)
     )
   );
 }
+
+function runUsageStream(): void {
+  runBackground(
+    Stream.fromQueue(usageSignals).pipe(
+      Stream.groupByKey((signal) => signal.userId, { idleTimeToLive: Duration.seconds(30) }),
+      Stream.map(([userId, stream]) =>
+        stream.pipe(
+          Stream.throttle({
+            cost: () => 1,
+            units: 1,
+            duration: USAGE_THROTTLE,
+            strategy: "enforce",
+          }),
+          Stream.debounce(USAGE_THROTTLE),
+          Stream.runForEach(() => publishUsage(userId)),
+          Effect.catchCause((cause) => Effect.logError(`Failed to publish usage for ${userId}`, cause))
+        )
+      ),
+      Stream.runForEach((run) => run),
+      Effect.catchCause(() => Effect.void)
+    )
+  );
+}
+
+function runPointsStream(): void {
+  runBackground(
+    Stream.fromQueue(pointsSignals).pipe(
+      Stream.groupByKey((signal) => signal.userId, { idleTimeToLive: Duration.seconds(30) }),
+      Stream.map(([userId, stream]) =>
+        stream.pipe(
+          Stream.debounce(POINTS_DEBOUNCE),
+          Stream.runForEach((signal) => publishPoints(userId, signal.balance)),
+          Effect.catchCause((cause) => Effect.logError(`Failed to publish points for ${userId}`, cause))
+        )
+      ),
+      Stream.runForEach((run) => run),
+      Effect.catchCause(() => Effect.void)
+    )
+  );
+}
+
+function runHeartbeat(): void {
+  runBackground(
+    Stream.tick(HEARTBEAT_INTERVAL).pipe(
+      Stream.runForEach(() =>
+        Effect.sync(() => {
+          for (const userId of activeUserIds) publishToUser(userId, { type: "ping", at: now() });
+        })
+      ),
+      Effect.catchCause(() => Effect.void)
+    )
+  );
+}
+
+let workersStarted = false;
+
+function startWorkers(): void {
+  if (workersStarted) return;
+  workersStarted = true;
+  runTopicStream();
+  runUsageStream();
+  runPointsStream();
+}
+
+runHeartbeat();
 
 export function publishModelsChanged(userId: string): void {
   scheduleTopic(userId, "models");
@@ -75,66 +181,20 @@ export function publishAccountsChanged(userId: string): void {
 
 function scheduleTopic(userId: string, topic: LiveTopic): void {
   if (!activeUserIds.has(userId)) return;
-
-  const key = `${userId}:${topic}`;
-  if (snapshotTimers.has(key)) return;
-
-  const timer = setTimeout(() => {
-    snapshotTimers.delete(key);
-    publishTopic(userId, topic);
-  }, SNAPSHOT_DEBOUNCE_MS);
-
-  timer.unref?.();
-  snapshotTimers.set(key, timer);
-}
-
-function flushUsageChanged(userId: string): void {
-  usageTimers.delete(userId);
-  usagePendingUserIds.delete(userId);
-  usagePublishedAt.set(userId, Date.now());
-  publishTopic(userId, "usage");
+  Effect.runSync(Queue.offer(topicSignals, { userId, topic }));
 }
 
 export function publishUsageChanged(userId: string): void {
   if (!activeUserIds.has(userId)) return;
-
-  const elapsed = Date.now() - (usagePublishedAt.get(userId) ?? 0);
-  if (elapsed >= USAGE_THROTTLE_MS) {
-    flushUsageChanged(userId);
-    return;
-  }
-
-  usagePendingUserIds.add(userId);
-  if (usageTimers.has(userId)) return;
-
-  const timer = setTimeout(() => {
-    usageTimers.delete(userId);
-    if (!usagePendingUserIds.has(userId)) return;
-    flushUsageChanged(userId);
-  }, USAGE_THROTTLE_MS - elapsed);
-
-  timer.unref?.();
-  usageTimers.set(userId, timer);
+  Effect.runSync(Queue.offer(usageSignals, { userId }));
 }
 
 export function publishPointsBalance(userId: string, balance: number): void {
-  pointsBalances.set(userId, balance);
-  if (pointsTimers.has(userId)) return;
-
-  const timer = setTimeout(() => {
-    pointsTimers.delete(userId);
-    const latest = pointsBalances.get(userId);
-    pointsBalances.delete(userId);
-    if (latest === undefined) return;
-    publishToUser(userId, { type: "update", topic: "points", at: now(), data: { balance: latest } });
-  }, POINTS_DEBOUNCE_MS);
-
-  timer.unref?.();
-  pointsTimers.set(userId, timer);
+  Effect.runSync(Queue.offer(pointsSignals, { userId, balance }));
 }
 
 async function* initialEvents(userId: string, topics: LiveTopic[]): AsyncGenerator<ServerEvent, void> {
-  const snapshots = await buildSnapshots(userId, topics);
+  const snapshots = await Effect.runPromise(buildSnapshots(userId, topics));
   for (const topic of topics) {
     const event = toUpdateEvent(topic, snapshots);
     if (event) yield event;
@@ -144,6 +204,7 @@ async function* initialEvents(userId: string, topics: LiveTopic[]): AsyncGenerat
 export async function* subscribeUserEvents(userId: string, topics: LiveTopic[], signal?: AbortSignal): AsyncGenerator<ServerEvent, void> {
   const wanted = new Set<LiveTopic>(topics);
   activeUserIds.add(userId);
+  startWorkers();
 
   try {
     yield* initialEvents(userId, topics);
@@ -153,27 +214,12 @@ export async function* subscribeUserEvents(userId: string, topics: LiveTopic[], 
     }
   } finally {
     activeUserIds.delete(userId);
-    usagePublishedAt.delete(userId);
-    usagePendingUserIds.delete(userId);
-    const timer = usageTimers.get(userId);
-    if (timer) {
-      clearTimeout(timer);
-      usageTimers.delete(userId);
-    }
-    for (const topic of ["accounts", "models"] as const) {
-      const key = `${userId}:${topic}`;
-      const snapshotTimer = snapshotTimers.get(key);
-      if (!snapshotTimer) continue;
-      clearTimeout(snapshotTimer);
-      snapshotTimers.delete(key);
-    }
+    await Effect.runPromise(Ref.update(usageLastPublishedAt, (current) => {
+      const next = new Map(current);
+      next.delete(userId);
+      return next;
+    }));
   }
 }
 
 proxyEvents.onUsageLogged((userId) => publishUsageChanged(userId));
-
-const heartbeat = setInterval(() => {
-  for (const userId of activeUserIds) publishToUser(userId, { type: "ping", at: now() });
-}, HEARTBEAT_MS);
-
-heartbeat.unref?.();

@@ -401,21 +401,26 @@ export class AntigravityProvider implements Provider, CredentialRefresher, Refre
     const onboardTier = selectOnboardTier(tier, allowedTiers);
     if (!onboardTier) return { projectId: "", tier: "", paidTier: "", email: "" };
     const payload = JSON.stringify({ tierId: onboardTier, metadata: codeAssistMetadata() });
-    for (const endpoint of this.onboardEndpoints) {
-      let data = await this.postOnboardUser(accessToken, endpoint, payload);
-      if (!data) continue;
-      for (let i = 0; i < 30 && data.done === false; i += 1) {
-        await Effect.runPromise(Effect.sleep(Duration.millis(2000)));
-        const polled = await this.postOnboardUser(accessToken, endpoint, payload);
-        if (polled) data = polled;
+    const poll = Effect.gen({ self: this }, function* () {
+      for (const endpoint of this.onboardEndpoints) {
+        let data = yield* Effect.promise(() => this.postOnboardUser(accessToken, endpoint, payload));
+        if (!data) continue;
+        for (let i = 0; i < 30 && data.done === false; i += 1) {
+          yield* Effect.sleep(Duration.millis(2000));
+          const polled = yield* Effect.promise(() => this.postOnboardUser(accessToken, endpoint, payload));
+          if (polled) data = polled;
+        }
+        if (data.done === false) continue;
+        const response = data.response;
+        if (response !== null && typeof response === "object" && !Array.isArray(response)) data = response as Json;
+        const project = extractGoogleProjectId(data);
+        if (project) {
+          return { projectId: project, tier: normalizeGoogleTierId(onboardTier), paidTier: "", email: "" };
+        }
       }
-      if (data.done === false) continue;
-      const response = data.response;
-      if (response !== null && typeof response === "object" && !Array.isArray(response)) data = response as Json;
-      const project = extractGoogleProjectId(data);
-      if (project) return { projectId: project, tier: normalizeGoogleTierId(onboardTier), paidTier: "", email: "" };
-    }
-    return { projectId: "", tier: "", paidTier: "", email: "" };
+      return { projectId: "", tier: "", paidTier: "", email: "" };
+    });
+    return Effect.runPromise(poll);
   }
 
   private async postOnboardUser(accessToken: string, endpoint: string, payload: string): Promise<Json | null> {

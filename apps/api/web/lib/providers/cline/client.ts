@@ -1,4 +1,7 @@
-import { fetchExternal } from "#web/lib/external.js";
+import { Effect } from "effect";
+import { fetchExternalEffect } from "#web/lib/external.js";
+import { fromPromise } from "#web/lib/task.js";
+import { unavailable } from "#web/errors.js";
 import { formatProviderHttpError } from "../provider-http-errors.js";
 import type { OAuthResult } from "../types.js";
 import {
@@ -46,8 +49,19 @@ function formatClineError(response: Response, body: string, endpointLabel: strin
   return formatProviderHttpError("Cline", response, body, { endpointLabel });
 }
 
-export async function initiateClineDeviceCodeFlow(): Promise<ClineInitiateResult> {
-  const response = await fetchExternal(`${WORKOS_BASE_URL}${DEVICE_AUTHORIZE_PATH}`, {
+function readText(response: Response) {
+  return fromPromise(() => response.text().catch(() => ""), "Failed to read Cline response");
+}
+
+function readJson<T>(response: Response, fallback: T) {
+  return fromPromise(
+    async () => ((await response.json().catch(() => fallback)) as T),
+    "Failed to read Cline response"
+  );
+}
+
+export const initiateClineDeviceCodeFlow = Effect.fn("cline.initiateDeviceCodeFlow")(function* () {
+  const response = yield* fetchExternalEffect(`${WORKOS_BASE_URL}${DEVICE_AUTHORIZE_PATH}`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: `client_id=${CLIENT_ID}`,
@@ -55,13 +69,13 @@ export async function initiateClineDeviceCodeFlow(): Promise<ClineInitiateResult
   });
 
   if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new Error(formatClineError(response, body, "device code endpoint"));
+    const body = yield* readText(response);
+    return yield* unavailable(formatClineError(response, body, "device code endpoint"));
   }
 
-  const data = (await response.json().catch(() => ({}))) as ClineDeviceCodeResponse;
+  const data = yield* readJson<ClineDeviceCodeResponse>(response, {});
   if (!data.device_code || !data.verification_uri_complete) {
-    throw new Error("Cline device code response is missing required fields");
+    return yield* unavailable("Cline device code response is missing required fields");
   }
 
   return {
@@ -71,48 +85,14 @@ export async function initiateClineDeviceCodeFlow(): Promise<ClineInitiateResult
     verificationUrlComplete: data.verification_uri_complete,
     expiresIn: data.expires_in ?? DEVICE_CODE_EXPIRY_SECONDS,
     interval: data.interval ?? POLLING_INTERVAL_SECONDS,
-  };
-}
+  } satisfies ClineInitiateResult;
+});
 
-export async function pollClineDeviceCodeAuthorization(
-  deviceCode: string
-): Promise<OAuthResult | { pending: true; retryAfterSeconds?: number } | { error: string }> {
-  const response = await fetchExternal(`${WORKOS_BASE_URL}${DEVICE_AUTHENTICATE_PATH}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: `grant_type=urn:ietf:params:oauth:grant-type:device_code&device_code=${encodeURIComponent(deviceCode)}&client_id=${CLIENT_ID}`,
-    cache: "no-store",
-  });
-
-  const data = (await response.json().catch(() => ({}))) as ClineDeviceAuthenticateResponse;
-
-  if (data.error === "authorization_pending") return { pending: true };
-  if (data.error === "slow_down") return { pending: true, retryAfterSeconds: 5 };
-  if (data.error === "expired_token") return { error: "Cline device code expired. Please try again." };
-  if (data.error === "access_denied") return { error: "Cline authorization was denied. Please try again." };
-
-  if (!data.access_token) {
-    if (!response.ok) {
-      const body = await response.text().catch(() => "");
-      return { error: formatClineError(response, body, "device authorization endpoint") };
-    }
-    return { pending: true };
-  }
-
-  const registered = await registerWithCline(data.access_token, data.refresh_token ?? "");
-  return {
-    accessToken: registered.accessToken,
-    refreshToken: registered.refreshToken,
-    expiresAt: new Date(Date.now() + ACCESS_TOKEN_TTL_SECONDS * 1000),
-    email: data.user?.email ?? "",
-  };
-}
-
-async function registerWithCline(
+const registerWithCline = Effect.fn("cline.register")(function* (
   workosAccessToken: string,
   workosRefreshToken: string
-): Promise<{ accessToken: string; refreshToken: string }> {
-  const response = await fetchExternal(`${CLINE_BASE_URL}${CLINE_REGISTER_PATH}`, {
+) {
+  const response = yield* fetchExternalEffect(`${CLINE_BASE_URL}${CLINE_REGISTER_PATH}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ accessToken: workosAccessToken, refreshToken: workosRefreshToken }),
@@ -120,14 +100,48 @@ async function registerWithCline(
   });
 
   if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new Error(formatClineError(response, body, "registration endpoint"));
+    const body = yield* readText(response);
+    return yield* unavailable(formatClineError(response, body, "registration endpoint"));
   }
 
-  const data = (await response.json().catch(() => ({}))) as ClineRegisterResponse;
+  const data = yield* readJson<ClineRegisterResponse>(response, {});
   if (!data.data?.accessToken || !data.data?.refreshToken) {
-    throw new Error("Cline registration returned an incomplete session");
+    return yield* unavailable("Cline registration returned an incomplete session");
   }
 
   return { accessToken: `workos:${data.data.accessToken}`, refreshToken: data.data.refreshToken };
-}
+});
+
+export const pollClineDeviceCodeAuthorization = Effect.fn("cline.pollDeviceCodeAuthorization")(
+  function* (deviceCode: string) {
+    const response = yield* fetchExternalEffect(`${WORKOS_BASE_URL}${DEVICE_AUTHENTICATE_PATH}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: `grant_type=urn:ietf:params:oauth:grant-type:device_code&device_code=${encodeURIComponent(deviceCode)}&client_id=${CLIENT_ID}`,
+      cache: "no-store",
+    });
+
+    const data = yield* readJson<ClineDeviceAuthenticateResponse>(response, {});
+
+    if (data.error === "authorization_pending") return { pending: true as const };
+    if (data.error === "slow_down") return { pending: true as const, retryAfterSeconds: 5 };
+    if (data.error === "expired_token") return { error: "Cline device code expired. Please try again." };
+    if (data.error === "access_denied") return { error: "Cline authorization was denied. Please try again." };
+
+    if (!data.access_token) {
+      if (!response.ok) {
+        const body = yield* readText(response);
+        return { error: formatClineError(response, body, "device authorization endpoint") };
+      }
+      return { pending: true as const };
+    }
+
+    const registered = yield* registerWithCline(data.access_token, data.refresh_token ?? "");
+    return {
+      accessToken: registered.accessToken,
+      refreshToken: registered.refreshToken,
+      expiresAt: new Date(Date.now() + ACCESS_TOKEN_TTL_SECONDS * 1000),
+      email: data.user?.email ?? "",
+    } satisfies OAuthResult;
+  }
+);

@@ -1,3 +1,5 @@
+import { Option, Schema } from "effect";
+
 export function stringValue(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
@@ -167,6 +169,13 @@ export function extractInstructions(messages: unknown[]): string {
   return parts.join("\n\n");
 }
 
+const JsonRecord = Schema.Record(Schema.String, Schema.Unknown);
+const decodeJsonRecord = Schema.decodeUnknownOption(Schema.fromJsonString(JsonRecord));
+
+export function parseJsonRecord(text: string): Record<string, unknown> | null {
+  return Option.getOrNull(decodeJsonRecord(text));
+}
+
 export function parseSseDataLines(text: string): Array<Record<string, unknown>> {
   const events: Array<Record<string, unknown>> = [];
   for (const line of text.split("\n")) {
@@ -174,14 +183,8 @@ export function parseSseDataLines(text: string): Array<Record<string, unknown>> 
     if (!trimmed.startsWith("data:")) continue;
     const data = trimmed.slice("data:".length).trim();
     if (!data || data === "[DONE]") continue;
-    try {
-      const parsed = JSON.parse(data) as unknown;
-      if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) {
-        events.push(parsed as Record<string, unknown>);
-      }
-    } catch {
-      continue;
-    }
+    const parsed = parseJsonRecord(data);
+    if (parsed) events.push(parsed);
   }
   return events;
 }

@@ -3,6 +3,7 @@ import {
   defaultStringValue,
   isTruthful,
   numberFromAny,
+  parseJsonRecord,
   randomId,
   stringValue,
 } from "../core/helpers.js";
@@ -150,15 +151,8 @@ function anthropicAssistantBlocks(msg: Json): unknown[] {
     const fn = (call.function ?? {}) as Json;
     const name = stringValue(fn.name);
     if (!name) continue;
-    let input: unknown = {};
     const args = stringValue(fn.arguments);
-    if (args) {
-      try {
-        input = JSON.parse(args);
-      } catch {
-        input = {};
-      }
-    }
+    const input: unknown = args ? (parseJsonRecord(args) ?? {}) : {};
     blocks.push({
       type: "tool_use",
       id: defaultStringValue(stringValue(call.id), randomId("toolu")),
@@ -428,12 +422,8 @@ async function* transformAnthropicMessagesSseToChat(
 
   for await (const data of sseDataLines(source)) {
     if (!data || data === "[DONE]") continue;
-    let event: Json;
-    try {
-      event = JSON.parse(data) as Json;
-    } catch {
-      continue;
-    }
+    const event = parseJsonRecord(data);
+    if (!event) continue;
     switch (stringValue(event.type)) {
       case "message_start": {
         const message = event.message;

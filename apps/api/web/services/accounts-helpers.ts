@@ -1,4 +1,6 @@
+import { Effect } from "effect";
 import { db, pinnedProvider, providerAccountModelHealth } from "@opendum/database";
+import { fromPromise } from "#web/lib/task.js";
 import { getRedisClient } from "#web/lib/redis.js";
 import { getModelFamily, getProviderAccessRule, getProviderModelSet } from "#web/lib/proxy/models.js";
 import { compareModelEntries } from "@opendum/models/sort";
@@ -218,13 +220,22 @@ export function parseRedisErrorHistoryEntry(value: string | null): RedisErrorHis
   }
 }
 
-export async function readRedisErrorHistory(accountId: string, limit: number) {
-  const redis = await getRedisClient();
+export const readRedisErrorHistory = Effect.fn("accounts.readRedisErrorHistory")(function* (
+  accountId: string,
+  limit: number
+) {
+  const redis = yield* getRedisClient();
   const key = errorHistoryKey(accountId);
-  const ids = await redis.zRange(key, 0, Math.max(0, limit - 1), { REV: true });
+  const ids = yield* fromPromise(
+    () => redis.zRange(key, 0, Math.max(0, limit - 1), { REV: true }),
+    "Failed to read error history"
+  );
   if (ids.length === 0) return [];
 
-  const values = await redis.mGet(ids.map(errorHistoryEntryKey));
+  const values = yield* fromPromise(
+    () => redis.mGet(ids.map(errorHistoryEntryKey)),
+    "Failed to read error history entries"
+  );
   const missingIds: string[] = [];
   const entries = values.flatMap((value, index) => {
     const entry = parseRedisErrorHistoryEntry(value);
@@ -232,24 +243,53 @@ export async function readRedisErrorHistory(accountId: string, limit: number) {
       missingIds.push(ids[index] ?? "");
       return [];
     }
-    return [{ id: entry.id, model: entry.model, errorCode: entry.errorCode, errorMessage: entry.errorMessage, createdAt: entry.createdAt }];
+    return [
+      {
+        id: entry.id,
+        model: entry.model,
+        errorCode: entry.errorCode,
+        errorMessage: entry.errorMessage,
+        createdAt: entry.createdAt,
+      },
+    ];
   });
 
-  if (missingIds.length > 0) await redis.zRem(key, missingIds.filter(Boolean));
+  const staleIds = missingIds.filter(Boolean);
+  if (staleIds.length > 0) {
+    yield* fromPromise(() => redis.zRem(key, staleIds), "Failed to prune error history").pipe(Effect.ignore);
+  }
   return entries;
-}
+});
 
-export async function readRedisErrorHistories(accountIds: string[], limit: number) {
-  const redis = await getRedisClient();
-  const idsByAccountId = Object.fromEntries(await Promise.all(accountIds.map(async (accountId) => [
-    accountId,
-    await redis.zRange(errorHistoryKey(accountId), 0, Math.max(0, limit - 1), { REV: true }),
-  ] as const)));
-  const entryRefs = Object.entries(idsByAccountId).flatMap(([accountId, ids]) => ids.map((id) => ({ accountId, id })));
-  const entriesByAccountId: Record<string, Array<{ id: string; model: string | null; errorCode: number; errorMessage: string; createdAt: string }>> = Object.fromEntries(accountIds.map((accountId) => [accountId, []]));
+export const readRedisErrorHistories = Effect.fn("accounts.readRedisErrorHistories")(function* (
+  accountIds: string[],
+  limit: number
+) {
+  const redis = yield* getRedisClient();
+  const idsByAccountId = Object.fromEntries(
+    yield* Effect.forEach(
+      accountIds,
+      (accountId) =>
+        fromPromise(
+          () => redis.zRange(errorHistoryKey(accountId), 0, Math.max(0, limit - 1), { REV: true }),
+          "Failed to read error history"
+        ).pipe(Effect.map((ids) => [accountId, ids] as const)),
+      { concurrency: 4 }
+    )
+  );
+  const entryRefs = Object.entries(idsByAccountId).flatMap(([accountId, ids]) =>
+    ids.map((id) => ({ accountId, id }))
+  );
+  const entriesByAccountId: Record<
+    string,
+    Array<{ id: string; model: string | null; errorCode: number; errorMessage: string; createdAt: string }>
+  > = Object.fromEntries(accountIds.map((accountId) => [accountId, []]));
   if (entryRefs.length === 0) return entriesByAccountId;
 
-  const values = await redis.mGet(entryRefs.map(({ id }) => errorHistoryEntryKey(id)));
+  const values = yield* fromPromise(
+    () => redis.mGet(entryRefs.map(({ id }) => errorHistoryEntryKey(id))),
+    "Failed to read error history entries"
+  );
   const missingIdsByAccountId: Record<string, string[]> = {};
 
   for (const [index, value] of values.entries()) {
@@ -262,49 +302,77 @@ export async function readRedisErrorHistories(accountIds: string[], limit: numbe
       continue;
     }
 
-    entriesByAccountId[ref.accountId]?.push({ id: entry.id, model: entry.model, errorCode: entry.errorCode, errorMessage: entry.errorMessage, createdAt: entry.createdAt });
+    entriesByAccountId[ref.accountId]?.push({
+      id: entry.id,
+      model: entry.model,
+      errorCode: entry.errorCode,
+      errorMessage: entry.errorMessage,
+      createdAt: entry.createdAt,
+    });
   }
 
-  await Promise.all(Object.entries(missingIdsByAccountId).map(([accountId, missingIds]) => redis.zRem(errorHistoryKey(accountId), missingIds.filter(Boolean))));
+  yield* Effect.forEach(
+    Object.entries(missingIdsByAccountId),
+    ([accountId, missingIds]) =>
+      fromPromise(
+        () => redis.zRem(errorHistoryKey(accountId), missingIds.filter(Boolean)),
+        "Failed to prune error history"
+      ).pipe(Effect.ignore),
+    { concurrency: 4 }
+  );
   return entriesByAccountId;
-}
+});
 
-export async function deleteRedisErrorHistory(accountId: string) {
-  const redis = await getRedisClient();
+export const deleteRedisErrorHistory = Effect.fn("accounts.deleteRedisErrorHistory")(function* (
+  accountId: string
+) {
+  const redis = yield* getRedisClient();
   const key = errorHistoryKey(accountId);
-  const ids = await redis.zRange(key, 0, -1);
+  const ids = yield* fromPromise(() => redis.zRange(key, 0, -1), "Failed to read error history");
   if (ids.length === 0) {
-    await redis.del(key);
+    yield* fromPromise(() => redis.del(key), "Failed to delete error history").pipe(Effect.ignore);
     return;
   }
 
-  const values = await redis.mGet(ids.map(errorHistoryEntryKey));
+  const values = yield* fromPromise(
+    () => redis.mGet(ids.map(errorHistoryEntryKey)),
+    "Failed to read error history entries"
+  );
   const keysToDelete = new Set<string>([key]);
   ids.forEach((id) => keysToDelete.add(errorHistoryEntryKey(id)));
   for (const value of values) {
     const entry = parseRedisErrorHistoryEntry(value);
     if (entry?.dedupeKey) keysToDelete.add(entry.dedupeKey);
   }
-  await redis.del(Array.from(keysToDelete));
-}
+  yield* fromPromise(
+    () => redis.del(Array.from(keysToDelete)),
+    "Failed to delete error history"
+  ).pipe(Effect.ignore);
+});
 
-export async function getAccountSummaryHealthRows(accountIds: string[]): Promise<AccountModelHealthSummaryRow[]> {
-  if (accountIds.length === 0) return [];
+export const getAccountSummaryHealthRows = Effect.fn("accounts.getAccountSummaryHealthRows")(function* (
+  accountIds: string[]
+) {
+  if (accountIds.length === 0) return [] as AccountModelHealthSummaryRow[];
 
-  return db
-    .select({
-      providerAccountId: providerAccountModelHealth.providerAccountId,
-      status: providerAccountModelHealth.status,
-      statusChangedAt: providerAccountModelHealth.statusChangedAt,
-      consecutiveErrors: providerAccountModelHealth.consecutiveErrors,
-      lastErrorAt: providerAccountModelHealth.lastErrorAt,
-      lastErrorCode: providerAccountModelHealth.lastErrorCode,
-      lastSuccessAt: providerAccountModelHealth.lastSuccessAt,
-      unhealthyCountUpdatedAt: providerAccountModelHealth.unhealthyCountUpdatedAt,
-    })
-    .from(providerAccountModelHealth)
-    .where(inArray(providerAccountModelHealth.providerAccountId, accountIds));
-}
+  return yield* fromPromise(
+    () =>
+      db
+        .select({
+          providerAccountId: providerAccountModelHealth.providerAccountId,
+          status: providerAccountModelHealth.status,
+          statusChangedAt: providerAccountModelHealth.statusChangedAt,
+          consecutiveErrors: providerAccountModelHealth.consecutiveErrors,
+          lastErrorAt: providerAccountModelHealth.lastErrorAt,
+          lastErrorCode: providerAccountModelHealth.lastErrorCode,
+          lastSuccessAt: providerAccountModelHealth.lastSuccessAt,
+          unhealthyCountUpdatedAt: providerAccountModelHealth.unhealthyCountUpdatedAt,
+        })
+        .from(providerAccountModelHealth)
+        .where(inArray(providerAccountModelHealth.providerAccountId, accountIds)),
+    "Failed to load account health rows"
+  );
+});
 
 export function buildAccountHealthByAccountId(healthRows: AccountModelHealthSummaryRow[], now = new Date(), cooldownRecoveryAccountIds = new Set<string>()) {
   return healthRows.map((row) => withEffectiveModelHealth(row, now, cooldownRecoveryAccountIds.has(row.providerAccountId))).reduce<Record<string, AccountHealthAggregate>>((acc, row) => {
@@ -353,8 +421,20 @@ export function buildAccountPingSummaries(accounts: AccountSummarySourceRow[], h
   return summaries;
 }
 
-export async function getPinnedProviderKeys(userId: string, providersWithAccounts?: Iterable<string>, options: AccountReadOptions = {}): Promise<string[]> {
-  const rows = await db.select({ providerKey: pinnedProvider.providerKey }).from(pinnedProvider).where(eq(pinnedProvider.userId, userId)).orderBy(asc(pinnedProvider.createdAt));
+export const getPinnedProviderKeys = Effect.fn("accounts.getPinnedProviderKeys")(function* (
+  userId: string,
+  providersWithAccounts?: Iterable<string>,
+  options: AccountReadOptions = {}
+) {
+  const rows = yield* fromPromise(
+    () =>
+      db
+        .select({ providerKey: pinnedProvider.providerKey })
+        .from(pinnedProvider)
+        .where(eq(pinnedProvider.userId, userId))
+        .orderBy(asc(pinnedProvider.createdAt)),
+    "Failed to load pinned providers"
+  );
 
   if (rows.length === 0 && providersWithAccounts && options.autoPin !== false) {
     const providerSet = new Set(providersWithAccounts);
@@ -364,13 +444,17 @@ export async function getPinnedProviderKeys(userId: string, providersWithAccount
       { userId, providerKey: AUTO_PIN_SENTINEL },
     ];
 
-    if (rowsToInsert.length > 0) {
-      await db.insert(pinnedProvider).values(rowsToInsert).onConflictDoNothing({ target: [pinnedProvider.userId, pinnedProvider.providerKey] });
-    }
+    yield* fromPromise(
+      () =>
+        db
+          .insert(pinnedProvider)
+          .values(rowsToInsert)
+          .onConflictDoNothing({ target: [pinnedProvider.userId, pinnedProvider.providerKey] }),
+      "Failed to pin providers"
+    ).pipe(Effect.ignore);
 
     return autoPinKeys;
   }
 
   return rows.map((row) => row.providerKey);
-}
-
+});

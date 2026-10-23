@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 import type { PointPort } from "./repositories.js";
 import type { Registry } from "@opendum/models/runtime";
 import {
@@ -14,20 +15,22 @@ export class Roaming {
     private readonly models: Registry
   ) {}
 
-  reserve(userId: string, model: string): Promise<PointReservation | null> {
-    return reserveRoamingPoint(this.points, userId, model);
+  reserve(userId: string, model: string): Effect.Effect<PointReservation | null> {
+    return Effect.promise(() => reserveRoamingPoint(this.points, userId, model));
   }
 
-  async settle(
+  settle(
     ownerUserId: string,
     reservation: PointReservation,
     model: string,
     usage: UsageCounts
-  ): Promise<void> {
-    await settleRoamingPoint(this.points, this.models, ownerUserId, reservation, model, usage);
+  ): Effect.Effect<void> {
+    return Effect.promise(() =>
+      settleRoamingPoint(this.points, this.models, ownerUserId, reservation, model, usage)
+    );
   }
 
-  async refund(reservation: PointReservation): Promise<void> {
-    await refundRoamingPoint(this.points, reservation);
+  refund(reservation: PointReservation): Effect.Effect<void> {
+    return Effect.promise(() => refundRoamingPoint(this.points, reservation));
   }
 }

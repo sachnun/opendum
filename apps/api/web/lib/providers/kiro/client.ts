@@ -2,7 +2,10 @@ import { eq } from "drizzle-orm";
 
 import { db, providerAccount, type ProviderAccount } from "@opendum/database";
 import { decrypt, encrypt, hashString } from "#web/lib/encryption.js";
-import { fetchExternal } from "#web/lib/external.js";
+import { Effect } from "effect";
+import { fetchExternalEffect } from "#web/lib/external.js";
+import { fromPromise } from "#web/lib/task.js";
+import { badRequest, unavailable } from "#web/errors.js";
 import type { OAuthResult } from "../types.js";
 import { formatProviderHttpError } from "../provider-http-errors.js";
 import {
@@ -103,121 +106,131 @@ export function generateCodeVerifier(): string {
     .replace(/=+$/, "");
 }
 
-async function generateCodeChallenge(verifier: string): Promise<string> {
+const generateCodeChallenge = Effect.fn("kiro.generateCodeChallenge")(function* (verifier: string) {
   const encoded = new TextEncoder().encode(verifier);
-  const digest = await crypto.subtle.digest("SHA-256", encoded);
+  const digest = yield* fromPromise(
+    () => crypto.subtle.digest("SHA-256", encoded),
+    "Failed to build Kiro code challenge"
+  );
   return btoa(String.fromCharCode(...new Uint8Array(digest)))
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
     .replace(/=+$/, "");
-}
+});
+
+const exchangeKiroCode = Effect.fn("kiro.exchangeCode")(function* (
+  code: string,
+  redirectUri: string,
+  codeVerifier?: string
+) {
+  if (!codeVerifier) {
+    return yield* badRequest("Code verifier is required for Kiro token exchange");
+  }
+
+  const response = yield* fetchExternalEffect(TOKEN_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "User-Agent": "KiroIDE",
+    },
+    body: JSON.stringify({
+      code,
+      code_verifier: codeVerifier,
+      redirect_uri: redirectUri || BROWSER_REDIRECT_URI,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = yield* fromPromise(() => response.text(), "Failed to read Kiro response");
+    return yield* unavailable(
+      formatProviderHttpError("Kiro", response, errorText, {
+        endpointLabel: "token exchange endpoint",
+      })
+    );
+  }
+
+  const data = yield* readJson<KiroTokenExchangeResponse>(response);
+  const profileArn = data.profileArn || "";
+  const identity = buildKiroAccountIdentity(data.accessToken, data.refreshToken, profileArn);
+
+  return {
+    accessToken: data.accessToken,
+    refreshToken: data.refreshToken,
+    expiresAt: new Date(Date.now() + (data.expiresIn || 3600) * 1000),
+    email: identity.email,
+    accountId: identity.accountId,
+  } satisfies OAuthResult;
+});
+
+const refreshKiroToken = Effect.fn("kiro.refreshToken")(function* (refreshToken: string) {
+  const response = yield* fetchExternalEffect(REFRESH_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "User-Agent": "KiroIDE",
+    },
+    body: JSON.stringify({ refreshToken }),
+  });
+
+  if (!response.ok) {
+    const errorText = yield* fromPromise(() => response.text(), "Failed to read Kiro response");
+    return yield* unavailable(
+      formatProviderHttpError("Kiro", response, errorText, {
+        endpointLabel: "token refresh endpoint",
+      })
+    );
+  }
+
+  const data = yield* readJson<KiroRefreshResponse>(response);
+  const profileArn = data.profileArn || "";
+  const nextRefreshToken = data.refreshToken || refreshToken;
+  const identity = buildKiroAccountIdentity(data.accessToken, nextRefreshToken, profileArn);
+
+  return {
+    accessToken: data.accessToken,
+    refreshToken: nextRefreshToken,
+    expiresAt: new Date(Date.now() + (data.expiresIn || 3600) * 1000),
+    email: identity.email,
+    accountId: identity.accountId,
+  } satisfies OAuthResult;
+});
+
+const getValidKiroCredentials = Effect.fn("kiro.getValidCredentials")(function* (
+  account: CredentialAccount
+) {
+  if (!isTokenExpired(account.expiresAt)) return decrypt(account.accessToken);
+
+  const refreshed = yield* refreshKiroToken(decrypt(account.refreshToken));
+  yield* fromPromise(
+    () =>
+      db
+        .update(providerAccount)
+        .set({
+          accessToken: encrypt(refreshed.accessToken),
+          refreshToken: encrypt(refreshed.refreshToken!),
+          expiresAt: refreshed.expiresAt,
+          ...(refreshed.accountId ? { accountId: refreshed.accountId } : {}),
+        })
+        .where(eq(providerAccount.id, account.id)),
+    "Failed to persist refreshed Kiro credentials"
+  );
+
+  return refreshed.accessToken;
+});
 
 export const kiroProvider = {
-  async exchangeCode(
-    code: string,
-    redirectUri: string,
-    codeVerifier?: string
-  ): Promise<OAuthResult> {
-    if (!codeVerifier) {
-      throw new Error("Code verifier is required for Kiro token exchange");
-    }
-
-    const response = await fetchExternal(TOKEN_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        "User-Agent": "KiroIDE",
-      },
-      body: JSON.stringify({
-        code,
-        code_verifier: codeVerifier,
-        redirect_uri: redirectUri || BROWSER_REDIRECT_URI,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(
-        formatProviderHttpError("Kiro", response, errorText, {
-          endpointLabel: "token exchange endpoint",
-        })
-      );
-    }
-
-    const data = (await response.json()) as KiroTokenExchangeResponse;
-    const profileArn = data.profileArn || "";
-    const identity = buildKiroAccountIdentity(data.accessToken, data.refreshToken, profileArn);
-
-    return {
-      accessToken: data.accessToken,
-      refreshToken: data.refreshToken,
-      expiresAt: new Date(Date.now() + (data.expiresIn || 3600) * 1000),
-      email: identity.email,
-      accountId: identity.accountId,
-    };
-  },
-
-  async refreshToken(refreshToken: string): Promise<OAuthResult> {
-    const response = await fetchExternal(REFRESH_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        "User-Agent": "KiroIDE",
-      },
-      body: JSON.stringify({ refreshToken }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(
-        formatProviderHttpError("Kiro", response, errorText, {
-          endpointLabel: "token refresh endpoint",
-        })
-      );
-    }
-
-    const data = (await response.json()) as KiroRefreshResponse;
-    const profileArn = data.profileArn || "";
-    const nextRefreshToken = data.refreshToken || refreshToken;
-    const identity = buildKiroAccountIdentity(data.accessToken, nextRefreshToken, profileArn);
-
-    return {
-      accessToken: data.accessToken,
-      refreshToken: nextRefreshToken,
-      expiresAt: new Date(Date.now() + (data.expiresIn || 3600) * 1000),
-      email: identity.email,
-      accountId: identity.accountId,
-    };
-  },
-
-  async getValidCredentials(account: CredentialAccount): Promise<string> {
-    let accessToken = decrypt(account.accessToken);
-    const refreshTokenValue = decrypt(account.refreshToken);
-
-    if (!isTokenExpired(account.expiresAt)) {
-      return accessToken;
-    }
-
-    const refreshed = await kiroProvider.refreshToken(refreshTokenValue);
-    await db
-      .update(providerAccount)
-      .set({
-        accessToken: encrypt(refreshed.accessToken),
-        refreshToken: encrypt(refreshed.refreshToken!),
-        expiresAt: refreshed.expiresAt,
-        ...(refreshed.accountId ? { accountId: refreshed.accountId } : {}),
-      })
-      .where(eq(providerAccount.id, account.id));
-
-    accessToken = refreshed.accessToken;
-    return accessToken;
-  },
+  exchangeCode: exchangeKiroCode,
+  refreshToken: refreshKiroToken,
+  getValidCredentials: getValidKiroCredentials,
 };
 
-export async function buildKiroAuthUrl(state: string, codeVerifier: string): Promise<string> {
-  const codeChallenge = await generateCodeChallenge(codeVerifier);
+export const buildKiroAuthUrl = Effect.fn("kiro.buildAuthUrl")(function* (
+  state: string,
+  codeVerifier: string
+) {
+  const codeChallenge = yield* generateCodeChallenge(codeVerifier);
   const params = new URLSearchParams({
     idp: IDP,
     redirect_uri: BROWSER_REDIRECT_URI,
@@ -228,4 +241,11 @@ export async function buildKiroAuthUrl(state: string, codeVerifier: string): Pro
   });
 
   return `${AUTHORIZE_ENDPOINT}?${params.toString()}`;
+});
+
+function readJson<T>(response: Response) {
+  return fromPromise(
+    async () => ((await response.json()) as T),
+    "Failed to read Kiro response"
+  );
 }

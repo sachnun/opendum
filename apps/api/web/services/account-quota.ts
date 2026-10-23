@@ -1,11 +1,14 @@
+import { Effect } from "effect";
 import { and, eq, inArray } from "drizzle-orm";
 import { db, providerAccount } from "@opendum/database";
 import type { AccountQuotaBatchInput, AccountQuotaInput } from "@opendum/providers/contract";
 import { type QuotaProviderKey } from "@opendum/providers/provider-accounts";
 import { getProxyContext } from "../../context.js";
 import { fetchAccountQuota } from "../../core/quota.js";
+import { fromPromise } from "#web/lib/task.js";
+import { internal } from "#web/errors.js";
 
-const quotaInFlight = new Map<string, Promise<AccountQuotaResult>>();
+const quotaInFlight = new Map<string, Effect.Effect<AccountQuotaResult>>();
 
 type JsonRecord = Record<string, unknown>;
 
@@ -79,84 +82,145 @@ function toPublicQuotaInfo(quota: AccountQuotaInfo): AccountQuotaInfo {
   };
 }
 
-async function fetchQuotaFromCore(userId: string, provider: QuotaProviderKey, accountId: string, options: AccountQuotaFetchOptions = {}): Promise<AccountQuotaResult> {
-  try {
-    const context = await getProxyContext();
-    const outcome = await fetchAccountQuota(context, { userId, provider, accountId, forceRefresh: options.forceRefresh === true });
+const fetchQuotaFromCore = Effect.fn("accountQuota.fetchFromCore")(function* (
+  userId: string,
+  provider: QuotaProviderKey,
+  accountId: string,
+  options: AccountQuotaFetchOptions = {}
+) {
+  const context = yield* fromPromise(() => getProxyContext(), "Failed to start the proxy runtime").pipe(
+    Effect.catch(() => Effect.succeed(null))
+  );
+  if (!context) return { success: false as const, error: "Failed to fetch quota data" };
 
-    if (outcome.status === "unsupported") {
-      return { success: false, error: `provider ${outcome.provider} is not supported for quota` };
-    }
-    if (outcome.status === "not-found") {
-      return { success: false, error: "Account not found" };
-    }
-    if (outcome.status === "error") {
-      return { success: false, error: outcome.message };
-    }
-    if (!isAccountQuotaInfo(outcome.data)) {
-      return { success: false, error: "Quota provider returned an invalid response" };
-    }
-    return { success: true, data: toPublicQuotaInfo(outcome.data) };
-  } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : "Failed to fetch quota data" };
+  const outcome = yield* fromPromise(
+    () =>
+      fetchAccountQuota(context, {
+        userId,
+        provider,
+        accountId,
+        forceRefresh: options.forceRefresh === true,
+      }),
+    "Failed to fetch quota data"
+  ).pipe(Effect.catch((failure) => Effect.succeed({ status: "error" as const, message: failure.message })));
+
+  if (outcome.status === "unsupported") {
+    return { success: false as const, error: `provider ${outcome.provider} is not supported for quota` };
   }
-}
+  if (outcome.status === "not-found") {
+    return { success: false as const, error: "Account not found" };
+  }
+  if (outcome.status === "error") {
+    return { success: false as const, error: outcome.message };
+  }
+  if (!isAccountQuotaInfo(outcome.data)) {
+    return { success: false as const, error: "Quota provider returned an invalid response" };
+  }
+  return { success: true as const, data: toPublicQuotaInfo(outcome.data) };
+});
 
-async function fetchQuota(userId: string, provider: QuotaProviderKey, accountId: string, options: AccountQuotaFetchOptions = {}): Promise<AccountQuotaResult> {
+const fetchQuota = Effect.fn("accountQuota.fetch")(function* (
+  userId: string,
+  provider: QuotaProviderKey,
+  accountId: string,
+  options: AccountQuotaFetchOptions = {}
+) {
   const inFlightKey = `${userId}:${provider}:${accountId}:${options.forceRefresh ? "force" : "cache"}`;
   const existing = quotaInFlight.get(inFlightKey);
-  if (existing) return existing;
+  if (existing) return yield* existing;
 
-  const promise = fetchQuotaFromCore(userId, provider, accountId, options);
-  quotaInFlight.set(inFlightKey, promise);
-  try {
-    return await promise;
-  } finally {
-    if (quotaInFlight.get(inFlightKey) === promise) quotaInFlight.delete(inFlightKey);
+  const pending = Effect.cached(fetchQuotaFromCore(userId, provider, accountId, options)).pipe(
+    Effect.flatten
+  );
+  quotaInFlight.set(inFlightKey, pending);
+  return yield* pending.pipe(
+    Effect.ensuring(
+      Effect.sync(() => {
+        if (quotaInFlight.get(inFlightKey) === pending) quotaInFlight.delete(inFlightKey);
+      })
+    )
+  );
+});
+
+export const getAccountQuota = Effect.fn("accountQuota.get")(function* (
+  userId: string,
+  input: AccountQuotaInput
+) {
+  const accounts = yield* fromPromise(
+    () =>
+      db
+        .select(quotaOwnershipColumns)
+        .from(providerAccount)
+        .where(
+          and(
+            eq(providerAccount.userId, userId),
+            eq(providerAccount.provider, input.provider),
+            eq(providerAccount.id, input.accountId)
+          )
+        )
+        .limit(1),
+    "Failed to fetch provider quota"
+  ).pipe(Effect.catch(() => Effect.succeed([])));
+
+  const account = accounts[0];
+  if (!account) return { success: false as const, error: "Account not found" };
+  return yield* fetchQuota(userId, input.provider, account.id, {
+    forceRefresh: input.forceRefresh,
+  });
+});
+
+export const getAccountQuotas = Effect.fn("accountQuota.list")(function* (
+  userId: string,
+  input: AccountQuotaBatchInput
+) {
+  return yield* getAccountQuotasInner(userId, input).pipe(
+    Effect.catch((failure: { message: string }) =>
+      Effect.succeed({ success: false as const, error: failure.message })
+    )
+  );
+});
+
+const getAccountQuotasInner = Effect.fnUntraced(function* (
+  userId: string,
+  input: AccountQuotaBatchInput
+) {
+  const accountIds = [...new Set(input.accountIds)];
+  const accounts = yield* fromPromise(
+    () =>
+      db
+        .select(quotaOwnershipColumns)
+        .from(providerAccount)
+        .where(
+          and(
+            eq(providerAccount.userId, userId),
+            eq(providerAccount.provider, input.provider),
+            inArray(providerAccount.id, accountIds)
+          )
+        ),
+    "Failed to fetch provider quotas"
+  ).pipe(
+    Effect.mapError((failure) => internal("Failed to fetch provider quotas", failure.cause ?? failure))
+  );
+
+  const accountById = new Map(accounts.map((account) => [account.id, account]));
+  const results: Record<string, AccountQuotaResult> = {};
+  const accountsToFetch: string[] = [];
+
+  for (const accountId of accountIds) {
+    const account = accountById.get(accountId);
+    if (account) accountsToFetch.push(account.id);
+    else results[accountId] = { success: false, error: "Account not found" };
   }
-}
 
-export async function getAccountQuota(userId: string, input: AccountQuotaInput) {
-  try {
-    const [account] = await db
-      .select(quotaOwnershipColumns)
-      .from(providerAccount)
-      .where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, input.provider), eq(providerAccount.id, input.accountId)))
-      .limit(1);
+  const fetched = yield* Effect.forEach(
+    accountsToFetch,
+    (accountId) =>
+      fetchQuota(userId, input.provider, accountId, { forceRefresh: input.forceRefresh }).pipe(
+        Effect.map((result) => [accountId, result] as const)
+      ),
+    { concurrency: 4 }
+  );
+  for (const [accountId, result] of fetched) results[accountId] = result;
 
-    if (!account) return { success: false, error: "Account not found" } as const;
-    const result = await fetchQuota(userId, input.provider, account.id, { forceRefresh: input.forceRefresh });
-    return result;
-  } catch (error) {
-    console.error("Failed to fetch provider quota:", error);
-    return { success: false, error: error instanceof Error ? error.message : "Failed to fetch quota data" } as const;
-  }
-}
-
-export async function getAccountQuotas(userId: string, input: AccountQuotaBatchInput) {
-  try {
-    const accountIds = [...new Set(input.accountIds)];
-    const accounts = await db
-      .select(quotaOwnershipColumns)
-      .from(providerAccount)
-      .where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, input.provider), inArray(providerAccount.id, accountIds)));
-
-    const accountById = new Map(accounts.map((account) => [account.id, account]));
-    const results: Record<string, AccountQuotaResult> = {};
-    const accountsToFetch: string[] = [];
-
-    for (const accountId of accountIds) {
-      const account = accountById.get(accountId);
-      if (account) accountsToFetch.push(account.id);
-      else results[accountId] = { success: false, error: "Account not found" };
-    }
-
-    await Promise.all(accountsToFetch.map(async (accountId) => {
-      results[accountId] = await fetchQuota(userId, input.provider, accountId, { forceRefresh: input.forceRefresh });
-    }));
-    return { success: true, data: results } as const;
-  } catch (error) {
-    console.error("Failed to fetch provider quotas:", error);
-    return { success: false, error: error instanceof Error ? error.message : "Failed to fetch quota data" } as const;
-  }
-}
+  return { success: true as const, data: results };
+});

@@ -119,52 +119,33 @@ export function tryReadJson(
   });
 }
 
-export async function writeBytes(path: string, content: Uint8Array): Promise<void> {
-  await Bun.write(path, content);
-}
-
-export async function writeText(path: string, content: string): Promise<void> {
-  await Bun.write(path, encoder.encode(content));
-}
-
-export function tryWriteText(path: string, content: string): Effect.Effect<void, ModelWriteFailure> {
-  return Effect.tryPromise({
-    try: () => writeText(path, content),
-    catch: (cause) => writeFailure(path, cause),
-  });
-}
-
 export function tryWriteBytes(
   path: string,
   content: Uint8Array
 ): Effect.Effect<void, ModelWriteFailure> {
   return Effect.tryPromise({
-    try: () => writeBytes(path, content),
+    try: () => Bun.write(path, content).then(() => undefined),
     catch: (cause) => writeFailure(path, cause),
   });
 }
 
-export async function remove(path: string): Promise<void> {
-  if (!exists(path) || isDirectory(path)) return;
-  try {
-    await Bun.file(path).delete();
-  } catch (cause) {
-    if (isMissing(cause)) return;
-    throw cause;
-  }
+export function tryWriteText(path: string, content: string): Effect.Effect<void, ModelWriteFailure> {
+  return tryWriteBytes(path, encoder.encode(content));
 }
 
 export function tryRemove(path: string): Effect.Effect<void, ModelWriteFailure> {
   return Effect.tryPromise({
-    try: () => remove(path),
+    try: async () => {
+      if (!exists(path) || isDirectory(path)) return;
+      try {
+        await Bun.file(path).delete();
+      } catch (cause) {
+        if (isMissing(cause)) return;
+        throw cause;
+      }
+    },
     catch: (cause) => writeFailure(path, cause),
   });
-}
-
-export async function rename(from: string, to: string): Promise<void> {
-  if (from === to) return;
-  await fsMkdir(dirname(to), { recursive: true });
-  await fsRename(from, to);
 }
 
 export function tryRename(
@@ -172,10 +153,30 @@ export function tryRename(
   to: string
 ): Effect.Effect<void, ModelReadFailure | ModelWriteFailure> {
   return Effect.tryPromise({
-    try: () => rename(from, to),
+    try: async () => {
+      if (from === to) return;
+      await fsMkdir(dirname(to), { recursive: true });
+      await fsRename(from, to);
+    },
     catch: (cause) =>
       isMissing(cause) ? readFailure(from, cause) : writeFailure(from, cause),
   });
+}
+
+export function writeBytes(path: string, content: Uint8Array): Promise<void> {
+  return Effect.runPromise(tryWriteBytes(path, content));
+}
+
+export function writeText(path: string, content: string): Promise<void> {
+  return Effect.runPromise(tryWriteText(path, content));
+}
+
+export function remove(path: string): Promise<void> {
+  return Effect.runPromise(tryRemove(path));
+}
+
+export function rename(from: string, to: string): Promise<void> {
+  return Effect.runPromise(tryRename(from, to));
 }
 
 function listWith(scan: () => Iterable<string>): string[] {

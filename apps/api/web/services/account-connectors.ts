@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 import { and, count as countFn, eq } from "drizzle-orm";
 
 import type { CreateAccountInput } from "@opendum/providers/contract";
@@ -6,7 +7,8 @@ import { db, providerAccount } from "@opendum/database";
 import { publishAccountsChanged } from "#web/events/bus.js";
 import { encrypt, hashString } from "#web/lib/encryption.js";
 import { clearRefreshFailCount } from "#web/lib/proxy/auth.js";
-import { fetchExternal } from "#web/lib/external.js";
+import { fetchExternalEffect } from "#web/lib/external.js";
+import { fromPromise } from "#web/lib/task.js";
 import { getProviderModelMap } from "#web/lib/proxy/models.js";
 import { API_BASE_URL as nvidiaApiBaseUrl } from "#web/lib/providers/nvidia/constants.js";
 import { API_BASE_URL as openRouterApiBaseUrl } from "#web/lib/providers/openrouter/constants.js";
@@ -16,12 +18,11 @@ import { API_BASE_URL as hyperApiBaseUrl } from "#web/lib/providers/hyper/consta
 import { formatProviderHttpError, isLikelyCloudflareChallenge } from "#web/lib/providers/provider-http-errors.js";
 import { getCloudflareValidationUrl } from "#web/lib/providers/cloudflare/constants.js";
 import { API_KEY_PROVIDER_KEYS, type ApiKeyProviderKey } from "@opendum/providers/provider-accounts";
-import type { ActionResult } from "#web/utils/api.js";
+import type { ServiceFailure } from "#web/errors.js";
 
 const API_KEY_PROVIDER_ACCOUNT_EXPIRY = new Date("2100-01-01T00:00:00.000Z");
 const API_KEY_VALIDATION_TIMEOUT_MS = 15000;
 const INTERNAL_RELAY_ERROR_HEADER = "X-Opendum-Internal-Relay-Error";
-
 
 const MODELS_VALIDATION = { validationPath: "/models", requireSuccessfulStatus: true, skipInference: false } as const;
 const CHAT_AUTH_PROBE = { validationPath: "/chat/completions", requireSuccessfulStatus: false, skipInference: true } as const;
@@ -33,6 +34,8 @@ const API_KEY_PROVIDER_SETTINGS = {
   harbor: { label: "Harbor", baseUrl: harborApiBaseUrl, modelMap: getProviderModelMap("harbor"), ...MODELS_VALIDATION },
   hyper: { label: "Charm", baseUrl: hyperApiBaseUrl, modelMap: getProviderModelMap("hyper"), ...CHAT_AUTH_PROBE },
 } satisfies Record<ApiKeyProviderKey, { label: string; baseUrl: string; modelMap: Record<string, string>; validationPath: "/models" | "/chat/completions"; requireSuccessfulStatus: boolean; skipInference?: boolean }>;
+
+type ConnectResult = { email: string; isUpdate: boolean };
 
 function buildValidationRequest(provider: ApiKeyProviderKey, apiKey: string) {
   const { baseUrl, modelMap, validationPath, skipInference } = API_KEY_PROVIDER_SETTINGS[provider];
@@ -54,106 +57,294 @@ function buildValidationRequest(provider: ApiKeyProviderKey, apiKey: string) {
   };
 }
 
-async function validateProviderApiKey(provider: ApiKeyProviderKey, apiKey: string): Promise<ActionResult<void>> {
-  const { label, validationPath, requireSuccessfulStatus } = API_KEY_PROVIDER_SETTINGS[provider];
-  const { validationModel, url, method, headers, body } = buildValidationRequest(provider, apiKey);
-  if (validationPath === "/chat/completions" && !validationModel) return { success: false, error: `${label} API key validation model is not configured.` };
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), API_KEY_VALIDATION_TIMEOUT_MS);
-  try {
-    const response = await fetchExternal(url, { method, headers, body, signal: controller.signal });
-    if (response.headers.get(INTERNAL_RELAY_ERROR_HEADER) === "1") return { success: false, error: `Unable to validate ${label} API key through the proxy. Please try again.` };
-    let responseText = "";
-    if (!response.ok) {
-      try { responseText = await response.text(); } catch { responseText = ""; }
-    }
-    if (isLikelyCloudflareChallenge(response, responseText)) return { success: false, error: formatProviderHttpError(label, response, responseText, { endpointLabel: "API key validation endpoint" }) };
-    if (response.status === 401 || response.status === 403) return { success: false, error: `${label} API key is invalid.` };
-    if (requireSuccessfulStatus && !response.ok) {
-      const normalizedBody = responseText.toLowerCase();
-      if (normalizedBody.includes("authenticate") || normalizedBody.includes("unauthorized") || normalizedBody.includes("invalid api key") || normalizedBody.includes("user not found")) return { success: false, error: `${label} API key is invalid.` };
-      return { success: false, error: `Unable to validate ${label} API key right now (HTTP ${response.status}). Please try again.` };
-    }
-    return { success: true, data: undefined };
-  } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") return { success: false, error: `${label} API key validation timed out. Please try again.` };
-    return { success: false, error: `Unable to validate ${label} API key. Please check your network and try again.` };
-  } finally {
-    clearTimeout(timeout);
-  }
+function failWith(message: string) {
+  return { success: false as const, error: message };
 }
 
-async function connectApiKeyProviderAccount(userId: string, provider: ApiKeyProviderKey, apiKey: string, accountName?: string, platformKey?: string): Promise<ActionResult<{ email: string; isUpdate: boolean }>> {
+const validateProviderApiKey = Effect.fn("accountConnectors.validateApiKey")(function* (
+  provider: ApiKeyProviderKey,
+  apiKey: string
+) {
+  const { label, validationPath, requireSuccessfulStatus } = API_KEY_PROVIDER_SETTINGS[provider];
+  const { validationModel, url, method, headers, body } = buildValidationRequest(provider, apiKey);
+  if (validationPath === "/chat/completions" && !validationModel) {
+    return failWith(`${label} API key validation model is not configured.`);
+  }
+
+  const response = yield* fetchExternalEffect(url, {
+    method,
+    headers,
+    body,
+    signal: AbortSignal.timeout(API_KEY_VALIDATION_TIMEOUT_MS),
+  }).pipe(
+    Effect.catch(() =>
+      Effect.succeed(
+        new Response(null, {
+          status: 599,
+          headers: { [INTERNAL_RELAY_ERROR_HEADER]: "timeout" },
+        })
+      )
+    )
+  );
+  if (response.headers.get(INTERNAL_RELAY_ERROR_HEADER) === "timeout") {
+    return failWith(`${label} API key validation timed out. Please try again.`);
+  }
+  if (response.headers.get(INTERNAL_RELAY_ERROR_HEADER) === "1") {
+    return failWith(`Unable to validate ${label} API key through the proxy. Please try again.`);
+  }
+
+  const responseText = response.ok
+    ? ""
+    : yield* fromPromise(() => response.text().catch(() => ""), "Failed to read provider response");
+
+  if (isLikelyCloudflareChallenge(response, responseText)) {
+    return failWith(
+      formatProviderHttpError(label, response, responseText, { endpointLabel: "API key validation endpoint" })
+    );
+  }
+  if (response.status === 401 || response.status === 403) {
+    return failWith(`${label} API key is invalid.`);
+  }
+  if (requireSuccessfulStatus && !response.ok) {
+    const normalizedBody = responseText.toLowerCase();
+    if (
+      normalizedBody.includes("authenticate") ||
+      normalizedBody.includes("unauthorized") ||
+      normalizedBody.includes("invalid api key") ||
+      normalizedBody.includes("user not found")
+    ) {
+      return failWith(`${label} API key is invalid.`);
+    }
+    return failWith(`Unable to validate ${label} API key right now (HTTP ${response.status}). Please try again.`);
+  }
+  return { success: true as const, data: undefined };
+});
+
+const connectApiKeyProviderAccount = Effect.fn("accountConnectors.connectApiKey")(function* (
+  userId: string,
+  provider: ApiKeyProviderKey,
+  apiKey: string,
+  accountName?: string,
+  platformKey?: string
+) {
   const normalizedApiKey = apiKey.trim();
-  if (!normalizedApiKey) return { success: false, error: "API key is required" };
-  const validationResult = await validateProviderApiKey(provider, normalizedApiKey);
+  if (!normalizedApiKey) return failWith("API key is required");
+  const validationResult = yield* validateProviderApiKey(provider, normalizedApiKey);
   if (!validationResult.success) return validationResult;
 
   const { label } = API_KEY_PROVIDER_SETTINGS[provider];
   const identifier = `${provider}-${hashString(normalizedApiKey).slice(0, 16)}`;
   const normalizedAccountName = accountName?.trim();
   const normalizedPlatformKey = platformKey?.trim() || null;
-  const [existingAccount] = await db.select().from(providerAccount).where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, provider), eq(providerAccount.email, identifier))).limit(1);
+  const existing = yield* fromPromise(
+    () =>
+      db
+        .select()
+        .from(providerAccount)
+        .where(
+          and(
+            eq(providerAccount.userId, userId),
+            eq(providerAccount.provider, provider),
+            eq(providerAccount.email, identifier)
+          )
+        )
+        .limit(1),
+    "Failed to load provider account"
+  );
+  const existingAccount = existing[0];
   if (existingAccount) {
-    await db.update(providerAccount).set({ accessToken: encrypt(normalizedApiKey), refreshToken: encrypt(normalizedApiKey), expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY, ...(normalizedAccountName ? { name: normalizedAccountName } : {}), ...(normalizedPlatformKey ? { accountId: normalizedPlatformKey } : {}), isActive: true, disabledUntil: null }).where(eq(providerAccount.id, existingAccount.id));
-    await clearRefreshFailCount(existingAccount.id);
-    return { success: true, data: { email: identifier, isUpdate: true } };
+    yield* fromPromise(
+      () =>
+        db
+          .update(providerAccount)
+          .set({
+            accessToken: encrypt(normalizedApiKey),
+            refreshToken: encrypt(normalizedApiKey),
+            expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY,
+            ...(normalizedAccountName ? { name: normalizedAccountName } : {}),
+            ...(normalizedPlatformKey ? { accountId: normalizedPlatformKey } : {}),
+            isActive: true,
+            disabledUntil: null,
+          })
+          .where(eq(providerAccount.id, existingAccount.id)),
+      "Failed to update provider account"
+    );
+    yield* clearRefreshFailCount(existingAccount.id);
+    return { success: true as const, data: { email: identifier, isUpdate: true } satisfies ConnectResult };
   }
 
-  const [countResult] = await db.select({ value: countFn() }).from(providerAccount).where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, provider)));
-  await db.insert(providerAccount).values({ userId, provider, name: normalizedAccountName || `${label} ${(countResult?.value ?? 0) + 1}`, accessToken: encrypt(normalizedApiKey), refreshToken: encrypt(normalizedApiKey), expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY, email: identifier, ...(normalizedPlatformKey ? { accountId: normalizedPlatformKey } : {}), isActive: true });
-  return { success: true, data: { email: identifier, isUpdate: false } };
-}
+  const countResult = yield* fromPromise(
+    () =>
+      db
+        .select({ value: countFn() })
+        .from(providerAccount)
+        .where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, provider))),
+    "Failed to count provider accounts"
+  );
+  yield* fromPromise(
+    () =>
+      db.insert(providerAccount).values({
+        userId,
+        provider,
+        name: normalizedAccountName || `${label} ${(countResult[0]?.value ?? 0) + 1}`,
+        accessToken: encrypt(normalizedApiKey),
+        refreshToken: encrypt(normalizedApiKey),
+        expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY,
+        email: identifier,
+        ...(normalizedPlatformKey ? { accountId: normalizedPlatformKey } : {}),
+        isActive: true,
+      }),
+    "Failed to create provider account"
+  );
+  return { success: true as const, data: { email: identifier, isUpdate: false } satisfies ConnectResult };
+});
 
-async function connectCloudflare(userId: string, apiToken: string, cfAccountId: string, accountName?: string): Promise<ActionResult<{ email: string; isUpdate: boolean }>> {
+const connectCloudflare = Effect.fn("accountConnectors.connectCloudflare")(function* (
+  userId: string,
+  apiToken: string,
+  cfAccountId: string,
+  accountName?: string
+) {
   const normalizedApiToken = apiToken.trim();
   const normalizedAccountId = cfAccountId.trim();
-  if (!normalizedApiToken) return { success: false, error: "API token is required" };
-  if (!normalizedAccountId) return { success: false, error: "Cloudflare Account ID is required" };
+  if (!normalizedApiToken) return failWith("API token is required");
+  if (!normalizedAccountId) return failWith("Cloudflare Account ID is required");
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), API_KEY_VALIDATION_TIMEOUT_MS);
-  try {
-    const response = await fetchExternal(getCloudflareValidationUrl(normalizedAccountId), { method: "GET", headers: { Authorization: `Bearer ${normalizedApiToken}`, Accept: "application/json" }, signal: controller.signal });
-    if (response.headers.get(INTERNAL_RELAY_ERROR_HEADER) === "1") return { success: false, error: "Unable to validate Cloudflare credentials through the proxy. Please try again." };
-    if (!response.ok) {
-      const responseText = await response.text().catch(() => "");
-      if (isLikelyCloudflareChallenge(response, responseText)) return { success: false, error: formatProviderHttpError("Cloudflare", response, responseText, { endpointLabel: "credentials validation endpoint" }) };
-      if (response.status === 401 || response.status === 403) return { success: false, error: "Cloudflare API token is invalid." };
-      return { success: false, error: `Unable to validate Cloudflare credentials (HTTP ${response.status}). Please try again.` };
+  const response = yield* fetchExternalEffect(getCloudflareValidationUrl(normalizedAccountId), {
+    method: "GET",
+    headers: { Authorization: `Bearer ${normalizedApiToken}`, Accept: "application/json" },
+    signal: AbortSignal.timeout(API_KEY_VALIDATION_TIMEOUT_MS),
+  }).pipe(
+    Effect.catch(() =>
+      Effect.succeed(
+        new Response(null, {
+          status: 599,
+          headers: { [INTERNAL_RELAY_ERROR_HEADER]: "timeout" },
+        })
+      )
+    )
+  );
+  if (response.headers.get(INTERNAL_RELAY_ERROR_HEADER) === "timeout") {
+    return failWith("Cloudflare validation timed out. Please try again.");
+  }
+  if (response.headers.get(INTERNAL_RELAY_ERROR_HEADER) === "1") {
+    return failWith("Unable to validate Cloudflare credentials through the proxy. Please try again.");
+  }
+  if (!response.ok) {
+    const responseText = yield* fromPromise(
+      () => response.text().catch(() => ""),
+      "Failed to read provider response"
+    );
+    if (isLikelyCloudflareChallenge(response, responseText)) {
+      return failWith(
+        formatProviderHttpError("Cloudflare", response, responseText, {
+          endpointLabel: "credentials validation endpoint",
+        })
+      );
     }
-  } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") return { success: false, error: "Cloudflare validation timed out. Please try again." };
-    return { success: false, error: "Unable to validate Cloudflare credentials. Please check your network and try again." };
-  } finally {
-    clearTimeout(timeout);
+    if (response.status === 401 || response.status === 403) {
+      return failWith("Cloudflare API token is invalid.");
+    }
+    return failWith(`Unable to validate Cloudflare credentials (HTTP ${response.status}). Please try again.`);
   }
 
   const identifier = `workers_ai-${hashString(`${normalizedAccountId}:${normalizedApiToken}`).slice(0, 16)}`;
   const normalizedAccountName = accountName?.trim();
-  const [existingAccount] = await db.select().from(providerAccount).where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, "workers_ai"), eq(providerAccount.email, identifier))).limit(1);
+  const existing = yield* fromPromise(
+    () =>
+      db
+        .select()
+        .from(providerAccount)
+        .where(
+          and(
+            eq(providerAccount.userId, userId),
+            eq(providerAccount.provider, "workers_ai"),
+            eq(providerAccount.email, identifier)
+          )
+        )
+        .limit(1),
+    "Failed to load provider account"
+  );
+  const existingAccount = existing[0];
   if (existingAccount) {
-    await db.update(providerAccount).set({ accessToken: encrypt(normalizedApiToken), refreshToken: encrypt(normalizedApiToken), expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY, accountId: normalizedAccountId, ...(normalizedAccountName ? { name: normalizedAccountName } : {}), isActive: true, disabledUntil: null }).where(eq(providerAccount.id, existingAccount.id));
-    await clearRefreshFailCount(existingAccount.id);
-    return { success: true, data: { email: identifier, isUpdate: true } };
+    yield* fromPromise(
+      () =>
+        db
+          .update(providerAccount)
+          .set({
+            accessToken: encrypt(normalizedApiToken),
+            refreshToken: encrypt(normalizedApiToken),
+            expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY,
+            accountId: normalizedAccountId,
+            ...(normalizedAccountName ? { name: normalizedAccountName } : {}),
+            isActive: true,
+            disabledUntil: null,
+          })
+          .where(eq(providerAccount.id, existingAccount.id)),
+      "Failed to update provider account"
+    );
+    yield* clearRefreshFailCount(existingAccount.id);
+    return { success: true as const, data: { email: identifier, isUpdate: true } satisfies ConnectResult };
   }
 
-  const [countResult] = await db.select({ value: countFn() }).from(providerAccount).where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, "workers_ai")));
-  await db.insert(providerAccount).values({ userId, provider: "workers_ai", name: normalizedAccountName || `Cloudflare ${(countResult?.value ?? 0) + 1}`, accessToken: encrypt(normalizedApiToken), refreshToken: encrypt(normalizedApiToken), expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY, email: identifier, accountId: normalizedAccountId, isActive: true });
-  return { success: true, data: { email: identifier, isUpdate: false } };
-}
+  const countResult = yield* fromPromise(
+    () =>
+      db
+        .select({ value: countFn() })
+        .from(providerAccount)
+        .where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, "workers_ai"))),
+    "Failed to count provider accounts"
+  );
+  yield* fromPromise(
+    () =>
+      db.insert(providerAccount).values({
+        userId,
+        provider: "workers_ai",
+        name: normalizedAccountName || `Cloudflare ${(countResult[0]?.value ?? 0) + 1}`,
+        accessToken: encrypt(normalizedApiToken),
+        refreshToken: encrypt(normalizedApiToken),
+        expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY,
+        email: identifier,
+        accountId: normalizedAccountId,
+        isActive: true,
+      }),
+    "Failed to create provider account"
+  );
+  return { success: true as const, data: { email: identifier, isUpdate: false } satisfies ConnectResult };
+});
 
-const ACCOUNT_CONNECTORS = {
-  ...Object.fromEntries(API_KEY_PROVIDER_KEYS.map((provider) => [provider, (userId: string, input: CreateAccountInput) => connectApiKeyProviderAccount(userId, provider, input.token, input.name, input.platformKey)])),
-  workers_ai: (userId: string, input: CreateAccountInput) => connectCloudflare(userId, input.token, input.cfAccountId ?? "", input.name),
-} as Record<string, (userId: string, input: CreateAccountInput) => Promise<ActionResult<{ email: string; isUpdate: boolean }>>>;
+type Connector = (
+  userId: string,
+  input: CreateAccountInput
+) => Effect.Effect<
+  { success: true; data: ConnectResult } | { success: false; error: string },
+  ServiceFailure
+>;
 
-export async function createAccount(userId: string, input: CreateAccountInput) {
+const ACCOUNT_CONNECTORS: Record<string, Connector> = {
+  ...Object.fromEntries(
+    API_KEY_PROVIDER_KEYS.map((provider) => [
+      provider,
+      (userId: string, input: CreateAccountInput) =>
+        connectApiKeyProviderAccount(userId, provider, input.token, input.name, input.platformKey),
+    ])
+  ),
+  workers_ai: (userId: string, input: CreateAccountInput) =>
+    connectCloudflare(userId, input.token, input.cfAccountId ?? "", input.name),
+};
+
+export const createAccount = Effect.fn("accountConnectors.createAccount")(function* (
+  userId: string,
+  input: CreateAccountInput
+) {
   const connect = ACCOUNT_CONNECTORS[input.provider];
-  if (!connect) return { success: false, error: `${input.provider} does not support direct API-key connection.` } as const;
+  if (!connect) {
+    return failWith(`${input.provider} does not support direct API-key connection.`);
+  }
 
-  const result = await connect(userId, input);
+  const result = yield* connect(userId, input).pipe(
+    Effect.catch((failure) => Effect.succeed(failWith(failure.message)))
+  );
   if (result.success) publishAccountsChanged(userId);
   return result;
-}
+});

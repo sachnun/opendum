@@ -1,3 +1,5 @@
+import { Effect } from "effect";
+
 import { requireSessionFromHeaders } from "./session.js";
 import { roleForEmail, type UserRole } from "./maintainers.js";
 import type { AuthUser } from "#web/lib/claims.js";
@@ -18,16 +20,23 @@ export type ActionResult<T = void> =
   | { success: true; data: T }
   | { success: false; error: string };
 
-async function resolveActor(claims: AuthUser, impersonatedBy: string | null): Promise<AuthUser> {
+export const resolveActor = Effect.fn("resolveActor")(function* (
+  claims: AuthUser,
+  impersonatedBy: string | null
+) {
   if (!impersonatedBy) return claims;
 
-  return (await findUserById(impersonatedBy)) ?? claims;
-}
+  const found = yield* findUserById(impersonatedBy);
+  return found ?? claims;
+});
 
-export async function requireContextFromHeaders(headers: Headers): Promise<RequestContext> {
-  const claims = await requireSessionFromHeaders(headers);
-  const impersonatedBy = claims.impersonatedBy && claims.impersonatedBy !== claims.user.id ? claims.impersonatedBy : null;
-  const actor = await resolveActor(claims.user, impersonatedBy);
+export const requireContextFromHeaders = Effect.fn("requireContextFromHeaders")(function* (
+  headers: Headers
+) {
+  const claims = yield* requireSessionFromHeaders(headers);
+  const impersonatedBy =
+    claims.impersonatedBy && claims.impersonatedBy !== claims.user.id ? claims.impersonatedBy : null;
+  const actor = yield* resolveActor(claims.user, impersonatedBy);
   const role = roleForEmail(actor.email);
   const isMaintainer = role === "maintainer";
 
@@ -38,5 +47,5 @@ export async function requireContextFromHeaders(headers: Headers): Promise<Reque
     userId: claims.user.id,
     auditUser: impersonatedBy ? claims.user : null,
     isAuditMode: Boolean(impersonatedBy),
-  };
-}
+  } satisfies RequestContext;
+});

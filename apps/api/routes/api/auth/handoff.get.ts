@@ -1,5 +1,6 @@
 import { defineHandler } from "nitro";
 import { getQuery, HTTPError } from "h3";
+import { Effect } from "effect";
 
 import { resolveWebOrigin, sanitizeRedirectPath, signInRedirectUrl } from "#web/lib/handoff.js";
 import { getSessionFromEvent, mintAccessToken } from "#web/utils/session.js";
@@ -18,11 +19,13 @@ export default defineHandler(async (event) => {
 
   if (error) return redirectTo(signInRedirectUrl(webOrigin, { error, redirect }));
 
-  const session = await getSessionFromEvent(event).catch(() => null);
+  const session = await Effect.runPromise(
+    getSessionFromEvent(event).pipe(Effect.catch(() => Effect.succeed(null)))
+  );
   const sessionToken = session?.session?.token;
   if (!session?.user?.id || !sessionToken) return redirectTo(signInRedirectUrl(webOrigin, { error: "SessionExpired", redirect }));
 
-  const token = await mintAccessToken(event);
+  const token = await Effect.runPromise(mintAccessToken(event));
   if (!token) return redirectTo(signInRedirectUrl(webOrigin, { error: "SessionExpired", redirect }));
 
   return redirectTo(signInRedirectUrl(webOrigin, { token, session: sessionToken, redirect }));

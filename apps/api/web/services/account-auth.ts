@@ -1,4 +1,5 @@
 import { and, count as countFn, eq } from "drizzle-orm";
+import { Effect } from "effect";
 
 import type { ConnectCodexSessionInput, ExchangeOAuthInput, GetAuthUrlInput, InitiateDeviceAuthInput, PollDeviceAuthInput } from "@opendum/providers/contract";
 import { db, providerAccount } from "@opendum/database";
@@ -15,6 +16,8 @@ import { clearRefreshFailCount } from "#web/lib/proxy/auth.js";
 import type { OAuthResult } from "#web/lib/providers/types.js";
 import type { DeviceProviderKey, OAuthProviderKey } from "@opendum/providers/provider-accounts";
 import type { ActionResult } from "#web/utils/api.js";
+import { fromPromise } from "#web/lib/task.js";
+import { ServiceFailure, badRequest, internal } from "#web/errors.js";
 import { trackProviderEmail } from "./points.js";
 
 const GOOGLE_OAUTH_AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -42,28 +45,28 @@ function buildGoogleOAuthUrl(): string {
   return `${GOOGLE_OAUTH_AUTHORIZE_URL}?${params.toString()}`;
 }
 
-async function buildCodexOAuthUrl(state: string) {
+const buildCodexOAuthUrl = Effect.fn("accountAuth.buildCodexOAuthUrl")(function* (state: string) {
   const codeVerifier = generateCodexCodeVerifier();
-  const codeChallenge = await generateCodexCodeChallenge(codeVerifier);
+  const codeChallenge = yield* generateCodexCodeChallenge(codeVerifier);
   const params = new URLSearchParams({ response_type: "code", client_id: codexClientId, redirect_uri: codexBrowserRedirectUri, scope: codexScope, code_challenge: codeChallenge, code_challenge_method: "S256", id_token_add_organizations: "true", codex_cli_simplified_flow: "true", state, originator: codexOriginator });
   return { authUrl: `${codexAuthorizeEndpoint}?${params.toString()}`, state, codeVerifier };
-}
+});
 
-async function buildKiroOAuthUrl(state: string) {
+const buildKiroOAuthUrl = Effect.fn("accountAuth.buildKiroOAuthUrl")(function* (state: string) {
   const codeVerifier = generateKiroCodeVerifier();
-  return { authUrl: await buildKiroAuthUrl(state, codeVerifier), state, codeVerifier };
-}
+  return { authUrl: yield* buildKiroAuthUrl(state, codeVerifier), state, codeVerifier };
+});
 
 const OAUTH_PROVIDERS: Record<OAuthProviderKey, {
   label: string;
   accountIdPrefix?: string;
   requiresCodeVerifier?: boolean;
-  buildAuthUrl: () => Promise<AuthUrlResult>;
-  exchangeCode: (code: string, codeVerifier?: string | null) => Promise<OAuthResult>;
+  buildAuthUrl: () => Effect.Effect<AuthUrlResult, ServiceFailure>;
+  exchangeCode: (code: string, codeVerifier?: string | null) => Effect.Effect<OAuthResult, ServiceFailure>;
 }> = {
   antigravity: {
     label: "Antigravity",
-    buildAuthUrl: async () => ({ authUrl: buildGoogleOAuthUrl(), state: null, codeVerifier: null }),
+    buildAuthUrl: () => Effect.succeed({ authUrl: buildGoogleOAuthUrl(), state: null, codeVerifier: null }),
     exchangeCode: (code) => antigravityProvider.exchangeCode(code, antigravityRedirectUri),
   },
   codex: {
@@ -83,10 +86,10 @@ const OAUTH_PROVIDERS: Record<OAuthProviderKey, {
   perch: {
     label: "Perch",
     requiresCodeVerifier: true,
-    buildAuthUrl: async () => {
-      const result = await initiatePerchOAuth();
-      return { authUrl: result.authUrl, state: null, codeVerifier: result.codeVerifier };
-    },
+    buildAuthUrl: () =>
+      initiatePerchOAuth().pipe(
+        Effect.map((result) => ({ authUrl: result.authUrl, state: null, codeVerifier: result.codeVerifier }))
+      ),
     exchangeCode: (code, codeVerifier) => exchangePerchOAuthCode(code, codeVerifier ?? ""),
   },
 };
@@ -101,87 +104,123 @@ const DEVICE_PROVIDERS = {
   workbuddy: {
     label: "WorkBuddy",
     emailPrefix: "workbuddy",
-    initiate: async () => {
-      const result = await initiateWorkbuddyDeviceCodeFlow();
-      return {
-        deviceCode: result.deviceCode,
-        userCode: result.userCode,
-        verificationUrl: result.verificationUrl,
-        verificationUrlComplete: result.verificationUrlComplete,
-        expiresIn: result.expiresIn,
-        interval: result.interval,
-      };
-    },
-    poll: async (input: PollDeviceAuthInput) => {
-      return pollWorkbuddyDeviceCodeAuthorization(input.deviceCode);
-    },
+    initiate: () => initiateWorkbuddyDeviceCodeFlow(),
+    poll: (input: PollDeviceAuthInput) => pollWorkbuddyDeviceCodeAuthorization(input.deviceCode),
   },
   cline: {
     label: "Cline",
     emailPrefix: "cline",
-    initiate: async () => {
-      const result = await initiateClineDeviceCodeFlow();
-      return {
-        deviceCode: result.deviceCode,
-        userCode: result.userCode,
-        verificationUrl: result.verificationUrl,
-        verificationUrlComplete: result.verificationUrlComplete,
-        expiresIn: result.expiresIn,
-        interval: result.interval,
-      };
-    },
-    poll: async (input: PollDeviceAuthInput) => {
-      return pollClineDeviceCodeAuthorization(input.deviceCode);
-    },
+    initiate: () => initiateClineDeviceCodeFlow(),
+    poll: (input: PollDeviceAuthInput) => pollClineDeviceCodeAuthorization(input.deviceCode),
   },
-} satisfies Record<DeviceProviderKey, { label: string; emailPrefix: string; initiate: (input: InitiateDeviceAuthInput) => Promise<unknown>; poll: (input: PollDeviceAuthInput) => Promise<unknown> }>;
-
-function parseOAuthCallbackUrl(callbackUrl: string, providerLabel: string): ActionResult<{ code: string; state: string | null }> {
-  if (!callbackUrl || typeof callbackUrl !== "string") return { success: false, error: "Callback URL is required" };
-
-  let url: URL;
-  try {
-    url = new URL(callbackUrl);
-  } catch {
-    return { success: false, error: "Invalid URL format" };
-  }
-
-  const error = url.searchParams.get("error");
-  if (error) return { success: false, error: `${providerLabel} OAuth error: ${url.searchParams.get("error_description") || error}` };
-
-  const code = url.searchParams.get("code");
-  if (!code) return { success: false, error: "No authorization code found in URL. Make sure you copied the complete URL from your browser." };
-  return { success: true, data: { code, state: url.searchParams.get("state") } };
-}
+} satisfies Record<DeviceProviderKey, { label: string; emailPrefix: string; initiate: () => Effect.Effect<unknown, ServiceFailure>; poll: (input: PollDeviceAuthInput) => Effect.Effect<unknown, ServiceFailure> }>;
 
 function encryptOptionalRefreshToken(refreshToken: string | undefined): string {
   return refreshToken ? encrypt(refreshToken) : "";
 }
 
-async function upsertOAuthAccount(userId: string, provider: ProviderAccountKey, label: string, oauthResult: OAuthResult, options: OAuthAccountOptions = {}): Promise<ActionResult<{ email: string; isUpdate: boolean }>> {
+const upsertOAuthAccount = Effect.fn("accountAuth.upsertOAuthAccount")(function* (
+  userId: string,
+  provider: ProviderAccountKey,
+  label: string,
+  oauthResult: OAuthResult,
+  options: OAuthAccountOptions = {}
+) {
   const email = options.email || oauthResult.email || `${provider}-${Date.now()}`;
   const accountId = options.accountId ?? oauthResult.accountId ?? null;
-  const [foundByEmail] = await db.select({ id: providerAccount.id, email: providerAccount.email }).from(providerAccount).where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, provider), eq(providerAccount.email, email))).limit(1);
-  const [foundByAccountId] = !foundByEmail && accountId && options.dedupeByAccountId
-    ? await db.select({ id: providerAccount.id, email: providerAccount.email }).from(providerAccount).where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, provider), eq(providerAccount.accountId, accountId))).limit(1)
-    : [];
-  const existingAccount = foundByEmail ?? foundByAccountId ?? null;
+  const foundByEmail = yield* fromPromise(
+    () =>
+      db
+        .select({ id: providerAccount.id, email: providerAccount.email })
+        .from(providerAccount)
+        .where(
+          and(
+            eq(providerAccount.userId, userId),
+            eq(providerAccount.provider, provider),
+            eq(providerAccount.email, email)
+          )
+        )
+        .limit(1),
+    "Failed to load provider account"
+  );
+  const foundByAccountId =
+    !foundByEmail[0] && accountId && options.dedupeByAccountId
+      ? yield* fromPromise(
+          () =>
+            db
+              .select({ id: providerAccount.id, email: providerAccount.email })
+              .from(providerAccount)
+              .where(
+                and(
+                  eq(providerAccount.userId, userId),
+                  eq(providerAccount.provider, provider),
+                  eq(providerAccount.accountId, accountId)
+                )
+              )
+              .limit(1),
+          "Failed to load provider account"
+        )
+      : [];
+  const existingAccount = foundByEmail[0] ?? foundByAccountId[0] ?? null;
 
   if (existingAccount) {
-    const resolvedEmail = oauthResult.email && email === oauthResult.email ? oauthResult.email : existingAccount.email || email;
-    await db.update(providerAccount).set({ accessToken: encrypt(oauthResult.accessToken), refreshToken: encryptOptionalRefreshToken(oauthResult.refreshToken), expiresAt: oauthResult.expiresAt, email: resolvedEmail, ...(oauthResult.projectId ? { projectId: oauthResult.projectId } : {}), ...(oauthResult.tier ? { tier: oauthResult.tier } : {}), ...(accountId ? { accountId } : {}), isActive: true, disabledUntil: null }).where(eq(providerAccount.id, existingAccount.id));
-    await clearRefreshFailCount(existingAccount.id);
-    await trackProviderEmail(userId, resolvedEmail);
+    const resolvedEmail =
+      oauthResult.email && email === oauthResult.email
+        ? oauthResult.email
+        : existingAccount.email || email;
+    yield* fromPromise(
+      () =>
+        db
+          .update(providerAccount)
+          .set({
+            accessToken: encrypt(oauthResult.accessToken),
+            refreshToken: encryptOptionalRefreshToken(oauthResult.refreshToken),
+            expiresAt: oauthResult.expiresAt,
+            email: resolvedEmail,
+            ...(oauthResult.projectId ? { projectId: oauthResult.projectId } : {}),
+            ...(oauthResult.tier ? { tier: oauthResult.tier } : {}),
+            ...(accountId ? { accountId } : {}),
+            isActive: true,
+            disabledUntil: null,
+          })
+          .where(eq(providerAccount.id, existingAccount.id)),
+      "Failed to update provider account"
+    );
+    yield* clearRefreshFailCount(existingAccount.id);
+    yield* trackProviderEmail(userId, resolvedEmail);
     publishAccountsChanged(userId);
-    return { success: true, data: { email: resolvedEmail, isUpdate: true } };
+    return { email: resolvedEmail, isUpdate: true };
   }
 
-  const [countResult] = await db.select({ value: countFn() }).from(providerAccount).where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, provider)));
-  await db.insert(providerAccount).values({ userId, provider, name: `${label} ${(countResult?.value ?? 0) + 1}`, accessToken: encrypt(oauthResult.accessToken), refreshToken: encryptOptionalRefreshToken(oauthResult.refreshToken), expiresAt: oauthResult.expiresAt, email, projectId: oauthResult.projectId, tier: oauthResult.tier, accountId, isActive: true });
-  await trackProviderEmail(userId, email);
+  const countResult = yield* fromPromise(
+    () =>
+      db
+        .select({ value: countFn() })
+        .from(providerAccount)
+        .where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, provider))),
+    "Failed to count provider accounts"
+  );
+  yield* fromPromise(
+    () =>
+      db.insert(providerAccount).values({
+        userId,
+        provider,
+        name: `${label} ${(countResult[0]?.value ?? 0) + 1}`,
+        accessToken: encrypt(oauthResult.accessToken),
+        refreshToken: encryptOptionalRefreshToken(oauthResult.refreshToken),
+        expiresAt: oauthResult.expiresAt,
+        email,
+        projectId: oauthResult.projectId,
+        tier: oauthResult.tier,
+        accountId,
+        isActive: true,
+      }),
+    "Failed to create provider account"
+  );
+  yield* trackProviderEmail(userId, email);
   publishAccountsChanged(userId);
-  return { success: true, data: { email, isUpdate: false } };
-}
+  return { email, isUpdate: false };
+});
 
 function oauthAccountOptions(provider: OAuthProviderKey, config: (typeof OAUTH_PROVIDERS)[OAuthProviderKey], oauthResult: OAuthResult): OAuthAccountOptions | undefined {
   if (provider === "codex") {
@@ -208,72 +247,127 @@ function oauthAccountOptions(provider: OAuthProviderKey, config: (typeof OAUTH_P
   return { email: accountId ? `${config.accountIdPrefix}-${accountId}` : `${config.accountIdPrefix}-${Date.now()}`, accountId, dedupeByAccountId: true };
 }
 
-function validateOAuthContext(config: (typeof OAUTH_PROVIDERS)[OAuthProviderKey], input: ExchangeOAuthInput, parsedState: string | null): ActionResult<void> | null {
+function validateOAuthContext(config: (typeof OAUTH_PROVIDERS)[OAuthProviderKey], input: ExchangeOAuthInput, parsedState: string | null): ServiceFailure | null {
   if (!config.requiresCodeVerifier) return null;
-  if (parsedState !== input.state) return { success: false, error: "Invalid OAuth state. Please restart authentication." };
-  if (!input.codeVerifier) return { success: false, error: "Missing authentication context. Please restart authentication." };
+  if (parsedState !== input.state) return badRequest("Invalid OAuth state. Please restart authentication.");
+  if (!input.codeVerifier) return badRequest("Missing authentication context. Please restart authentication.");
   return null;
 }
 
-export async function getAccountAuthUrl(input: GetAuthUrlInput) {
+function parseOAuthCallbackUrl(callbackUrl: string, providerLabel: string) {
+  if (!callbackUrl || typeof callbackUrl !== "string") return badRequest("Callback URL is required");
+
+  let url: URL;
   try {
-    return { success: true, data: await OAUTH_PROVIDERS[input.provider].buildAuthUrl() } as const;
-  } catch (error) {
-    console.error("Failed to build provider auth URL:", error);
-    return { success: false, error: error instanceof Error ? error.message : "Failed to build login URL" } as const;
+    url = new URL(callbackUrl);
+  } catch {
+    return badRequest("Invalid URL format");
   }
+
+  const error = url.searchParams.get("error");
+  if (error) {
+    return badRequest(`${providerLabel} OAuth error: ${url.searchParams.get("error_description") || error}`);
+  }
+
+  const code = url.searchParams.get("code");
+  if (!code) {
+    return badRequest("No authorization code found in URL. Make sure you copied the complete URL from your browser.");
+  }
+  return { code, state: url.searchParams.get("state") };
 }
 
-export async function exchangeOAuthAccount(userId: string, input: ExchangeOAuthInput) {
-  try {
-    const config = OAUTH_PROVIDERS[input.provider];
-    const parsedUrl = parseOAuthCallbackUrl(input.callbackUrl, config.label);
-    if (!parsedUrl.success) return parsedUrl;
-    const invalidContext = validateOAuthContext(config, input, parsedUrl.data.state);
-    if (invalidContext) return invalidContext;
+export const getAccountAuthUrl = Effect.fn("accountAuth.getAuthUrl")(function* (input: GetAuthUrlInput) {
+  const config = OAUTH_PROVIDERS[input.provider];
+  const data = yield* config.buildAuthUrl().pipe(
+    Effect.mapError((failure) => internal(failure.message, failure.cause))
+  );
+  return { success: true as const, data };
+});
 
-    const oauthResult = await config.exchangeCode(parsedUrl.data.code, input.codeVerifier);
-    return await upsertOAuthAccount(userId, input.provider, config.label, oauthResult, oauthAccountOptions(input.provider, config, oauthResult));
-  } catch (error) {
-    console.error("Failed to exchange provider OAuth code:", error);
-    return { success: false, error: error instanceof Error ? error.message : "Failed to connect account" } as const;
+export const exchangeOAuthAccount = Effect.fn("accountAuth.exchangeOAuthAccount")(function* (
+  userId: string,
+  input: ExchangeOAuthInput
+) {
+  const config = OAUTH_PROVIDERS[input.provider];
+  const parsed = parseOAuthCallbackUrl(input.callbackUrl, config.label);
+  if (parsed instanceof ServiceFailure) return { success: false as const, error: parsed.message };
+  const invalidContext = validateOAuthContext(config, input, parsed.state);
+  if (invalidContext) return { success: false as const, error: invalidContext.message };
+
+  const oauthResult = yield* config.exchangeCode(parsed.code, input.codeVerifier);
+  const data = yield* upsertOAuthAccount(
+    userId,
+    input.provider,
+    config.label,
+    oauthResult,
+    oauthAccountOptions(input.provider, config, oauthResult)
+  );
+  return { success: true as const, data };
+}) as (
+  userId: string,
+  input: ExchangeOAuthInput
+) => Effect.Effect<ActionResult<{ email: string; isUpdate: boolean }>, ServiceFailure>;
+
+export const connectCodexSessionAccount = Effect.fn("accountAuth.connectCodexSessionAccount")(function* (
+  userId: string,
+  input: ConnectCodexSessionInput
+) {
+  const oauthResult = yield* Effect.try({
+    try: () => buildOAuthResultFromChatGPTSession(input.sessionJson),
+    catch: (cause) => badRequest(cause instanceof Error ? cause.message : "Failed to connect account"),
+  });
+  const data = yield* upsertOAuthAccount(
+    userId,
+    "codex",
+    "Codex",
+    oauthResult,
+    oauthAccountOptions("codex", OAUTH_PROVIDERS.codex, oauthResult)
+  );
+  return { success: true as const, data };
+}) as (
+  userId: string,
+  input: ConnectCodexSessionInput
+) => Effect.Effect<ActionResult<{ email: string; isUpdate: boolean }>, ServiceFailure>;
+
+export const initiateDeviceAuth = Effect.fn("accountAuth.initiateDeviceAuth")(function* (
+  input: InitiateDeviceAuthInput
+) {
+  const config = DEVICE_PROVIDERS[input.provider];
+  const data = yield* config.initiate().pipe(
+    Effect.mapError((failure) => internal(failure.message, failure.cause))
+  );
+  return { success: true as const, data };
+});
+
+export const pollDeviceAuth = Effect.fn("accountAuth.pollDeviceAuth")(function* (
+  userId: string,
+  input: PollDeviceAuthInput
+) {
+  const config = DEVICE_PROVIDERS[input.provider];
+  const result = yield* config.poll(input);
+  if (result && typeof result === "object" && "pending" in result) {
+    return {
+      success: true as const,
+      data: {
+        status: "pending" as const,
+        retryAfterSeconds:
+          "retryAfterSeconds" in result ? (result.retryAfterSeconds as number | undefined) : undefined,
+      },
+    };
   }
-}
-
-export async function connectCodexSessionAccount(userId: string, input: ConnectCodexSessionInput) {
-  try {
-    const oauthResult = buildOAuthResultFromChatGPTSession(input.sessionJson);
-    return await upsertOAuthAccount(userId, "codex", "Codex", oauthResult, oauthAccountOptions("codex", OAUTH_PROVIDERS.codex, oauthResult));
-  } catch (error) {
-    console.error("Failed to connect Codex ChatGPT session:", error);
-    return { success: false, error: error instanceof Error ? error.message : "Failed to connect account" } as const;
+  if (result && typeof result === "object" && "error" in result) {
+    return { success: true as const, data: { status: "error" as const, message: String(result.error) } };
   }
-}
 
-export async function initiateDeviceAuth(input: InitiateDeviceAuthInput) {
-  try {
-    const result = await DEVICE_PROVIDERS[input.provider].initiate();
-    return { success: true, data: result } as const;
-  } catch (error) {
-    console.error("Failed to initiate provider device auth:", error);
-    return { success: false, error: error instanceof Error ? error.message : "Failed to start device login" } as const;
-  }
-}
-
-export async function pollDeviceAuth(userId: string, input: PollDeviceAuthInput) {
-  try {
-    const config = DEVICE_PROVIDERS[input.provider];
-    const result = await config.poll(input);
-    if ("pending" in result) return { success: true, data: { status: "pending" as const, retryAfterSeconds: "retryAfterSeconds" in result ? result.retryAfterSeconds : undefined } } as const;
-    if ("error" in result) return { success: true, data: { status: "error" as const, message: result.error } } as const;
-
-    const provider = input.provider;
-    const email = result.email || `${config.emailPrefix}-${Date.now()}`;
-    const saved = await upsertOAuthAccount(userId, provider, config.label, result, provider === "codex" ? oauthAccountOptions(provider, OAUTH_PROVIDERS.codex, result) : { email });
-    if (!saved.success) return saved;
-    return { success: true, data: { status: "success" as const, ...saved.data } } as const;
-  } catch (error) {
-    console.error("Failed to poll provider device auth:", error);
-    return { success: false, error: error instanceof Error ? error.message : "Failed to connect account" } as const;
-  }
-}
+  const oauthResult = result as OAuthResult;
+  const provider = input.provider;
+  const email = oauthResult.email || `${config.emailPrefix}-${Date.now()}`;
+  const saved = yield* upsertOAuthAccount(
+    userId,
+    provider,
+    config.label,
+    oauthResult,
+    provider === "codex" ? oauthAccountOptions(provider, OAUTH_PROVIDERS.codex, oauthResult) : { email }
+  );
+  return { success: true as const, data: { status: "success" as const, ...saved } };
+});

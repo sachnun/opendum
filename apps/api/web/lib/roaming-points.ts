@@ -1,6 +1,8 @@
 import { and, eq, inArray, ne, sql } from "drizzle-orm";
 
+import { Effect } from "effect";
 import { db, providerAccount, usageLog } from "@opendum/database";
+import { fromPromise } from "./task.js";
 import { MODEL_REGISTRY, resolveModelAlias } from "./proxy/models.js";
 
 export const ROAMING_MINIMUM_POINTS = 1;
@@ -31,11 +33,14 @@ export function roamingPointsForUsage(model: string, usage: RoamingTokenUsage): 
   return Math.max(ROAMING_MINIMUM_POINTS, Math.ceil(points));
 }
 
-export async function roamingUsagePointsByApiKey(userId: string, apiKeyIds: string[]): Promise<Map<string, number>> {
+export const roamingUsagePointsByApiKey = Effect.fn("roamingUsagePointsByApiKey")(function* (
+  userId: string,
+  apiKeyIds: string[]
+) {
   const pointsByKey = new Map<string, number>();
   if (apiKeyIds.length === 0) return pointsByKey;
 
-  const rows = await db
+  const rows = yield* fromPromise(() => db
     .select({
       apiKeyId: usageLog.proxyApiKeyId,
       model: usageLog.model,
@@ -53,7 +58,7 @@ export async function roamingUsagePointsByApiKey(userId: string, apiKeyIds: stri
       sql`${usageLog.statusCode} >= 200`,
       sql`${usageLog.statusCode} < 400`,
     ))
-    .groupBy(usageLog.proxyApiKeyId, usageLog.model);
+    .groupBy(usageLog.proxyApiKeyId, usageLog.model), "Failed to load roaming usage");
 
   for (const row of rows) {
     if (!row.apiKeyId) continue;
@@ -67,4 +72,4 @@ export async function roamingUsagePointsByApiKey(userId: string, apiKeyIds: stri
   }
 
   return pointsByKey;
-}
+});
