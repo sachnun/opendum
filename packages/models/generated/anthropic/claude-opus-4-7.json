@@ -25,7 +25,7 @@
     ]
   },
   "limit": {
-    "context": 1000000,
+    "context": 200000,
     "output": 128000
   },
   "cost": {
@@ -43,7 +43,7 @@
   "providerConfig": {
     "kiro": {
       "upstream": "claude-opus-4.7",
-      "contextWindow": 1000000,
+      "contextWindow": 200000,
       "maxOutputTokens": 128000
     }
   }
