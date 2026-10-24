@@ -9,9 +9,7 @@
   "reasoning": true,
   "reasoning_effort": [
     "low",
-    "medium",
-    "high",
-    "xhigh"
+    "high"
   ],
   "modalities": {
     "input": [
@@ -22,13 +20,13 @@
     ]
   },
   "limit": {
-    "context": 262144,
+    "context": 256000,
     "output": 128000
   },
   "cost": {
-    "input": 0.4125,
-    "output": 1.65,
-    "cacheRead": 0.103125
+    "input": 0.66,
+    "output": 2.64,
+    "cacheRead": 0.165
   },
   "scores": {
     "artificialAnalysis": {
@@ -38,7 +36,7 @@
   },
   "providerConfig": {
     "workbuddy": {
-      "contextWindow": 262144,
+      "contextWindow": 256000,
       "maxOutputTokens": 128000
     }
   }

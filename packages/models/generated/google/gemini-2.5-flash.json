@@ -5,7 +5,7 @@
   "aliases": [
     "gemini-2.5-flash-thinking"
   ],
-  "reasoning": false,
+  "reasoning": true,
   "reasoning_effort": [
     "low",
     "medium",
@@ -13,15 +13,18 @@
   ],
   "modalities": {
     "input": [
+      "audio",
       "image",
-      "text"
+      "pdf",
+      "text",
+      "video"
     ],
     "output": [
       "text"
     ]
   },
   "limit": {
-    "context": 1000000,
+    "context": 1048576,
     "output": 65536
   },
   "cost": {
@@ -38,7 +41,7 @@
   },
   "providerConfig": {
     "antigravity": {
-      "contextWindow": 1000000,
+      "contextWindow": 1048576,
       "maxOutputTokens": 65536
     }
   }

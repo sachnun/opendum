@@ -1,7 +1,8 @@
 {
   "id": "claude-haiku-5-5",
   "providers": [
-    "zenmux"
+    "zenmux",
+    "kiro"
   ],
   "aliases": [
     "anthropic-claude-haiku-5.5",
@@ -44,6 +45,11 @@
     }
   },
   "providerConfig": {
+    "kiro": {
+      "upstream": "claude-haiku-5.5",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 128000
+    },
     "zenmux": {
       "upstream": "anthropic/claude-haiku-5.5",
       "contextWindow": 1000000,

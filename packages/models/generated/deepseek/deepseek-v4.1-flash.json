@@ -28,8 +28,8 @@
     ]
   },
   "limit": {
-    "context": 1048000,
-    "output": 1048000
+    "context": 1000000,
+    "output": 384000
   },
   "cost": {
     "input": 0.05,
@@ -46,8 +46,8 @@
   "providerConfig": {
     "harbor": {
       "upstream": "deepseek-v4.1-flash:free",
-      "contextWindow": 1048000,
-      "maxOutputTokens": 1048000
+      "contextWindow": 1000000,
+      "maxOutputTokens": 384000
     },
     "hyper": {
       "upstream": "deepseek-v4.1-flash-1017",
@@ -61,12 +61,12 @@
     },
     "perch": {
       "upstream": "deepseek-flash-starter",
-      "contextWindow": 1048000,
-      "maxOutputTokens": 1048000
+      "contextWindow": 1000000,
+      "maxOutputTokens": 384000
     },
     "workbuddy": {
-      "contextWindow": 1048000,
-      "maxOutputTokens": 1048000
+      "contextWindow": 1000000,
+      "maxOutputTokens": 384000
     },
     "zenmux": {
       "upstream": "deepseek/deepseek-v4.1-flash",
