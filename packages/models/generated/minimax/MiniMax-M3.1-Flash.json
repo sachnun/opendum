@@ -31,7 +31,7 @@
     ]
   },
   "limit": {
-    "context": 1000000,
+    "context": 1048576,
     "output": 524288
   },
   "cost": {
@@ -48,12 +48,12 @@
   "providerConfig": {
     "nvidia_nim": {
       "upstream": "minimaxai/minimax-m3.1-flash",
-      "contextWindow": 1000000,
+      "contextWindow": 1048576,
       "maxOutputTokens": 524288
     },
     "perch": {
       "upstream": "minimax-m3.1-flash-starter",
-      "contextWindow": 1000000,
+      "contextWindow": 1048576,
       "maxOutputTokens": 524288
     }
   }

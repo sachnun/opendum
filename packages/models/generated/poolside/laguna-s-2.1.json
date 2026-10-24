@@ -29,7 +29,7 @@
   "providerConfig": {
     "cline": {
       "upstream": "poolside/laguna-s-2.1-free",
-      "contextWindow": 1000000,
+      "contextWindow": 1048576,
       "maxOutputTokens": 131072
     },
     "kilo_code": {
@@ -44,7 +44,7 @@
     },
     "perch": {
       "upstream": "laguna-s",
-      "contextWindow": 1000000,
+      "contextWindow": 1048576,
       "maxOutputTokens": 131072
     }
   }

@@ -14,8 +14,7 @@
   "modalities": {
     "input": [
       "image",
-      "text",
-      "video"
+      "text"
     ],
     "output": [
       "text"

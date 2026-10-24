@@ -28,7 +28,7 @@
     "input": 1.25,
     "output": 7.5,
     "cacheRead": 0.125,
-    "cacheWrite": 0.416667
+    "cacheWrite": 0.416665
   },
   "providerConfig": {
     "antigravity": {
