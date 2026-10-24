@@ -26,7 +26,7 @@
   },
   "limit": {
     "context": 1000000,
-    "output": 64000
+    "output": 128000
   },
   "cost": {
     "input": 25,
@@ -44,7 +44,7 @@
     "kiro": {
       "upstream": "claude-opus-4.7",
       "contextWindow": 1000000,
-      "maxOutputTokens": 64000
+      "maxOutputTokens": 128000
     }
   }
 }

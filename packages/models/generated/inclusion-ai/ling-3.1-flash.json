@@ -4,6 +4,8 @@
   ],
   "reasoning": true,
   "reasoning_effort": [
+    "low",
+    "medium",
     "high"
   ],
   "modalities": {
@@ -16,11 +18,11 @@
   },
   "limit": {
     "context": 262144,
-    "output": 235929
+    "output": 32768
   },
   "cost": {
     "input": 0.375,
-    "output": 1.125,
+    "output": 1.1,
     "cacheRead": 0.075
   },
   "scores": {
@@ -33,7 +35,7 @@
     "zenmux": {
       "upstream": "inclusionai/ling-3.1-flash",
       "contextWindow": 262144,
-      "maxOutputTokens": 235929
+      "maxOutputTokens": 32768
     }
   }
 }

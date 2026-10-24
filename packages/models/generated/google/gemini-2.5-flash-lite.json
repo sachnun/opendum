@@ -13,22 +13,21 @@
       "audio",
       "image",
       "pdf",
-      "text",
-      "video"
+      "text"
     ],
     "output": [
       "text"
     ]
   },
   "limit": {
-    "context": 1048576,
-    "output": 65535
+    "context": 1000000,
+    "output": 65536
   },
   "cost": {
     "input": 0.5,
     "output": 2,
     "cacheRead": 0.05,
-    "cacheWrite": 0.416665
+    "cacheWrite": 0.416667
   },
   "scores": {
     "artificialAnalysis": {
@@ -38,8 +37,8 @@
   },
   "providerConfig": {
     "antigravity": {
-      "contextWindow": 1048576,
-      "maxOutputTokens": 65535
+      "contextWindow": 1000000,
+      "maxOutputTokens": 65536
     }
   }
 }
