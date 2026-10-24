@@ -24,9 +24,9 @@
     "output": 64000
   },
   "cost": {
-    "input": 3.35,
-    "output": 10,
-    "cacheRead": 0.17
+    "input": 3.753,
+    "output": 11.2545,
+    "cacheRead": 0.189
   },
   "providerConfig": {
     "workbuddy": {

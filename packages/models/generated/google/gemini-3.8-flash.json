@@ -16,6 +16,7 @@
   ],
   "modalities": {
     "input": [
+      "audio",
       "image",
       "pdf",
       "text"
@@ -25,14 +26,14 @@
     ]
   },
   "limit": {
-    "context": 1048576,
+    "context": 1000000,
     "output": 65536
   },
   "cost": {
     "input": 3.75,
     "output": 18.75,
     "cacheRead": 0.375,
-    "cacheWrite": 0.208333
+    "cacheWrite": 0.2075
   },
   "scores": {
     "artificialAnalysis": {
@@ -43,12 +44,12 @@
   "providerConfig": {
     "antigravity": {
       "upstream": "gemini-3.8-flash-tiered",
-      "contextWindow": 1048576,
+      "contextWindow": 1000000,
       "maxOutputTokens": 65536
     },
     "zenmux": {
       "upstream": "google/gemini-3.8-flash",
-      "contextWindow": 1048576,
+      "contextWindow": 1000000,
       "maxOutputTokens": 65536
     }
   }

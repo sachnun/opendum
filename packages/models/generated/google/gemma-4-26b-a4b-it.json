@@ -30,7 +30,8 @@
   "reasoning_effort": [
     "low",
     "medium",
-    "high"
+    "high",
+    "max"
   ],
   "modalities": {
     "input": [
@@ -59,8 +60,8 @@
     },
     "nvidia_nim": {
       "upstream": "google/gemma-4-31b-it",
-      "contextWindow": 256000,
-      "maxOutputTokens": 16384
+      "contextWindow": 262144,
+      "maxOutputTokens": 32768
     },
     "openrouter": {
       "upstream": "google/gemma-4-26b-a4b-it:free",

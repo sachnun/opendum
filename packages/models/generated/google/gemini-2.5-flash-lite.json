@@ -13,14 +13,15 @@
       "audio",
       "image",
       "pdf",
-      "text"
+      "text",
+      "video"
     ],
     "output": [
       "text"
     ]
   },
   "limit": {
-    "context": 1000000,
+    "context": 1048576,
     "output": 65536
   },
   "cost": {
@@ -37,7 +38,7 @@
   },
   "providerConfig": {
     "antigravity": {
-      "contextWindow": 1000000,
+      "contextWindow": 1048576,
       "maxOutputTokens": 65536
     }
   }

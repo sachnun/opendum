@@ -15,9 +15,11 @@
   ],
   "modalities": {
     "input": [
+      "audio",
       "image",
       "pdf",
-      "text"
+      "text",
+      "video"
     ],
     "output": [
       "text"
@@ -31,7 +33,7 @@
     "input": 3.75,
     "output": 18.75,
     "cacheRead": 0.375,
-    "cacheWrite": 0.208333
+    "cacheWrite": 0.2075
   },
   "scores": {
     "artificialAnalysis": {
