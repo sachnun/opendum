@@ -5,9 +5,9 @@
   ],
   "reasoning": true,
   "reasoning_effort": [
-    "medium",
     "high",
-    "xhigh"
+    "xhigh",
+    "max"
   ],
   "modalities": {
     "input": [
@@ -19,7 +19,7 @@
   },
   "limit": {
     "context": 1000000,
-    "output": 131072
+    "output": 128000
   },
   "cost": {
     "input": 0.1705,
@@ -38,8 +38,8 @@
       "maxOutputTokens": 32768
     },
     "workbuddy": {
-      "contextWindow": 262144,
-      "maxOutputTokens": 131072
+      "contextWindow": 1000000,
+      "maxOutputTokens": 128000
     }
   }
 }

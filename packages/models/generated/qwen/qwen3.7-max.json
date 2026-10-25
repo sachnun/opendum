@@ -6,9 +6,7 @@
   "reasoning_effort": [
     "low",
     "medium",
-    "high",
-    "xhigh",
-    "max"
+    "high"
   ],
   "modalities": {
     "input": [
@@ -26,7 +24,7 @@
     "input": 6.25,
     "output": 18.75,
     "cacheRead": 1.25,
-    "cacheWrite": 9.21875
+    "cacheWrite": 7.8125
   },
   "scores": {
     "artificialAnalysis": {

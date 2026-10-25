@@ -24,8 +24,7 @@
   "cost": {
     "input": 0.109,
     "output": 1.092,
-    "cacheRead": 0.022,
-    "cacheWrite": 0
+    "cacheRead": 0.022
   },
   "providerConfig": {
     "zenmux": {

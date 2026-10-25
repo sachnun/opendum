@@ -14,7 +14,6 @@
   ],
   "modalities": {
     "input": [
-      "image",
       "text"
     ],
     "output": [
@@ -22,12 +21,12 @@
     ]
   },
   "limit": {
-    "context": 163840,
-    "output": 16384
+    "context": 128000,
+    "output": 8000
   },
   "cost": {
-    "input": 1.3,
-    "output": 1.9,
+    "input": 1.4,
+    "output": 2.1,
     "cacheRead": 0.14
   },
   "scores": {
@@ -39,8 +38,8 @@
   "providerConfig": {
     "kiro": {
       "upstream": "deepseek-3.2",
-      "contextWindow": 163840,
-      "maxOutputTokens": 16384
+      "contextWindow": 128000,
+      "maxOutputTokens": 8000
     }
   }
 }

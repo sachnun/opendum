@@ -9,9 +9,7 @@
   "reasoning": true,
   "reasoning_effort": [
     "low",
-    "medium",
-    "high",
-    "xhigh"
+    "high"
   ],
   "modalities": {
     "input": [
@@ -22,7 +20,7 @@
     ]
   },
   "limit": {
-    "context": 262144,
+    "context": 256000,
     "output": 128000
   },
   "cost": {
@@ -38,7 +36,7 @@
   },
   "providerConfig": {
     "workbuddy": {
-      "contextWindow": 262144,
+      "contextWindow": 256000,
       "maxOutputTokens": 128000
     }
   }

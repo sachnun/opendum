@@ -26,7 +26,7 @@
   },
   "limit": {
     "context": 1048576,
-    "output": 1048560
+    "output": 131072
   },
   "cost": {
     "input": 0.375,
@@ -46,8 +46,8 @@
     },
     "nvidia_nim": {
       "upstream": "z-ai/glm-5.3-flash",
-      "contextWindow": 1048560,
-      "maxOutputTokens": 1048560
+      "contextWindow": 1000000,
+      "maxOutputTokens": 128000
     },
     "opencode": {
       "upstream": "glm-5.3-flash-free",
@@ -56,12 +56,12 @@
     },
     "perch": {
       "upstream": "glm-5.3-flash-starter",
-      "contextWindow": 1048560,
-      "maxOutputTokens": 1048560
+      "contextWindow": 1000000,
+      "maxOutputTokens": 128000
     },
     "workbuddy": {
-      "contextWindow": 1048560,
-      "maxOutputTokens": 1048560
+      "contextWindow": 1000000,
+      "maxOutputTokens": 128000
     },
     "zenmux": {
       "upstream": "z-ai/glm-5.3-flash",

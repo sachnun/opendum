@@ -27,8 +27,8 @@
     ]
   },
   "limit": {
-    "context": 1048576,
-    "output": 182520
+    "context": 262144,
+    "output": 262144
   },
   "cost": {
     "input": 2,
@@ -49,8 +49,8 @@
     },
     "nvidia_nim": {
       "upstream": "nvidia/nemotron-3-ultra-550b-a55b",
-      "contextWindow": 1048576,
-      "maxOutputTokens": 128000
+      "contextWindow": 262144,
+      "maxOutputTokens": 262144
     },
     "openrouter": {
       "upstream": "nvidia/nemotron-3-ultra-550b-a55b:free",

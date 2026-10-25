@@ -7,9 +7,7 @@
   "reasoning_effort": [
     "low",
     "medium",
-    "high",
-    "xhigh",
-    "max"
+    "high"
   ],
   "modalities": {
     "input": [
@@ -25,9 +23,9 @@
     "output": 131072
   },
   "cost": {
-    "input": 0.75,
-    "output": 2.35,
-    "cacheRead": 0.08,
+    "input": 0.6,
+    "output": 1.9,
+    "cacheRead": 0.065,
     "cacheWrite": 1
   },
   "providerConfig": {
