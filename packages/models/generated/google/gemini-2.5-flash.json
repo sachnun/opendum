@@ -9,8 +9,7 @@
   "reasoning_effort": [
     "low",
     "medium",
-    "high",
-    "max"
+    "high"
   ],
   "modalities": {
     "input": [
@@ -25,8 +24,8 @@
     ]
   },
   "limit": {
-    "context": 1048576,
-    "output": 65536
+    "context": 1048000,
+    "output": 65535
   },
   "cost": {
     "input": 1.5,
@@ -42,8 +41,8 @@
   },
   "providerConfig": {
     "antigravity": {
-      "contextWindow": 1048576,
-      "maxOutputTokens": 65536
+      "contextWindow": 1048000,
+      "maxOutputTokens": 65535
     }
   }
 }

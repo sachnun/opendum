@@ -5,7 +5,11 @@
   ],
   "reasoning": true,
   "reasoning_effort": [
-    "high"
+    "low",
+    "medium",
+    "high",
+    "xhigh",
+    "max"
   ],
   "modalities": {
     "input": [
@@ -20,7 +24,7 @@
   },
   "limit": {
     "context": 1048576,
-    "output": 131072
+    "output": 65536
   },
   "cost": {
     "input": 0.7,
@@ -37,7 +41,7 @@
     "harbor": {
       "upstream": "mimo-v2.6-flash:free",
       "contextWindow": 1048576,
-      "maxOutputTokens": 131072
+      "maxOutputTokens": 65536
     },
     "opencode": {
       "upstream": "mimo-v2.6-flash-free",
