@@ -19,13 +19,13 @@
     ]
   },
   "limit": {
-    "context": 1000000,
+    "context": 1048575,
     "output": 131072
   },
   "cost": {
-    "input": 0.6,
-    "output": 1.9,
-    "cacheRead": 0.065,
+    "input": 0.75,
+    "output": 2.35,
+    "cacheRead": 0.08,
     "cacheWrite": 1
   },
   "providerConfig": {
@@ -35,7 +35,7 @@
     },
     "zenmux": {
       "upstream": "qwen/qwen3.8-flash",
-      "contextWindow": 1000000,
+      "contextWindow": 1048575,
       "maxOutputTokens": 131072
     }
   }

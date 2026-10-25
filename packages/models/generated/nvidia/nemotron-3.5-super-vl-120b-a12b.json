@@ -34,12 +34,12 @@
   },
   "limit": {
     "context": 1048576,
-    "output": 262144
+    "output": 235929
   },
   "cost": {
     "input": 0.3,
     "output": 1.2,
-    "cacheRead": 0.05
+    "cacheRead": 0.1
   },
   "scores": {
     "artificialAnalysis": {
@@ -50,18 +50,18 @@
   "providerConfig": {
     "cline": {
       "upstream": "cline-free/nemotron-3.5-super-vl",
-      "contextWindow": 262144,
-      "maxOutputTokens": 262144
+      "contextWindow": 1048576,
+      "maxOutputTokens": 8192
     },
     "kilo_code": {
       "upstream": "nvidia/nemotron-3.5-super-vl:free",
-      "contextWindow": 262144,
-      "maxOutputTokens": 235929
+      "contextWindow": 1000000,
+      "maxOutputTokens": 131072
     },
     "nvidia_nim": {
       "upstream": "nvidia/nemotron-3.5-super-vl-120b-a12b",
-      "contextWindow": 262144,
-      "maxOutputTokens": 262144
+      "contextWindow": 1048576,
+      "maxOutputTokens": 8192
     },
     "opencode": {
       "upstream": "nemotron-3.5-super-vl-free",
