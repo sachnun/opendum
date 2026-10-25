@@ -8,6 +8,8 @@
   ],
   "reasoning": true,
   "reasoning_effort": [
+    "low",
+    "medium",
     "high"
   ],
   "modalities": {
@@ -36,7 +38,7 @@
   "providerConfig": {
     "cline": {
       "upstream": "nvidia/nemotron-3.5-lightning-free",
-      "contextWindow": 1000000,
+      "contextWindow": 262144,
       "maxOutputTokens": 65536
     },
     "kilo_code": {
@@ -46,7 +48,7 @@
     },
     "nvidia_nim": {
       "upstream": "nvidia/nemotron-3.5-lightning-30b-a3b",
-      "contextWindow": 1000000,
+      "contextWindow": 262144,
       "maxOutputTokens": 65536
     },
     "opencode": {

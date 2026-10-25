@@ -7,27 +7,24 @@
   "reasoning_effort": [
     "low",
     "medium",
-    "high",
-    "xhigh",
-    "max"
+    "high"
   ],
   "modalities": {
     "input": [
       "image",
-      "text",
-      "video"
+      "text"
     ],
     "output": [
       "text"
     ]
   },
   "limit": {
-    "context": 200000,
-    "output": 32000
+    "context": 262144,
+    "output": 262144
   },
   "cost": {
-    "input": 1.375,
-    "output": 5.5,
+    "input": 3.25,
+    "output": 17.05,
     "cacheRead": 0.75
   },
   "scores": {
@@ -39,12 +36,12 @@
   "providerConfig": {
     "nvidia_nim": {
       "upstream": "moonshotai/kimi-k2.6",
-      "contextWindow": 200000,
-      "maxOutputTokens": 32000
+      "contextWindow": 262144,
+      "maxOutputTokens": 262144
     },
     "workbuddy": {
-      "contextWindow": 200000,
-      "maxOutputTokens": 32000
+      "contextWindow": 262144,
+      "maxOutputTokens": 262144
     }
   }
 }

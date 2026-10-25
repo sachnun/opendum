@@ -5,9 +5,9 @@
   ],
   "reasoning": true,
   "reasoning_effort": [
+    "medium",
     "high",
-    "xhigh",
-    "max"
+    "xhigh"
   ],
   "modalities": {
     "input": [
@@ -24,8 +24,7 @@
   "cost": {
     "input": 0.1705,
     "output": 22,
-    "cacheRead": 0.165,
-    "cacheWrite": 0
+    "cacheRead": 0.165
   },
   "scores": {
     "artificialAnalysis": {
@@ -39,7 +38,7 @@
       "maxOutputTokens": 32768
     },
     "workbuddy": {
-      "contextWindow": 1000000,
+      "contextWindow": 262144,
       "maxOutputTokens": 131072
     }
   }

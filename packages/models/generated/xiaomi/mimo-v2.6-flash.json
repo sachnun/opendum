@@ -24,12 +24,12 @@
   },
   "limit": {
     "context": 1048576,
-    "output": 65536
+    "output": 131072
   },
   "cost": {
-    "input": 0.7,
-    "output": 1.4,
-    "cacheRead": 0.014
+    "input": 0.6,
+    "output": 1.25,
+    "cacheRead": 0.0125
   },
   "scores": {
     "artificialAnalysis": {
@@ -41,7 +41,7 @@
     "harbor": {
       "upstream": "mimo-v2.6-flash:free",
       "contextWindow": 1048576,
-      "maxOutputTokens": 65536
+      "maxOutputTokens": 131072
     },
     "opencode": {
       "upstream": "mimo-v2.6-flash-free",

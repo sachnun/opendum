@@ -23,16 +23,15 @@
   "modalities": {
     "input": [
       "image",
-      "text",
-      "video"
+      "text"
     ],
     "output": [
       "text"
     ]
   },
   "limit": {
-    "context": 1000000,
-    "output": 512000
+    "context": 1048576,
+    "output": 1048576
   },
   "cost": {
     "input": 0.75,
@@ -48,13 +47,13 @@
   "providerConfig": {
     "nvidia_nim": {
       "upstream": "minimaxai/minimax-m3.1-flash",
-      "contextWindow": 1000000,
-      "maxOutputTokens": 512000
+      "contextWindow": 1048576,
+      "maxOutputTokens": 1048576
     },
     "perch": {
       "upstream": "minimax-m3.1-flash-starter",
-      "contextWindow": 1000000,
-      "maxOutputTokens": 512000
+      "contextWindow": 1048576,
+      "maxOutputTokens": 1048576
     }
   }
 }

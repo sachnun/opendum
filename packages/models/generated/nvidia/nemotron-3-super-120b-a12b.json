@@ -34,9 +34,9 @@
     "output": 256000
   },
   "cost": {
-    "input": 1.5,
-    "output": 7.2,
-    "cacheRead": 0.57
+    "input": 0.25,
+    "output": 1.25,
+    "cacheRead": 0.125
   },
   "scores": {
     "artificialAnalysis": {
@@ -52,8 +52,8 @@
     },
     "nvidia_nim": {
       "upstream": "nvidia/nemotron-3-super-120b-a12b",
-      "contextWindow": 65536,
-      "maxOutputTokens": 65536
+      "contextWindow": 262144,
+      "maxOutputTokens": 16384
     },
     "openrouter": {
       "upstream": "nvidia/nemotron-3-super-120b-a12b:free",

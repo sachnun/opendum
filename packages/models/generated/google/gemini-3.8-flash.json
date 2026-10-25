@@ -18,9 +18,7 @@
     "input": [
       "audio",
       "image",
-      "pdf",
-      "text",
-      "video"
+      "text"
     ],
     "output": [
       "text"
@@ -28,7 +26,7 @@
   },
   "limit": {
     "context": 1048576,
-    "output": 128000
+    "output": 1048576
   },
   "cost": {
     "input": 3.75,
@@ -46,12 +44,12 @@
     "antigravity": {
       "upstream": "gemini-3.8-flash-tiered",
       "contextWindow": 1048576,
-      "maxOutputTokens": 128000
+      "maxOutputTokens": 1048576
     },
     "zenmux": {
       "upstream": "google/gemini-3.8-flash",
       "contextWindow": 1048576,
-      "maxOutputTokens": 128000
+      "maxOutputTokens": 1048576
     }
   }
 }

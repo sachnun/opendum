@@ -5,7 +5,11 @@
   ],
   "reasoning": true,
   "reasoning_effort": [
-    "high"
+    "low",
+    "medium",
+    "high",
+    "xhigh",
+    "max"
   ],
   "modalities": {
     "input": [
@@ -20,8 +24,9 @@
     "output": 235929
   },
   "cost": {
-    "input": 0,
-    "output": 0
+    "input": 1.1,
+    "output": 4.5,
+    "cacheRead": 0.055
   },
   "providerConfig": {
     "kilo_code": {
