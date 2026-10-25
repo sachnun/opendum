@@ -11,9 +11,7 @@
   "reasoning": true,
   "reasoning_effort": [
     "low",
-    "medium",
     "high",
-    "xhigh",
     "max"
   ],
   "modalities": {
@@ -27,13 +25,12 @@
   },
   "limit": {
     "context": 1048576,
-    "output": 1048576
+    "output": 131072
   },
   "cost": {
     "input": 1.195,
     "output": 54,
-    "cacheRead": 1.05,
-    "cacheWrite": 18.75
+    "cacheRead": 1.05
   },
   "scores": {
     "artificialAnalysis": {
@@ -48,11 +45,11 @@
     },
     "kiro": {
       "contextWindow": 1048576,
-      "maxOutputTokens": 1048576
+      "maxOutputTokens": 131072
     },
     "workbuddy": {
       "contextWindow": 1048576,
-      "maxOutputTokens": 1048576
+      "maxOutputTokens": 131072
     }
   }
 }

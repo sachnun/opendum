@@ -12,9 +12,7 @@
   "reasoning_effort": [
     "low",
     "medium",
-    "high",
-    "xhigh",
-    "max"
+    "high"
   ],
   "modalities": {
     "input": [
@@ -27,8 +25,8 @@
     ]
   },
   "limit": {
-    "context": 200000,
-    "output": 8192
+    "context": 1000000,
+    "output": 64000
   },
   "cost": {
     "input": 15,
@@ -45,8 +43,8 @@
   "providerConfig": {
     "kiro": {
       "upstream": "claude-sonnet-4.5-1m",
-      "contextWindow": 200000,
-      "maxOutputTokens": 8192
+      "contextWindow": 1000000,
+      "maxOutputTokens": 64000
     }
   }
 }
