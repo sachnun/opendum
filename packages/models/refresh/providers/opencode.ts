@@ -130,17 +130,17 @@ const configOf = (
 const versionTargets = (ctx: SourceContext): ReadonlyArray<VersionTarget> => [
   {
     label: "opencode provider",
-    path: join(ctx.repoRoot, "packages/providers/upstreams/opencode.ts"),
+    path: join(ctx.repoRoot, "packages/providers/upstreams/opencode/index.ts"),
     pattern: /(const USER_AGENT = "opencode\/)(\d+\.\d+\.\d+)(")/,
   },
   {
     label: "opencode provider test",
-    path: join(ctx.repoRoot, "packages/providers/upstreams/opencode.test.ts"),
+    path: join(ctx.repoRoot, "packages/providers/upstreams/opencode/index.test.ts"),
     pattern: /(toBe\("opencode\/)(\d+\.\d+\.\d+)(")/,
   },
   {
     label: "codex provider",
-    path: join(ctx.repoRoot, "packages/providers/upstreams/codex.ts"),
+    path: join(ctx.repoRoot, "packages/providers/upstreams/codex/index.ts"),
     pattern: /(User-Agent": `opencode\/)(\d+\.\d+\.\d+)( \()/,
   },
   {

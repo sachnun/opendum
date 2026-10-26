@@ -4,7 +4,7 @@ import type { Registry } from "@opendum/models/runtime";
 import { CODEX_CLIENT_ID, CODEX_TOKEN_ENDPOINT } from "@opendum/providers/endpoints";
 import type { UpstreamTransport } from "@opendum/providers/core/http";
 import type { ProviderAccount } from "@opendum/providers/types";
-import { CodexProvider, fromResponses } from "@opendum/providers/upstreams/codex";
+import { CodexProvider, fromResponses } from "@opendum/providers/upstreams/codex/index";
 
 const account = { id: "acc-1" } as unknown as ProviderAccount;
 

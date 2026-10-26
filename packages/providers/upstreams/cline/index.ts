@@ -1,9 +1,15 @@
 import { Effect } from "effect";
-import type { Registry } from "@opendum/models/runtime";
+import { OAuth } from "@opendum/providers/core/oauth";
+import { OAuthProvider, type Json, type ProviderOptions } from "@opendum/providers/core/provider";
 import { Value } from "@opendum/providers/core/helpers";
-import { JSONPoster, type UpstreamTransport } from "@opendum/providers/core/http";
-import { OAuthBase } from "@opendum/providers/core/oauth";
-import type { Provider, ProviderFailure, ProviderRequest } from "@opendum/providers/types";
+import { JSONPoster } from "@opendum/providers/core/http";
+import type {
+  ProviderAccount,
+  ProviderFailure,
+  ProviderRequest,
+  RefreshedCredentials,
+  ProviderCredentialFailure,
+} from "@opendum/providers/types";
 
 import { CLINE_BASE_URL } from "@opendum/providers/endpoints";
 
@@ -11,7 +17,6 @@ const CLINE_API_BASE = CLINE_BASE_URL;
 const CLINE_REFRESH_PATH = "/auth/refresh";
 const CLINE_CHAT_PATH = "/chat/completions";
 const ACCESS_TTL_MS = 60 * 60 * 1000;
-const REFRESH_BUFFER_MS = 5 * 60 * 1000;
 
 const CLINE_REQUEST_HEADERS: Record<string, string> = {
   "HTTP-Referer": "https://cline.bot",
@@ -25,21 +30,17 @@ export const SUPPORTED_CLINE = new Set([
   "frequency_penalty", "n", "stop", "seed", "response_format", "reasoning", "reasoning_effort",
 ]);
 
-export type ClineOptions = {
-  registry: Registry;
-  transport: UpstreamTransport;
-};
-
-export class ClineProvider extends OAuthBase implements Provider {
+export class ClineProvider extends OAuthProvider {
   readonly name = "cline";
-  private readonly registry: Registry;
-  private readonly transport: UpstreamTransport;
+  protected readonly refreshBufferMs = 5 * 60 * 1000;
+  private readonly oauth: OAuth;
 
-  constructor(options: ClineOptions) {
-    super({
+  constructor(options: ProviderOptions) {
+    super(options);
+    this.oauth = new OAuth({
       provider: "cline",
       tokenUrl: `${CLINE_API_BASE}${CLINE_REFRESH_PATH}`,
-      transport: options.transport,
+      transport: this.transport,
       request: (refreshToken) => ({
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -58,25 +59,21 @@ export class ClineProvider extends OAuthBase implements Provider {
         };
       },
     });
-    this.registry = options.registry;
-    this.transport = options.transport;
   }
 
-  refreshBuffer(): number {
-    return REFRESH_BUFFER_MS;
+  protected exchange(
+    refreshToken: string,
+    account: ProviderAccount
+  ): Effect.Effect<RefreshedCredentials, ProviderCredentialFailure> {
+    return this.oauth.exchange(refreshToken, account);
   }
 
   makeRequest(request: ProviderRequest): Effect.Effect<Response, ProviderFailure> {
-    const payload: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(request.body)) {
-      if (SUPPORTED_CLINE.has(key) && value !== undefined && value !== null) payload[key] = value;
-    }
-    let model = Value.string(request.body.model);
-    if (model.startsWith("cline/")) model = model.slice("cline/".length);
-    payload.model = this.registry.upstream(model, "cline");
+    const payload: Json = this.filterParams(request.body, SUPPORTED_CLINE);
+    payload.model = this.upstream(Value.string(request.body.model));
     payload.stream = request.stream;
     return JSONPoster.withAuth({
-      provider: "cline",
+      provider: this.name,
       fetchFn: this.transport.direct,
       url: `${CLINE_API_BASE}${CLINE_CHAT_PATH}`,
       bearer: request.credentials,

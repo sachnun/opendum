@@ -4,7 +4,7 @@ import type { Registry } from "@opendum/models/runtime";
 import { CLINE_BASE_URL } from "@opendum/providers/endpoints";
 import type { UpstreamTransport } from "@opendum/providers/core/http";
 import type { ProviderAccount } from "@opendum/providers/types";
-import { ClineProvider } from "@opendum/providers/upstreams/cline";
+import { ClineProvider } from "@opendum/providers/upstreams/cline/index";
 
 const account = { id: "acc-1" } as unknown as ProviderAccount;
 

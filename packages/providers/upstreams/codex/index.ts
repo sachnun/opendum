@@ -1,5 +1,4 @@
 import { Effect } from "effect";
-import type { Registry } from "@opendum/models/runtime";
 import type { OpendumRedis } from "@opendum/core/redis";
 import { Value, Payload, Responses, JSONText } from "@opendum/providers/core/helpers";
 import { Jwt, ModelName } from "@opendum/providers/core/identity";
@@ -12,12 +11,15 @@ import {
   sseStream,
   callId,
 } from "@opendum/providers/transform/responses";
-import { RequestFailure, type UpstreamTransport } from "@opendum/providers/core/http";
-import { OAuthBase } from "@opendum/providers/core/oauth";
+import { RequestFailure } from "@opendum/providers/core/http";
+import { OAuth } from "@opendum/providers/core/oauth";
+import { OAuthProvider, type ProviderOptions } from "@opendum/providers/core/provider";
 import type {
-  Provider,
+  ProviderAccount,
   ProviderFailure,
   ProviderRequest,
+  RefreshedCredentials,
+  ProviderCredentialFailure,
 } from "@opendum/providers/types";
 
 import {
@@ -26,7 +28,6 @@ import {
   CODEX_ORIGINATOR,
   CODEX_TOKEN_ENDPOINT,
 } from "@opendum/providers/endpoints";
-const REFRESH_BUFFER_MS = 5 * 60 * 1000;
 
 export const SUPPORTED_CODEX = new Set([
   "model", "instructions", "store", "input", "stream", "tools", "tool_choice",
@@ -35,6 +36,65 @@ export const SUPPORTED_CODEX = new Set([
 ]);
 
 type Json = Record<string, unknown>;
+
+function buildPayload(body: Json, modelName: string, upstreamStream: boolean): Json {
+  const messages = Array.isArray(body.messages) ? body.messages : [];
+  const payload: Json = { model: modelName, store: false, stream: upstreamStream };
+  const instructions = Value.string(body.instructions);
+  if (instructions) {
+    payload.instructions = instructions;
+  } else {
+    const derived = Payload.instructions(messages);
+    payload.instructions = derived || "You are Codex, an expert coding assistant.";
+  }
+  if (Array.isArray(body._responsesInput) && body._responsesInput.length > 0) {
+    payload.input = inputOf(body._responsesInput);
+  } else {
+    payload.input = toInput(messages);
+  }
+  const tools = toolsFor(body.tools);
+  if (tools.length > 0) {
+    payload.tools = tools;
+    if (body.tool_choice === undefined || body.tool_choice === null) payload.tool_choice = "auto";
+  }
+  if (body.tool_choice !== undefined && body.tool_choice !== null) {
+    payload.tool_choice = Payload.toolChoice(body.tool_choice);
+  }
+  if (body.parallel_tool_calls !== undefined && body.parallel_tool_calls !== null) {
+    payload.parallel_tool_calls = body.parallel_tool_calls;
+  }
+  if (body.reasoning !== null && typeof body.reasoning === "object" && !Array.isArray(body.reasoning)) {
+    payload.reasoning = Payload.clone(body.reasoning as Json);
+  } else {
+    const effort = Value.string(body.reasoning_effort);
+    if (effort) payload.reasoning = { effort };
+  }
+  const reasoning = payload.reasoning;
+  if (
+    reasoning !== null &&
+    typeof reasoning === "object" &&
+    !Array.isArray(reasoning) &&
+    body._includeReasoning === true &&
+    (reasoning as Json).summary === undefined
+  ) {
+    (reasoning as Json).summary = "auto";
+  }
+  let include = Value.strings(body.include);
+  if (body._includeReasoning === true || tools.length > 0) {
+    include.push("reasoning.encrypted_content");
+  }
+  if (include.length > 0) payload.include = Value.unique(include);
+  for (const key of ["previous_response_id", "service_tier"]) {
+    if (body[key] !== undefined && body[key] !== null) payload[key] = body[key];
+  }
+  const sessionId = Value.string(body._sessionId);
+  if (sessionId) {
+    payload.prompt_cache_key = sessionId;
+    payload.client_metadata = { session_id: sessionId };
+  }
+  return Payload.filter(payload, SUPPORTED_CODEX);
+
+}
 
 function claimString(claims: Json, key: string): string {
   return Jwt.claim(claims, key);
@@ -152,22 +212,21 @@ function readQuota(headers: Headers): Json | null {
   return snapshot;
 }
 
-export type CodexOptions = {
-  registry: Registry;
-  transport: UpstreamTransport;
+export type CodexOptions = ProviderOptions & {
   redis?: OpendumRedis | null;
   onAccountId?: (accountId: string) => void;
 };
 
-export class CodexProvider extends OAuthBase implements Provider {
+export class CodexProvider extends OAuthProvider {
   readonly name = "codex";
-  private readonly registry: Registry;
-  private readonly transport: UpstreamTransport;
+  protected readonly refreshBufferMs = 5 * 60 * 1000;
   private readonly redis: OpendumRedis | null;
   private readonly onAccountId: ((accountId: string) => void) | undefined;
+  private readonly oauth: OAuth;
 
   constructor(options: CodexOptions) {
-    super({
+    super(options);
+    this.oauth = new OAuth({
       provider: "codex",
       tokenUrl: CODEX_TOKEN_ENDPOINT,
       transport: options.transport,
@@ -208,14 +267,15 @@ export class CodexProvider extends OAuthBase implements Provider {
         };
       },
     });
-    this.registry = options.registry;
-    this.transport = options.transport;
     this.redis = options.redis ?? null;
     this.onAccountId = options.onAccountId;
   }
 
-  refreshBuffer(): number {
-    return REFRESH_BUFFER_MS;
+  protected exchange(
+    refreshToken: string,
+    account: ProviderAccount
+  ): Effect.Effect<RefreshedCredentials, ProviderCredentialFailure> {
+    return this.oauth.exchange(refreshToken, account);
   }
 
   makeRequest(request: ProviderRequest): Effect.Effect<Response, ProviderFailure> {
@@ -244,7 +304,7 @@ export class CodexProvider extends OAuthBase implements Provider {
       );
     }
 
-    const payload = this.buildPayload(request.body, modelName, true);
+    const payload = buildPayload(request.body, modelName, true);
     const headers: Record<string, string> = {
       Authorization: `Bearer ${request.credentials.trim()}`,
       "Content-Type": "application/json",
@@ -316,64 +376,6 @@ export class CodexProvider extends OAuthBase implements Provider {
       if (upstream) values.add(upstream);
     }
     return [...values].sort((a, b) => a.localeCompare(b));
-  }
-
-  private buildPayload(body: Json, modelName: string, upstreamStream: boolean): Json {
-    const messages = Array.isArray(body.messages) ? body.messages : [];
-    const payload: Json = { model: modelName, store: false, stream: upstreamStream };
-    const instructions = Value.string(body.instructions);
-    if (instructions) {
-      payload.instructions = instructions;
-    } else {
-      const derived = Payload.instructions(messages);
-      payload.instructions = derived || "You are Codex, an expert coding assistant.";
-    }
-    if (Array.isArray(body._responsesInput) && body._responsesInput.length > 0) {
-      payload.input = inputOf(body._responsesInput);
-    } else {
-      payload.input = toInput(messages);
-    }
-    const tools = toolsFor(body.tools);
-    if (tools.length > 0) {
-      payload.tools = tools;
-      if (body.tool_choice === undefined || body.tool_choice === null) payload.tool_choice = "auto";
-    }
-    if (body.tool_choice !== undefined && body.tool_choice !== null) {
-      payload.tool_choice = Payload.toolChoice(body.tool_choice);
-    }
-    if (body.parallel_tool_calls !== undefined && body.parallel_tool_calls !== null) {
-      payload.parallel_tool_calls = body.parallel_tool_calls;
-    }
-    if (body.reasoning !== null && typeof body.reasoning === "object" && !Array.isArray(body.reasoning)) {
-      payload.reasoning = Payload.clone(body.reasoning as Json);
-    } else {
-      const effort = Value.string(body.reasoning_effort);
-      if (effort) payload.reasoning = { effort };
-    }
-    const reasoning = payload.reasoning;
-    if (
-      reasoning !== null &&
-      typeof reasoning === "object" &&
-      !Array.isArray(reasoning) &&
-      body._includeReasoning === true &&
-      (reasoning as Json).summary === undefined
-    ) {
-      (reasoning as Json).summary = "auto";
-    }
-    let include = Value.strings(body.include);
-    if (body._includeReasoning === true || tools.length > 0) {
-      include.push("reasoning.encrypted_content");
-    }
-    if (include.length > 0) payload.include = Value.unique(include);
-    for (const key of ["previous_response_id", "service_tier"]) {
-      if (body[key] !== undefined && body[key] !== null) payload[key] = body[key];
-    }
-    const sessionId = Value.string(body._sessionId);
-    if (sessionId) {
-      payload.prompt_cache_key = sessionId;
-      payload.client_metadata = { session_id: sessionId };
-    }
-    return Payload.filter(payload, SUPPORTED_CODEX);
   }
 
   private resolveModel(model: string): string {

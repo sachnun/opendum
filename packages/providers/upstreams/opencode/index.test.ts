@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
-import { OpencodeProvider } from "@opendum/providers/upstreams/opencode";
+import { OpencodeProvider } from "@opendum/providers/upstreams/opencode/index";
 import type { UpstreamTransport } from "@opendum/providers/core/http";
 import type { ProviderRequest } from "@opendum/providers/types";
 

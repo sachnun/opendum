@@ -1,9 +1,15 @@
 import { Effect } from "effect";
-import type { Registry } from "@opendum/models/runtime";
 import { Responses, Value } from "@opendum/providers/core/helpers";
-import { RequestFailure, type UpstreamTransport } from "@opendum/providers/core/http";
-import { OAuthBase } from "@opendum/providers/core/oauth";
-import type { Provider, ProviderFailure, ProviderRequest } from "@opendum/providers/types";
+import { RequestFailure } from "@opendum/providers/core/http";
+import { OAuth } from "@opendum/providers/core/oauth";
+import { OAuthProvider, type ProviderOptions } from "@opendum/providers/core/provider";
+import type {
+  ProviderAccount,
+  ProviderFailure,
+  ProviderRequest,
+  RefreshedCredentials,
+  ProviderCredentialFailure,
+} from "@opendum/providers/types";
 import { PERCH_APP_URL } from "@opendum/providers/endpoints";
 
 import {
@@ -20,22 +26,15 @@ import {
 import { PerchPayload } from "@opendum/providers/upstreams/perch/payload";
 import { PerchCompletion, PerchStream, sseGenerator } from "@opendum/providers/upstreams/perch/stream";
 
-export type PerchOptions = {
-  registry: Registry;
-  transport: UpstreamTransport;
-};
-
-export class PerchProvider extends OAuthBase implements Provider {
+export class PerchProvider extends OAuthProvider {
   readonly name = "perch";
-
-  private readonly registry: Registry;
-
-  private readonly transport: UpstreamTransport;
-
+  protected readonly refreshBufferMs = REFRESH_BUFFER_MS;
   private readonly auth: PerchAuth;
+  private readonly oauth: OAuth;
 
-  constructor(options: PerchOptions) {
-    super({
+  constructor(options: ProviderOptions) {
+    super(options);
+    this.oauth = new OAuth({
       provider: "perch",
       tokenUrl: async () => {
         const config = await this.auth.config();
@@ -66,13 +65,14 @@ export class PerchProvider extends OAuthBase implements Provider {
         return { accessToken, refreshToken: nextRefresh, expiresAt };
       },
     });
-    this.registry = options.registry;
-    this.transport = options.transport;
     this.auth = new PerchAuth(options.transport);
   }
 
-  refreshBuffer(): number {
-    return REFRESH_BUFFER_MS;
+  protected exchange(
+    refreshToken: string,
+    account: ProviderAccount
+  ): Effect.Effect<RefreshedCredentials, ProviderCredentialFailure> {
+    return this.oauth.exchange(refreshToken, account);
   }
 
   makeRequest(request: ProviderRequest): Effect.Effect<Response, ProviderFailure> {

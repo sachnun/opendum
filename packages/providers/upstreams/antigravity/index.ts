@@ -1,5 +1,4 @@
 import { Duration, Effect } from "effect";
-import type { Registry } from "@opendum/models/runtime";
 import type { OpendumRedis } from "@opendum/core/redis";
 
 import { Value, Payload, Ids, Responses } from "@opendum/providers/core/helpers";
@@ -15,8 +14,9 @@ import {
   GeminiStream,
 } from "@opendum/providers/upstreams/antigravity/transform";
 import { ChatImageInliner } from "@opendum/providers/core/images";
-import { RequestFailure, type UpstreamTransport } from "@opendum/providers/core/http";
-import { OAuthBase } from "@opendum/providers/core/oauth";
+import { RequestFailure } from "@opendum/providers/core/http";
+import { OAuth } from "@opendum/providers/core/oauth";
+import { OAuthProvider } from "@opendum/providers/core/provider";
 import { CodeAssist, type AccountInfo, type AntigravityOptions } from "@opendum/providers/upstreams/antigravity/options";
 import { GeminiModel, GeminiTier } from "@opendum/providers/upstreams/antigravity/model";
 import {
@@ -28,7 +28,13 @@ import {
 import {
   GeminiRequest,
 } from "@opendum/providers/upstreams/antigravity/request";
-import type { Provider, ProviderFailure, ProviderRequest } from "@opendum/providers/types";
+import type {
+  ProviderAccount,
+  ProviderFailure,
+  ProviderRequest,
+  RefreshedCredentials,
+  ProviderCredentialFailure,
+} from "@opendum/providers/types";
 
 import { ANTIGRAVITY_TOKEN_ENDPOINT } from "@opendum/providers/endpoints";
 
@@ -42,11 +48,31 @@ const CLAUDE_BETA_HEADER = "interleaved-thinking-2025-05-14";
 const ANTIGRAVITY_SYSTEM_INSTRUCTION =
   "You are Antigravity, a powerful agentic AI coding assistant designed by the Google Deepmind team working on Advanced Agentic Coding.You are pair programming with a USER to solve their coding task. The task may require creating a new codebase, modifying or debugging an existing codebase, or simply answering a question.**Absolute paths only****Proactiveness**";
 
-export class AntigravityProvider extends OAuthBase implements Provider {
+function normalizeLevel(model: string, level: string): string {
+  const value = level.trim().toLowerCase();
+  switch (value) {
+    case "xhigh":
+      return "high";
+    case "minimal":
+      return model.toLowerCase().includes("pro") ? "low" : "minimal";
+    case "medium": {
+      const lower = model.toLowerCase();
+      if (lower.includes("pro") && !lower.includes("gemini-3.1-pro")) return "high";
+      return "medium";
+    }
+    case "low":
+    case "high":
+      return value;
+    default:
+      return "";
+  }
+}
+
+export class AntigravityProvider extends OAuthProvider {
   readonly name = "antigravity";
-  private readonly registry: Registry;
-  private readonly transport: UpstreamTransport;
+  protected readonly refreshBufferMs = REFRESH_BUFFER_MS;
   private readonly redis: OpendumRedis | null;
+  private readonly oauth: OAuth;
   private readonly persistAccountInfo:
     | ((accountId: string, info: { projectId: string; tier: string; email: string }) => void)
     | undefined;
@@ -72,7 +98,8 @@ export class AntigravityProvider extends OAuthBase implements Provider {
     '{"ideType":"IDE_UNSPECIFIED","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI"}';
 
   constructor(options: AntigravityOptions) {
-    super({
+    super(options);
+    this.oauth = new OAuth({
       provider: "antigravity",
       tokenUrl: OAUTH_TOKEN_ENDPOINT,
       transport: options.transport,
@@ -103,14 +130,15 @@ export class AntigravityProvider extends OAuthBase implements Provider {
         };
       },
     });
-    this.registry = options.registry;
-    this.transport = options.transport;
     this.redis = options.redis ?? null;
     this.persistAccountInfo = options.persistAccountInfo;
   }
 
-  refreshBuffer(): number {
-    return REFRESH_BUFFER_MS;
+  protected exchange(
+    refreshToken: string,
+    account: ProviderAccount
+  ): Effect.Effect<RefreshedCredentials, ProviderCredentialFailure> {
+    return this.oauth.exchange(refreshToken, account);
   }
 
   private setGoogleHeaders(headers: Record<string, string>, accessToken: string, stream: boolean): void {
@@ -437,7 +465,7 @@ export class AntigravityProvider extends OAuthBase implements Provider {
     const thinking = body.thinking;
     if (thinking !== null && typeof thinking === "object" && !Array.isArray(thinking)) {
       const t = thinking as Json;
-      const level = this.normalizeLevel(model, Value.string(t.thinkingLevel));
+      const level = normalizeLevel(model, Value.string(t.thinkingLevel));
       if (level) return level;
       const budget = Value.number(t.budget_tokens);
       if (budget > 0) return this.levelFromBudget(model, budget);
@@ -493,32 +521,12 @@ export class AntigravityProvider extends OAuthBase implements Provider {
       else if (budget <= 16384) effort = "medium";
     }
     const level = this.thinkingLevel(model, effort);
-    return this.normalizeLevel(model, level || effort);
+    return normalizeLevel(model, level || effort);
   }
 
   private levelFromEffort(model: string, effort: string): string {
     const level = this.thinkingLevel(model, effort);
-    return this.normalizeLevel(model, level || effort);
-  }
-
-  private normalizeLevel(model: string, level: string): string {
-    const value = level.trim().toLowerCase();
-    switch (value) {
-      case "xhigh":
-        return "high";
-      case "minimal":
-        return model.toLowerCase().includes("pro") ? "low" : "minimal";
-      case "medium": {
-        const lower = model.toLowerCase();
-        if (lower.includes("pro") && !lower.includes("gemini-3.1-pro")) return "high";
-        return "medium";
-      }
-      case "low":
-      case "high":
-        return value;
-      default:
-        return "";
-    }
+    return normalizeLevel(model, level || effort);
   }
 
   private fitLevel(generation: Json, model: string, level: string): string {
@@ -529,7 +537,7 @@ export class AntigravityProvider extends OAuthBase implements Provider {
     for (const candidate of ["minimal", "low", "medium", "high", "xhigh"]) {
       const budget = budgets[candidate] ?? 0;
       if (budget <= 0 || budget > maxTokens / 2) continue;
-      const normalized = this.normalizeLevel(model, candidate);
+      const normalized = normalizeLevel(model, candidate);
       return normalized || candidate;
     }
     return "";
@@ -544,7 +552,7 @@ export class AntigravityProvider extends OAuthBase implements Provider {
       const budget = Value.number(defaultAny(thinking?.thinkingBudget, thinking?.thinking_budget));
       if (budget > 0) level = this.levelFromBudget(model, budget);
     } else {
-      level = this.normalizeLevel(model, level);
+      level = normalizeLevel(model, level);
     }
     if (!level) level = GeminiModel.levelFromName(model);
     if (!level && GeminiModel.segment(model).toLowerCase().endsWith("-tiered")) level = "medium";

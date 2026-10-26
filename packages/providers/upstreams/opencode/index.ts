@@ -1,5 +1,4 @@
 import { Effect } from "effect";
-import type { Registry } from "@opendum/models/runtime";
 import {
   sseCompletion,
   buildPayload,
@@ -11,6 +10,7 @@ import {
 } from "@opendum/providers/transform/anthropic";
 import { Value, Ids, Responses } from "@opendum/providers/core/helpers";
 import { ModelConfig } from "@opendum/providers/core/model-config";
+import { StaticProvider, type ProviderOptions } from "@opendum/providers/core/provider";
 import {
   EgressPoster,
   FallbackPoster,
@@ -19,10 +19,9 @@ import {
   type FetchLike,
   type Logger,
   type ProviderTransportFailure,
-  type UpstreamTransport,
 } from "@opendum/providers/core/http";
 import type { FallbackState } from "@opendum/providers/core/fallback";
-import type { Provider, ProviderFailure, ProviderRequest } from "@opendum/providers/types";
+import type { ProviderFailure, ProviderRequest } from "@opendum/providers/types";
 
 const CHAT_ENDPOINT = "https://opencode.ai/inference/v1/chat/completions";
 const RESPONSES_ENDPOINT = "https://opencode.ai/inference/v1/responses";
@@ -208,29 +207,21 @@ function responsesTools(body: Json): void {
   body.tools = tools;
 }
 
-export type OpencodeOptions = {
-  registry: Registry;
-  transport: UpstreamTransport;
+export type OpencodeOptions = ProviderOptions & {
   fallback: FallbackState | null;
   logger?: Logger;
 };
 
-export class OpencodeProvider implements Provider {
+export class OpencodeProvider extends StaticProvider {
   readonly name = "opencode";
-  private readonly registry: Registry;
-  private readonly transport: UpstreamTransport;
+  protected readonly authlessMode = true;
   private readonly fallback: FallbackState | null;
   private readonly logger: Logger | undefined;
 
   constructor(options: OpencodeOptions) {
-    this.registry = options.registry;
-    this.transport = options.transport;
+    super(options);
     this.fallback = options.fallback;
     this.logger = options.logger;
-  }
-
-  authless(): boolean {
-    return true;
   }
 
   makeRequest(request: ProviderRequest): Effect.Effect<Response, ProviderFailure> {

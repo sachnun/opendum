@@ -1,11 +1,16 @@
 import { Effect } from "effect";
-import type { Registry } from "@opendum/models/runtime";
 import { Value, Payload, Ids, Responses, JSONText } from "@opendum/providers/core/helpers";
-import { ModelName } from "@opendum/providers/core/identity";
-import { RequestFailure, type UpstreamTransport } from "@opendum/providers/core/http";
-import { OAuthBase } from "@opendum/providers/core/oauth";
+import { RequestFailure } from "@opendum/providers/core/http";
+import { OAuth } from "@opendum/providers/core/oauth";
+import { OAuthProvider, type Json, type ProviderOptions } from "@opendum/providers/core/provider";
 import { Collector } from "@opendum/providers/transform/collector";
-import type { Provider, ProviderFailure, ProviderRequest } from "@opendum/providers/types";
+import type {
+  ProviderAccount,
+  ProviderFailure,
+  ProviderRequest,
+  RefreshedCredentials,
+  ProviderCredentialFailure,
+} from "@opendum/providers/types";
 
 import { WORKBUDDY_BASE_URL, WORKBUDDY_DOMAIN } from "@opendum/providers/endpoints";
 
@@ -16,7 +21,6 @@ const WORKBUDDY_REFRESH_SOURCE = "plugin";
 const WORKBUDDY_DEFAULT_SYSTEM = "You are a helpful assistant.";
 const DEFAULT_MAX_TOKENS = 32768;
 const FALLBACK_TTL = 31536000;
-const REFRESH_BUFFER_MS = 5 * 60 * 1000;
 const WORKBUDDY_IDE_TYPE = "WorkBuddy";
 const WORKBUDDY_IDE_NAME = "WorkBuddy";
 const WORKBUDDY_IDE_VERSION = "5.8.4";
@@ -42,8 +46,6 @@ export const SUPPORTED_WORKBUDDY = new Set([
   "stream_options", "tools", "tool_choice", "parallel_tool_calls", "presence_penalty",
   "frequency_penalty", "n", "stop", "seed", "response_format", "reasoning", "reasoning_effort",
 ]);
-
-type Json = Record<string, unknown>;
 
 function traceHeaders(): Record<string, string> {
   const traceId = Ids.hex(crypto.getRandomValues(new Uint8Array(16)));
@@ -100,18 +102,14 @@ function workbuddyExpiry(expiresAt: number, expiresIn: number): Date {
   return new Date(Date.now() + FALLBACK_TTL * 1000);
 }
 
-export type WorkbuddyOptions = {
-  registry: Registry;
-  transport: UpstreamTransport;
-};
-
-export class WorkbuddyProvider extends OAuthBase implements Provider {
+export class WorkbuddyProvider extends OAuthProvider {
   readonly name = "workbuddy";
-  private readonly registry: Registry;
-  private readonly transport: UpstreamTransport;
+  protected readonly refreshBufferMs = 5 * 60 * 1000;
+  private readonly oauth: OAuth;
 
-  constructor(options: WorkbuddyOptions) {
-    super({
+  constructor(options: ProviderOptions) {
+    super(options);
+    this.oauth = new OAuth({
       provider: "workbuddy",
       tokenUrl: `${WORKBUDDY_API_BASE}${WORKBUDDY_REFRESH_PATH}`,
       transport: options.transport,
@@ -142,12 +140,13 @@ export class WorkbuddyProvider extends OAuthBase implements Provider {
         };
       },
     });
-    this.registry = options.registry;
-    this.transport = options.transport;
   }
 
-  refreshBuffer(): number {
-    return REFRESH_BUFFER_MS;
+  protected exchange(
+    refreshToken: string,
+    account: ProviderAccount
+  ): Effect.Effect<RefreshedCredentials, ProviderCredentialFailure> {
+    return this.oauth.exchange(refreshToken, account);
   }
 
   makeRequest(request: ProviderRequest): Effect.Effect<Response, ProviderFailure> {
@@ -158,21 +157,14 @@ export class WorkbuddyProvider extends OAuthBase implements Provider {
         RequestFailure.transport("workbuddy", new Error("workbuddy account is missing user id, re-authenticate this account"))
       );
     }
-    const payload: Json = {};
-    for (const [key, value] of Object.entries(request.body)) {
-      if (key === "tools" || key === "tool_choice") continue;
-      if (SUPPORTED_WORKBUDDY.has(key) && value !== undefined && value !== null) payload[key] = value;
-    }
+    const payload: Json = this.filterParams(request.body, SUPPORTED_WORKBUDDY, ["tools", "tool_choice"]);
     const tools = normalizeTools(request.body.tools);
     if (tools) {
       payload.tools = tools;
       const toolChoice = request.body.tool_choice;
       if (toolChoice !== undefined && toolChoice !== null) payload.tool_choice = toolChoice;
     }
-    let model = Value.string(request.body.model);
-    if (model.startsWith("workbuddy/")) model = model.slice("workbuddy/".length);
-    let modelName = ModelName.segment(model);
-    modelName = this.registry.upstream(modelName, "workbuddy") || model;
+    const modelName = this.upstream(Value.string(request.body.model));
     const messages = Array.isArray(request.body.messages) ? request.body.messages : [];
     const normalizedMessages = ensureSystem(messages);
     payload.messages = normalizedMessages;

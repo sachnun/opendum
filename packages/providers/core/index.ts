@@ -6,3 +6,4 @@ export * from "@opendum/providers/core/fallback";
 export * from "@opendum/providers/core/images";
 export * from "@opendum/providers/core/model-config";
 export * from "@opendum/providers/core/oauth";
+export * from "@opendum/providers/core/provider";

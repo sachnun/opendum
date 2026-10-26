@@ -1,8 +1,8 @@
 import { Effect } from "effect";
-import type { Registry } from "@opendum/models/runtime";
 import { Value, Ids, Responses } from "@opendum/providers/core/helpers";
-import { RequestFailure, type UpstreamTransport } from "@opendum/providers/core/http";
-import { OAuthBase } from "@opendum/providers/core/oauth";
+import { RequestFailure } from "@opendum/providers/core/http";
+import { OAuth } from "@opendum/providers/core/oauth";
+import { OAuthProvider, type ProviderOptions } from "@opendum/providers/core/provider";
 import { KIRO_REFRESH_ENDPOINT } from "@opendum/providers/endpoints";
 import {
   BracketCalls,
@@ -15,22 +15,22 @@ import {
   Parser,
   type Json,
 } from "@opendum/providers/upstreams/kiro/transform";
-import type { Provider, ProviderFailure, ProviderRequest } from "@opendum/providers/types";
+import type {
+  ProviderAccount,
+  ProviderFailure,
+  ProviderRequest,
+  RefreshedCredentials,
+  ProviderCredentialFailure,
+} from "@opendum/providers/types";
 
-const REFRESH_BUFFER_MS = 5 * 60 * 1000;
-
-export type KiroOptions = {
-  registry: Registry;
-  transport: UpstreamTransport;
-};
-
-export class KiroProvider extends OAuthBase implements Provider {
+export class KiroProvider extends OAuthProvider {
   readonly name = "kiro";
-  private readonly registry: Registry;
-  private readonly transport: UpstreamTransport;
+  protected readonly refreshBufferMs = 5 * 60 * 1000;
+  private readonly oauth: OAuth;
 
-  constructor(options: KiroOptions) {
-    super({
+  constructor(options: ProviderOptions) {
+    super(options);
+    this.oauth = new OAuth({
       provider: "kiro",
       tokenUrl: KIRO_REFRESH_ENDPOINT,
       transport: options.transport,
@@ -49,12 +49,13 @@ export class KiroProvider extends OAuthBase implements Provider {
         return { accessToken, refreshToken: nextRefresh, expiresAt: new Date(Date.now() + expiresIn * 1000), tier };
       },
     });
-    this.registry = options.registry;
-    this.transport = options.transport;
   }
 
-  refreshBuffer(): number {
-    return REFRESH_BUFFER_MS;
+  protected exchange(
+    refreshToken: string,
+    account: ProviderAccount
+  ): Effect.Effect<RefreshedCredentials, ProviderCredentialFailure> {
+    return this.oauth.exchange(refreshToken, account);
   }
 
   private async fetchSubscriptionTier(accessToken: string): Promise<string> {

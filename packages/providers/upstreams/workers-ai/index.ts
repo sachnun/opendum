@@ -1,9 +1,9 @@
 import { Effect } from "effect";
-import type { Registry } from "@opendum/models/runtime";
 import { Value } from "@opendum/providers/core/helpers";
 import { ChatImageInliner } from "@opendum/providers/core/images";
-import { JSONPoster, RequestFailure, type UpstreamTransport } from "@opendum/providers/core/http";
-import type { Provider, ProviderFailure, ProviderRequest } from "@opendum/providers/types";
+import { JSONPoster, RequestFailure } from "@opendum/providers/core/http";
+import { StaticProvider, type Json } from "@opendum/providers/core/provider";
+import type { ProviderFailure, ProviderRequest } from "@opendum/providers/types";
 
 export const SUPPORTED_WORKERS_AI = new Set([
   "model", "messages", "audio", "temperature", "top_p", "max_tokens", "max_completion_tokens",
@@ -13,20 +13,8 @@ export const SUPPORTED_WORKERS_AI = new Set([
   "logprobs", "top_logprobs", "store", "service_tier", "user", "web_search_options", "n",
 ]);
 
-export type WorkersAiOptions = {
-  registry: Registry;
-  transport: UpstreamTransport;
-};
-
-export class WorkersAiProvider implements Provider {
+export class WorkersAiProvider extends StaticProvider {
   readonly name = "workers_ai";
-  private readonly registry: Registry;
-  private readonly transport: UpstreamTransport;
-
-  constructor(options: WorkersAiOptions) {
-    this.registry = options.registry;
-    this.transport = options.transport;
-  }
 
   makeRequest(request: ProviderRequest): Effect.Effect<Response, ProviderFailure> {
     const accountId = request.account.accountId;
@@ -35,12 +23,8 @@ export class WorkersAiProvider implements Provider {
         RequestFailure.transport("workers_ai", new Error("missing Cloudflare Account ID on Cloudflare account"))
       );
     }
-    const payload: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(request.body)) {
-      if (SUPPORTED_WORKERS_AI.has(key) && value !== undefined && value !== null) payload[key] = value;
-    }
-    const model = Value.string(request.body.model);
-    payload.model = this.registry.upstream(model, "workers_ai");
+    const payload: Json = this.filterParams(request.body, SUPPORTED_WORKERS_AI);
+    payload.model = this.upstream(Value.string(request.body.model));
     payload.stream = request.stream;
     const url = `https://api.cloudflare.com/client/v4/accounts/${accountId.trim()}/ai/v1/chat/completions`;
     const direct = this.transport.direct;

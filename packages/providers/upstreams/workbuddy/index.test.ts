@@ -4,7 +4,7 @@ import type { Registry } from "@opendum/models/runtime";
 import { WORKBUDDY_BASE_URL, WORKBUDDY_DOMAIN } from "@opendum/providers/endpoints";
 import type { UpstreamTransport } from "@opendum/providers/core/http";
 import type { ProviderAccount } from "@opendum/providers/types";
-import { WorkbuddyProvider, fromStream } from "@opendum/providers/upstreams/workbuddy";
+import { WorkbuddyProvider, fromStream } from "@opendum/providers/upstreams/workbuddy/index";
 
 const account = { id: "acc-1" } as unknown as ProviderAccount;
 const FALLBACK_TTL_MS = 31536000 * 1000;

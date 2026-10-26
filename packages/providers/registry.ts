@@ -2,15 +2,15 @@ import type { Registry } from "@opendum/models/runtime";
 import type { OpendumRedis } from "@opendum/core/redis";
 import { Transport, type EgressFetch, type Logger } from "@opendum/providers/core/http";
 import type { FallbackState } from "@opendum/providers/core/fallback";
-import { CompatProvider, SUPPORTED_HARBOR, SUPPORTED_HYPER, SUPPORTED_KILO, SUPPORTED_NVIDIA, SUPPORTED_OPENROUTER, SUPPORTED_ZENMUX } from "@opendum/providers/upstreams/openai-compatible";
-import { OpencodeProvider } from "@opendum/providers/upstreams/opencode";
-import { ClineProvider } from "@opendum/providers/upstreams/cline";
-import { WorkbuddyProvider } from "@opendum/providers/upstreams/workbuddy";
+import { CompatProvider, SUPPORTED_HARBOR, SUPPORTED_HYPER, SUPPORTED_KILO, SUPPORTED_NVIDIA, SUPPORTED_OPENROUTER, SUPPORTED_ZENMUX } from "@opendum/providers/upstreams/compat/index";
+import { OpencodeProvider } from "@opendum/providers/upstreams/opencode/index";
+import { ClineProvider } from "@opendum/providers/upstreams/cline/index";
+import { WorkbuddyProvider } from "@opendum/providers/upstreams/workbuddy/index";
 import { PerchProvider } from "@opendum/providers/upstreams/perch/index";
-import { CodexProvider } from "@opendum/providers/upstreams/codex";
+import { CodexProvider } from "@opendum/providers/upstreams/codex/index";
 import { KiroProvider } from "@opendum/providers/upstreams/kiro/index";
 import { AntigravityProvider } from "@opendum/providers/upstreams/antigravity/index";
-import { WorkersAiProvider } from "@opendum/providers/upstreams/workers-ai";
+import { WorkersAiProvider } from "@opendum/providers/upstreams/workers-ai/index";
 import type { AuthlessProvider, CredentialRefresher, Provider } from "@opendum/providers/types";
 
 export type ProviderRegistryOptions = {

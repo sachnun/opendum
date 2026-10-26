@@ -20,7 +20,8 @@ import {
   type ProviderTransportFailure,
   type UpstreamTransport,
 } from "@opendum/providers/core/http";
-import type { Provider, ProviderAccount, ProviderFailure, ProviderRequest } from "@opendum/providers/types";
+import { BaseProvider } from "@opendum/providers/core/provider";
+import type { ProviderAccount, ProviderFailure, ProviderRequest } from "@opendum/providers/types";
 
 export const SUPPORTED_ZENMUX = new Set([
   "model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream",
@@ -75,13 +76,11 @@ export type CompatOptions = {
   logger?: Logger;
 };
 
-export class CompatProvider implements Provider, ResponsesNativeProvider {
+export class CompatProvider extends BaseProvider implements ResponsesNativeProvider {
   readonly name: string;
   private readonly baseUrl: string;
   private readonly fallbackBaseUrl: string;
   private readonly supportedParams: Set<string>;
-  private readonly registry: Registry | null;
-  private readonly transport: UpstreamTransport;
   private readonly fallback: FallbackState | null;
   private readonly trimPrefix: string;
   private readonly extraHeaders: Record<string, string> | undefined;
@@ -91,12 +90,11 @@ export class CompatProvider implements Provider, ResponsesNativeProvider {
   private readonly logger: Logger | undefined;
 
   constructor(options: CompatOptions) {
+    super({ registry: options.registry, transport: options.transport });
     this.name = options.name;
     this.baseUrl = options.baseUrl;
     this.fallbackBaseUrl = options.fallbackBaseUrl ?? "";
     this.supportedParams = options.supportedParams;
-    this.registry = options.registry;
-    this.transport = options.transport;
     this.fallback = options.fallback;
     this.trimPrefix = options.trimPrefix ?? "";
     this.extraHeaders = options.extraHeaders;
@@ -210,12 +208,7 @@ export class CompatProvider implements Provider, ResponsesNativeProvider {
   }
 
   private buildPayload(body: Json, model: string, modelName: string, stream: boolean): Json {
-    const payload: Json = {};
-    for (const [key, value] of Object.entries(body)) {
-      if (this.supportedParams.has(key) && value !== undefined && value !== null) {
-        payload[key] = value;
-      }
-    }
+    const payload: Json = this.filterParams(body, this.supportedParams);
     if (this.flagBool(model, "top_p_deprecated")) delete payload.top_p;
     payload.model = modelName;
     payload.stream = stream;

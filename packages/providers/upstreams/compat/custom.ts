@@ -1,5 +1,5 @@
 import type { FallbackState } from "@opendum/providers/core/fallback";
-import { CompatProvider } from "@opendum/providers/upstreams/openai-compatible";
+import { CompatProvider } from "@opendum/providers/upstreams/compat/index";
 import type { Logger, UpstreamTransport } from "@opendum/providers/core/http";
 import type { Provider } from "@opendum/providers/types";
 
