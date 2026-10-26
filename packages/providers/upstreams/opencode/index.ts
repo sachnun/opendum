@@ -367,11 +367,3 @@ export class OpencodeProvider extends StaticProvider {
     });
   }
 }
-
-export function fallbackUrls(): { chat: string; responses: string } {
-  return { chat: FALLBACK_CHAT_ENDPOINT, responses: FALLBACK_RESPONSES_ENDPOINT };
-}
-
-export function defaultValue(value: unknown, fallback: string): string {
-  return Value.stringOr(value, fallback);
-}

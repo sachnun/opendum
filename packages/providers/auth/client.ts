@@ -1,9 +1,8 @@
 import { Effect } from "effect";
 
 import type { AuthFailure } from "@opendum/providers/auth/failure";
-import type { ExternalInit } from "@opendum/providers/auth/external";
 import { ProviderResponse } from "@opendum/providers/auth/response";
-import type { AuthRuntime } from "@opendum/providers/auth/runtime";
+import type { AuthRuntime, ExternalInit } from "@opendum/providers/auth/runtime";
 
 export type OAuthSpec = {
   readonly provider: string;

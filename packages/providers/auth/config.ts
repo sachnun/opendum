@@ -5,7 +5,6 @@ import {
   PROVIDER_ACCOUNT_DEFINITIONS,
   type DeviceProviderKey,
   type AuthProvider,
-  type ProviderAccountKey,
   type AuthMethodKey,
 } from "@opendum/providers/provider-accounts";
 
@@ -85,9 +84,6 @@ export function isDevice(provider: Provider): provider is DeviceProviderKey {
 }
 
 export function callbackPlaceholder(providerKey: Provider | null) {
-  if (providerKey && providerKey in BY_KEY) {
-    const definition = BY_KEY[providerKey as ProviderAccountKey];
-    if (definition.callbackPlaceholder) return definition.callbackPlaceholder;
-  }
-  return "http://localhost:1/oauth2callback?code=...";
+  const definition = providerKey ? BY_KEY[providerKey] : undefined;
+  return definition?.callbackPlaceholder ?? "http://localhost:1/oauth2callback?code=...";
 }

@@ -36,7 +36,7 @@ import type {
   ProviderCredentialFailure,
 } from "@opendum/providers/types";
 
-import { ANTIGRAVITY_TOKEN_ENDPOINT } from "@opendum/providers/endpoints";
+import { ANTIGRAVITY_TOKEN_ENDPOINT } from "@opendum/providers/auth/antigravity/constants";
 
 const OAUTH_TOKEN_ENDPOINT = ANTIGRAVITY_TOKEN_ENDPOINT;
 const REFRESH_BUFFER_MS = 60 * 60 * 1000;

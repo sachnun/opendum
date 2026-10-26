@@ -12,7 +12,7 @@ import type {
   ProviderCredentialFailure,
 } from "@opendum/providers/types";
 
-import { WORKBUDDY_BASE_URL, WORKBUDDY_DOMAIN } from "@opendum/providers/endpoints";
+import { WORKBUDDY_BASE_URL, WORKBUDDY_DOMAIN } from "@opendum/providers/auth/workbuddy/constants";
 
 const WORKBUDDY_API_BASE = WORKBUDDY_BASE_URL;
 const WORKBUDDY_CHAT_PATH = "/v2/chat/completions";

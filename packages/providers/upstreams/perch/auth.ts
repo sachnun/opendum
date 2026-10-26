@@ -2,7 +2,7 @@ import { Ids, Value } from "@opendum/providers/core/helpers";
 import type { Registry } from "@opendum/models/runtime";
 import type { ProviderAccount } from "@opendum/providers/types";
 import type { UpstreamTransport } from "@opendum/providers/core/http";
-import { PERCH_ACCOUNT_PATH, PERCH_APP_URL, PERCH_CONFIG_PATH } from "@opendum/providers/endpoints";
+import { PERCH_ACCOUNT_PATH, PERCH_APP_URL, PERCH_CONFIG_PATH } from "@opendum/providers/auth/perch/constants";
 
 export type Json = Record<string, unknown>;
 

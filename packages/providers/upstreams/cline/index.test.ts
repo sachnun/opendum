@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
-import { CLINE_BASE_URL } from "@opendum/providers/endpoints";
+import { CLINE_BASE_URL } from "@opendum/providers/auth/cline/constants";
 import type { UpstreamTransport } from "@opendum/providers/core/http";
 import type { ProviderAccount } from "@opendum/providers/types";
 import { ClineProvider } from "@opendum/providers/upstreams/cline/index";

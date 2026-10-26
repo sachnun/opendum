@@ -11,7 +11,7 @@ import type {
   ProviderCredentialFailure,
 } from "@opendum/providers/types";
 
-import { CLINE_BASE_URL } from "@opendum/providers/endpoints";
+import { CLINE_BASE_URL } from "@opendum/providers/auth/cline/constants";
 
 const CLINE_API_BASE = CLINE_BASE_URL;
 const CLINE_REFRESH_PATH = "/auth/refresh";

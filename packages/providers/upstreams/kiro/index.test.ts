@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
-import { KIRO_REFRESH_ENDPOINT } from "@opendum/providers/endpoints";
+import { REFRESH_ENDPOINT as KIRO_REFRESH_ENDPOINT } from "@opendum/providers/auth/kiro/constants";
 import type { UpstreamTransport } from "@opendum/providers/core/http";
 import type { ProviderAccount } from "@opendum/providers/types";
 import { KiroProvider } from "@opendum/providers/upstreams/kiro/index";

@@ -62,6 +62,11 @@ const FORM_HEADERS = {
   Accept: "application/json",
 };
 
+const JSON_HEADERS = {
+  "Content-Type": "application/json",
+  Accept: "application/json",
+};
+
 function pickToken(payload: unknown): CodexTokenResponse | null {
   const value = payload as Partial<CodexTokenResponse> | null;
   if (!value || typeof value.access_token !== "string" || !value.access_token) return null;
@@ -330,22 +335,18 @@ export function codexAuth(runtime: AuthRuntime) {
   };
 
   const startDeviceFlow = Effect.fn("codex.initiateDeviceCodeFlow")(function* () {
-    const result = yield* runtime.fetch(DEVICE_CODE_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        "User-Agent": USER_AGENT,
+    const data = yield* client.decode<DeviceCodeResponse>(
+      {
+        url: DEVICE_CODE_ENDPOINT,
+        endpoint: "device code endpoint",
+        init: {
+          method: "POST",
+          headers: { ...JSON_HEADERS, "User-Agent": USER_AGENT },
+          body: JSON.stringify({ client_id: CLIENT_ID }),
+        },
       },
-      body: JSON.stringify({ client_id: CLIENT_ID }),
-    });
-
-    if (!result.ok) {
-      const error = yield* response.text(result);
-      return yield* runtime.unavailable(response.failure(result, error, "device code endpoint"));
-    }
-
-    const data = yield* response.json<DeviceCodeResponse>(result);
+      (payload) => (payload as DeviceCodeResponse | null) ?? null
+    );
     return {
       deviceCode: data.device_auth_id,
       userCode: data.user_code,

@@ -22,12 +22,7 @@ import type {
   ProviderCredentialFailure,
 } from "@opendum/providers/types";
 
-import {
-  CODEX_BASE_URL,
-  CODEX_CLIENT_ID,
-  CODEX_ORIGINATOR,
-  CODEX_TOKEN_ENDPOINT,
-} from "@opendum/providers/endpoints";
+import { CLIENT_ID as CODEX_CLIENT_ID, CODEX_BASE_URL, ORIGINATOR as CODEX_ORIGINATOR, TOKEN_ENDPOINT as CODEX_TOKEN_ENDPOINT } from "@opendum/providers/auth/codex/constants";
 
 export const SUPPORTED_CODEX = new Set([
   "model", "instructions", "store", "input", "stream", "tools", "tool_choice",

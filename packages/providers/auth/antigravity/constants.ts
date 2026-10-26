@@ -40,4 +40,21 @@ export const AUTH_HEADERS = {
 
 export const REFRESH_BUFFER_SECONDS = 60 * 60;
 
-export { ANTIGRAVITY_PROJECT_ID as DEFAULT_PROJECT_ID } from "@opendum/providers/endpoints";
+export const ANTIGRAVITY_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
+export const ANTIGRAVITY_PROJECT_ID = "bamboo-precept-lgxtn";
+
+export const DEFAULT_PROJECT_ID = ANTIGRAVITY_PROJECT_ID;
+
+export const PROVIDER = {
+  spec: {
+    key: "antigravity" as const,
+    slug: "antigravity",
+    label: "Antigravity",
+    category: "oauth" as const,
+    showTier: true,
+    authMethods: ["oauth_redirect"] as const,
+    supportsQuota: true,
+    displayOrder: 0,
+    navOrder: 0,
+  },
+};

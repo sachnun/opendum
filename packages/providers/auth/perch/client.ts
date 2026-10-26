@@ -151,19 +151,21 @@ export function perchAuth(runtime: AuthRuntime) {
     codeVerifier: string
   ) {
     const config = yield* authConfig();
-    const result = yield* runtime.fetch(`${supabaseUrl(config)}${PERCH_TOKEN_PATH}?grant_type=pkce`, {
-      method: "POST",
-      headers: authHeaders(config),
-      body: JSON.stringify({ auth_code: code, code_verifier: codeVerifier }),
-      cache: "no-store",
-    });
-    if (!result.ok) {
-      const body = yield* response.text(result);
-      return yield* runtime.unavailable(response.failure(result, body, "token exchange endpoint"));
-    }
-    const tokens = yield* response.jsonOr<PerchTokenResponse>(result, {});
+    const tokens = yield* client.decode<PerchTokenResponse>(
+      {
+        url: `${supabaseUrl(config)}${PERCH_TOKEN_PATH}?grant_type=pkce`,
+        endpoint: "token exchange endpoint",
+        init: {
+          method: "POST",
+          headers: authHeaders(config),
+          body: JSON.stringify({ auth_code: code, code_verifier: codeVerifier }),
+          cache: "no-store",
+        },
+      },
+      (payload) => (payload as PerchTokenResponse | null) ?? null
+    );
     if (!tokens.access_token) {
-      return yield* runtime.unavailable("Perch token exchange returned an incomplete session.");
+      return yield* Effect.fail(client.fail("Perch token exchange returned an incomplete session."));
     }
     yield* ensureSession(tokens.access_token);
     const expiresAt =

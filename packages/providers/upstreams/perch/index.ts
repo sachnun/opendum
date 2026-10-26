@@ -10,7 +10,7 @@ import type {
   RefreshedCredentials,
   ProviderCredentialFailure,
 } from "@opendum/providers/types";
-import { PERCH_APP_URL } from "@opendum/providers/endpoints";
+import { PERCH_APP_URL } from "@opendum/providers/auth/perch/constants";
 
 import {
   ACCESS_TTL_MS,
