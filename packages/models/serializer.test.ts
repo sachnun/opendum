@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import type { ModelInfo } from "./registry.ts";
-import { Serializer } from "./serializer.ts";
+import type { ModelInfo } from "@opendum/models/registry";
+import { Serializer } from "@opendum/models/serializer";
 
 function serializerOf(models: Record<string, ModelInfo>): Serializer {
   return new Serializer({

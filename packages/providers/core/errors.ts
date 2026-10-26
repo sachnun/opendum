@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import { Effect, Schema } from "effect";
 
 const OptionalString = Schema.optional(Schema.String);
 const OptionalNumber = Schema.optional(Schema.Number);
@@ -77,4 +77,8 @@ export function failureMessage(cause: unknown): string {
 
 export function asError(cause: unknown): Error {
   return cause instanceof Error ? cause : new Error(failureMessage(cause));
+}
+
+export function raise(error: Error): never {
+  return Effect.runSync(Effect.die(error));
 }

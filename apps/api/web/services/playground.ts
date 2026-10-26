@@ -2,14 +2,14 @@ import { Effect } from "effect";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 
 import { db, disabledModel, providerAccount, accountDisabledModel } from "@opendum/database";
-import { fromPromise } from "#web/lib/task.js";
-import { internal } from "#web/errors.js";
-import { modelAvailability, usable } from "#web/lib/proxy/auth.js";
-import { authlessAccounts } from "#web/lib/proxy/authless-providers.js";
-import { MODEL_REGISTRY, allModels, familyOf, providersFor, aliasOf } from "#web/lib/proxy/models.js";
+import { fromPromise } from "@opendum/api/web/lib/task";
+import { internal } from "@opendum/api/web/errors";
+import { modelAvailability, usable } from "@opendum/api/web/lib/proxy/auth";
+import { authlessAccounts } from "@opendum/api/web/lib/proxy/authless-providers";
+import { MODEL_REGISTRY, allModels, familyOf, providersFor, aliasOf } from "@opendum/api/web/lib/proxy/models";
 import { compareEntries } from "@opendum/models/sort";
-import { Tier } from "./accounts-helpers.js";
-import { PROVIDER_ACCOUNT_KEYS } from "./account-providers.js";
+import { Tier } from "@opendum/api/web/services/accounts-helpers";
+import { PROVIDER_ACCOUNT_KEYS } from "@opendum/api/web/services/account-providers";
 
 function normalizeUrl(value: unknown) {
   return typeof value === "string" ? value.trim().replace(/\/$/, "") || undefined : undefined;

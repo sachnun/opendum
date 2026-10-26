@@ -1,1 +1,1 @@
-export * from "./registry.ts";
+export * from "@opendum/models/registry";

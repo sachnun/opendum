@@ -1,8 +1,8 @@
-import { Value } from "../../core/helpers.js";
-import { anySlice, type Json } from "./common.js";
-import { GeminiMedia, GeminiToolBlocks } from "./payload.js";
-import { GeminiModel } from "./model.js";
-import { GeminiSchema } from "./transform.js";
+import { Value } from "@opendum/providers/core/helpers";
+import { anySlice, type Json } from "@opendum/providers/upstreams/antigravity/common";
+import { GeminiMedia, GeminiToolBlocks } from "@opendum/providers/upstreams/antigravity/payload";
+import { GeminiModel } from "@opendum/providers/upstreams/antigravity/model";
+import { GeminiSchema } from "@opendum/providers/upstreams/antigravity/transform";
 
 export class GeminiToolCalls {
   static completedIds(messages: unknown[]): Set<string> {
@@ -107,15 +107,8 @@ export class GeminiToolCalls {
       const fn = (call.function ?? {}) as Json;
       const name = Value.string(fn.name);
       if (!name) continue;
-      let args: unknown = {};
       const rawArgs = Value.string(fn.arguments);
-      if (rawArgs) {
-        try {
-          args = JSON.parse(rawArgs);
-        } catch {
-          args = {};
-        }
-      }
+      const args: unknown = rawArgs ? (Value.parseJson(rawArgs) ?? {}) : {};
       parts.push({ functionCall: { name, args, id } });
     }
     return parts;

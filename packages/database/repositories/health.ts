@@ -1,4 +1,4 @@
-import type { DbExecutor } from "../client.js";
+import type { DbExecutor } from "@opendum/database/client";
 import {
   bumpRequests,
   healthState,
@@ -19,7 +19,7 @@ import {
   setStatus,
   markSuccess,
   successStatus,
-} from "../queries/index.js";
+} from "@opendum/database/queries/index";
 
 export class Health {
   constructor(private readonly database: DbExecutor) {}

@@ -1,3 +1,4 @@
+import { raise } from "@opendum/core/raise";
 import { Buffer } from "node:buffer";
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 
@@ -12,14 +13,14 @@ const getEncryptionKey = (): string => {
     return authSecret;
   }
 
-  throw new Error("BETTER_AUTH_SECRET is not defined");
+  raise(new Error("BETTER_AUTH_SECRET is not defined"));
 };
 
 const deriveKey = (): Buffer => createHash("sha256").update(getEncryptionKey()).digest();
 
 function decryptV1(ciphertext: string): string {
   const [, ivText, tagText, encryptedText] = ciphertext.split(":");
-  if (!ivText || !tagText || !encryptedText) throw new Error("Invalid encrypted payload");
+  if (!ivText || !tagText || !encryptedText) raise(new Error("Invalid encrypted payload"));
 
   const decipher = createDecipheriv("aes-256-gcm", deriveKey(), Buffer.from(ivText, "base64"));
   decipher.setAuthTag(Buffer.from(tagText, "base64"));
@@ -53,7 +54,7 @@ function encryptLegacy(text: string): string {
 
 function decryptLegacy(ciphertext: string): string {
   const encrypted = Buffer.from(ciphertext, "base64");
-  if (encrypted.subarray(0, OPENSSL_SALTED_PREFIX.length).toString("utf8") !== OPENSSL_SALTED_PREFIX) throw new Error("Unsupported encrypted payload");
+  if (encrypted.subarray(0, OPENSSL_SALTED_PREFIX.length).toString("utf8") !== OPENSSL_SALTED_PREFIX) raise(new Error("Unsupported encrypted payload"));
 
   const salt = encrypted.subarray(OPENSSL_SALTED_PREFIX.length, OPENSSL_SALTED_PREFIX.length + 8);
   const payload = encrypted.subarray(OPENSSL_SALTED_PREFIX.length + 8);

@@ -2,7 +2,7 @@ import { Effect, Exit, Ref } from "effect";
 
 import { Schema } from "effect";
 
-import { ModelFetchFailure, ModelParseFailure, ModelTimeoutFailure } from "./errors.ts";
+import { ModelFetchFailure, ModelParseFailure, ModelTimeoutFailure } from "@opendum/models/errors";
 
 export class ScraperFailure extends Schema.TaggedError<ScraperFailure>()("ScraperFailure", {
   message: Schema.String,

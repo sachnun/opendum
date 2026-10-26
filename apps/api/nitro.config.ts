@@ -1,4 +1,3 @@
-import { fileURLToPath } from "node:url";
 import { defineConfig } from "nitro";
 
 export default defineConfig({
@@ -7,9 +6,6 @@ export default defineConfig({
   serverEntry: false,
   builder: "rolldown",
   errorHandler: "./error.ts",
-  alias: {
-    "#web": fileURLToPath(new URL("./web", import.meta.url)),
-  },
   routeRules: {
     "/**": {
       cors: {

@@ -1,47 +1,45 @@
-import { Duration, Effect } from "effect";
-import type { Registry } from "@opendum/models/runtime";
+import { Duration, Effect, Result } from "effect";
 import type { OpendumRedis } from "@opendum/core/redis";
 
-import { Value, Payload, Ids, Responses } from "../../core/helpers.js";
+import { Value, Payload, Ids, Responses } from "@opendum/providers/core/helpers";
 import {
   anySlice,
   defaultAny,
   type Json,
-} from "./common.js";
+} from "@opendum/providers/upstreams/antigravity/common";
 import {
   GeminiCompletion,
   GeminiResponse,
   GeminiSchema,
   GeminiStream,
-} from "./transform.js";
-import { ChatImageInliner } from "../../core/images.js";
-import { RequestFailure, type UpstreamTransport } from "../../core/http.js";
-import { ProviderCredentialFailure } from "../../core/errors.js";
-import { OAuth } from "../../core/oauth.js";
-import { CodeAssist, type AccountInfo, type AntigravityOptions } from "./options.js";
-import { GeminiModel, GeminiTier } from "./model.js";
+} from "@opendum/providers/upstreams/antigravity/transform";
+import { ChatImageInliner } from "@opendum/providers/core/images";
+import { RequestFailure } from "@opendum/providers/core/http";
+import { OAuth } from "@opendum/providers/core/oauth";
+import { OAuthProvider } from "@opendum/providers/core/provider";
+import { CodeAssist, type AccountInfo, type AntigravityOptions } from "@opendum/providers/upstreams/antigravity/options";
+import { GeminiModel, GeminiTier } from "@opendum/providers/upstreams/antigravity/model";
 import {
   GeminiArtifacts,
   GeminiPayload,
   GeminiTierDetector,
   GeminiToolBlocks,
-} from "./payload.js";
+} from "@opendum/providers/upstreams/antigravity/payload";
 import {
   GeminiRequest,
-} from "./request.js";
+} from "@opendum/providers/upstreams/antigravity/request";
 import type {
-  CredentialRefresher,
-  Provider,
   ProviderAccount,
   ProviderFailure,
   ProviderRequest,
   RefreshedCredentials,
-  RefreshBufferProvider,
-} from "../../types.js";
+  ProviderCredentialFailure,
+} from "@opendum/providers/types";
 
-import { ANTIGRAVITY_TOKEN_ENDPOINT } from "../../endpoints.js";
+import { ANTIGRAVITY_TOKEN_ENDPOINT } from "@opendum/providers/auth/antigravity/constants";
 
 const OAUTH_TOKEN_ENDPOINT = ANTIGRAVITY_TOKEN_ENDPOINT;
+const REFRESH_BUFFER_MS = 60 * 60 * 1000;
 const MIN_THINKING_BUDGET = 1024;
 const MAX_OUTPUT_TOKENS = 64000;
 const SIGNATURE_PREFIX = "opendum:thought-signature";
@@ -50,11 +48,31 @@ const CLAUDE_BETA_HEADER = "interleaved-thinking-2025-05-14";
 const ANTIGRAVITY_SYSTEM_INSTRUCTION =
   "You are Antigravity, a powerful agentic AI coding assistant designed by the Google Deepmind team working on Advanced Agentic Coding.You are pair programming with a USER to solve their coding task. The task may require creating a new codebase, modifying or debugging an existing codebase, or simply answering a question.**Absolute paths only****Proactiveness**";
 
-export class AntigravityProvider implements Provider, CredentialRefresher, RefreshBufferProvider {
+function normalizeLevel(model: string, level: string): string {
+  const value = level.trim().toLowerCase();
+  switch (value) {
+    case "xhigh":
+      return "high";
+    case "minimal":
+      return model.toLowerCase().includes("pro") ? "low" : "minimal";
+    case "medium": {
+      const lower = model.toLowerCase();
+      if (lower.includes("pro") && !lower.includes("gemini-3.1-pro")) return "high";
+      return "medium";
+    }
+    case "low":
+    case "high":
+      return value;
+    default:
+      return "";
+  }
+}
+
+export class AntigravityProvider extends OAuthProvider {
   readonly name = "antigravity";
-  private readonly registry: Registry;
-  private readonly transport: UpstreamTransport;
+  protected readonly refreshBufferMs = REFRESH_BUFFER_MS;
   private readonly redis: OpendumRedis | null;
+  private readonly oauth: OAuth;
   private readonly persistAccountInfo:
     | ((accountId: string, info: { projectId: string; tier: string; email: string }) => void)
     | undefined;
@@ -78,14 +96,10 @@ export class AntigravityProvider implements Provider, CredentialRefresher, Refre
   private readonly apiClient = "google-cloud-sdk vscode_cloudshelleditor/0.1";
   private readonly clientMetadata =
     '{"ideType":"IDE_UNSPECIFIED","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI"}';
-  private readonly exchange: OAuth;
 
   constructor(options: AntigravityOptions) {
-    this.registry = options.registry;
-    this.transport = options.transport;
-    this.redis = options.redis ?? null;
-    this.persistAccountInfo = options.persistAccountInfo;
-    this.exchange = new OAuth({
+    super(options);
+    this.oauth = new OAuth({
       provider: "antigravity",
       tokenUrl: OAUTH_TOKEN_ENDPOINT,
       transport: options.transport,
@@ -101,11 +115,11 @@ export class AntigravityProvider implements Provider, CredentialRefresher, Refre
       }),
       parse: async (payload, refreshToken) => {
         const token = payload as { access_token?: string; refresh_token?: string; expires_in?: number };
-        if (!token.access_token) throw new Error("antigravity token refresh returned empty access token");
+        if (!token.access_token) return Result.fail("antigravity token refresh returned empty access token");
         const nextRefresh = token.refresh_token || refreshToken;
         const expiresIn = token.expires_in && token.expires_in > 0 ? token.expires_in : 3600;
         const info = await this.fetchAccountInfo(token.access_token);
-        return {
+        return Result.succeed({
           accessToken: token.access_token,
           refreshToken: nextRefresh,
           expiresAt: new Date(Date.now() + expiresIn * 1000),
@@ -113,20 +127,18 @@ export class AntigravityProvider implements Provider, CredentialRefresher, Refre
           tier: info.tier,
           paidTier: info.paidTier,
           email: info.email,
-        };
+        });
       },
     });
+    this.redis = options.redis ?? null;
+    this.persistAccountInfo = options.persistAccountInfo;
   }
 
-  refreshBuffer(): number {
-    return 60 * 60 * 1000;
-  }
-
-  refreshCredentials(
+  protected exchange(
     refreshToken: string,
     account: ProviderAccount
   ): Effect.Effect<RefreshedCredentials, ProviderCredentialFailure> {
-    return this.exchange.exchange(refreshToken, account);
+    return this.oauth.exchange(refreshToken, account);
   }
 
   private setGoogleHeaders(headers: Record<string, string>, accessToken: string, stream: boolean): void {
@@ -146,24 +158,20 @@ export class AntigravityProvider implements Provider, CredentialRefresher, Refre
     for (const endpoint of this.loadEndpoints) {
       const headers: Record<string, string> = {};
       this.setGoogleHeaders(headers, accessToken, false);
-      let resp: Response;
-      try {
-        resp = await this.transport.direct(`${endpoint}/v1internal:loadCodeAssist`, {
+      const resp = await this.transport
+        .direct(`${endpoint}/v1internal:loadCodeAssist`, {
           method: "POST",
           headers,
           body: JSON.stringify({ metadata: CodeAssist.metadata() }),
-        });
-      } catch {
+        })
+        .catch(() => null);
+      if (!resp) {
         hadError = true;
         continue;
       }
       let data: Json = {};
       if (resp.status >= 200 && resp.status < 300) {
-        try {
-          data = (await resp.json()) as Json;
-        } catch {
-          data = {};
-        }
+        data = ((await resp.json().catch(() => null)) as Json | null) ?? {};
       } else {
         hadError = true;
       }
@@ -229,30 +237,24 @@ export class AntigravityProvider implements Provider, CredentialRefresher, Refre
   private async postOnboardUser(accessToken: string, endpoint: string, payload: string): Promise<Json | null> {
     const headers: Record<string, string> = {};
     this.setGoogleHeaders(headers, accessToken, false);
-    try {
-      const resp = await this.transport.direct(`${endpoint}/v1internal:onboardUser`, {
-        method: "POST",
-        headers,
-        body: payload,
-      });
-      if (resp.status < 200 || resp.status >= 300) return null;
-      return (await resp.json()) as Json;
-    } catch {
-      return null;
-    }
+    const resp = await this.transport
+      .direct(`${endpoint}/v1internal:onboardUser`, { method: "POST", headers, body: payload })
+      .catch(() => null);
+    if (!resp) return null;
+    if (resp.status < 200 || resp.status >= 300) return null;
+    return (await resp.json().catch(() => null)) as Json | null;
   }
 
   private async fetchGoogleEmail(accessToken: string): Promise<string> {
     const headers: Record<string, string> = {};
     this.setGoogleHeaders(headers, accessToken, false);
-    try {
-      const resp = await this.transport.direct("https://www.googleapis.com/oauth2/v2/userinfo", { headers });
-      if (resp.status < 200 || resp.status >= 300) return "";
-      const data = (await resp.json()) as Json;
-      return Value.string(data.email);
-    } catch {
-      return "";
-    }
+    const resp = await this.transport
+      .direct("https://www.googleapis.com/oauth2/v2/userinfo", { headers })
+      .catch(() => null);
+    if (!resp) return "";
+    if (resp.status < 200 || resp.status >= 300) return "";
+    const data = ((await resp.json().catch(() => null)) as Json | null) ?? {};
+    return Value.string(data.email);
   }
 
   makeRequest(request: ProviderRequest): Effect.Effect<Response, ProviderFailure> {
@@ -285,10 +287,7 @@ export class AntigravityProvider implements Provider, CredentialRefresher, Refre
         const messages = normalizedBody.messages;
         if (Array.isArray(messages) && modelName.includes("claude")) {
           normalizedBody = Payload.clone(normalizedBody);
-          normalizedBody.messages = yield* Effect.tryPromise({
-            try: () => new ChatImageInliner(this.transport.direct).run(messages),
-            catch: (cause) => RequestFailure.transport("antigravity", cause),
-          });
+          normalizedBody.messages = yield* new ChatImageInliner(this.transport.direct).run(messages);
         }
 
         const clientSession = Value.string(normalizedBody._sessionId);
@@ -317,16 +316,17 @@ export class AntigravityProvider implements Provider, CredentialRefresher, Refre
           this.setGoogleHeaders(headers, request.credentials, actualStream);
           if (this.needsAnthropicBeta(modelName)) headers["anthropic-beta"] = CLAUDE_BETA_HEADER;
           const url = `${endpoint}/v1internal:${action}`;
-          let resp: Response;
-          try {
-            resp = yield* Effect.tryPromise({
+          const attempt = yield* Effect.result(
+            Effect.tryPromise({
               try: () => this.transport.direct(url, { method: "POST", headers, body: encoded }),
               catch: (cause) => RequestFailure.transport("antigravity", cause, url),
-            });
-          } catch (error) {
-            lastErr = error;
+            })
+          );
+          if (Result.isFailure(attempt)) {
+            lastErr = attempt.failure;
             continue;
           }
+          const resp: Response = attempt.success;
           if (resp.status === 429) {
             request.onResponseStart?.();
             return resp;
@@ -345,10 +345,8 @@ export class AntigravityProvider implements Provider, CredentialRefresher, Refre
           break;
         }
         const resp = lastResp;
-        if (lastErr || !resp || resp.status < 200 || resp.status >= 300) {
-          if (lastErr) throw lastErr;
-          return resp as Response;
-        }
+        if (lastErr) return yield* Effect.fail(lastErr);
+        if (!resp || resp.status < 200 || resp.status >= 300) return resp as Response;
 
         let streamBody: ReadableStream<Uint8Array> | null = resp.body;
         if (request.stream || actualStream) {
@@ -453,7 +451,7 @@ export class AntigravityProvider implements Provider, CredentialRefresher, Refre
     const thinking = body.thinking;
     if (thinking !== null && typeof thinking === "object" && !Array.isArray(thinking)) {
       const t = thinking as Json;
-      const level = this.normalizeLevel(model, Value.string(t.thinkingLevel));
+      const level = normalizeLevel(model, Value.string(t.thinkingLevel));
       if (level) return level;
       const budget = Value.number(t.budget_tokens);
       if (budget > 0) return this.levelFromBudget(model, budget);
@@ -509,32 +507,12 @@ export class AntigravityProvider implements Provider, CredentialRefresher, Refre
       else if (budget <= 16384) effort = "medium";
     }
     const level = this.thinkingLevel(model, effort);
-    return this.normalizeLevel(model, level || effort);
+    return normalizeLevel(model, level || effort);
   }
 
   private levelFromEffort(model: string, effort: string): string {
     const level = this.thinkingLevel(model, effort);
-    return this.normalizeLevel(model, level || effort);
-  }
-
-  private normalizeLevel(model: string, level: string): string {
-    const value = level.trim().toLowerCase();
-    switch (value) {
-      case "xhigh":
-        return "high";
-      case "minimal":
-        return model.toLowerCase().includes("pro") ? "low" : "minimal";
-      case "medium": {
-        const lower = model.toLowerCase();
-        if (lower.includes("pro") && !lower.includes("gemini-3.1-pro")) return "high";
-        return "medium";
-      }
-      case "low":
-      case "high":
-        return value;
-      default:
-        return "";
-    }
+    return normalizeLevel(model, level || effort);
   }
 
   private fitLevel(generation: Json, model: string, level: string): string {
@@ -545,7 +523,7 @@ export class AntigravityProvider implements Provider, CredentialRefresher, Refre
     for (const candidate of ["minimal", "low", "medium", "high", "xhigh"]) {
       const budget = budgets[candidate] ?? 0;
       if (budget <= 0 || budget > maxTokens / 2) continue;
-      const normalized = this.normalizeLevel(model, candidate);
+      const normalized = normalizeLevel(model, candidate);
       return normalized || candidate;
     }
     return "";
@@ -560,7 +538,7 @@ export class AntigravityProvider implements Provider, CredentialRefresher, Refre
       const budget = Value.number(defaultAny(thinking?.thinkingBudget, thinking?.thinking_budget));
       if (budget > 0) level = this.levelFromBudget(model, budget);
     } else {
-      level = this.normalizeLevel(model, level);
+      level = normalizeLevel(model, level);
     }
     if (!level) level = GeminiModel.levelFromName(model);
     if (!level && GeminiModel.segment(model).toLowerCase().endsWith("-tiered")) level = "medium";
@@ -708,27 +686,19 @@ export class AntigravityProvider implements Provider, CredentialRefresher, Refre
 
   async getCachedSignature(model: string, sessionId: string, thoughtText: string): Promise<string> {
     if (!this.redis || !sessionId || !thoughtText.trim()) return "";
-    try {
-      const raw = await this.redis.get(this.signatureCacheKey(model, sessionId, thoughtText));
-      if (!raw) return "";
-      const cached = JSON.parse(raw) as Json;
-      return Value.string(cached.signature);
-    } catch {
-      return "";
-    }
+    const raw = await this.redis.get(this.signatureCacheKey(model, sessionId, thoughtText)).catch(() => null);
+    if (!raw) return "";
+    const cached = Value.parseJson(raw) as Json;
+    return Value.string(cached?.signature);
   }
 
   async cacheSignature(model: string, sessionId: string, thoughtText: string, signature: string): Promise<void> {
     if (!this.redis || !sessionId || !thoughtText.trim() || !signature.trim()) return;
-    try {
-      await this.redis.set(
-        this.signatureCacheKey(model, sessionId, thoughtText),
-        JSON.stringify({ signature }),
-        { EX: SIGNATURE_TTL_SECONDS }
-      );
-    } catch {
-      return;
-    }
+    await this.redis
+      .set(this.signatureCacheKey(model, sessionId, thoughtText), JSON.stringify({ signature }), {
+        EX: SIGNATURE_TTL_SECONDS,
+      })
+      .catch(() => undefined);
   }
 
   async cacheSignatures(response: Json, model: string, sessionId: string): Promise<void> {

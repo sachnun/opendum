@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { Suggester } from "./suggester.ts";
+import { Suggester } from "@opendum/models/suggester";
 
 const suggester = Suggester.fromModels([
   { value: "gpt-4o", providers: ["openai"] },

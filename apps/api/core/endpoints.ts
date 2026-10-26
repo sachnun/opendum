@@ -1,8 +1,8 @@
-import { Coerce, Records } from "./helpers.js";
-import type { ErrorFormat, ParsedEndpointRequest, ResponseContext, RouteError, StreamRecorder } from "./types.js";
-import { nonStream, anthropicStream, passthrough, passthroughStream } from "./stream.js";
-import { fromChat, toChat } from "./endpoints/anthropic.js";
-import { toMessages, toolsOf } from "./endpoints/responses.js";
+import { Coerce, Records } from "@opendum/api/core/helpers";
+import type { ErrorFormat, ParsedEndpointRequest, ResponseContext, RouteError, StreamRecorder } from "@opendum/api/core/types";
+import { nonStream, anthropicStream, passthrough, passthroughStream } from "@opendum/api/core/stream";
+import { fromChat, toChat } from "@opendum/api/core/endpoints/anthropic";
+import { toMessages, toolsOf } from "@opendum/api/core/endpoints/responses";
 
 type Json = Record<string, unknown>;
 

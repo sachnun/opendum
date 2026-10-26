@@ -1,8 +1,0 @@
-export {
-  PERCH_ACCOUNT_PATH,
-  PERCH_APP_URL,
-  PERCH_CONFIG_PATH,
-  PERCH_TOKEN_PATH,
-  PERCH_REDIRECT_URI,
-  PERCH_PLAN_CODE,
-} from "@opendum/providers/endpoints";

@@ -1,7 +1,7 @@
 import { oc } from "@orpc/contract";
 import { z } from "zod";
 
-import { emptyInputSchema } from "./common.js";
+import { emptyInputSchema } from "@opendum/providers/contract/common";
 
 const SLUG_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/;
 

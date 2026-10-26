@@ -1,7 +1,7 @@
 import { oc } from "@orpc/contract";
 import { z } from "zod";
 
-import { emptyInputSchema } from "./common.js";
+import { emptyInputSchema } from "@opendum/providers/contract/common";
 
 export const sharingInputSchema = z.object({ enabled: z.boolean() });
 

@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { MODEL_COST_FIELDS, costEntries, costPoints } from "./model-cost";
+import { MODEL_COST_FIELDS, costEntries, costPoints } from "~~/lib/model-cost";
 
 test("MODEL_COST_FIELDS covers every cost dimension", () => {
   expect(MODEL_COST_FIELDS.map((field) => field.key)).toEqual(["input", "output", "cacheRead", "cacheWrite"]);

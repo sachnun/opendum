@@ -1,10 +1,12 @@
+import { Effect, Result } from "effect";
+import { raise } from "@opendum/core/raise";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { admin, bearer, jwt } from "better-auth/plugins";
 import { eq } from "drizzle-orm";
 import { db as defaultDb, schema, user, type Database } from "@opendum/database";
-import { ensureBalance } from "./services/points.js";
-import { roleOf as maintainerRole } from "./utils/maintainers.js";
+import { ensureBalance } from "@opendum/api/web/services/points";
+import { roleOf as maintainerRole } from "@opendum/api/web/utils/maintainers";
 
 export const ACCESS_TOKEN_TTL = "7d";
 export const ACCESS_TOKEN_ISSUER = "opendum";
@@ -14,7 +16,7 @@ export const USER_ROLE = "user";
 
 function requireEnv(name: string): string {
   const value = process.env[name];
-  if (!value) throw new Error(`${name} is required`);
+  if (!value) raise(new Error(`${name} is required`));
   return value;
 }
 
@@ -45,11 +47,10 @@ export function createAuth(db: Database = defaultDb, options: { baseURL?: string
             return { data: { ...createdUser, role: roleOf(createdUser.email) } };
           },
           after: async (createdUser) => {
-            try {
-              await ensureBalance(createdUser.id);
-            } catch (error) {
-              console.error("Failed to initialize point balance:", error);
-            }
+            const balanced = await Effect.runPromise(
+              Effect.result(ensureBalance(createdUser.id))
+            ).then((outcome) => (Result.isFailure(outcome) ? outcome.failure : null));
+            if (balanced) console.error("Failed to initialize point balance:", balanced);
           },
         },
       },

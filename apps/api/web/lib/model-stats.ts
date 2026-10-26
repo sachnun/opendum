@@ -3,8 +3,8 @@ import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import { dayKeys, emptyStats, hourKeys, LOOKBACK_HOURS, MODEL_STATS_DAYS, type ModelStats } from "@opendum/models/stats";
 import { db, usageLog } from "@opendum/database";
 import { Effect } from "effect";
-import { fromPromise } from "./task.js";
-import { keysOf, aliasOf } from "./proxy/models.js";
+import { fromPromise } from "@opendum/api/web/lib/task";
+import { keysOf, aliasOf } from "@opendum/api/web/lib/proxy/models";
 
 interface RawModelStats {
   totalRequests: number;

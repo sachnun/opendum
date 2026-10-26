@@ -1,24 +1,24 @@
+import { Effect } from "effect";
 import {
   ARRAY_PREVIEW_LIMIT,
   ERROR_MESSAGE_LIMIT,
   RAW_MESSAGE_LIMIT,
   ERROR_STRING_LIMIT,
   type PlaygroundEndpoint,
-} from "./types";
+} from "~~/lib/playground/types";
+import { parseJson } from "~~/lib/settle";
 
 export class ErrorText {
   static fromResponse(text: string): string {
     const trimmed = text.trim();
     if (!trimmed) return "Request failed";
-    try {
-      const parsed = JSON.parse(trimmed);
+    {
+      const parsed = parseJson(trimmed);
       const error = (parsed as { error?: { message?: unknown } } | null)?.error;
       if (error && typeof error === "object" && typeof error.message === "string") return error.message;
       if (parsed && typeof parsed === "object" && typeof (parsed as { message?: unknown }).message === "string") {
         return (parsed as { message: string }).message;
       }
-    } catch {
-      return trimmed;
     }
     return trimmed;
   }
@@ -132,12 +132,14 @@ export class ErrorText {
         : message;
 
     let serializedParameters = "{}";
-    if (context.parameters) {
-      try {
-        serializedParameters = JSON.stringify(ErrorText.parameters(context.parameters), null, 2);
-      } catch {
-        serializedParameters = '"[unserializable parameters]"';
-      }
+    const parameters = context.parameters;
+    if (parameters) {
+      serializedParameters = Effect.runSync(
+        Effect.try({
+          try: () => JSON.stringify(ErrorText.parameters(parameters), null, 2),
+          catch: () => '"[unserializable parameters]"',
+        })
+      );
     }
 
     const lines = [`Error: ${truncated}`];

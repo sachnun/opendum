@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { Effect, Exit } from "effect";
+import { raise } from "@opendum/models/refresh/core/raise";
 
 import {
   ModelParseFailure,
@@ -7,13 +8,13 @@ import {
   ModelsDirectoryFailure,
   asError,
   failureMessage,
-} from "./errors.ts";
-import { tryLoad } from "./registry.ts";
-import { tryRead } from "./model-store.ts";
+} from "@opendum/models/errors";
+import { tryLoad } from "@opendum/models/registry";
+import { tryRead } from "@opendum/models/model-store";
 
 function failureOf<E>(exit: Exit.Exit<unknown, E>): E {
   const option = Exit.findErrorOption(exit);
-  if (option._tag === "None") throw new Error("expected a failure");
+  if (option._tag === "None") raise(new Error("expected a failure"));
   return option.value;
 }
 

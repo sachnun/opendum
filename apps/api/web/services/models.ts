@@ -3,12 +3,12 @@ import { Effect } from "effect";
 
 import type { ModelListItem, ModelSearchItem, ModelStatsData, ModelStatsInput, EnableModelInput, EnableModelResult } from "@opendum/providers/contract";
 import { db, disabledModel } from "@opendum/database";
-import { statsByModel } from "#web/lib/model-stats.js";
-import { modelAvailability, invalidateDisabled, usable, type AccountModelAvailability } from "#web/lib/proxy/auth.js";
-import { MODEL_REGISTRY, allModels, familyOf, keysOf, providersFor, supportsModel, aliasOf } from "#web/lib/proxy/models.js";
+import { statsByModel } from "@opendum/api/web/lib/model-stats";
+import { modelAvailability, invalidateDisabled, usable, type AccountModelAvailability } from "@opendum/api/web/lib/proxy/auth";
+import { MODEL_REGISTRY, allModels, familyOf, keysOf, providersFor, supportsModel, aliasOf } from "@opendum/api/web/lib/proxy/models";
 import { compareEntries } from "@opendum/models/sort";
-import { fromEffect, fromPromise } from "#web/lib/task.js";
-import { internal } from "#web/errors.js";
+import { fromEffect, fromPromise } from "@opendum/api/web/lib/task";
+import { internal } from "@opendum/api/web/errors";
 
 function modelInfo(model: string) {
   const info = MODEL_REGISTRY[model];

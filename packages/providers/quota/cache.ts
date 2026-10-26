@@ -1,6 +1,6 @@
 import { Effect } from "effect";
-import type { QuotaAccount, QuotaContext } from "./types.js";
-import { QuotaFetchFailure } from "../core/errors.js";
+import type { QuotaAccount, QuotaContext } from "@opendum/providers/quota/types";
+import { QuotaFetchFailure } from "@opendum/providers/core/errors";
 
 const RAW_CACHE_PREFIX = "opendum:quota:raw";
 const MIN_TTL = 60;

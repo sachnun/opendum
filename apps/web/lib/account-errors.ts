@@ -1,3 +1,4 @@
+import { parseJson } from "~~/lib/settle";
 export type ParsedErrorDetails = {
   error: string | null;
   provider: string | null;
@@ -116,12 +117,12 @@ export function parseMessage(rawMessage: string, code: number | null | undefined
     const rawMessages = sections.messages.join("\n").trim();
     if (!rawMessages) return null;
 
-    try {
-      const parsed = JSON.parse(rawMessages) as Array<{
+    {
+      const parsed = parseJson(rawMessages) as Array<{
         index?: number;
         keys?: unknown;
         type?: unknown;
-      }>;
+      }> | null;
 
       if (!Array.isArray(parsed)) return null;
 
@@ -136,11 +137,6 @@ export function parseMessage(rawMessage: string, code: number | null | undefined
 
         return `#${entry.index}: (unknown)`;
       }).filter((entry): entry is string => entry !== null);
-    } catch {
-      return rawMessages
-        .split("\n")
-        .map((line) => line.trim())
-        .filter(Boolean);
     }
   })();
 
@@ -188,12 +184,8 @@ export function normalizeEndpoint(value: string | null | undefined): ErrorPlaygr
 export function parseParams(value: string | null | undefined): Record<string, unknown> | null {
   if (!value?.trim()) return null;
 
-  try {
-    const parsed = JSON.parse(value) as unknown;
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : null;
-  } catch {
-    return null;
-  }
+  const parsed = parseJson(value) as unknown;
+  return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : null;
 }
 
 export function addParam(query: Record<string, string>, params: Record<string, unknown>, targetKey: string, sourceKeys: string[] = []) {

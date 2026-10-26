@@ -1,4 +1,4 @@
-import type { ModelValidationResult } from "./types.js";
+import type { ModelValidationResult } from "@opendum/auth/types";
 
 export function valid(provider: string | null, model: string): ModelValidationResult {
   return {

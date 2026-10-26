@@ -4,58 +4,24 @@ import { and, count as countFn, eq } from "drizzle-orm";
 import type { CreateAccountInput } from "@opendum/providers/contract";
 
 import { db, providerAccount } from "@opendum/database";
-import { publishAccounts } from "#web/events/bus.js";
-import { encrypt, hashString } from "#web/lib/encryption.js";
-import { clearFails } from "#web/lib/proxy/auth.js";
-import { fetchExternalEffect } from "#web/lib/external.js";
-import { fromPromise } from "#web/lib/task.js";
-import { providerModels } from "#web/lib/proxy/models.js";
-import { API_BASE_URL as nvidiaApiBaseUrl } from "#web/lib/providers/nvidia/constants.js";
-import { API_BASE_URL as openRouterApiBaseUrl } from "#web/lib/providers/openrouter/constants.js";
-import { API_BASE_URL as zenmuxApiBaseUrl } from "#web/lib/providers/zenmux/constants.js";
-import { API_BASE_URL as harborApiBaseUrl } from "#web/lib/providers/harbor/constants.js";
-import { API_BASE_URL as hyperApiBaseUrl } from "#web/lib/providers/hyper/constants.js";
-import { httpError, isChallenge } from "#web/lib/providers/provider-http-errors.js";
-import { validationUrl } from "#web/lib/providers/cloudflare/constants.js";
+import { publishAccounts } from "@opendum/api/web/events/bus";
+import { encrypt, hashString } from "@opendum/api/web/lib/encryption";
+import { clearFails } from "@opendum/api/web/lib/proxy/auth";
+import { fetchExternalEffect } from "@opendum/api/web/lib/external";
+import { fromPromise } from "@opendum/api/web/lib/task";
+import { providerModels } from "@opendum/api/web/lib/proxy/models";
+import { KEY_SETTINGS, validationRequest } from "@opendum/providers/auth/key-settings";
+import { httpError, isChallenge } from "@opendum/providers/auth/http-errors";
+import { validationUrl } from "@opendum/providers/auth/cloudflare/constants";
 import { KEY_PROVIDERS, type KeyProvider } from "@opendum/providers/provider-accounts";
-import type { ServiceFailure } from "#web/errors.js";
+import type { ServiceFailure } from "@opendum/api/web/errors";
 
 const KEY_ACCOUNT_EXPIRY = new Date("2100-01-01T00:00:00.000Z");
 const VALIDATION_TIMEOUT_MS = 15000;
 const RELAY_ERROR_HEADER = "X-Opendum-Internal-Relay-Error";
 
-const MODELS_VALIDATION = { validationPath: "/models", requireSuccessfulStatus: true, skipInference: false } as const;
-const CHAT_AUTH_PROBE = { validationPath: "/chat/completions", requireSuccessfulStatus: false, skipInference: true } as const;
-
-const KEY_SETTINGS = {
-  nvidia_nim: { label: "Nvidia", baseUrl: nvidiaApiBaseUrl, modelMap: providerModels("nvidia_nim"), ...CHAT_AUTH_PROBE },
-  openrouter: { label: "OpenRouter", baseUrl: openRouterApiBaseUrl, modelMap: providerModels("openrouter"), ...MODELS_VALIDATION },
-  zenmux: { label: "ZenMux", baseUrl: zenmuxApiBaseUrl, modelMap: providerModels("zenmux"), ...CHAT_AUTH_PROBE },
-  harbor: { label: "Harbor", baseUrl: harborApiBaseUrl, modelMap: providerModels("harbor"), ...MODELS_VALIDATION },
-  hyper: { label: "Charm", baseUrl: hyperApiBaseUrl, modelMap: providerModels("hyper"), ...CHAT_AUTH_PROBE },
-} satisfies Record<KeyProvider, { label: string; baseUrl: string; modelMap: Record<string, string>; validationPath: "/models" | "/chat/completions"; requireSuccessfulStatus: boolean; skipInference?: boolean }>;
 
 type ConnectResult = { email: string; isUpdate: boolean };
-
-function validationRequest(provider: KeyProvider, apiKey: string) {
-  const { baseUrl, modelMap, validationPath, skipInference } = KEY_SETTINGS[provider];
-  const validationModel = Object.values(modelMap)[0];
-  const isPost = validationPath === "/chat/completions";
-  const headers: Record<string, string> = { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", Accept: "application/json" };
-  let body: Record<string, unknown> | undefined;
-  if (validationPath === "/chat/completions") {
-    body = skipInference
-      ? { model: validationModel, messages: [] }
-      : { model: validationModel, messages: [{ role: "user", content: "ping" }], max_tokens: 1, stream: false };
-  }
-  return {
-    validationModel,
-    url: `${baseUrl}${validationPath}`,
-    method: (isPost ? "POST" : "GET") as "POST" | "GET",
-    headers,
-    body,
-  };
-}
 
 function failWith(message: string) {
   return { success: false as const, error: message };
@@ -66,7 +32,7 @@ const validateKey = Effect.fn("accountConnectors.validateApiKey")(function* (
   apiKey: string
 ) {
   const { label, validationPath, requireSuccessfulStatus } = KEY_SETTINGS[provider];
-  const { validationModel, url, method, headers, body } = validationRequest(provider, apiKey);
+  const { validationModel, url, method, headers, body } = validationRequest(provider, apiKey, providerModels(provider));
   if (validationPath === "/chat/completions" && !validationModel) {
     return failWith(`${label} API key validation model is not configured.`);
   }

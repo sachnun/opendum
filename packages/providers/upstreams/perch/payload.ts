@@ -1,5 +1,5 @@
-import { Value } from "../../core/helpers.js";
-import type { Json } from "./auth.js";
+import { Value } from "@opendum/providers/core/helpers";
+import type { Json } from "@opendum/providers/upstreams/perch/auth";
 
 export class PerchPayload {
   static text(value: unknown): string {

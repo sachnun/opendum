@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 
-import { mergeData, splitData } from "./merge.ts";
-import type { ModelData } from "../types.ts";
+import { mergeData, splitData } from "@opendum/models/model/merge";
+import type { ModelData } from "@opendum/models/types";
 
 test("mergeData lets authored fields win over generated", () => {
   const merged = mergeData(

@@ -1,5 +1,5 @@
 import { defineHandler } from "nitro";
-import { notFound, unknownEndpoint } from "../handlers/errors.js";
+import { notFound, unknownEndpoint } from "@opendum/api/handlers/errors";
 
 export default defineHandler((event) => {
   const pathname = event.url.pathname;

@@ -1,10 +1,9 @@
-import { Effect } from "effect";
-import type { Registry } from "@opendum/models/runtime";
-import { Value, Ids, Responses } from "../../core/helpers.js";
-import { RequestFailure, type UpstreamTransport } from "../../core/http.js";
-import { ProviderCredentialFailure } from "../../core/errors.js";
-import { OAuth } from "../../core/oauth.js";
-import { KIRO_REFRESH_ENDPOINT } from "../../endpoints.js";
+import { Effect, Result } from "effect";
+import { Value, Ids, Responses } from "@opendum/providers/core/helpers";
+import { RequestFailure } from "@opendum/providers/core/http";
+import { OAuth } from "@opendum/providers/core/oauth";
+import { OAuthProvider, type ProviderOptions } from "@opendum/providers/core/provider";
+import { REFRESH_ENDPOINT as KIRO_REFRESH_ENDPOINT } from "@opendum/providers/auth/kiro/constants";
 import {
   BracketCalls,
   KiroAccount,
@@ -15,32 +14,23 @@ import {
   KiroUsage,
   Parser,
   type Json,
-} from "./transform.js";
+} from "@opendum/providers/upstreams/kiro/transform";
 import type {
-  CredentialRefresher,
-  Provider,
   ProviderAccount,
   ProviderFailure,
   ProviderRequest,
   RefreshedCredentials,
-  RefreshBufferProvider,
-} from "../../types.js";
+  ProviderCredentialFailure,
+} from "@opendum/providers/types";
 
-export type KiroOptions = {
-  registry: Registry;
-  transport: UpstreamTransport;
-};
-
-export class KiroProvider implements Provider, CredentialRefresher, RefreshBufferProvider {
+export class KiroProvider extends OAuthProvider {
   readonly name = "kiro";
-  private readonly registry: Registry;
-  private readonly transport: UpstreamTransport;
-  private readonly exchange: OAuth;
+  protected readonly refreshBufferMs = 5 * 60 * 1000;
+  private readonly oauth: OAuth;
 
-  constructor(options: KiroOptions) {
-    this.registry = options.registry;
-    this.transport = options.transport;
-    this.exchange = new OAuth({
+  constructor(options: ProviderOptions) {
+    super(options);
+    this.oauth = new OAuth({
       provider: "kiro",
       tokenUrl: KIRO_REFRESH_ENDPOINT,
       transport: options.transport,
@@ -52,29 +42,30 @@ export class KiroProvider implements Provider, CredentialRefresher, RefreshBuffe
       parse: async (payload, refreshToken) => {
         const token = payload as { accessToken?: string; refreshToken?: string; expiresIn?: number };
         const accessToken = (token.accessToken ?? "").trim();
-        if (!accessToken) throw new Error("kiro token refresh returned empty access token");
+        if (!accessToken) return Result.fail("kiro token refresh returned empty access token");
         const nextRefresh = token.refreshToken || refreshToken;
         const expiresIn = token.expiresIn && token.expiresIn > 0 ? token.expiresIn : 3600;
         const tier = await this.fetchSubscriptionTier(accessToken);
-        return { accessToken, refreshToken: nextRefresh, expiresAt: new Date(Date.now() + expiresIn * 1000), tier };
+        return Result.succeed({
+          accessToken,
+          refreshToken: nextRefresh,
+          expiresAt: new Date(Date.now() + expiresIn * 1000),
+          tier,
+        });
       },
     });
   }
 
-  refreshBuffer(): number {
-    return 5 * 60 * 1000;
-  }
-
-  refreshCredentials(
+  protected exchange(
     refreshToken: string,
     account: ProviderAccount
   ): Effect.Effect<RefreshedCredentials, ProviderCredentialFailure> {
-    return this.exchange.exchange(refreshToken, account);
+    return this.oauth.exchange(refreshToken, account);
   }
 
   private async fetchSubscriptionTier(accessToken: string): Promise<string> {
-    try {
-      const resp = await this.transport.direct("https://q.us-east-1.amazonaws.com/", {
+    const resp = await this.transport
+      .direct("https://q.us-east-1.amazonaws.com/", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${accessToken.trim()}`,
@@ -84,16 +75,15 @@ export class KiroProvider implements Provider, CredentialRefresher, RefreshBuffe
           "User-Agent": "KiroIDE-1.3.11",
         },
         body: JSON.stringify({ origin: "AI_EDITOR" }),
-      });
-      if (resp.status < 200 || resp.status >= 300) return "";
-      const payload = (await resp.json()) as Json;
-      const record = ((payload.data ?? payload) as Json) ?? {};
-      const sub = record.subscriptionInfo;
-      if (sub === null || typeof sub !== "object" || Array.isArray(sub)) return "";
-      return KiroTier.normalize(Value.string((sub as Json).type), Value.string((sub as Json).subscriptionTitle));
-    } catch {
-      return "";
-    }
+      })
+      .catch(() => null);
+    if (!resp) return "";
+    if (resp.status < 200 || resp.status >= 300) return "";
+    const payload = ((await resp.json().catch(() => null)) as Json | null) ?? {};
+    const record = ((payload.data ?? payload) as Json) ?? {};
+    const sub = record.subscriptionInfo;
+    if (sub === null || typeof sub !== "object" || Array.isArray(sub)) return "";
+    return KiroTier.normalize(Value.string((sub as Json).type), Value.string((sub as Json).subscriptionTitle));
   }
 
   makeRequest(request: ProviderRequest): Effect.Effect<Response, ProviderFailure> {
@@ -254,22 +244,19 @@ async function* transformSse(source: ReadableStream<Uint8Array>, model: string):
 
   const reader = source.getReader();
   const decoder = new TextDecoder();
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      const text = decoder.decode(value, { stream: true });
-      for (const event of parser.feed(text)) processEvent(event);
-      for (const chunk of pending.splice(0)) yield chunk;
-    }
-    const tail = decoder.decode();
-    if (tail) {
-      for (const event of parser.feed(tail)) processEvent(event);
-    }
-    for (const event of parser.finish()) processEvent(event);
-  } finally {
-    reader.releaseLock();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const text = decoder.decode(value, { stream: true });
+    for (const event of parser.feed(text)) processEvent(event);
+    for (const chunk of pending.splice(0)) yield chunk;
   }
+  const tail = decoder.decode();
+  if (tail) {
+    for (const event of parser.feed(tail)) processEvent(event);
+  }
+  for (const event of parser.finish()) processEvent(event);
+  reader.releaseLock();
 
   let [flushContent, flushReasoning] = parser.flushContent();
   if (hasNativeReasoning) flushReasoning = "";

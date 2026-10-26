@@ -1,8 +1,8 @@
 import { RPCHandler } from "@orpc/server/fetch";
 import { defineHandler } from "nitro";
 
-import { router } from "#web/orpc/router.js";
-import { notFound } from "../../handlers/errors.js";
+import { router } from "@opendum/api/web/orpc/router";
+import { notFound } from "@opendum/api/handlers/errors";
 
 const handler = new RPCHandler(router);
 

@@ -1,9 +1,9 @@
 import { Effect } from "effect";
 
-import { sessionFrom } from "./session.js";
-import { roleOf, type UserRole } from "./maintainers.js";
-import type { AuthUser } from "#web/lib/claims.js";
-import { findUser } from "#web/services/users.js";
+import { sessionFrom } from "@opendum/api/web/utils/session";
+import { roleOf, type UserRole } from "@opendum/api/web/utils/maintainers";
+import type { AuthUser } from "@opendum/api/web/lib/claims";
+import { findUser } from "@opendum/api/web/services/users";
 
 export type ActorUser = AuthUser;
 

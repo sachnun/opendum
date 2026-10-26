@@ -1,4 +1,4 @@
-import type { QuotaProviderKey } from "../provider-accounts.js";
+import type { QuotaProviderKey } from "@opendum/providers/provider-accounts";
 export interface ModelModalities {
   input: string[];
   output: string[];
@@ -199,7 +199,7 @@ export interface ApiKeyOptions {
   rateLimitsByKeyId: Record<string, Array<{ target: string; targetType: "model" | "family"; perMinute: number | null; perHour: number | null; perDay: number | null }>>;
 }
 
-export type { ModelListItem, ModelSearchItem, ModelStats, ModelStatsData } from "./models.js";
+export type { ModelListItem, ModelSearchItem, ModelStats, ModelStatsData } from "@opendum/providers/contract/models";
 
 export interface PlaygroundOptions {
   proxyBaseUrl?: string;

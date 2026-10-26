@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { normalizeEmail } from "./email.js";
+import { normalizeEmail } from "@opendum/database/email";
 
 test("normalizeEmail trims and lowercases", () => {
   expect(normalizeEmail("  User@Example.COM ")).toBe("user@example.com");

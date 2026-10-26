@@ -1,4 +1,5 @@
 import type { Ref } from "vue";
+import { parseJson } from "~~/lib/settle";
 
 import type { NavItem, NavSubItem } from "~~/lib/navigation";
 
@@ -20,15 +21,14 @@ export function useAnchorNavigation(options: { anchorIds: Ref<string[]>; onNavig
     const rawValue = window.sessionStorage.getItem(PENDING_KEY);
     if (!rawValue) return null;
 
-    try {
-      const pendingAnchor = JSON.parse(rawValue) as { path?: string; anchorId?: string };
-      if (pendingAnchor.path !== pathname || !pendingAnchor.anchorId) return null;
-
+    {
+      const pendingAnchor = parseJson(rawValue) as { path?: string; anchorId?: string } | null;
+      if (!pendingAnchor || pendingAnchor.path !== pathname || !pendingAnchor.anchorId) {
+        window.sessionStorage.removeItem(PENDING_KEY);
+        return null;
+      }
       window.sessionStorage.removeItem(PENDING_KEY);
       return pendingAnchor.anchorId;
-    } catch {
-      window.sessionStorage.removeItem(PENDING_KEY);
-      return null;
     }
   }
 

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { parseUrl, settle } from "~~/lib/settle";
 import { cn, messageOf } from "~~/lib/utils";
 import { COMMON_HEADER_NAMES } from "~~/lib/headers";
 import type { ActionResult } from "~~/lib/api-types";
@@ -39,11 +40,8 @@ const synced = ref(false);
 const MULTIPART_SUFFIXES = new Set(["ac", "biz", "co", "com", "edu", "go", "gov", "mil", "my", "ne", "net", "or", "org", "sch", "web"]);
 
 const host = computed(() => {
-  try {
-    return new URL(baseUrl.value.trim()).hostname.toLowerCase().replace(/^www\./, "");
-  } catch {
-    return "";
-  }
+  const parsed = parseUrl(baseUrl.value.trim());
+  return parsed ? parsed.hostname.toLowerCase().replace(/^www\./, "") : "";
 });
 
 const domain = computed(() => {
@@ -134,16 +132,24 @@ async function ensureProvider(): Promise<boolean> {
 async function syncModels() {
   busy.value = "sync";
   errorMessage.value = "";
-  try {
-    const result = await webApi.customProviders.previewModels({
+  const preview = await settle(() =>
+    webApi.customProviders.previewModels({
       baseUrl: baseUrl.value.trim(),
       extraHeaders: headersPayload(),
       token: apiKey.value.trim() || undefined,
-    });
-    if (!result.success) {
-      errorMessage.value = result.error;
-      return;
-    }
+    })
+  );
+  busy.value = "";
+  if (!preview.ok) {
+    errorMessage.value = messageOf(preview.error);
+    return;
+  }
+  if (!preview.value.success) {
+    errorMessage.value = preview.value.error;
+    return;
+  }
+  {
+    const result = preview.value;
     models.value = result.data.models.length > 0
       ? result.data.models.map((model) => {
         const source = model.upstream || model.modelId;
@@ -151,10 +157,6 @@ async function syncModels() {
       })
       : [{ model: "", alias: "", aliased: false }];
     synced.value = true;
-  } catch (error) {
-    errorMessage.value = messageOf(error);
-  } finally {
-    busy.value = "";
   }
 }
 

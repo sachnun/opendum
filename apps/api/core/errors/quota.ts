@@ -1,5 +1,5 @@
 import { Result } from "effect";
-import { Coerce, Safe } from "../helpers.js";
+import { Coerce, Safe } from "@opendum/api/core/helpers";
 
 export class ProviderQuota {
   static antigravityExhausted(provider: string, status: number, body: string): boolean {

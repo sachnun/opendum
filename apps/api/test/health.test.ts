@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it } from "bun:test";
 import { Effect } from "effect";
 import type { OpendumRedis } from "@opendum/core/redis";
 import type { Registry } from "@opendum/models/runtime";
-import { Health, MAX_ERROR_LEN } from "../core/health.js";
-import { fakes, type Fakes } from "./fakes.js";
+import { Health, MAX_ERROR_LEN } from "@opendum/api/core/health";
+import { fakes, type Fakes } from "@opendum/api/test/fakes";
 
 type Options = ConstructorParameters<typeof Health>[0];
 
@@ -165,7 +165,7 @@ describe("Health", () => {
 
   it("bumps request counts in the background", async () => {
     healthService().bumpRequest("acc-1");
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await Effect.runPromise(Effect.sleep("10 millis"));
     expect(repositories.health.bumpRequests).toHaveBeenCalledTimes(1);
   });
 });

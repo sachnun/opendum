@@ -12,7 +12,10 @@
     "./signature": "./crypto/signature.ts",
     "./redis": "./redis/index.ts",
     "./redis/keys": "./redis/keys.ts",
-    "./egress": "./egress/index.ts"
+    "./egress": "./egress/index.ts",
+    "./*": "./*.ts",
+    "./raise": "./raise.ts",
+    "./json": "./json.ts"
   },
   "scripts": {
     "test": "bun test",
@@ -21,8 +24,7 @@
   "dependencies": {
     "effect": "4.0.6",
     "redis": "^6.3.0",
-    "undici": "^8.12.3",
-    "zod": "^4.6.7"
+    "undici": "^8.12.3"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

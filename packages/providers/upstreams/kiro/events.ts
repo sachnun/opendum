@@ -1,6 +1,6 @@
-import { Value, Payload } from "../../core/helpers.js";
-import { pick } from "./common.js";
-import { KiroModel } from "./model.js";
+import { Value, Payload } from "@opendum/providers/core/helpers";
+import { pick } from "@opendum/providers/upstreams/kiro/common";
+import { KiroModel } from "@opendum/providers/upstreams/kiro/model";
 
 export type Json = Record<string, unknown>;
 

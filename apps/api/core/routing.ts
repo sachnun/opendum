@@ -1,7 +1,7 @@
 import { preferSticky } from "@opendum/core/redis";
 import type { ProviderAccount } from "@opendum/providers";
-import type { ProviderRoutingOptions } from "./provider-performance.js";
-import { isSynthetic, prioritizeAccounts } from "./service-helpers.js";
+import type { ProviderRoutingOptions } from "@opendum/api/core/provider-performance";
+import { isSynthetic, prioritizeAccounts } from "@opendum/api/core/service-helpers";
 
 export type Context = {
   crossProvider: boolean;

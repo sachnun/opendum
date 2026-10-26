@@ -1,4 +1,4 @@
-import { SORT_ORDER, categorize, type ModelFamily } from "./ranking.ts";
+import { SORT_ORDER, categorize, type ModelFamily } from "@opendum/models/ranking";
 
 export type ModelSortEntry = string | { id?: string; name?: string; family?: string | null };
 

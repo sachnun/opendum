@@ -10,8 +10,8 @@ import {
   scoreMetrics,
   type ProviderRoutingOptions,
   type ProviderScore,
-} from "../core/provider-performance.js";
-import { byPerformance, prioritizeAccounts } from "../core/service-helpers.js";
+} from "@opendum/api/core/provider-performance";
+import { byPerformance, prioritizeAccounts } from "@opendum/api/core/service-helpers";
 
 const config = DEFAULT_CONFIG;
 

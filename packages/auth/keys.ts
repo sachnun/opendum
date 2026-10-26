@@ -12,9 +12,9 @@ import {
   type Cached,
   INVALID_TTL,
   VALID_TTL,
-} from "./cache.js";
-import { accessList, accessMode, accountList } from "./normalize.js";
-import { type AuthResult, type RateLimitRule, emptyResult } from "./types.js";
+} from "@opendum/auth/cache";
+import { accessList, accessMode, accountList } from "@opendum/auth/normalize";
+import { type AuthResult, type RateLimitRule, emptyResult } from "@opendum/auth/types";
 
 export type Queries = {
   keyByHash: typeof keyByHash;

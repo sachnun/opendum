@@ -1,7 +1,7 @@
 import { defineHandler } from "nitro";
-import { proxyContext } from "../../context.js";
-import { handleInference } from "../../handlers/inference.js";
-import { Responses } from "../../core/endpoints.js";
+import { proxyContext } from "@opendum/api/context";
+import { handleInference } from "@opendum/api/handlers/inference";
+import { Responses } from "@opendum/api/core/endpoints";
 
 export default defineHandler(async (event) =>
   handleInference(event, await proxyContext(), new Responses())

@@ -1,4 +1,4 @@
-import type { QuotaGroupDisplay } from "./api-types";
+import type { QuotaGroupDisplay } from "~~/lib/api-types";
 
 export function percentRemaining(group: QuotaGroupDisplay): number {
   return Math.max(0, Math.min(100, Math.round(group.remainingFraction * 100)));

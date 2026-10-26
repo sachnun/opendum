@@ -1,8 +1,8 @@
 import { eq } from "drizzle-orm";
 import { Effect } from "effect";
-import { db, type DbExecutor } from "../client.js";
-import { tryDb } from "../errors.js";
-import { proxyApiKey, keyRateLimit } from "../schema/keys.js";
+import { db, type DbExecutor } from "@opendum/database/client";
+import { tryDb } from "@opendum/database/errors";
+import { proxyApiKey, keyRateLimit } from "@opendum/database/schema/keys";
 
 export const keyByHash = Effect.fn("db.keyByHash")(function* (
   keyHash: string,

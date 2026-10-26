@@ -1,17 +1,17 @@
 import { Effect } from "effect";
 import { db, pinnedProvider, providerAccount, accountDisabledModel, accountModelHealth } from "@opendum/database";
-import { fromPromise } from "#web/lib/task.js";
-import { internal } from "#web/errors.js";
+import { fromPromise } from "@opendum/api/web/lib/task";
+import { internal } from "@opendum/api/web/errors";
 import type { AccountSessionInput, AccountStatsInput, DeleteAccountInput, HistoryBatchInput, ErrorHistoryInput, ProviderDetailInput, ProviderInput, ResolveErrorsInput, ModelToggleInput, PinToggleInput, UpdateAccountInput } from "@opendum/providers/contract";
-import { publishAccounts } from "#web/events/bus.js";
-import { keysOf, providerSet, aliasOf } from "#web/lib/proxy/models.js";
-import { clearFails, invalidateDisabled } from "#web/lib/proxy/auth.js";
-import { decrypt } from "#web/lib/encryption.js";
+import { publishAccounts } from "@opendum/api/web/events/bus";
+import { keysOf, providerSet, aliasOf } from "@opendum/api/web/lib/proxy/models";
+import { clearFails, invalidateDisabled } from "@opendum/api/web/lib/proxy/auth";
+import { decrypt } from "@opendum/api/web/lib/encryption";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
-import { isKnown, PROVIDER_ACCOUNT_KEYS } from "./account-providers.js";
-import { customProviderModels } from "./custom-providers.js";
-import { trackProviderEmail } from "./points.js";
-import { buildAccountStats, emptyStats, providerSummary, type ProviderAccountIndicator, type ProviderStats } from "./account-stats.js";
+import { isKnown, PROVIDER_ACCOUNT_KEYS } from "@opendum/api/web/services/account-providers";
+import { customProviderModels } from "@opendum/api/web/services/custom-providers";
+import { trackProviderEmail } from "@opendum/api/web/services/points";
+import { buildAccountStats, emptyStats, providerSummary, type ProviderAccountIndicator, type ProviderStats } from "@opendum/api/web/services/account-stats";
 import {
   AccountState,
   Clock,
@@ -26,9 +26,9 @@ import {
   type HealthRow,
   type AccountOverviewSummary,
   type AccountReadOptions,
-} from "./accounts-helpers.js";
+} from "@opendum/api/web/services/accounts-helpers";
 
-export { createAccount } from "./account-connectors.js";
+export { createAccount } from "@opendum/api/web/services/account-connectors";
 
 const ACCOUNT_COOLDOWN_MS = 10 * 60 * 1000;
 const DEFAULT_HISTORY_ROWS = 100;

@@ -1,19 +1,20 @@
-import { Effect } from "effect";
+import { raise } from "@opendum/models/refresh/core/raise";
+import { Effect, Result } from "effect";
 
-import { familyOf } from "./model/families.ts";
-import { ModelParseFailure, ModelReadFailure, ModelsDirectoryFailure, asError } from "./errors.ts";
-import { exists, isDirectory, listJson, readText } from "./fs.ts";
-import { basename, dirname, join } from "./paths.ts";
-import { decodeSync } from "./schema.ts";
-import { Catalog } from "./catalog.ts";
-import { Aliases } from "./aliases.ts";
-import { View } from "./view.ts";
-import { Suggester } from "./suggester.ts";
-import { Serializer } from "./serializer.ts";
-import { Policy } from "./policy.ts";
+import { familyOf } from "@opendum/models/model/families";
+import { ModelParseFailure, ModelReadFailure, ModelsDirectoryFailure, asError } from "@opendum/models/errors";
+import { exists, isDirectory, listJson, readText } from "@opendum/models/fs";
+import { basename, dirname, join } from "@opendum/models/paths";
+import { decodeSync } from "@opendum/models/schema";
+import { Catalog } from "@opendum/models/catalog";
+import { Aliases } from "@opendum/models/aliases";
+import { View } from "@opendum/models/view";
+import { Suggester } from "@opendum/models/suggester";
+import { Serializer } from "@opendum/models/serializer";
+import { Policy } from "@opendum/models/policy";
 
-export { scoreFor } from "./suggester.ts";
-export { nvidiaAlias } from "./aliases.ts";
+export { scoreFor } from "@opendum/models/suggester";
+export { nvidiaAlias } from "@opendum/models/aliases";
 
 export type ModelModalities = {
   input?: string[];
@@ -91,17 +92,19 @@ function generatedDir(dir: string): string {
 function readEntries(dir: string, required: boolean): ModelEntry[] {
   if (!exists(dir)) {
     if (required) {
-      throw new ModelsDirectoryFailure({
-        message: `models directory not found: ${dir}`,
-        path: dir,
-        cause: undefined,
-      });
+      raise(
+        new ModelsDirectoryFailure({
+          message: `models directory not found: ${dir}`,
+          path: dir,
+          cause: undefined,
+        })
+      );
     }
     return [];
   }
   if (!isDirectory(dir)) {
     if (required) {
-      throw new ModelsDirectoryFailure({ message: `models path is not a directory: ${dir}`, path: dir });
+      raise(new ModelsDirectoryFailure({ message: `models path is not a directory: ${dir}`, path: dir }));
     }
     return [];
   }
@@ -110,13 +113,21 @@ function readEntries(dir: string, required: boolean): ModelEntry[] {
   for (const relativePath of listJson(dir)) {
     if (!relativePath.endsWith(".json")) continue;
     const fullPath = join(dir, relativePath);
-    let parsed: ModelInfo;
-    try {
-      parsed = decodeSync(readText(fullPath), fullPath) as ModelInfo;
-    } catch (cause) {
-      if (cause instanceof ModelParseFailure) throw cause;
-      throw new ModelParseFailure({ message: `invalid model JSON: ${fullPath}`, path: fullPath, cause });
+    const decoded = Result.try({
+      try: () => decodeSync(readText(fullPath), fullPath) as ModelInfo,
+      catch: (cause: unknown) => cause,
+    });
+    if (Result.isFailure(decoded)) {
+      if (decoded.failure instanceof ModelParseFailure) raise(decoded.failure);
+      raise(
+        new ModelParseFailure({
+          message: `invalid model JSON: ${fullPath}`,
+          path: fullPath,
+          cause: decoded.failure,
+        })
+      );
     }
+    const parsed = decoded.success;
     const segments = relativePath.split("/");
     entries.push({
       fileId: basename(relativePath, ".json"),

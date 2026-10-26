@@ -1,4 +1,4 @@
-import type { ModelInfo } from "./registry.ts";
+import type { ModelInfo } from "@opendum/models/registry";
 
 type Json = Record<string, unknown>;
 

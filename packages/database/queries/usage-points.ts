@@ -2,9 +2,9 @@ import { and, eq, gte, lt, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { createId } from "@paralleldrive/cuid2";
 import { Effect } from "effect";
-import { db, type DbExecutor } from "../client.js";
-import { tryDb } from "../errors.js";
-import { pointTransaction, usageLog, userPointBalance } from "../schema/usage.js";
+import { db, type DbExecutor } from "@opendum/database/client";
+import { tryDb } from "@opendum/database/errors";
+import { pointTransaction, usageLog, userPointBalance } from "@opendum/database/schema/usage";
 
 export type UsageLogParams = {
   id?: string;

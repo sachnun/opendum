@@ -6,13 +6,14 @@ import {
   familyCounts,
   type ShellAccountSummary,
 } from "~~/lib/account-overview";
+import { settle } from "~~/lib/settle";
 
 import type { AccountsData, ModelsData, UsageData } from "@opendum/providers/contract";
-import type { NavItem, NavSubItem, ProviderAccountIndicator } from "../../lib/navigation";
-import type { AccountOverviewData, MeData } from "../../lib/api-types";
-import { isSwitch, primaryNavigation, hrefOf } from "../../lib/navigation";
+import type { NavItem, NavSubItem, ProviderAccountIndicator } from "~~/lib/navigation";
+import type { AccountOverviewData, MeData } from "~~/lib/api-types";
+import { isSwitch, primaryNavigation, hrefOf } from "~~/lib/navigation";
 import { hrefMap, accountPath, PROVIDER_ACCOUNT_DEFINITIONS } from "@opendum/providers/provider-accounts";
-import { avatarUrl } from "../../lib/utils";
+import { avatarUrl } from "~~/lib/utils";
 
 const route = useRoute();
 const { user: authUser, signOut: endSession } = useAuth();
@@ -292,18 +293,15 @@ async function updateSharing(enabled: boolean) {
   if (isAuditMode.value || sharingUpdating.value) return;
 
   sharingUpdating.value = true;
-  try {
-    const result = await api.sharing.update({ enabled });
-    sharingEnabled.value = result.enabled;
-    if (me.value) {
-      me.value = {
-        ...me.value,
-        sharing: { enabled: result.enabled },
-      };
-    }
-  } finally {
-    sharingUpdating.value = false;
+  const result = await api.sharing.update({ enabled });
+  sharingEnabled.value = result.enabled;
+  if (me.value) {
+    me.value = {
+      ...me.value,
+      sharing: { enabled: result.enabled },
+    };
   }
+  sharingUpdating.value = false;
 }
 
 function toggleSharing() {

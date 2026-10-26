@@ -9,8 +9,9 @@ import {
   setImpersonation,
   type AccessTokenClaims,
   type AuthUser,
-} from "../../lib/auth-token";
-import { apiUrl } from "../../lib/api-url";
+} from "~~/lib/auth-token";
+import { raise, settle } from "~~/lib/settle";
+import { apiUrl } from "~~/lib/api-url";
 
 function sanitizeRedirect(value: string | undefined): string | null {
   if (!value || !value.startsWith("/") || value.startsWith("//")) return null;
@@ -68,15 +69,12 @@ export function useAuth() {
   async function requestAccessToken(sessionToken: string): Promise<string | null> {
     if (!sessionToken) return null;
 
-    try {
-      const result = await $fetch<{ token?: string }>(`${baseUrl}/api/auth/token`, {
+    const fetched = await settle(() =>
+      $fetch<{ token?: string }>(`${baseUrl}/api/auth/token`, {
         headers: { authorization: `Bearer ${sessionToken}` },
-      });
-
-      return result?.token ?? null;
-    } catch {
-      return null;
-    }
+      })
+    );
+    return fetched.ok ? (fetched.value?.token ?? null) : null;
   }
 
   async function refreshAccessToken(): Promise<boolean> {
@@ -103,26 +101,25 @@ export function useAuth() {
 
   async function startAudit(userId: string): Promise<AuthUser> {
     const token = sessionToken();
-    if (!token) throw new Error("Not signed in");
+    if (!token) raise(new Error("Not signed in"));
 
-    let result: { session?: { token?: string }; user?: AuthUser };
-    try {
-      result = await $fetch<{ session?: { token?: string }; user?: AuthUser }>(`${baseUrl}/api/auth/admin/impersonate-user`, {
+    const fetched = await settle(() =>
+      $fetch<{ session?: { token?: string }; user?: AuthUser }>(`${baseUrl}/api/auth/admin/impersonate-user`, {
         method: "POST",
         headers: { authorization: `Bearer ${token}` },
         body: { userId },
-      });
-    } catch (error) {
-      throw new Error(errorMessage(error, "Failed to start audit mode"));
-    }
+      })
+    );
+    if (!fetched.ok) raise(new Error(errorMessage(fetched.error, "Failed to start audit mode")));
+    const result = fetched.value;
 
     const impersonationToken = result?.session?.token;
-    if (!impersonationToken) throw new Error("Failed to start audit mode");
+    if (!impersonationToken) raise(new Error("Failed to start audit mode"));
 
     setImpersonation(impersonationToken);
     if (!(await refreshAccessToken())) {
       setImpersonation(null);
-      throw new Error("Failed to start audit mode");
+      raise(new Error("Failed to start audit mode"));
     }
 
     return result.user ?? { id: userId, name: null, email: null, image: null };

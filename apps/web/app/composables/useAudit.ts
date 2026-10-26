@@ -1,4 +1,4 @@
-import type { AuditInfo, MeData } from "../../lib/api-types";
+import type { AuditInfo, MeData } from "~~/lib/api-types";
 
 const emptyAuditInfo: AuditInfo = {
   active: false,

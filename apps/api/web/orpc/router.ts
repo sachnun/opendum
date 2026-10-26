@@ -3,25 +3,26 @@ import { contract } from "@opendum/providers/contract";
 import { playgroundSignature } from "@opendum/core/crypto";
 import { implement } from "@orpc/server";
 import { Effect } from "effect";
+import { raise } from "@opendum/core/raise";
 
-import { proxyContext } from "../../context.js";
-import { runOrpc } from "./run.js";
-import { publishModels, subscribeEvents } from "#web/events/bus.js";
-import "#web/events/snapshots.js";
-import { originOf } from "#web/lib/request-origin.js";
-import * as accountAuth from "#web/services/account-auth.js";
-import * as accountQuota from "#web/services/account-quota.js";
-import * as accounts from "#web/services/accounts.js";
-import * as analytics from "#web/services/analytics.js";
-import * as apiKeys from "#web/services/api-keys.js";
-import * as customProviders from "#web/services/custom-providers.js";
-import * as maintainer from "#web/services/maintainer.js";
-import * as models from "#web/services/models.js";
-import * as ops from "#web/services/ops.js";
-import { getPlaygroundOptions } from "#web/services/playground.js";
-import { claimDaily, pointStatus } from "#web/services/points.js";
-import { sharingEnabled, setSharing } from "#web/services/sharing.js";
-import { requireMaintainer, requireWritable, resolveContext, type OrpcInitialContext } from "./context.js";
+import { proxyContext } from "@opendum/api/context";
+import { runOrpc } from "@opendum/api/web/orpc/run";
+import { publishModels, subscribeEvents } from "@opendum/api/web/events/bus";
+import "@opendum/api/web/events/snapshots";
+import { originOf } from "@opendum/api/web/lib/request-origin";
+import * as accountAuth from "@opendum/api/web/services/account-auth";
+import * as accountQuota from "@opendum/api/web/services/account-quota";
+import * as accounts from "@opendum/api/web/services/accounts";
+import * as analytics from "@opendum/api/web/services/analytics";
+import * as apiKeys from "@opendum/api/web/services/api-keys";
+import * as customProviders from "@opendum/api/web/services/custom-providers";
+import * as maintainer from "@opendum/api/web/services/maintainer";
+import * as models from "@opendum/api/web/services/models";
+import * as ops from "@opendum/api/web/services/ops";
+import { getPlaygroundOptions } from "@opendum/api/web/services/playground";
+import { claimDaily, pointStatus } from "@opendum/api/web/services/points";
+import { sharingEnabled, setSharing } from "@opendum/api/web/services/sharing";
+import { requireMaintainer, requireWritable, resolveContext, type OrpcInitialContext } from "@opendum/api/web/orpc/context";
 
 const base = implement(contract).$context<OrpcInitialContext>();
 
@@ -156,7 +157,7 @@ export const router = authed.router({
     ),
     session: writable.accounts.session.handler(({ context, input }) => {
       if (process.env.NODE_ENV === "production" && !context.requestContext.isMaintainer) {
-        throw new ORPCError("NOT_FOUND", { message: "Not Found" });
+        raise(new ORPCError("NOT_FOUND", { message: "Not Found" }));
       }
       return runOrpc(accounts.getAccountSession(context.requestContext.userId, input));
     }),
@@ -348,7 +349,7 @@ export const router = authed.router({
       const method = "POST";
       const path = endpointPath(input.endpoint);
       const secret = process.env.BETTER_AUTH_SECRET;
-      if (!secret) throw new ORPCError("INTERNAL_SERVER_ERROR", { message: "BETTER_AUTH_SECRET is required" });
+      if (!secret) raise(new ORPCError("INTERNAL_SERVER_ERROR", { message: "BETTER_AUTH_SECRET is required" }));
 
       return {
         headers: {

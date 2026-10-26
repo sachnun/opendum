@@ -1,5 +1,6 @@
-import { Value, Payload, Ids, JSONText } from "../core/helpers.js";
-import { ChatImageInliner, type ImageFetch } from "../core/images.js";
+import { Value, Payload, Ids, JSONText } from "@opendum/providers/core/helpers";
+import { Effect } from "effect";
+import { ChatImageInliner, type ImageFetch } from "@opendum/providers/core/images";
 
 type Json = Record<string, unknown>;
 
@@ -13,7 +14,7 @@ export async function payloadFor(
 ): Promise<Json> {
   const messagesInput = Array.isArray(body.messages) ? body.messages : [];
   const messages = imageFetch
-    ? await new ChatImageInliner(imageFetch).run(messagesInput)
+    ? await Effect.runPromise(new ChatImageInliner(imageFetch).run(messagesInput))
     : messagesInput;
   const payload: Json = {
     model: modelName,
@@ -359,28 +360,25 @@ async function* dataLines(source: ReadableStream<Uint8Array>): AsyncGenerator<st
   const reader = source.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed.startsWith("data:")) continue;
-        yield trimmed.slice("data:".length).trim();
-      }
-    }
-    buffer += decoder.decode();
-    for (const line of buffer.split("\n")) {
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
       const trimmed = line.trim();
       if (!trimmed.startsWith("data:")) continue;
       yield trimmed.slice("data:".length).trim();
     }
-  } finally {
-    reader.releaseLock();
   }
+  buffer += decoder.decode();
+  for (const line of buffer.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("data:")) continue;
+    yield trimmed.slice("data:".length).trim();
+  }
+  reader.releaseLock();
 }
 
 async function* chatStream(

@@ -1,7 +1,7 @@
-import { Ids, Payload, Value } from "../../core/helpers.js";
-import { pick } from "./common.js";
-import { KiroNames } from "./parser.js";
-import type { Json } from "./events.js";
+import { Ids, Payload, Value } from "@opendum/providers/core/helpers";
+import { pick } from "@opendum/providers/upstreams/kiro/common";
+import { KiroNames } from "@opendum/providers/upstreams/kiro/parser";
+import type { Json } from "@opendum/providers/upstreams/kiro/events";
 
 export const THINKING_START = "<thinking>";
 export const THINKING_END = "</thinking>";
@@ -136,15 +136,8 @@ export class KiroToolCalls {
     const id = Value.string(call.id);
     const name = Value.string(fn.name);
     if (!id || !name) return null;
-    let input: unknown = {};
     const args = Value.string(fn.arguments);
-    if (args) {
-      try {
-        input = JSON.parse(args);
-      } catch {
-        input = {};
-      }
-    }
+    const input = args ? (Value.parseJson(args) ?? {}) : {};
     return { toolUseId: id, name, input };
   }
 

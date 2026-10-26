@@ -1,13 +1,13 @@
 import { Effect } from "effect";
 import type { DatabaseFailure } from "@opendum/database";
-import type { CustomPort, HealthPort, AccountPort } from "./repositories.js";
+import type { CustomPort, HealthPort, AccountPort } from "@opendum/api/core/repositories";
 import { OWN_ACCOUNT_SCOPE, SHARED_ACCOUNT_SCOPE, type AccountAffinity } from "@opendum/core/redis";
 import type { AuthResult, ModelValidationResult } from "@opendum/auth";
 import type { ProviderAccount, ProviderRegistry } from "@opendum/providers";
 import type { Registry } from "@opendum/models/runtime";
-import type { Health } from "./health.js";
-import type { ProviderPerformance, ProviderRoutingOptions } from "./provider-performance.js";
-import { Priority, Sticky, compose } from "./routing.js";
+import type { Health } from "@opendum/api/core/health";
+import type { ProviderPerformance, ProviderRoutingOptions } from "@opendum/api/core/provider-performance";
+import { Priority, Sticky, compose } from "@opendum/api/core/routing";
 import {
   accessDenial,
   isSynthetic,
@@ -17,7 +17,7 @@ import {
   tierSatisfies,
   fallbackTier,
   byPriority,
-} from "./service-helpers.js";
+} from "@opendum/api/core/service-helpers";
 
 export type StickyMissReason = "cooldown" | "degraded" | "ineligible";
 

@@ -1,12 +1,12 @@
 import { Cause, Effect, Exit } from "effect";
 
-import { fetchJson } from "./http.ts";
-import { buildIndex, resolveCandidates, type IndexedModel } from "../model/similarity.ts";
+import { fetchJson } from "@opendum/models/sync/http";
+import { buildIndex, resolveCandidates, type IndexedModel } from "@opendum/models/model/similarity";
 import {
   MODELSDEV_CANONICAL_URL,
   canonicalIndex,
   type CanonicalIndex,
-} from "../model/canonical.ts";
+} from "@opendum/models/model/canonical";
 
 export const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
 export const MODELSDEV_URL = "https://models.dev/api.json";

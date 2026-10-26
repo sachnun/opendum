@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { Effect } from "effect";
-import { EgressPoster, type EgressFetch, type FetchLike, type UpstreamTransport } from "./http.js";
+import { EgressPoster, type EgressFetch, type FetchLike, type UpstreamTransport } from "@opendum/providers/core/http";
 
 type Harness = { transport: UpstreamTransport; egressCalls: () => number; directCalls: () => number };
 

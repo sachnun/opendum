@@ -41,29 +41,31 @@ export function pkcs7Pad(data: Buffer, blockSize: number): Buffer {
   return padded;
 }
 
-export function pkcs7Unpad(data: Buffer, blockSize: number): Buffer {
-  if (data.length === 0 || data.length % blockSize !== 0) {
-    throw new Error("invalid PKCS7 data");
-  }
+export function pkcs7Unpad(data: Buffer, blockSize: number): Buffer | null {
+  if (data.length === 0 || data.length % blockSize !== 0) return null;
   const padding = data[data.length - 1];
-  if (padding === undefined || padding === 0 || padding > blockSize || padding > data.length) {
-    throw new Error("invalid PKCS7 padding");
-  }
+  if (padding === undefined || padding === 0 || padding > blockSize || padding > data.length) return null;
   for (const byte of data.subarray(data.length - padding)) {
-    if (byte !== padding) {
-      throw new Error("invalid PKCS7 padding bytes");
-    }
+    if (byte !== padding) return null;
   }
   return data.subarray(0, data.length - padding);
 }
 
-export function decrypt(passphrase: string, ciphertext: string): string {
+export type DecryptFailure =
+  | { readonly _tag: "CiphertextFormat"; readonly message: string }
+  | { readonly _tag: "CiphertextLength"; readonly message: string }
+  | { readonly _tag: "Padding"; readonly message: string };
+
+export function decryptResult(
+  passphrase: string,
+  ciphertext: string
+): { readonly ok: true; readonly value: string } | { readonly ok: false; readonly failure: DecryptFailure } {
   const raw = Buffer.from(ciphertext, "base64");
   if (
     raw.length < OPENSSL_SALT_HEADER.length + SALT_LENGTH ||
     !raw.subarray(0, OPENSSL_SALT_HEADER.length).equals(OPENSSL_SALT_HEADER)
   ) {
-    throw new Error("unsupported CryptoJS ciphertext format");
+    return { ok: false, failure: { _tag: "CiphertextFormat", message: "unsupported CryptoJS ciphertext format" } };
   }
 
   const salt = raw.subarray(OPENSSL_SALT_HEADER.length, OPENSSL_SALT_HEADER.length + SALT_LENGTH);
@@ -71,13 +73,20 @@ export function decrypt(passphrase: string, ciphertext: string): string {
   const { key, iv } = evpKey(Buffer.from(passphrase, "utf8"), salt, KEY_LENGTH, BLOCK_SIZE);
 
   if (payload.length === 0 || payload.length % BLOCK_SIZE !== 0) {
-    throw new Error("invalid AES-CBC ciphertext length");
+    return { ok: false, failure: { _tag: "CiphertextLength", message: "invalid AES-CBC ciphertext length" } };
   }
 
   const decipher = createDecipheriv("aes-256-cbc", key, iv);
   decipher.setAutoPadding(false);
   const plaintext = Buffer.concat([decipher.update(payload), decipher.final()]);
-  return pkcs7Unpad(plaintext, BLOCK_SIZE).toString("utf8");
+  const unpadded = pkcs7Unpad(plaintext, BLOCK_SIZE);
+  if (!unpadded) return { ok: false, failure: { _tag: "Padding", message: "invalid PKCS7 padding" } };
+  return { ok: true, value: unpadded.toString("utf8") };
+}
+
+export function decrypt(passphrase: string, ciphertext: string): string {
+  const result = decryptResult(passphrase, ciphertext);
+  return result.ok ? result.value : result.failure.message;
 }
 
 export function encrypt(passphrase: string, plaintext: string): string {

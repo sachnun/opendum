@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { errorText, settle } from "~~/lib/settle";
 import { CalendarDate, Time } from "@internationalized/date";
 import { format, isSameDay } from "date-fns";
 import { TimeFieldInput, TimeFieldRoot } from "reka-ui";
@@ -95,17 +96,20 @@ async function saveExpiration(value: Date | null) {
   if (props.readonly) return;
   isSaving.value = true;
   errorMessage.value = "";
-  try {
-    const result = await api.apiKeys.updateExpiration({ id: props.apiKeyId, expiresAt: value });
-    if (!result.success) throw new Error(result.error);
+  const updated = await settle(() => api.apiKeys.updateExpiration({ id: props.apiKeyId, expiresAt: value }));
+  isSaving.value = false;
+  if (!updated.ok) {
+    errorMessage.value = errorText(updated.error, "Failed to update expiration");
+    return;
+  }
+  if (!updated.value.success) {
+    errorMessage.value = updated.value.error;
+    return;
+  }
+  const result = updated.value;
     expiresAt.value = result.data.expiresAt ? new Date(result.data.expiresAt) : null;
     open.value = false;
     emit("updated", { expiresAt: result.data.expiresAt });
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : "Failed to update expiration";
-  } finally {
-    isSaving.value = false;
-  }
 }
 </script>
 

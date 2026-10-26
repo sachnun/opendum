@@ -1,7 +1,6 @@
-import type { Registry } from "@opendum/models/runtime";
 import type { OpendumRedis } from "@opendum/core/redis";
-import type { Json } from "./common.js";
-import type { UpstreamTransport } from "../../core/http.js";
+import type { Json } from "@opendum/providers/upstreams/antigravity/common";
+import type { ProviderOptions } from "@opendum/providers/core/provider";
 
 export type AccountInfo = {
   projectId: string;
@@ -10,9 +9,7 @@ export type AccountInfo = {
   email: string;
 };
 
-export type AntigravityOptions = {
-  registry: Registry;
-  transport: UpstreamTransport;
+export type AntigravityOptions = ProviderOptions & {
   redis?: OpendumRedis | null;
   persistAccountInfo?: (accountId: string, info: { projectId: string; tier: string; email: string }) => void;
 };

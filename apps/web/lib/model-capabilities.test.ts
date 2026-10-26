@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { capabilitiesOf } from "./model-capabilities";
+import { capabilitiesOf } from "~~/lib/model-capabilities";
 
 test("missing model exposes no capabilities", () => {
   expect(capabilitiesOf(undefined)).toEqual({ reasoning: false, vision: false });

@@ -1,6 +1,6 @@
 import { Effect } from "effect";
-import type { DbExecutor } from "../client.js";
-import { DatabaseFailure, databaseFailure } from "../errors.js";
+import type { DbExecutor } from "@opendum/database/client";
+import { DatabaseFailure, databaseFailure } from "@opendum/database/errors";
 import {
   creditPointBalance,
   debitPointBalance,
@@ -10,7 +10,7 @@ import {
   insertPointTransaction,
   insertTransaction,
   updateTransactionBalance,
-} from "../queries/index.js";
+} from "@opendum/database/queries/index";
 
 export class Points {
   constructor(private readonly database: DbExecutor) {}

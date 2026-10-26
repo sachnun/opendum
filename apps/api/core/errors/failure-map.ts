@@ -1,4 +1,4 @@
-import type { ErrorFormat, RouteError } from "../types.js";
+import type { ErrorFormat, RouteError } from "@opendum/api/core/types";
 import {
   AuthenticationFailure,
   ConfigurationFailure,
@@ -8,7 +8,7 @@ import {
   UpstreamFailure,
   ValidationFailure,
   type ProxyFailure,
-} from "./failures.js";
+} from "@opendum/api/core/errors/failures";
 
 export class FailureMap {
   static toRoute(error: ProxyFailure): RouteError {

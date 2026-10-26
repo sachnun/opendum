@@ -1,9 +1,10 @@
 import { defineHandler } from "nitro";
 import { getQuery, HTTPError } from "h3";
 import { Effect } from "effect";
+import { raise } from "@opendum/core/raise";
 
-import { webOrigin, safePath, loginUrl } from "#web/lib/handoff.js";
-import { sessionOf, mintAccessToken } from "#web/utils/session.js";
+import { webOrigin, safePath, loginUrl } from "@opendum/api/web/lib/handoff";
+import { sessionOf, mintAccessToken } from "@opendum/api/web/utils/session";
 
 function redirectTo(location: string): Response {
   return new Response(null, { status: 302, headers: { location } });
@@ -12,7 +13,7 @@ function redirectTo(location: string): Response {
 export default defineHandler(async (event) => {
   const query = getQuery(event);
   const origin = webOrigin(query.to);
-  if (!origin) throw new HTTPError({ status: 400, statusText: "Invalid web origin" });
+  if (!origin) raise(new HTTPError({ status: 400, statusText: "Invalid web origin" }));
 
   const redirect = safePath(query.redirect);
   const error = typeof query.error === "string" ? query.error.trim() : "";

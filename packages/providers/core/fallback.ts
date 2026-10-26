@@ -119,13 +119,17 @@ export class FallbackPolicy {
       if (yield* this.sticky(provider)) {
         const resp = yield* post(fallback);
         if (!FallbackPolicy.triggers(resp.status)) return resp;
-        yield* Effect.promise(() => resp.body?.cancel() ?? Promise.resolve());
+        yield* Effect.promise(async () => {
+        await resp.body?.cancel();
+      });
         return yield* this.primary(provider, post(primary));
       }
 
       const resp = yield* this.primary(provider, post(primary));
       if (!FallbackPolicy.triggers(resp.status)) return resp;
-      yield* Effect.promise(() => resp.body?.cancel() ?? Promise.resolve());
+      yield* Effect.promise(async () => {
+        await resp.body?.cancel();
+      });
       yield* this.recordStrike(provider);
       return yield* post(fallback);
     });

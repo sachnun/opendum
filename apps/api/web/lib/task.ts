@@ -1,7 +1,7 @@
 import { Effect } from "effect";
 
-import type { ActionResult } from "#web/utils/api.js";
-import { ServiceFailure, asFailure } from "../errors.js";
+import type { ActionResult } from "@opendum/api/web/utils/api";
+import { ServiceFailure, asFailure } from "@opendum/api/web/errors";
 
 export function fromPromise<A>(
   run: () => Promise<A>,

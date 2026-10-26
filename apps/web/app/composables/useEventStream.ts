@@ -2,9 +2,9 @@ import type { AccountsData, LiveTopic, ModelsData, ServerEvent, UsageData } from
 import { consumeEventIterator } from "@orpc/client";
 import { Duration, Effect, Match, Schedule } from "effect";
 
-import { apiUrl } from "../../lib/api-url";
-import { apiClient } from "../../lib/orpc";
-import { liveEventKey } from "./useLiveEvent";
+import { apiUrl } from "~~/lib/api-url";
+import { apiClient } from "~~/lib/orpc";
+import { liveEventKey } from "~/composables/useLiveEvent";
 
 const SUBSCRIBED_TOPICS: LiveTopic[] = ["points", "accounts", "models", "usage"];
 const IDLE_TIMEOUT_MS = 45_000;
@@ -101,21 +101,23 @@ export function useEventStream(handlers: EventStreamHandlers = {}) {
     const client = apiClient({ baseUrl, refresh: refreshAuth });
     const iterator = client.events.subscribe({ topics: SUBSCRIBED_TOPICS });
 
-    await new Promise<void>((resolve) => {
-      release = resolve;
-      cancel = consumeEventIterator(iterator, {
-        onEvent: handleEvent,
-        onError: () => resolve(),
-        onSuccess: () => resolve(),
-        onFinish: () => {
-          connected.value = false;
-          resolve();
-        },
-      });
-
-      connected.value = true;
-      startWatchdog();
-    });
+    await Effect.runPromise(
+      Effect.callback<void>((resume) => {
+        release = () => resume(Effect.void);
+        cancel = consumeEventIterator(iterator, {
+          onEvent: handleEvent,
+          onError: () => release?.(),
+          onSuccess: () => release?.(),
+          onFinish: () => {
+            connected.value = false;
+            release?.();
+          },
+        });
+        connected.value = true;
+        startWatchdog();
+        return Effect.void;
+      })
+    );
 
     release = undefined;
     connected.value = false;

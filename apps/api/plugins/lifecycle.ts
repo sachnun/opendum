@@ -1,6 +1,6 @@
 import { definePlugin } from "nitro";
-import { disposeContext } from "../context.js";
-import { pendingCount, settleTasks } from "../core/pending.js";
+import { disposeContext } from "@opendum/api/context";
+import { pendingCount, settleTasks } from "@opendum/api/core/pending";
 
 const DRAIN_TIMEOUT_MS = 4_000;
 

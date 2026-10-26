@@ -33,9 +33,7 @@ function createClient() {
 }
 
 async function callMe(client: ReturnType<typeof createClient>) {
-  try {
-    await client.session.get({});
-  } catch {}
+  await client.session.get({}).catch(() => undefined);
 }
 
 describe("api client access tokens", () => {

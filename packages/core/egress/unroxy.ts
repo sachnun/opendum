@@ -40,7 +40,7 @@ export class UnroxyEgress implements Egress {
   }
 }
 
-async function fetchTimeout(
+function fetchTimeout(
   url: string,
   init: RequestInit | undefined,
   timeoutMs: number
@@ -50,9 +50,5 @@ async function fetchTimeout(
     controller.abort(new DOMException("upstream headers timed out", "TimeoutError"));
   }, timeoutMs);
   const signal = init?.signal ? AbortSignal.any([init.signal, controller.signal]) : controller.signal;
-  try {
-    return await fetch(url, { ...init, signal });
-  } finally {
-    clearTimeout(timer);
-  }
+  return fetch(url, { ...init, signal }).finally(() => clearTimeout(timer));
 }

@@ -1,10 +1,10 @@
 import type { Registry } from "@opendum/models/runtime";
-import { Value } from "../../core/helpers.js";
-import { pick } from "./common.js";
-import { KiroModel } from "./model.js";
-import { KiroNames } from "./parser.js";
-import { KiroHistory, KiroMessages, KiroToolCalls, KiroTools } from "./history.js";
-import type { Json } from "./events.js";
+import { Value } from "@opendum/providers/core/helpers";
+import { pick } from "@opendum/providers/upstreams/kiro/common";
+import { KiroModel } from "@opendum/providers/upstreams/kiro/model";
+import { KiroNames } from "@opendum/providers/upstreams/kiro/parser";
+import { KiroHistory, KiroMessages, KiroToolCalls, KiroTools } from "@opendum/providers/upstreams/kiro/history";
+import type { Json } from "@opendum/providers/upstreams/kiro/events";
 
 const DEFAULT_BUDGETS: Record<string, number> = {
   low: 1024,

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import { ConfigProvider, Effect, Exit, Schedule } from "effect";
 import { TestClock } from "effect/testing";
-import { proxyConfig } from "../config.js";
-import { AuthenticationFailure, FailureMap, RateLimitFailure, ValidationFailure, type ProxyFailure } from "../core/errors.js";
+import { proxyConfig } from "@opendum/api/config";
+import { AuthenticationFailure, FailureMap, RateLimitFailure, ValidationFailure, type ProxyFailure } from "@opendum/api/core/errors";
 
 const env = {
   DATABASE_URL: "postgres://localhost/db",
@@ -147,7 +147,7 @@ describe("retry schedules", () => {
         poll.pipe(Effect.repeat(Schedule.spaced("1 hour")), Effect.timeout("3 hours"))
       );
       yield* TestClock.adjust("3 hours");
-      const exit = yield* Effect.promise(() => Promise.resolve(fiber));
+      const exit = yield* Effect.succeed(fiber);
       void exit;
       return runs;
     });

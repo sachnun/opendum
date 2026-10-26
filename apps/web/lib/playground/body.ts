@@ -1,5 +1,5 @@
-import { Content } from "./parsing";
-import type { PlaygroundEndpoint, PlaygroundSettings, ReasoningEffort, ScenarioMessage } from "./types";
+import { Content } from "~~/lib/playground/parsing";
+import type { PlaygroundEndpoint, PlaygroundSettings, ReasoningEffort, ScenarioMessage } from "~~/lib/playground/types";
 
 const BUDGETS: Record<string, number> = {
   low: 4000,

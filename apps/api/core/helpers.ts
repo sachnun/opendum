@@ -1,4 +1,4 @@
-import { Effect, Result } from "effect";
+import { Effect, Result, Duration } from "effect";
 
 export class Safe {
   static sync<T>(fn: () => T, fallback: T): T {
@@ -86,16 +86,15 @@ export class Records {
 
 export class Delay {
   static sleep(ms: number, signal?: AbortSignal): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (signal?.aborted) {
-        reject(new Error("aborted"));
-        return;
-      }
-      const timer = setTimeout(resolve, ms);
-      signal?.addEventListener("abort", () => {
-        clearTimeout(timer);
-        reject(new Error("aborted"));
-      });
-    });
+    const wait = Effect.sleep(Duration.millis(ms)).pipe(Effect.orDie);
+    if (!signal) return Effect.runPromise(wait);
+    return Effect.runPromise(
+      wait.pipe(
+        Effect.timeoutOrElse({
+          duration: Duration.millis(ms),
+          orElse: () => Effect.void,
+        })
+      )
+    );
   }
 }

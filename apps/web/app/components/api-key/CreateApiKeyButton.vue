@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { errorText, settle } from "~~/lib/settle";
 import { cn } from "~~/lib/utils";
 
 const props = withDefaults(
@@ -45,16 +46,18 @@ async function createKey() {
   if (props.readonly) return;
   isCreating.value = true;
   errorMessage.value = "";
-  try {
-    const result = await api.apiKeys.create({ name: name.value.trim() || undefined });
-    if (!result.success) throw new Error(result.error);
-    createdKey.value = result.data.key;
-    hasCreatedKey.value = true;
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : "Failed to create API key";
-  } finally {
-    isCreating.value = false;
+  const created = await settle(() => api.apiKeys.create({ name: name.value.trim() || undefined }));
+  isCreating.value = false;
+  if (!created.ok) {
+    errorMessage.value = errorText(created.error, "Failed to create API key");
+    return;
   }
+  if (!created.value.success) {
+    errorMessage.value = created.value.error;
+    return;
+  }
+  createdKey.value = created.value.data.key;
+  hasCreatedKey.value = true;
 }
 
 async function copyKey() {

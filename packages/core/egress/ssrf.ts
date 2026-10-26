@@ -101,8 +101,10 @@ export function privateName(host: string): boolean {
   return isPrivate(normalized);
 }
 
-export function assertPublic(host: string): void {
-  if (privateName(host)) {
-    throw new PrivateHostError(host);
-  }
+export function hostError(host: string): PrivateHostError | null {
+  return privateName(host) ? new PrivateHostError(host) : null;
+}
+
+export function assertPublic(host: string): PrivateHostError | null {
+  return hostError(host);
 }

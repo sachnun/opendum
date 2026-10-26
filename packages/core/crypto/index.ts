@@ -1,15 +1,17 @@
 export {
   decrypt,
+  decryptResult,
   encrypt,
   evpKey,
   generateSalt,
   hashString,
   pkcs7Pad,
   pkcs7Unpad,
-} from "./cryptojs.js";
+  type DecryptFailure,
+} from "@opendum/core/crypto/cryptojs";
 export {
   hmacHex,
   playgroundSignature,
   signaturesMatch,
   equalHex,
-} from "./signature.js";
+} from "@opendum/core/crypto/signature";

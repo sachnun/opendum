@@ -1,41 +1,54 @@
-import { Effect } from "effect";
+import { Effect, Result } from "effect";
 import {
   baseInfo,
   clampFraction,
   displayNumber,
-  errorInfo,
   expiredInfo,
   parseNumber,
   parseRecord,
-} from "../helpers.js";
-import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay } from "../types.js";
-import { jsonData, type Json } from "./shared.js";
+} from "@opendum/providers/quota/helpers";
+import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay } from "@opendum/providers/quota/types";
+import { quotaPayload, type Json } from "@opendum/providers/quota/fetchers/shared";
 
 export function openrouterQuota(
   ctx: QuotaContext,
   account: QuotaAccount,
   forceRefresh: boolean
 ): Effect.Effect<AccountQuotaInfo> {
-  let apiKey: string;
-  try {
-    apiKey = ctx.decrypt(account.accessToken ?? "");
-  } catch {
+  const decrypted = Result.try({
+    try: () => ctx.decrypt(account.accessToken ?? ""),
+    catch: () => null,
+  });
+  if (Result.isFailure(decrypted)) {
     return Effect.succeed(
       expiredInfo("API key is missing or invalid. Please reconnect this account.")
     );
   }
+  const apiKey = decrypted.success;
   const headers = { Authorization: `Bearer ${apiKey.trim()}`, Accept: "application/json" };
   return Effect.all(
     [
-      jsonData(ctx, account, forceRefresh, "openrouter:key", "GET", "https://openrouter.ai/api/v1/key", headers, null),
-      jsonData(ctx, account, forceRefresh, "openrouter:credits", "GET", "https://openrouter.ai/api/v1/credits", headers, null),
+      quotaPayload(ctx, account, forceRefresh, {
+        cache: "openrouter:key",
+        method: "GET",
+        url: "https://openrouter.ai/api/v1/key",
+        headers,
+        label: "OpenRouter key",
+      }),
+      quotaPayload(ctx, account, forceRefresh, {
+        cache: "openrouter:credits",
+        method: "GET",
+        url: "https://openrouter.ai/api/v1/credits",
+        headers,
+        label: "OpenRouter credits",
+      }),
     ],
     { concurrency: 2 }
   ).pipe(
     Effect.map(([key, credits]) => {
-      if (key.error && credits.error) return errorInfo(key.error);
-      const keyData = parseRecord(key.data?.data) ?? {};
-      const creditsData = parseRecord(credits.data?.data) ?? {};
+      if (!key.ok && !credits.ok) return key.info;
+      const keyData = key.ok ? (parseRecord(key.data.data) ?? {}) : {};
+      const creditsData = credits.ok ? (parseRecord(credits.data.data) ?? {}) : {};
       return baseInfo("success", quotaGroups(keyData, creditsData));
     })
   );

@@ -1,4 +1,4 @@
-import { Ids } from "../core/helpers.js";
+import { Ids } from "@opendum/providers/core/helpers";
 
 type Json = Record<string, unknown>;
 

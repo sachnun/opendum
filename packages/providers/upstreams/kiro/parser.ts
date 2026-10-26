@@ -1,5 +1,6 @@
-import { Ids, Value } from "../../core/helpers.js";
-import { KiroBracket, KiroEvents, type Json } from "./events.js";
+import { Ids, Value } from "@opendum/providers/core/helpers";
+import { ModelName } from "@opendum/providers/core/identity";
+import { KiroBracket, KiroEvents, type Json } from "@opendum/providers/upstreams/kiro/events";
 
 export const THINKING_START = "<thinking>";
 export const THINKING_END = "</thinking>";
@@ -117,13 +118,10 @@ export class Parser {
       }
       const candidate = this.eventBuffer.slice(start, end + 1);
       cursor = end + 1;
-      try {
-        const parsed = JSON.parse(candidate) as Json;
-        for (const event of KiroEvents.expand(parsed)) {
-          if (KiroEvents.relevant(event)) events.push(event);
-        }
-      } catch {
-        continue;
+      const parsed = Value.parseJson(candidate) as Json;
+      if (parsed === null) continue;
+      for (const event of KiroEvents.expand(parsed)) {
+        if (KiroEvents.relevant(event)) events.push(event);
       }
     }
     this.eventBuffer = "";
@@ -240,9 +238,7 @@ export class BracketCalls {
         continue;
       }
       const args = text.slice(argsStart, argsEnd + 1);
-      try {
-        JSON.parse(args);
-      } catch {
+      if (Value.parseJson(args) === null) {
         search = closeIdx + 1;
         continue;
       }
@@ -267,8 +263,7 @@ export class BracketCalls {
 
 export class KiroNames {
   static lastSegment(model: string): string {
-    const parts = model.split("/");
-    return parts[parts.length - 1];
+    return ModelName.segment(model);
   }
 
   static truncate(value: string, maxLen: number): string {

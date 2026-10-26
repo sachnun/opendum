@@ -1,4 +1,4 @@
-import { uniqueSorted } from "./collections.ts";
+import { uniqueSorted } from "@opendum/models/collections";
 
 const THRESHOLD = 0.7;
 

@@ -2,7 +2,7 @@ import { Effect } from "effect";
 import { and, eq, gte, inArray, sql } from "drizzle-orm";
 
 import { db, providerAccount, usageLog } from "@opendum/database";
-import { fromPromise } from "#web/lib/task.js";
+import { fromPromise } from "@opendum/api/web/lib/task";
 
 const PROVIDER_STATS_DAYS = 30;
 const LOOKBACK_HOURS = 24;

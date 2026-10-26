@@ -1,6 +1,6 @@
-import { compactStrings, uniqueSorted } from "./collections.ts";
-import { familyOf } from "./model/families.ts";
-import type { ModelEntry, ModelInfo } from "./registry.ts";
+import { compactStrings, uniqueSorted } from "@opendum/models/collections";
+import { familyOf } from "@opendum/models/model/families";
+import type { ModelEntry, ModelInfo } from "@opendum/models/registry";
 
 export class Catalog {
   private readonly models = new Map<string, ModelInfo>();

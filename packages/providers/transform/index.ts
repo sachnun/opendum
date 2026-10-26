@@ -1,3 +1,3 @@
-export * from "./responses.js";
-export * from "./anthropic.js";
-export * from "./collector.js";
+export * from "@opendum/providers/transform/responses";
+export * from "@opendum/providers/transform/anthropic";
+export * from "@opendum/providers/transform/collector";

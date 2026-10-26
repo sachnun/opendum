@@ -1,8 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import { Effect, Exit } from "effect";
+import { raise } from "@opendum/models/refresh/core/raise";
 
-import { fetchDecoded, fetchJson, retryTransient, orThrow } from "./http.ts";
-import { ModelFetchFailure } from "../errors.ts";
+import { fetchDecoded, fetchJson, retryTransient, orThrow } from "@opendum/models/sync/http";
+import { ModelFetchFailure } from "@opendum/models/errors";
 
 type Stub = (url: string, init?: RequestInit) => Promise<Response>;
 
@@ -20,7 +21,7 @@ describe("retrying fetch helpers", () => {
     const payload = await withFetch(
       async () => {
         calls += 1;
-        if (calls < 3) throw new Error("network down");
+        if (calls < 3) raise(new Error("network down"));
         return new Response(JSON.stringify({ ok: true }), { status: 200 });
       },
       () => orThrow(fetchJson("https://example.test/data", { attempts: 3 })),
@@ -32,7 +33,7 @@ describe("retrying fetch helpers", () => {
   it("fails with a typed ModelFetchFailure after exhausting attempts", async () => {
     const exit = await withFetch(
       async () => {
-        throw new Error("still down");
+        raise(new Error("still down"));
       },
       () => Effect.runPromiseExit(fetchJson("https://example.test/data", { attempts: 1, label: "example" })),
     );

@@ -1,4 +1,4 @@
-import type { AccountQuotaInfo, QuotaGroupDisplay } from "./types.js";
+import type { AccountQuotaInfo, QuotaGroupDisplay } from "@opendum/providers/quota/types";
 
 export function clampFraction(value: number): number {
   return Math.max(0, Math.min(1, value));

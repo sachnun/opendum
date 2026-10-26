@@ -1,6 +1,7 @@
 import { lookup } from "node:dns/promises";
+import { Effect, Option } from "effect";
 import { isPrivate } from "@opendum/core/egress";
-import { Value, Payload } from "./helpers.js";
+import { Value, Payload } from "@opendum/providers/core/helpers";
 
 export type ImageFetch = (url: string, init?: RequestInit) => Promise<Response>;
 
@@ -16,21 +17,23 @@ export class ImageUrl {
     return isRemote(value);
   }
 
-  static async safe(value: string): Promise<boolean> {
-    let parsed: URL;
-    try {
-      parsed = new URL(value);
-    } catch {
-      return false;
-    }
-    if ((parsed.protocol !== "http:" && parsed.protocol !== "https:") || !parsed.hostname) return false;
-    try {
-      const addresses = await lookup(parsed.hostname, { all: true });
-      if (addresses.length === 0) return false;
-      return addresses.every((entry) => !isPrivate(entry.address));
-    } catch {
-      return false;
-    }
+  static safe(value: string): Effect.Effect<boolean> {
+    return Effect.gen(function* () {
+      const parsed = yield* Effect.try({
+        try: () => new URL(value),
+        catch: () => null,
+      }).pipe(Effect.option);
+      if (Option.isNone(parsed)) return false;
+      const target = parsed.value;
+      if ((target.protocol !== "http:" && target.protocol !== "https:") || !target.hostname) return false;
+      const addresses = yield* Effect.tryPromise({
+        try: () => lookup(target.hostname, { all: true }),
+        catch: () => null,
+      }).pipe(Effect.option);
+      if (Option.isNone(addresses)) return false;
+      if (addresses.value.length === 0) return false;
+      return addresses.value.every((entry) => !isPrivate(entry.address));
+    });
   }
 }
 
@@ -41,32 +44,38 @@ export class ImageDownloader {
     this.fetchFn = fetchFn;
   }
 
-  async toDataUri(imageUrl: string): Promise<string> {
-    if (!(await ImageUrl.safe(imageUrl))) return "";
-
-    let resp: Response;
-    try {
-      resp = await this.fetchFn(imageUrl, {
-        method: "GET",
-        headers: {
-          "User-Agent": USER_AGENT,
-          Accept: "image/*,application/pdf;q=0.9,*/*;q=0.8",
-        },
-        signal: AbortSignal.timeout(TIMEOUT_MS),
-      });
-    } catch {
-      return "";
-    }
-    if (resp.status < 200 || resp.status >= 300) return "";
-
-    const headerType = (resp.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
-    if (headerType && !headerType.startsWith("image/") && headerType !== "application/pdf") return "";
-
-    const data = Buffer.from(await resp.arrayBuffer());
-    if (data.byteLength > MAX_BYTES) return "";
-
-    const contentType = resp.headers.get("content-type") ?? "image/png";
-    return `data:${contentType};base64,${data.toString("base64")}`;
+  toDataUri(imageUrl: string): Effect.Effect<string> {
+    const fetchFn = this.fetchFn;
+    return Effect.gen(function* () {
+      const safe = yield* ImageUrl.safe(imageUrl);
+      if (!safe) return "";
+      const resp = yield* Effect.tryPromise({
+        try: () =>
+          fetchFn(imageUrl, {
+            method: "GET",
+            headers: {
+              "User-Agent": USER_AGENT,
+              Accept: "image/*,application/pdf;q=0.9,*/*;q=0.8",
+            },
+            signal: AbortSignal.timeout(TIMEOUT_MS),
+          }),
+        catch: () => null,
+      }).pipe(Effect.option);
+      if (Option.isNone(resp)) return "";
+      const response = resp.value;
+      if (response.status < 200 || response.status >= 300) return "";
+      const headerType = (response.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
+      if (headerType && !headerType.startsWith("image/") && headerType !== "application/pdf") return "";
+      const body = yield* Effect.tryPromise({
+        try: () => response.arrayBuffer(),
+        catch: () => null,
+      }).pipe(Effect.option);
+      if (Option.isNone(body)) return "";
+      const data = Buffer.from(body.value);
+      if (data.byteLength > MAX_BYTES) return "";
+      const contentType = response.headers.get("content-type") ?? "image/png";
+      return `data:${contentType};base64,${data.toString("base64")}`;
+    });
   }
 }
 
@@ -90,40 +99,40 @@ export class ChatImageInliner {
     return false;
   }
 
-  async run(messages: unknown[]): Promise<unknown[]> {
-    if (!ChatImageInliner.hasRemoteChat(messages)) return messages;
-
-    const out: unknown[] = [];
-    for (const raw of messages) {
-      const msg = raw as Record<string, unknown>;
-      const content = msg?.content;
-      if (!msg || !Array.isArray(content)) {
-        out.push(raw);
-        continue;
-      }
-
-      const copyMsg = Payload.clone(msg);
-      const parts: unknown[] = [];
-      for (const rawPart of content) {
-        const part = rawPart as Record<string, unknown>;
-        if (!part || part.type !== "image_url") {
-          parts.push(rawPart);
+  run(messages: unknown[]): Effect.Effect<unknown[]> {
+    const downloader = this.downloader;
+    return Effect.gen(function* () {
+      if (!ChatImageInliner.hasRemoteChat(messages)) return messages;
+      const out: unknown[] = [];
+      for (const raw of messages) {
+        const msg = raw as Record<string, unknown>;
+        const content = msg?.content;
+        if (!msg || !Array.isArray(content)) {
+          out.push(raw);
           continue;
         }
-
-        const copyPart = Payload.clone(part);
-        const imageUrl = (copyPart.image_url ?? {}) as Record<string, unknown>;
-        const url = Value.string(imageUrl.url);
-        if (ImageUrl.remote(url)) {
-          const dataUri = await this.downloader.toDataUri(url);
-          if (dataUri) imageUrl.url = dataUri;
+        const copyMsg = Payload.clone(msg);
+        const parts: unknown[] = [];
+        for (const rawPart of content) {
+          const part = rawPart as Record<string, unknown>;
+          if (!part || part.type !== "image_url") {
+            parts.push(rawPart);
+            continue;
+          }
+          const copyPart = Payload.clone(part);
+          const imageUrl = (copyPart.image_url ?? {}) as Record<string, unknown>;
+          const url = Value.string(imageUrl.url);
+          if (ImageUrl.remote(url)) {
+            const dataUri = yield* downloader.toDataUri(url);
+            if (dataUri) imageUrl.url = dataUri;
+          }
+          parts.push(copyPart);
         }
-        parts.push(copyPart);
+        copyMsg.content = parts;
+        out.push(copyMsg);
       }
-      copyMsg.content = parts;
-      out.push(copyMsg);
-    }
-    return out;
+      return out;
+    });
   }
 }
 
@@ -146,35 +155,35 @@ export class ResponsesImageInliner {
     return false;
   }
 
-  async run(input: unknown[]): Promise<unknown[]> {
-    if (!ResponsesImageInliner.hasRemoteResponses(input)) return input;
-
-    const out: unknown[] = [];
-    for (const raw of input) {
-      const item = raw as Record<string, unknown>;
-      const content = item?.content;
-      if (!item || !Array.isArray(content)) {
-        out.push(raw);
-        continue;
-      }
-
-      const copyItem = Payload.clone(item);
-      const parts: unknown[] = [];
-      for (const rawPart of content) {
-        const part = rawPart as Record<string, unknown>;
-        if (!part || part.type !== "input_image" || !ImageUrl.remote(Value.string(part.image_url))) {
-          parts.push(rawPart);
+  run(input: unknown[]): Effect.Effect<unknown[]> {
+    const downloader = this.downloader;
+    return Effect.gen(function* () {
+      if (!ResponsesImageInliner.hasRemoteResponses(input)) return input;
+      const out: unknown[] = [];
+      for (const raw of input) {
+        const item = raw as Record<string, unknown>;
+        const content = item?.content;
+        if (!item || !Array.isArray(content)) {
+          out.push(raw);
           continue;
         }
-
-        const copyPart = Payload.clone(part);
-        const dataUri = await this.downloader.toDataUri(Value.string(part.image_url));
-        if (dataUri) copyPart.image_url = dataUri;
-        parts.push(copyPart);
+        const copyItem = Payload.clone(item);
+        const parts: unknown[] = [];
+        for (const rawPart of content) {
+          const part = rawPart as Record<string, unknown>;
+          if (!part || part.type !== "input_image" || !ImageUrl.remote(Value.string(part.image_url))) {
+            parts.push(rawPart);
+            continue;
+          }
+          const copyPart = Payload.clone(part);
+          const dataUri = yield* downloader.toDataUri(Value.string(part.image_url));
+          if (dataUri) copyPart.image_url = dataUri;
+          parts.push(copyPart);
+        }
+        copyItem.content = parts;
+        out.push(copyItem);
       }
-      copyItem.content = parts;
-      out.push(copyItem);
-    }
-    return out;
+      return out;
+    });
   }
 }

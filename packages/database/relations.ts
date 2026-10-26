@@ -16,7 +16,7 @@ import {
   disabledModel,
   customProvider,
   customProviderModel,
-} from "./schema/index.js";
+} from "@opendum/database/schema/index";
 
 export const userRelations = relations(user, ({ one, many }) => ({
   accounts: many(account),

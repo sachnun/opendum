@@ -1,8 +1,9 @@
-import { Ids, Value } from "../../core/helpers.js";
+import { Result } from "effect";
+import { Ids, Value } from "@opendum/providers/core/helpers";
 import type { Registry } from "@opendum/models/runtime";
-import type { ProviderAccount } from "../../types.js";
-import type { UpstreamTransport } from "../../core/http.js";
-import { PERCH_ACCOUNT_PATH, PERCH_APP_URL, PERCH_CONFIG_PATH } from "../../endpoints.js";
+import type { ProviderAccount } from "@opendum/providers/types";
+import type { UpstreamTransport } from "@opendum/providers/core/http";
+import { PERCH_ACCOUNT_PATH, PERCH_APP_URL, PERCH_CONFIG_PATH } from "@opendum/providers/auth/perch/constants";
 
 export type Json = Record<string, unknown>;
 
@@ -58,56 +59,56 @@ export class PerchAuth {
     };
   }
 
-  async config(): Promise<AuthConfig> {
+  async config(): Promise<Result.Result<AuthConfig, string>> {
     if (this.cache && Date.now() - this.cache.fetchedAt < CONFIG_TTL_MS) {
-      return this.cache.config;
+      return Result.succeed(this.cache.config);
     }
     const resp = await this.transport.direct(`${PERCH_APP_URL}${PERCH_CONFIG_PATH}`, {
       headers: { Accept: "application/json" },
     });
     if (resp.status < 200 || resp.status >= 300) {
-      throw new Error(`perch auth config request failed: ${resp.status}`);
+      return Result.fail(`perch auth config request failed: ${resp.status}`);
     }
     const payload = (await resp.json()) as { supabaseUrl?: string; supabaseAnonKey?: string };
     const supabaseUrl = (payload.supabaseUrl ?? "").trim();
     const anonKey = (payload.supabaseAnonKey ?? "").trim();
-    if (!supabaseUrl || !anonKey) throw new Error("perch auth config is incomplete");
+    if (!supabaseUrl || !anonKey) return Result.fail("perch auth config is incomplete");
     const config = { supabaseUrl: supabaseUrl.replace(/\/+$/, ""), anonKey };
     this.cache = { config, fetchedAt: Date.now() };
-    return config;
+    return Result.succeed(config);
   }
 
-  async tokenHeaders(): Promise<Record<string, string>> {
-    return PerchAuth.headers(await this.config());
+  async tokenHeaders(): Promise<Result.Result<Record<string, string>, string>> {
+    const config = await this.config();
+    return Result.isFailure(config) ? Result.fail(config.failure) : Result.succeed(PerchAuth.headers(config.success));
   }
 
   async sessionIds(account: ProviderAccount, accessToken: string): Promise<SessionIds | null> {
     if (!account.id) return null;
     const cached = this.sessions.get(account.id);
     if (cached && Date.now() - cached.fetchedAt < SESSION_TTL_MS) return cached.ids;
-    try {
-      const resp = await this.transport.direct(`${PERCH_APP_URL}${PERCH_ACCOUNT_PATH}`, {
+    const fetched = await this.transport
+      .direct(`${PERCH_APP_URL}${PERCH_ACCOUNT_PATH}`, {
         headers: { Accept: "application/json", Authorization: `Bearer ${accessToken.trim()}` },
         signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
-      });
-      if (resp.status < 200 || resp.status >= 300) return null;
-      const payload = (await resp.json()) as {
-        ok?: boolean;
-        session?: { userId?: string; workspaceId?: string };
-      };
-      if (!payload.ok) return null;
-      const ids = {
-        userId: payload.session?.userId ?? "",
-        workspaceId: payload.session?.workspaceId ?? "",
-      };
-      this.sessions.set(account.id, { ids, fetchedAt: Date.now() });
-      return ids;
-    } catch {
-      return null;
-    }
+      })
+      .catch(() => null);
+    if (!fetched) return null;
+    if (fetched.status < 200 || fetched.status >= 300) return null;
+    const payload = (await fetched.json().catch(() => null)) as {
+      ok?: boolean;
+      session?: { userId?: string; workspaceId?: string };
+    } | null;
+    if (!payload?.ok) return null;
+    const ids = {
+      userId: payload.session?.userId ?? "",
+      workspaceId: payload.session?.workspaceId ?? "",
+    };
+    this.sessions.set(account.id, { ids, fetchedAt: Date.now() });
+    return ids;
   }
 
-  async turnTicket(accessToken: string): Promise<{ ticket: string; runId: string }> {
+  async turnTicket(accessToken: string): Promise<Result.Result<{ ticket: string; runId: string }, string>> {
     const resp = await this.transport.direct(`${PERCH_APP_URL}${TURN_TICKET_PATH}`, {
       method: "POST",
       headers: {
@@ -119,7 +120,7 @@ export class PerchAuth {
       body: JSON.stringify({ surface: "cli", profile: "standard" }),
     });
     if (resp.status < 200 || resp.status >= 300) {
-      throw new Error(`perch turn ticket failed: ${resp.status} ${(await resp.text()).slice(0, 1024)}`);
+      return Result.fail(`perch turn ticket failed: ${resp.status} ${(await resp.text()).slice(0, 1024)}`);
     }
     const result = (await resp.json()) as {
       ok?: boolean;
@@ -128,14 +129,14 @@ export class PerchAuth {
       error?: string;
     };
     if (result.ok === false) {
-      throw new Error((result.error ?? "").trim() || "Perch turn ticket request failed");
+      return Result.fail((result.error ?? "").trim() || "Perch turn ticket request failed");
     }
     const ticket = (result.ticket ?? "").trim();
     const runId = (result.runId ?? "").trim();
     if (!ticket || !runId) {
-      throw new Error((result.error ?? "").trim() || "Perch turn ticket returned incomplete credentials");
+      return Result.fail((result.error ?? "").trim() || "Perch turn ticket returned incomplete credentials");
     }
-    return { ticket, runId };
+    return Result.succeed({ ticket, runId });
   }
 
   static userAgent(): string {

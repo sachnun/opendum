@@ -11,9 +11,9 @@ import {
   parseRecord,
   parseString,
   isoOf,
-} from "../helpers.js";
-import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay } from "../types.js";
-import { jsonData, type Json } from "./shared.js";
+} from "@opendum/providers/quota/helpers";
+import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay } from "@opendum/providers/quota/types";
+import { quotaPayload, type Json } from "@opendum/providers/quota/fetchers/shared";
 
 export function zenmuxQuota(
   ctx: QuotaContext,
@@ -24,21 +24,16 @@ export function zenmuxQuota(
   if (!platformKey) {
     return Effect.succeed(expiredInfo("Platform key is required for ZenMux quota."));
   }
-  return jsonData(
-    ctx,
-    account,
-    forceRefresh,
-    "zenmux:subscription",
-    "GET",
-    "https://zenmux.ai/api/v1/management/subscription/detail",
-    { Authorization: `Bearer ${platformKey}`, Accept: "application/json" },
-    null
-  ).pipe(
-    Effect.map(({ data, error }) => {
-      if (error || !data) {
-        return errorInfo(`ZenMux subscription endpoint failed: ${error ?? "unknown error"}`);
-      }
-      const record = parseRecord(data.data);
+  return quotaPayload(ctx, account, forceRefresh, {
+    cache: "zenmux:subscription",
+    method: "GET",
+    url: "https://zenmux.ai/api/v1/management/subscription/detail",
+    headers: { Authorization: `Bearer ${platformKey}`, Accept: "application/json" },
+    label: "ZenMux subscription",
+  }).pipe(
+    Effect.map((payload) => {
+      if (!payload.ok) return payload.info;
+      const record = parseRecord(payload.data.data);
       if (!record) return errorInfo("ZenMux subscription response did not include data");
       return baseInfo("success", zenmuxGroups(record));
     })

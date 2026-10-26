@@ -1,4 +1,4 @@
-import type { ErrorFormat } from "../core/types.js";
+import type { ErrorFormat } from "@opendum/api/core/types";
 
 export function jsonResponse(value: unknown, status = 200, extraHeaders?: Record<string, string>): Response {
   const headers = new Headers({ "content-type": "application/json" });

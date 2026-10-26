@@ -4,8 +4,8 @@ import type { OpendumRedis } from "@opendum/core/redis";
 import type { Registry } from "@opendum/models/runtime";
 import type { Fetch, UnroxyEgress } from "@opendum/core/egress";
 import type { ProviderRegistry } from "@opendum/providers";
-import type { ProxyConfig } from "../config.js";
-import type { ProxyService } from "./service.js";
+import type { ProxyConfig } from "@opendum/api/config";
+import type { ProxyService } from "@opendum/api/core/service";
 
 export type ProxyContext = {
   config: ProxyConfig;

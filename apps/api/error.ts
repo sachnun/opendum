@@ -1,5 +1,5 @@
 import { defineErrorHandler, HTTPError } from "nitro";
-import { errorEnvelope, formatPath, inferencePath } from "./handlers/errors.js";
+import { errorEnvelope, formatPath, inferencePath } from "@opendum/api/handlers/errors";
 
 export default defineErrorHandler((error, event) => {
   const pathname = new URL(event.req.url).pathname;

@@ -1,7 +1,7 @@
-import { resolveFrom, type CanonicalIndex } from "./canonical.ts";
-import { GENERATED_PROVIDER_FIELDS } from "./merge.ts";
-import { probeSets } from "./probes.ts";
-import type { ModelData, ProviderModelConfig } from "../types.ts";
+import { resolveFrom, type CanonicalIndex } from "@opendum/models/model/canonical";
+import { GENERATED_PROVIDER_FIELDS } from "@opendum/models/model/merge";
+import { probeSets } from "@opendum/models/model/probes";
+import type { ModelData, ProviderModelConfig } from "@opendum/models/types";
 
 export interface CanonicalizationModel {
   relativeId: string;

@@ -2,7 +2,7 @@ import type { AccountsData, LiveTopic, ModelsData, ServerEvent, UsageData } from
 import { EventPublisher } from "@orpc/server";
 import { Duration, Effect, Match, Queue, Ref, Stream } from "effect";
 
-import { proxyEvents } from "../../core/events.js";
+import { proxyEvents } from "@opendum/api/core/events";
 
 const POINTS_DEBOUNCE = Duration.millis(1_500);
 const SNAPSHOT_DEBOUNCE = Duration.millis(400);
@@ -18,7 +18,7 @@ export interface EventSnapshots {
 export type SnapshotBuilder = (
   userId: string,
   topics: LiveTopic[]
-) => Effect.Effect<Partial<EventSnapshots>, import("#web/errors.js").ServiceFailure>;
+) => Effect.Effect<Partial<EventSnapshots>, import("@opendum/api/web/errors").ServiceFailure>;
 
 type TopicSignal = { userId: string; topic: LiveTopic };
 type UsageSignal = { userId: string };
@@ -206,13 +206,14 @@ export async function* subscribeEvents(userId: string, topics: LiveTopic[], sign
   activeUserIds.add(userId);
   startWorkers();
 
-  try {
+  {
     yield* initialEvents(userId, topics);
 
     for await (const event of publisher.subscribe(userId, { signal })) {
       if (event.type === "ping" || wanted.has(event.topic)) yield event;
     }
-  } finally {
+  }
+  {
     activeUserIds.delete(userId);
     await Effect.runPromise(Ref.update(usagePublishedAt, (current) => {
       const next = new Map(current);

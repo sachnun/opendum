@@ -7,8 +7,8 @@ import {
   type Cached,
   INVALID_TTL,
   VALID_TTL,
-} from "../cache.js";
-import { Keys, type Queries } from "../keys.js";
+} from "@opendum/auth/cache";
+import { Keys, type Queries } from "@opendum/auth/keys";
 
 type KeyRow = {
   id: string;

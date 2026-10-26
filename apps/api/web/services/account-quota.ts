@@ -3,10 +3,10 @@ import { and, eq, inArray } from "drizzle-orm";
 import { db, providerAccount } from "@opendum/database";
 import type { QuotaBatchInput, AccountQuotaInput } from "@opendum/providers/contract";
 import { type QuotaProviderKey } from "@opendum/providers/provider-accounts";
-import { proxyContext } from "../../context.js";
-import { fetchQuota as coreQuota } from "../../core/quota.js";
-import { fromPromise } from "#web/lib/task.js";
-import { internal } from "#web/errors.js";
+import { proxyContext } from "@opendum/api/context";
+import { fetchQuota as coreQuota } from "@opendum/api/core/quota";
+import { fromPromise } from "@opendum/api/web/lib/task";
+import { internal } from "@opendum/api/web/errors";
 
 const quotaInFlight = new Map<string, Effect.Effect<AccountQuotaResult>>();
 

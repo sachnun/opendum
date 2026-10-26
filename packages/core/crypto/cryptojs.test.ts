@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { decrypt, encrypt, hashString } from "./cryptojs.js";
+import { decrypt, decryptResult, encrypt, hashString } from "@opendum/core/crypto/cryptojs";
 
 describe("cryptojs", () => {
   const secret = "test-secret";
@@ -23,7 +23,9 @@ describe("cryptojs", () => {
   });
 
   it("rejects ciphertext that is not the CryptoJS salted format", () => {
-    expect(() => decrypt(secret, Buffer.from("not-salted").toString("base64"))).toThrow();
+    const result = decryptResult(secret, Buffer.from("not-salted").toString("base64"));
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.failure._tag).toBe("CiphertextFormat");
   });
 
   it("hashes with sha256 hex", () => {

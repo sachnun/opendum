@@ -1,4 +1,4 @@
-import { MODEL_FAMILY_RANKING } from "./ranking.generated.ts";
+import { MODEL_FAMILY_RANKING } from "@opendum/models/ranking.generated";
 
 type RankingEntry = (typeof MODEL_FAMILY_RANKING)[number];
 export type ModelFamily = RankingEntry["name"] | "Others";

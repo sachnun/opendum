@@ -1,6 +1,7 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": [
+    "import",
     "typescript",
     "unicorn",
     "oxc",
@@ -11,7 +12,8 @@
   },
   "jsPlugins": [
     "eslint-plugin-no-comments",
-    "./.oxlint/plugin/index.mjs"
+    "./.oxlint/plugin/index.mjs",
+    "oxlint-plugin-effect/plugin"
   ],
   "rules": {
     "no-comments/disallowComments": [
@@ -111,14 +113,26 @@
         "leadingUnderscore": "allow",
         "maxSegments": 3
       }
-    ]
+    ],
+    "import/extensions": [
+      "error",
+      "never",
+      {
+        "vue": "always"
+      }
+    ],
+    "import/no-relative-parent-imports": "error",
+    "effect/noNewPromise": "error",
+    "effect/noTryCatch": "error",
+    "effect/noThrowStatement": "error"
   },
   "ignorePatterns": [
     "**/.nuxt/**",
     "**/.output/**",
     "**/.edgeone/**",
     "**/dist/**",
-    "**/coverage/**"
+    "**/coverage/**",
+    "**/.oxlint/**"
   ],
   "overrides": [
     {
@@ -179,6 +193,14 @@
             "maxSegments": 3
           }
         ]
+      }
+    },
+    {
+      "files": [
+        "packages/core/egress/guard.ts"
+      ],
+      "rules": {
+        "import/extensions": "off"
       }
     }
   ]

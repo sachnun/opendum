@@ -1,12 +1,11 @@
 import { ORPCError } from "@orpc/server";
-import { assertPublic, PrivateHostError } from "@opendum/core/egress";
-import { Effect, Result } from "effect";
+import { Effect } from "effect";
+import { hostError } from "@opendum/core/egress";
 
 import type { QuotaInput, RelayInput, RelayResult } from "@opendum/providers/contract";
-import type { ProxyContext } from "../../core/context.js";
-import { Safe } from "../../core/helpers.js";
-import { fetchQuota } from "../../core/quota.js";
-import { fromPromise } from "#web/lib/task.js";
+import type { ProxyContext } from "@opendum/api/core/context";
+import { fetchQuota } from "@opendum/api/core/quota";
+import { fromPromise } from "@opendum/api/web/lib/task";
 
 const RELAY_TIMEOUT_MS = 20 * 1000;
 
@@ -64,17 +63,8 @@ function relayTarget(
   if (target.protocol !== "https:" || !target.hostname || target.username || target.password) {
     return { error: "url must be an https provider URL" };
   }
-  const hostCheck = Safe.result(() => assertPublic(target.hostname));
-  if (Result.isFailure(hostCheck)) {
-    return {
-      error:
-        hostCheck.failure instanceof PrivateHostError
-          ? "url must not target a private network address"
-          : hostCheck.failure instanceof Error
-            ? hostCheck.failure.message
-            : "Invalid target",
-    };
-  }
+  const hostIssue = hostError(target.hostname);
+  if (hostIssue) return { error: "url must not target a private network address" };
   return { method: normalizedMethod, target: target.toString() };
 }
 

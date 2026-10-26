@@ -5,9 +5,10 @@ import {
   providerOptions,
   isDevice,
   oauthCheck,
-} from "~~/lib/provider-auth-config";
+} from "@opendum/providers/auth/config";
+import { errorText, parseUrl, raise, settle } from "~~/lib/settle";
 import type { DeviceProviderKey } from "@opendum/providers/provider-accounts";
-import type { FlowType, MethodKey, Provider, ProviderConfig } from "~~/lib/provider-auth-config";
+import type { FlowType, MethodKey, Provider, ProviderConfig } from "@opendum/providers/auth/config";
 
 export function useAccountConnect(
   props: { initialProvider: Provider | null; triggerClass?: string; readonly?: boolean },
@@ -139,11 +140,11 @@ watch([open, step, provider, selectedMethod], async () => {
   deviceCodeInfo.value = null;
   isFetchingUrl.value = true;
 
-  try {
+  const started = await settle(async () => {
     if (selectedFlowType === "oauth_redirect") {
       if (!oauthCheck(selectedProvider)) return;
       const result = await api.accounts.getAuthUrl({ provider: selectedProvider });
-      if (!result.success) throw new Error(result.error);
+      if (!result.success) return raise(new Error(result.error));
       if (provider.value !== selectedProvider || activeFlowType.value !== selectedFlowType || step.value !== selectedStep) return;
       authUrl.value = result.data.authUrl;
       oauthState.value = result.data.state;
@@ -154,7 +155,7 @@ watch([open, step, provider, selectedMethod], async () => {
     if (selectedFlowType === "device_code") {
       if (!isDevice(selectedProvider)) return;
       const result = await api.accounts.initiateDeviceAuth({ provider: selectedProvider });
-      if (!result.success) throw new Error(result.error);
+      if (!result.success) return raise(new Error(result.error));
       if (provider.value !== selectedProvider || activeFlowType.value !== selectedFlowType || step.value !== selectedStep) return;
       deviceCodeInfo.value = {
         provider: selectedProvider,
@@ -168,13 +169,11 @@ watch([open, step, provider, selectedMethod], async () => {
     }
 
     authUrl.value = selectedConfig.value?.apiKeyPortalUrl ?? "";
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : "Failed to start account connection";
-  } finally {
-    if (provider.value === selectedProvider && activeFlowType.value === selectedFlowType && step.value === selectedStep) {
-      isFetchingUrl.value = false;
-    }
+  });
+  if (provider.value === selectedProvider && activeFlowType.value === selectedFlowType && step.value === selectedStep) {
+    isFetchingUrl.value = false;
   }
+  if (!started.ok) errorMessage.value = errorText(started.error, "Failed to start account connection");
 });
 
 function resetForm() {
@@ -291,8 +290,12 @@ function selectLogin(method: MethodKey) {
 
 
 async function copyText(value: string, target: "link" | "code") {
-  try {
-    await navigator.clipboard.writeText(value);
+  const copied = await settle(() => navigator.clipboard.writeText(value));
+  if (!copied.ok) {
+    errorMessage.value = target === "link" ? "Failed to copy link" : "Failed to copy code";
+    return;
+  }
+  {
     if (target === "link") {
       copiedLink.value = true;
       if (copiedLinkTimer) clearTimeout(copiedLinkTimer);
@@ -308,9 +311,6 @@ async function copyText(value: string, target: "link" | "code") {
         copiedCodeTimer = null;
       }, 2000);
     }
-  } catch {
-    errorMessage.value = target === "link" ? "Failed to copy link" : "Failed to copy code";
-    return;
   }
 
   if (target === "link" && activeFlowType.value !== "device_code" && step.value === authStep.value) {
@@ -386,18 +386,30 @@ function startPolling(popup: Window | null) {
       return;
     }
 
-    try {
-      const result = await api.accounts.pollAuth({
-        provider: deviceCodeInfo.value.provider,
-        deviceCode: deviceCodeInfo.value.deviceCode,
-        userCode: deviceCodeInfo.value.userCode,
-        codeVerifier: deviceCodeInfo.value.codeVerifier,
-        method: deviceCodeInfo.value.method,
-        machineId: deviceCodeInfo.value.machineId,
-      });
-
-      if (!result.success) throw new Error(result.error);
-
+    {
+      const info = deviceCodeInfo.value;
+      if (!info) return;
+      const polled = await settle(() =>
+        api.accounts.pollAuth({
+          provider: info.provider,
+          deviceCode: info.deviceCode,
+          userCode: info.userCode,
+          codeVerifier: info.codeVerifier,
+          method: info.method,
+          machineId: info.machineId,
+        })
+      );
+      if (!polled.ok) {
+        errorMessage.value = errorText(polled.error, "Failed to check authorization status");
+        pollingTimer = setTimeout(poll, intervalMs);
+        return;
+      }
+      const result = polled.value;
+      if (!result.success) {
+        errorMessage.value = result.error;
+        pollingTimer = setTimeout(poll, intervalMs);
+        return;
+      }
       if (result.data.status === "success") {
         if (popup && !popup.closed) popup.close();
         finishConnection({ email: result.data.email, isUpdate: result.data.isUpdate });
@@ -413,8 +425,6 @@ function startPolling(popup: Window | null) {
       if (typeof result.data.retryAfterSeconds === "number" && result.data.retryAfterSeconds > 0) {
         intervalMs = result.data.retryAfterSeconds * 1000;
       }
-    } catch (error) {
-      errorMessage.value = error instanceof Error ? error.message : "Failed to check authorization status";
     }
 
     pollingTimer = setTimeout(poll, intervalMs);
@@ -435,15 +445,19 @@ async function connectKey() {
   const activeProvider = provider.value;
   if (customProvider(activeProvider)) {
     isLoading.value = true;
-    try {
-      const result = await api.customProviders.connect({ slug: activeProvider, token: apiKey.value.trim() });
-      if (!result.success) throw new Error(result.error);
-      finishConnection({ email: `custom-${activeProvider}`, isUpdate: result.data.isUpdate });
-    } catch (error) {
-      errorMessage.value = error instanceof Error ? error.message : "Failed to connect account";
-    } finally {
-      isLoading.value = false;
+    const connected = await settle(() =>
+      api.customProviders.connect({ slug: activeProvider, token: apiKey.value.trim() })
+    );
+    isLoading.value = false;
+    if (!connected.ok) {
+      errorMessage.value = errorText(connected.error, "Failed to connect account");
+      return;
     }
+    if (!connected.value.success) {
+      errorMessage.value = connected.value.error;
+      return;
+    }
+    finishConnection({ email: `custom-${activeProvider}`, isUpdate: connected.value.data.isUpdate });
     return;
   }
   if (provider.value === "zenmux" && !platformKey.value.trim()) {
@@ -457,15 +471,26 @@ async function connectKey() {
   }
 
   isLoading.value = true;
-  try {
-    const result = await api.accounts.create({ provider: provider.value, token: apiKey.value.trim(), cfAccountId: cfAccountId.value.trim() || undefined, platformKey: platformKey.value.trim() || undefined });
-    if (!result.success) throw new Error(result.error);
-    finishConnection(result.data);
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : "Failed to connect account";
-  } finally {
-    isLoading.value = false;
+  const connectProvider = provider.value;
+  if (!connectProvider) return;
+  const connected = await settle(() =>
+    api.accounts.create({
+      provider: connectProvider,
+      token: apiKey.value.trim(),
+      cfAccountId: cfAccountId.value.trim() || undefined,
+      platformKey: platformKey.value.trim() || undefined,
+    })
+  );
+  isLoading.value = false;
+  if (!connected.ok) {
+    errorMessage.value = errorText(connected.error, "Failed to connect account");
+    return;
   }
+  if (!connected.value.success) {
+    errorMessage.value = connected.value.error;
+    return;
+  }
+  finishConnection(connected.value.data);
 }
 
 async function connectCodex() {
@@ -478,15 +503,17 @@ async function connectCodex() {
   }
 
   isLoading.value = true;
-  try {
-    const result = await api.accounts.connectCodexSession({ sessionJson: chatgptSessionJson.value.trim() });
-    if (!result.success) throw new Error(result.error);
-    finishConnection(result.data);
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : "Failed to connect account";
-  } finally {
-    isLoading.value = false;
+  const connected = await settle(() => api.accounts.connectCodexSession({ sessionJson: chatgptSessionJson.value.trim() }));
+  isLoading.value = false;
+  if (!connected.ok) {
+    errorMessage.value = errorText(connected.error, "Failed to connect account");
+    return;
   }
+  if (!connected.value.success) {
+    errorMessage.value = connected.value.error;
+    return;
+  }
+  finishConnection(connected.value.data);
 }
 
 async function oauthExchange() {
@@ -507,27 +534,25 @@ async function oauthExchange() {
   }
 
   isLoading.value = true;
-  try {
-    const result = await api.accounts.oauthExchange({ provider: selectedProvider, callbackUrl: callbackUrl.value.trim(), state: oauthState.value, codeVerifier: oauthCodeVerifier.value });
-    if (!result.success) throw new Error(result.error);
-    finishConnection(result.data);
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : "Failed to connect account";
-  } finally {
-    isLoading.value = false;
+  const connected = await settle(() => api.accounts.oauthExchange({ provider: selectedProvider, callbackUrl: callbackUrl.value.trim(), state: oauthState.value, codeVerifier: oauthCodeVerifier.value }));
+  isLoading.value = false;
+  if (!connected.ok) {
+    errorMessage.value = errorText(connected.error, "Failed to connect account");
+    return;
   }
+  if (!connected.value.success) {
+    errorMessage.value = connected.value.error;
+    return;
+  }
+  finishConnection(connected.value.data);
 }
 
 function callbackInput(event: Event) {
   clearExchange();
   if (props.readonly || isLoading.value) return;
   const value = event.target instanceof HTMLInputElement ? event.target.value : callbackUrl.value;
-  try {
-    const url = new URL(value);
-    if (!url.searchParams.get("code")) return;
-  } catch {
-    return;
-  }
+  const parsed = parseUrl(value);
+  if (!parsed || !parsed.searchParams.get("code")) return;
 
   exchangeTimer = setTimeout(() => {
     exchangeTimer = null;
@@ -538,20 +563,20 @@ function callbackInput(event: Event) {
 async function pasteCallback() {
   if (props.readonly || isLoading.value) return;
 
-  try {
-    const value = await navigator.clipboard.readText();
-    callbackUrl.value = value.trim();
-    copiedCallbackUrl.value = true;
-    if (copiedCallbackTimer) clearTimeout(copiedCallbackTimer);
-    copiedCallbackTimer = setTimeout(() => {
-      copiedCallbackUrl.value = false;
-      copiedCallbackTimer = null;
-    }, 2000);
-    clearExchange();
-    await oauthExchange();
-  } catch {
+  const pasted = await settle(() => navigator.clipboard.readText());
+  if (!pasted.ok) {
     errorMessage.value = "Failed to paste callback URL";
+    return;
   }
+  callbackUrl.value = pasted.value.trim();
+  copiedCallbackUrl.value = true;
+  if (copiedCallbackTimer) clearTimeout(copiedCallbackTimer);
+  copiedCallbackTimer = setTimeout(() => {
+    copiedCallbackUrl.value = false;
+    copiedCallbackTimer = null;
+  }, 2000);
+  clearExchange();
+  await oauthExchange();
 }
 
 async function callbackPaste(event: ClipboardEvent) {

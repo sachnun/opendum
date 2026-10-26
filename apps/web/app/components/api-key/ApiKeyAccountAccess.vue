@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import { errorText, settle } from "~~/lib/settle";
 import { labelOf } from "@opendum/providers/provider-accounts";
 
-type AccessMode = "all" | "whitelist" | "blacklist";
+import type { AccessMode } from "~~/lib/access-draft";
 
 interface ProviderAccountOption {
   id: string;
@@ -23,140 +24,68 @@ const emit = defineEmits<{
 }>();
 
 const api = useApi();
-const accountPickerOpen = ref(false);
-const accountSearch = ref("");
+const mode = ref<AccessMode>(props.initialMode);
+const accounts = ref<string[]>(props.initialAccounts);
+const search = ref("");
+const pickerOpen = ref(false);
 const isSaving = ref(false);
-const savedMode = ref<AccessMode>(props.initialMode);
-const savedAccounts = ref<string[]>(normalizeAccounts(props.initialAccounts));
-const draftMode = ref<AccessMode>(props.initialMode);
-const draftAccounts = ref<string[]>(normalizeAccounts(props.initialAccounts));
-const errorMessage = ref("");
+const error = ref("");
+const saved = ref<{ mode: AccessMode; ids: string[] }>({
+  mode: props.initialMode,
+  ids: props.initialAccounts,
+});
 
-function normalizeAccounts(accounts: string[]): string[] {
-  return Array.from(new Set(accounts)).sort((a, b) => a.localeCompare(b));
+const targets = computed(() =>
+  props.availableAccounts.map((account) => ({
+    id: account.id,
+    label: account.email ? `${account.name} (${account.email})` : account.name,
+    detail: `${labelOf(account.provider)}${account.email ? ` - ${account.email}` : ""}`,
+  }))
+);
+
+function searchText(target: { id: string }): string {
+  const account = props.availableAccounts.find((entry) => entry.id === target.id);
+  return account ? `${account.provider} ${account.name} ${account.email ?? ""}` : target.id;
 }
 
-function sameList(left: string[], right: string[]): boolean {
-  return left.length === right.length && left.every((item, index) => item === right[index]);
-}
-
-function accountLabel(account: ProviderAccountOption): string {
-  return account.email ? `${account.name} (${account.email})` : account.name;
-}
-
-function providerName(provider: string): string {
-  return labelOf(provider);
-}
-
-function toggleAccount(accountId: string) {
-  if (props.readonly) return;
-  draftAccounts.value = draftAccounts.value.includes(accountId)
-    ? draftAccounts.value.filter((id) => id !== accountId)
-    : normalizeAccounts([...draftAccounts.value, accountId]);
-}
-
-function resetDraft() {
-  draftMode.value = savedMode.value;
-  draftAccounts.value = [...savedAccounts.value];
-  accountPickerOpen.value = false;
-  accountSearch.value = "";
-  errorMessage.value = "";
-}
-
-async function save() {
-  if (props.readonly) return;
-  const accountsForSave = draftMode.value === "all" ? [] : normalizedDraftAccounts.value;
-  if (draftMode.value !== "all" && accountsForSave.length === 0) {
-    errorMessage.value = "Select at least one account";
+async function save(value: { mode: AccessMode; ids: string[] }) {
+  isSaving.value = true;
+  error.value = "";
+  const updated = await settle(() => api.apiKeys.updateAccountAccess({ id: props.apiKeyId, mode: value.mode, accounts: value.ids }));
+  isSaving.value = false;
+  if (!updated.ok) {
+    error.value = errorText(updated.error, "Failed to update account access");
     return;
   }
-
-  isSaving.value = true;
-  errorMessage.value = "";
-  try {
-    const result = await api.apiKeys.updateAccountAccess({ id: props.apiKeyId, mode: draftMode.value, accounts: accountsForSave });
-    if (!result.success) throw new Error(result.error);
-    savedMode.value = result.data.mode;
-    savedAccounts.value = normalizeAccounts(result.data.accounts);
-    draftMode.value = result.data.mode;
-    draftAccounts.value = [...savedAccounts.value];
-    accountPickerOpen.value = false;
-    emit("updated", { mode: result.data.mode, accounts: savedAccounts.value });
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : "Failed to update account access";
-  } finally {
-    isSaving.value = false;
+  if (!updated.value.success) {
+    error.value = updated.value.error;
+    return;
   }
+  const result = updated.value;
+    saved.value = { mode: result.data.mode, ids: result.data.accounts };
+    mode.value = result.data.mode;
+    accounts.value = [...result.data.accounts];
+    emit("updated", { mode: result.data.mode, accounts: result.data.accounts });
 }
-
-const normalizedDraftAccounts = computed(() => normalizeAccounts(draftAccounts.value));
-const normalizedSavedAccounts = computed(() => normalizeAccounts(savedAccounts.value));
-const hasChanges = computed(() => draftMode.value !== savedMode.value || !sameList(draftMode.value === "all" ? [] : normalizedDraftAccounts.value, savedMode.value === "all" ? [] : normalizedSavedAccounts.value));
-const accountMap = computed(() => new Map(props.availableAccounts.map((account) => [account.id, account])));
-const filteredAccounts = computed(() => {
-  const query = accountSearch.value.trim().toLowerCase();
-  if (!query) return props.availableAccounts;
-  return props.availableAccounts.filter((account) => `${account.provider} ${account.name} ${account.email ?? ""}`.toLowerCase().includes(query));
-});
 </script>
 
 <template>
-  <section class="flex h-full flex-col">
-    <div class="flex-1 space-y-3">
-      <div class="grid grid-cols-3 gap-1 rounded-md border border-border/70 bg-card/30 p-1">
-        <button v-for="mode in ['all', 'whitelist', 'blacklist']" :key="mode" type="button" :disabled="readonly" :class="['h-8 rounded-sm border px-2 text-xs font-medium disabled:cursor-default disabled:pointer-events-none disabled:opacity-60', draftMode === mode ? 'border-primary/35 bg-primary/10 text-primary' : 'border-transparent text-muted-foreground']" @click="draftMode = mode as AccessMode">
-          {{ mode === 'all' ? 'All' : mode === 'whitelist' ? 'Whitelist' : 'Blacklist' }}
-        </button>
-      </div>
-
-      <div v-if="draftMode !== 'all'" class="space-y-2">
-        <div class="flex items-center justify-between gap-2">
-          <p class="text-xs font-medium">Accounts</p>
-          <UiButton type="button" variant="ghost" size="sm" class="h-7 px-2 text-[11px]" :disabled="normalizedDraftAccounts.length === 0 || isSaving || readonly" @click="draftAccounts = []">Clear</UiButton>
-        </div>
-
-        <UiPopover v-model:open="accountPickerOpen" :content="{ align: 'start', class: 'w-[min(90vw,28rem)] p-0' }">
-          <UiButton variant="outline" class="h-9 w-full justify-between px-3 text-xs" :disabled="isSaving || readonly">
-            <span class="truncate">{{ normalizedDraftAccounts.length > 0 ? `${normalizedDraftAccounts.length} account selected` : 'Select accounts' }}</span>
-            <UiIcon name="i-lucide-chevron-down" class="size-3.5 text-muted-foreground" />
-          </UiButton>
-          <template #content>
-            <div class="border-b border-border p-2">
-              <input v-model="accountSearch" placeholder="Search account..." class="h-8 w-full rounded-md bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring">
-            </div>
-            <div class="max-h-72 overflow-y-auto p-1">
-              <button v-for="account in filteredAccounts" :key="account.id" type="button" :disabled="readonly" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left hover:bg-accent disabled:cursor-default disabled:pointer-events-none disabled:opacity-60" @click="toggleAccount(account.id)">
-                <UiIcon name="i-lucide-check" :class="['size-3.5', normalizedDraftAccounts.includes(account.id) ? 'opacity-100' : 'opacity-0']" />
-                <div class="flex min-w-0 flex-col">
-                  <span class="truncate text-xs font-medium">{{ account.name }}</span>
-                  <span class="truncate text-[11px] text-muted-foreground">{{ providerName(account.provider) }}{{ account.email ? ` - ${account.email}` : '' }}</span>
-                </div>
-              </button>
-              <p v-if="filteredAccounts.length === 0" class="px-2 py-6 text-center text-xs text-muted-foreground">No account found.</p>
-            </div>
-          </template>
-        </UiPopover>
-
-        <div class="max-h-40 overflow-y-auto py-1">
-          <p v-if="normalizedDraftAccounts.length === 0" class="px-1 text-[11px] text-muted-foreground">No accounts selected</p>
-          <div v-else class="flex flex-wrap gap-1.5">
-            <UiBadge v-for="accountId in normalizedDraftAccounts" :key="accountId" variant="secondary" class="max-w-full gap-1 pr-1 text-[10px] font-normal">
-              <span class="min-w-0 truncate">{{ accountMap.get(accountId) ? accountLabel(accountMap.get(accountId)!) : accountId }}</span>
-              <UiTooltip text="Remove" :disabled="readonly">
-                <button type="button" :disabled="readonly" :aria-label="`Remove account ${accountMap.get(accountId) ? accountLabel(accountMap.get(accountId)!) : accountId}`" class="inline-flex size-4 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground disabled:cursor-default disabled:pointer-events-none disabled:opacity-60" @click="toggleAccount(accountId)">
-                  <UiIcon name="i-lucide-x" class="size-2.5" />
-                </button>
-              </UiTooltip>
-            </UiBadge>
-          </div>
-        </div>
-      </div>
-      <p v-if="errorMessage" class="text-xs text-destructive">{{ errorMessage }}</p>
-    </div>
-
-    <div class="flex items-center justify-end gap-2 border-t border-border/60 pt-3 lg:mt-4">
-      <UiButton variant="outline" size="sm" :disabled="isSaving || !hasChanges || readonly" @click="resetDraft">Cancel</UiButton>
-      <UiButton size="sm" :disabled="isSaving || !hasChanges || readonly" @click="save">{{ isSaving ? 'Saving...' : 'Save' }}</UiButton>
-    </div>
-  </section>
+  <ApiKeyAccessPicker
+    v-model:mode="mode"
+    v-model:ids="accounts"
+    v-model:search="search"
+    v-model:picker-open="pickerOpen"
+    v-model:saving="isSaving"
+    v-model:error="error"
+    v-model:saved="saved"
+    title="Accounts"
+    noun="account"
+    :targets="targets"
+    :search-text="searchText"
+    :initial-mode="initialMode"
+    :initial-ids="initialAccounts"
+    :readonly="readonly"
+    :normalize="(ids) => Array.from(new Set(ids)).sort((a, b) => a.localeCompare(b))"
+    @save="save"
+  />
 </template>

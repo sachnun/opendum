@@ -1,6 +1,6 @@
 import { Cache, Duration, Effect, Result } from "effect";
 import type { OpendumRedis } from "@opendum/core/redis";
-import { Safe } from "./helpers.js";
+import { Safe } from "@opendum/api/core/helpers";
 
 export type ProviderPerformanceConfig = {
   sampleTtlSeconds: number;

@@ -8,9 +8,9 @@ export {
   UpstreamFailure,
   ValidationFailure,
   type ProxyFailure,
-} from "./errors/failures.js";
-export { FailureMap } from "./errors/failure-map.js";
-export { ProviderError } from "./errors/provider.js";
-export { Workbuddy } from "./errors/workbuddy.js";
-export { ProviderQuota } from "./errors/quota.js";
-export { AccountError, type AccountErrorContext } from "./errors/account.js";
+} from "@opendum/api/core/errors/failures";
+export { FailureMap } from "@opendum/api/core/errors/failure-map";
+export { ProviderError } from "@opendum/api/core/errors/provider";
+export { Workbuddy } from "@opendum/api/core/errors/workbuddy";
+export { ProviderQuota } from "@opendum/api/core/errors/quota";
+export { AccountError, type AccountErrorContext } from "@opendum/api/core/errors/account";

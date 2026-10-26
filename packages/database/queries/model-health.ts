@@ -1,8 +1,8 @@
 import { and, eq, inArray, isNotNull, lte, sql } from "drizzle-orm";
 import { Effect } from "effect";
-import { db, type DbExecutor } from "../client.js";
-import { tryDb } from "../errors.js";
-import { providerAccount, accountModelHealth } from "../schema/accounts.js";
+import { db, type DbExecutor } from "@opendum/database/client";
+import { tryDb } from "@opendum/database/errors";
+import { providerAccount, accountModelHealth } from "@opendum/database/schema/accounts";
 
 export const bumpRequests = Effect.fn("db.bumpRequests")(function* (
   params: { id: string; at: Date },

@@ -11,12 +11,12 @@ export {
   type AccountReadOptions,
   type AccountRow,
   type HistoryEntry,
-} from "./accounts/types.js";
-export { AccountState, Clock, Health, ModelList, Tier } from "./accounts/health.js";
+} from "@opendum/api/web/services/accounts/types";
+export { AccountState, Clock, Health, ModelList, Tier } from "@opendum/api/web/services/accounts/health";
 export type AccountOverviewSummary = {
   connected: number;
   active: number;
   indicator: import("./account-stats.js").ProviderAccountIndicator;
   stats: import("./account-stats.js").ProviderStats;
 };
-export { ErrorHistory, HealthRows, Pins, type ErrorEntry } from "./accounts/store.js";
+export { ErrorHistory, HealthRows, Pins, type ErrorEntry } from "@opendum/api/web/services/accounts/store";

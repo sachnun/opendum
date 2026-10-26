@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { errorText, raise, settle } from "~~/lib/settle";
 import { cn } from "~~/lib/utils";
 import type { KeyListItem } from "~~/lib/api-types";
 
@@ -51,16 +52,18 @@ async function revealKey() {
 
   isLoading.value = true;
   errorMessage.value = "";
-  try {
-    const result = await api.apiKeys.reveal({ id: props.apiKey.id });
-    if (!result.success) throw new Error(result.error);
-    revealedKey.value = result.data.key;
-    isRevealed.value = true;
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : "Failed to reveal API key";
-  } finally {
-    isLoading.value = false;
+  const revealed = await settle(() => api.apiKeys.reveal({ id: props.apiKey.id }));
+  isLoading.value = false;
+  if (!revealed.ok) {
+    errorMessage.value = errorText(revealed.error, "Failed to reveal API key");
+    return;
   }
+  if (!revealed.value.success) {
+    errorMessage.value = revealed.value.error;
+    return;
+  }
+  revealedKey.value = revealed.value.data.key;
+  isRevealed.value = true;
 }
 
 async function copyKey() {
@@ -68,44 +71,48 @@ async function copyKey() {
   let key = revealedKey.value;
   isLoading.value = true;
   errorMessage.value = "";
-  try {
+  const copiedKey = await settle(async () => {
     if (!key) {
       const result = await api.apiKeys.reveal({ id: props.apiKey.id });
-      if (!result.success) throw new Error(result.error);
+      if (!result.success) return raise(new Error(result.error));
       key = result.data.key;
     }
     await navigator.clipboard.writeText(key);
-    revealedKey.value = key;
-    isTemporarilyRevealed.value = !isRevealed.value;
-    copied.value = true;
-    if (copyTimeout) clearTimeout(copyTimeout);
-    copyTimeout = setTimeout(() => {
-      copied.value = false;
-      isTemporarilyRevealed.value = false;
-      if (!isRevealed.value) revealedKey.value = null;
-      copyTimeout = null;
-    }, 2000);
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : "Failed to copy API key";
-  } finally {
-    isLoading.value = false;
+    return key;
+  });
+  isLoading.value = false;
+  if (!copiedKey.ok) {
+    errorMessage.value = errorText(copiedKey.error, "Failed to copy API key");
+    return;
   }
+  revealedKey.value = copiedKey.value;
+  isTemporarilyRevealed.value = !isRevealed.value;
+  copied.value = true;
+  if (copyTimeout) clearTimeout(copyTimeout);
+  copyTimeout = setTimeout(() => {
+    copied.value = false;
+    isTemporarilyRevealed.value = false;
+    if (!isRevealed.value) revealedKey.value = null;
+    copyTimeout = null;
+  }, 2000);
 }
 
 async function deleteKey() {
   if (props.readonly) return;
   isDeleting.value = true;
   errorMessage.value = "";
-  try {
-    const result = await api.apiKeys.delete({ id: props.apiKey.id });
-    if (!result.success) throw new Error(result.error);
-    deleteDialogOpen.value = false;
-    emit("deleted", props.apiKey.id);
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : "Failed to delete API key";
-  } finally {
-    isDeleting.value = false;
+  const deleted = await settle(() => api.apiKeys.delete({ id: props.apiKey.id }));
+  isDeleting.value = false;
+  if (!deleted.ok) {
+    errorMessage.value = errorText(deleted.error, "Failed to delete API key");
+    return;
   }
+  if (!deleted.value.success) {
+    errorMessage.value = deleted.value.error;
+    return;
+  }
+  deleteDialogOpen.value = false;
+  emit("deleted", props.apiKey.id);
 }
 
 onUnmounted(() => {

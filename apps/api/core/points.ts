@@ -1,8 +1,8 @@
 import { Effect } from "effect";
 import type { DatabaseFailure } from "@opendum/database";
-import type { PointPort } from "./repositories.js";
+import type { PointPort } from "@opendum/api/core/repositories";
 import type { Registry } from "@opendum/models/runtime";
-import type { UsageCounts } from "./types.js";
+import type { UsageCounts } from "@opendum/api/core/types";
 
 const INITIAL_POINT_BALANCE = 15;
 const ROAMING_MINIMUM_POINTS = 1;

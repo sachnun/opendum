@@ -1,3 +1,5 @@
+import { Result } from "effect";
+import { parseJson } from "~~/lib/settle";
 export interface AuthUser {
   id: string;
   name: string | null;
@@ -63,11 +65,16 @@ export function clearTokens(): void {
 }
 
 function decodeSegment(segment: string): unknown {
-  const base64 = segment.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(segment.length / 4) * 4, "=");
-  const binary = atob(base64);
-  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
-
-  return JSON.parse(new TextDecoder().decode(bytes));
+  const decoded = Result.try({
+    try: () => {
+      const base64 = segment.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(segment.length / 4) * 4, "=");
+      const binary = atob(base64);
+      const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+      return parseJson(new TextDecoder().decode(bytes));
+    },
+    catch: () => null,
+  });
+  return Result.isSuccess(decoded) ? decoded.success : null;
 }
 
 function authUser(value: unknown): AuthUser | null {
@@ -91,13 +98,9 @@ export function readClaims(token: string | null = accessToken()): AccessTokenCla
   const payload = token.split(".")[1];
   if (!payload) return null;
 
-  try {
-    const decoded = decodeSegment(payload) as Record<string, unknown>;
-    const user = authUser({ id: decoded.sub, name: decoded.name, email: decoded.email, image: decoded.image });
-    if (!user) return null;
-
-    return { user, impersonatedBy: text(decoded.impersonatedBy) };
-  } catch {
-    return null;
-  }
+  const decoded = decodeSegment(payload) as Record<string, unknown> | null;
+  if (!decoded || typeof decoded !== "object") return null;
+  const user = authUser({ id: decoded.sub, name: decoded.name, email: decoded.email, image: decoded.image });
+  if (!user) return null;
+  return { user, impersonatedBy: text(decoded.impersonatedBy) };
 }

@@ -1,8 +1,8 @@
 import { createId } from "@paralleldrive/cuid2";
 import { boolean, index, integer, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
-import { user } from "./auth.js";
-import { providerAccount } from "./accounts.js";
-import { proxyApiKey } from "./keys.js";
+import { user } from "@opendum/database/schema/auth";
+import { providerAccount } from "@opendum/database/schema/accounts";
+import { proxyApiKey } from "@opendum/database/schema/keys";
 
 export const userPointBalance = pgTable("user_point_balance", {
   userId: text("userId")

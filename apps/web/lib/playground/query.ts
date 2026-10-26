@@ -1,4 +1,5 @@
-import type { PlaygroundEndpoint, ReasoningEffort } from "./types";
+import type { PlaygroundEndpoint, ReasoningEffort } from "~~/lib/playground/types";
+import { parseJson } from "~~/lib/settle";
 
 const ENDPOINTS: PlaygroundEndpoint[] = ["chat_completions", "messages", "responses"];
 const EFFORTS: ReasoningEffort[] = ["none", "low", "medium", "high", "xhigh", "max"];
@@ -38,29 +39,22 @@ export class Query {
   static additional(value: unknown): string | null {
     const raw = Query.string(value);
     if (!raw?.trim()) return null;
-    try {
-      const parsed = JSON.parse(raw) as unknown;
-      return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-        ? JSON.stringify(parsed, null, 2)
-        : null;
-    } catch {
-      return raw;
-    }
+    const parsed = parseJson(raw) as unknown;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? JSON.stringify(parsed, null, 2)
+      : raw;
   }
 }
 
 export class Params {
   static parse(value: string): { params: Record<string, unknown> | null; error: string } {
     if (!value.trim()) return { params: null, error: "" };
-    try {
-      const parsed = JSON.parse(value) as unknown;
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-        return { params: null, error: "Additional parameters must be a JSON object." };
-      }
-      return { params: parsed as Record<string, unknown>, error: "" };
-    } catch (error) {
-      return { params: null, error: error instanceof Error ? error.message : "Invalid JSON." };
+    const parsed = parseJson(value) as unknown;
+    if (parsed === null) return { params: null, error: "Invalid JSON." };
+    if (typeof parsed !== "object" || Array.isArray(parsed)) {
+      return { params: null, error: "Additional parameters must be a JSON object." };
     }
+    return { params: parsed as Record<string, unknown>, error: "" };
   }
 
   static clamp(value: number, min: number, max: number): number {

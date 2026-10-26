@@ -2,8 +2,8 @@ import { ORPCError } from "@orpc/server";
 import { Effect } from "effect";
 import { HTTPError } from "h3";
 
-import { contextOf, type RequestContext } from "#web/utils/api.js";
-import { asFailure } from "../errors.js";
+import { contextOf, type RequestContext } from "@opendum/api/web/utils/api";
+import { asFailure } from "@opendum/api/web/errors";
 
 export interface OrpcInitialContext {
   headers: Headers;

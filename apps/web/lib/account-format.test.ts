@@ -7,13 +7,10 @@ import {
   compactNumber,
   formatDuration,
   signedPercent,
-  tierLabel,
   accountHeader,
-  freeTier,
-  paidTier,
   maskText,
   type StatMetric,
-} from "./account-format";
+} from "~~/lib/account-format";
 
 describe("account format helpers", () => {
   it("formats durations and numbers", () => {
@@ -39,14 +36,6 @@ describe("account format helpers", () => {
     const days = dayKeys(2);
     expect(days.length).toBe(2);
     expect([...days].sort()).toEqual(days);
-  });
-
-  it("classifies tiers", () => {
-    expect(paidTier("pro", "kiro")).toBe(true);
-    expect(freeTier("free")).toBe(true);
-    expect(tierLabel("free")).toBe("Free");
-    expect(tierLabel("pro", "kiro")).toBe("Paid");
-    expect(tierLabel("mystery")).toBe("");
   });
 
   it("masks sensitive text", () => {

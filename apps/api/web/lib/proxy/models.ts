@@ -1,7 +1,7 @@
 import { Registry } from "@opendum/models/runtime";
 import type { ModelInfo, ProviderAccessRule } from "@opendum/models/runtime";
 import { compareEntries } from "@opendum/models/sort";
-import { dirFor } from "../../../core/context.js";
+import { dirFor } from "@opendum/api/core/context";
 
 export const registry = Registry.load(dirFor(), { familyFromFolder: true });
 

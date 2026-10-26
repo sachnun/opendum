@@ -1,7 +1,7 @@
 import type { Provider, ProviderAccount } from "@opendum/providers";
-import { Coerce } from "./helpers.js";
-import { tierFor } from "./tiers.js";
-import type { ProviderRoutingOptions, ProviderScore } from "./provider-performance.js";
+import { Coerce } from "@opendum/api/core/helpers";
+import { tierFor } from "@opendum/api/core/tiers";
+import type { ProviderRoutingOptions, ProviderScore } from "@opendum/api/core/provider-performance";
 
 export const AUTHLESS_ACCOUNT_PREFIX = "authless:";
 export const IDLE_DECAY_MS = 10 * 60 * 1000;

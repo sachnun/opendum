@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { sessionKey } from "../core/service-helpers.js";
+import { sessionKey } from "@opendum/api/core/service-helpers";
 
 function request(headers: Record<string, string> = {}): Request {
   return new Request("https://proxy.test/v1/chat/completions", { method: "POST", headers });

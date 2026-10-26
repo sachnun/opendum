@@ -1,5 +1,7 @@
-import { Value, Payload, Ids, Responses, JSONText } from "../core/helpers.js";
-import { ResponsesImageInliner } from "../core/images.js";
+import { raise } from "@opendum/providers/core/errors";
+import {Effect} from "effect";
+import { Value, Payload, Ids, Responses, JSONText } from "@opendum/providers/core/helpers";
+import { ResponsesImageInliner } from "@opendum/providers/core/images";
 
 type Json = Record<string, unknown>;
 
@@ -176,20 +178,17 @@ async function* dataLines(source: ReadableStream<Uint8Array>): AsyncGenerator<st
       yield trimmed.slice("data:".length).trim();
     }
   };
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-      for (const data of emit(lines.join("\n"))) yield data;
-    }
-    buffer += decoder.decode();
-    for (const data of emit(buffer)) yield data;
-  } finally {
-    reader.releaseLock();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const data of emit(lines.join("\n"))) yield data;
   }
+  buffer += decoder.decode();
+  for (const data of emit(buffer)) yield data;
+  reader.releaseLock();
 }
 
 function toStream(events: AsyncIterable<string>): ReadableStream<Uint8Array> {
@@ -863,16 +862,13 @@ export async function sseJson(source: ReadableStream<Uint8Array>): Promise<Json>
   const reader = source.getReader();
   const decoder = new TextDecoder();
   let raw = "";
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      raw += decoder.decode(value, { stream: true });
-    }
-    raw += decoder.decode();
-  } finally {
-    reader.releaseLock();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    raw += decoder.decode(value, { stream: true });
   }
+  raw += decoder.decode();
+  reader.releaseLock();
   const trimmed = raw.trim();
   if (trimmed.startsWith("{")) return JSONText.record(trimmed) ?? {};
   let result: Json | null = null;
@@ -893,7 +889,7 @@ export async function sseJson(source: ReadableStream<Uint8Array>): Promise<Json>
       if (response !== null && typeof response === "object") result = response as Json;
     }
   }
-  if (!result) throw new Error("responses stream ended without a terminal event");
+  if (!result) raise(new Error("responses stream ended without a terminal event"));
   return result;
 }
 
@@ -904,16 +900,13 @@ export async function sseCompletion(
   const reader = source.getReader();
   const decoder = new TextDecoder();
   let raw = "";
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      raw += decoder.decode(value, { stream: true });
-    }
-    raw += decoder.decode();
-  } finally {
-    reader.releaseLock();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    raw += decoder.decode(value, { stream: true });
   }
+  raw += decoder.decode();
+  reader.releaseLock();
   const trimmed = raw.trim();
   if (trimmed.startsWith("{")) return JSONText.record(trimmed) ?? {};
 
@@ -991,7 +984,7 @@ export async function toResponses(
   stream: boolean
 ): Promise<Response> {
   if (!resp.body) {
-    throw new Error("upstream response has no body");
+    raise(new Error("upstream response has no body"));
   }
   if (stream) {
     return Responses.sse(chatStream(resp.body, model));
@@ -1097,6 +1090,8 @@ export async function buildPayload(
   };
 
   const input = payload.input as unknown[];
-  const converted = imageFetch ? await new ResponsesImageInliner(imageFetch).run(input) : input;
+  const converted = imageFetch
+    ? await Effect.runPromise(new ResponsesImageInliner(imageFetch).run(input))
+    : input;
   return finishPayload(converted);
 }

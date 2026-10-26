@@ -1,7 +1,7 @@
 import { ORPCError } from "@orpc/server";
 import { Effect } from "effect";
 
-import type { ServiceFailure } from "../errors.js";
+import type { ServiceFailure } from "@opendum/api/web/errors";
 
 const STATUS_CODES = {
   400: "BAD_REQUEST",

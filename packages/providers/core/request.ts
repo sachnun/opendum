@@ -5,7 +5,7 @@ import {
   ProviderTransportFailure,
   asError,
   failureMessage,
-} from "./errors.js";
+} from "@opendum/providers/core/errors";
 
 export type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
 export type EgressFetch = FetchLike;

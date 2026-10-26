@@ -1,5 +1,6 @@
 import { afterAll, describe, expect, it } from "bun:test";
-import { UnroxyEgress } from "./unroxy.js";
+import { Effect, Exit } from "effect";
+import { UnroxyEgress } from "@opendum/core/egress/unroxy";
 
 const encoder = new TextEncoder();
 
@@ -8,9 +9,7 @@ const server = Bun.serve({
   fetch(request) {
     const path = new URL(request.url).pathname;
     if (path === "/slow-headers") {
-      return new Promise<Response>((resolve) => {
-        setTimeout(() => resolve(new Response("late")), 300);
-      });
+      return Bun.sleep(300).then(() => new Response("late"));
     }
     if (path === "/slow-body") {
       const body = new ReadableStream<Uint8Array>({
@@ -36,14 +35,12 @@ afterAll(() => {
 describe("UnroxyEgress", () => {
   it("aborts when response headers take too long", async () => {
     const egress = new UnroxyEgress({ baseUrl, headersTimeout: 50 });
-    let caught: unknown;
-    try {
-      await egress.fetch("/slow-headers");
-    } catch (error) {
-      caught = error;
-    }
-    expect(caught).toBeInstanceOf(Error);
-    expect(String((caught as Error).name)).toBe("TimeoutError");
+    const exit = await Effect.runPromiseExit(
+      Effect.tryPromise({ try: () => egress.fetch("/slow-headers"), catch: (cause) => cause })
+    );
+    expect(Exit.isFailure(exit)).toBe(true);
+    const names = Exit.isFailure(exit) ? exit.cause.reasons.map((reason) => String(reason)) : [];
+    expect(names.join(" ")).toContain("upstream headers timed out");
   });
 
   it("leaves the body untouched after headers arrive", async () => {
@@ -64,12 +61,9 @@ describe("UnroxyEgress", () => {
     const controller = new AbortController();
     const pending = egress.fetch("/slow-headers", { signal: controller.signal });
     controller.abort(new Error("client gone"));
-    let caught: unknown;
-    try {
-      await pending;
-    } catch (error) {
-      caught = error;
-    }
-    expect(caught).toBeInstanceOf(Error);
+    const exit = await Effect.runPromiseExit(
+      Effect.tryPromise({ try: () => pending, catch: (cause) => cause })
+    );
+    expect(Exit.isFailure(exit)).toBe(true);
   });
 });

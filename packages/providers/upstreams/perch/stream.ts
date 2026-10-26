@@ -1,6 +1,8 @@
-import { Ids, Value } from "../../core/helpers.js";
-import { Collector } from "../../transform/collector.js";
-import { PerchUsage, UpstreamError, type Json } from "./auth.js";
+import {} from "effect";
+import { raise } from "@opendum/providers/core/errors";
+import { Ids, Value } from "@opendum/providers/core/helpers";
+import { Collector } from "@opendum/providers/transform/collector";
+import { PerchUsage, UpstreamError, type Json } from "@opendum/providers/upstreams/perch/auth";
 
 export class PerchToolCalls {
   static fromEvent(event: Json): unknown[] {
@@ -104,12 +106,8 @@ export class PerchStream {
     if (!trimmed || trimmed === "[DONE]" || trimmed.startsWith(":")) return out;
     const payload = trimmed.startsWith("data:") ? trimmed.slice("data:".length).trim() : trimmed;
     if (!payload || payload === "[DONE]") return out;
-    let event: Json;
-    try {
-      event = JSON.parse(payload) as Json;
-    } catch {
-      return out;
-    }
+    const event = Value.parseJson(payload) as Json | null;
+    if (event === null) return out;
     switch (Value.string(event.type)) {
       case "reasoning_delta": {
         if (!this.includeReasoning) break;
@@ -202,26 +200,29 @@ export async function* sseGenerator(
   const reader = source.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-      for (const line of lines) {
-        for (const chunk of stream.handle(line)) yield chunk;
-        if (stream.finished) return;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
+      for (const chunk of stream.handle(line)) yield chunk;
+      if (stream.finished) {
+        reader.releaseLock();
+        return;
       }
     }
-    buffer += decoder.decode();
-    for (const line of buffer.split("\n")) {
-      for (const chunk of stream.handle(line)) yield chunk;
-      if (stream.finished) return;
-    }
-  } finally {
-    reader.releaseLock();
   }
+  buffer += decoder.decode();
+  for (const line of buffer.split("\n")) {
+    for (const chunk of stream.handle(line)) yield chunk;
+    if (stream.finished) {
+      reader.releaseLock();
+      return;
+    }
+  }
+  reader.releaseLock();
   for (const chunk of stream.finish()) yield chunk;
 }
 
@@ -245,12 +246,8 @@ export class PerchCompletion {
       if (!trimmed || trimmed === "[DONE]" || trimmed.startsWith(":")) continue;
       const payload = trimmed.startsWith("data:") ? trimmed.slice("data:".length).trim() : trimmed;
       if (!payload || payload === "[DONE]") continue;
-      let event: Json;
-      try {
-        event = JSON.parse(payload) as Json;
-      } catch {
-        continue;
-      }
+      const event = Value.parseJson(payload) as Json | null;
+      if (event === null) continue;
       switch (Value.string(event.type)) {
         case "reasoning_delta":
           collector.addReasoning(Value.string(event.text));
@@ -289,7 +286,7 @@ export class PerchCompletion {
           const message = PerchUsage.errorMessage(event);
           const hasOk = typeof event.ok === "boolean";
           if (message || (hasOk && event.ok !== true)) {
-            throw new UpstreamError(message || "Perch request failed", PerchUsage.isQuota(message));
+            raise(new UpstreamError(message || "Perch request failed", PerchUsage.isQuota(message)));
           }
           const usage = PerchUsage.toChat(event.usage);
           if (usage) collector.setUsage(usage);

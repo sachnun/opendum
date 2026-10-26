@@ -7,9 +7,9 @@ import {
   openrouterQuota,
   workbuddyQuota,
   zenmuxQuota,
-} from "./fetchers/index.js";
-import { fetchQuota as perchQuota } from "./perch.js";
-import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaFetcher } from "./types.js";
+} from "@opendum/providers/quota/fetchers/index";
+import { fetchQuota as perchQuota } from "@opendum/providers/quota/perch";
+import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaFetcher } from "@opendum/providers/quota/types";
 
 const FETCHERS: QuotaFetcher[] = [
   {

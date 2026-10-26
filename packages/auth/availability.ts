@@ -9,11 +9,11 @@ import {
   disabledByUser,
   listSharedAccounts,
 } from "@opendum/database/queries";
-import type { Policy } from "./policy.js";
-import { AUTHLESS } from "./authless.js";
-import type { CustomModels } from "./custom-models.js";
-import { disabledList } from "./normalize.js";
-import { type AccountModelAvailability, emptyAvailability } from "./types.js";
+import type { Policy } from "@opendum/auth/policy";
+import { AUTHLESS } from "@opendum/auth/authless";
+import type { CustomModels } from "@opendum/auth/custom-models";
+import { disabledList } from "@opendum/auth/normalize";
+import { type AccountModelAvailability, emptyAvailability } from "@opendum/auth/types";
 
 const DISABLED_TTL = 60;
 

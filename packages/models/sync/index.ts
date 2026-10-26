@@ -1,3 +1,3 @@
-export * from "./http.ts";
-export * from "./metadata.ts";
-export * from "./aa.ts";
+export * from "@opendum/models/sync/http";
+export * from "@opendum/models/sync/metadata";
+export * from "@opendum/models/sync/aa";

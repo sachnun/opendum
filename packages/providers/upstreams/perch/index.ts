@@ -1,19 +1,16 @@
-import { Effect } from "effect";
-import type { Registry } from "@opendum/models/runtime";
-import { Responses, Value } from "../../core/helpers.js";
-import { RequestFailure, type UpstreamTransport } from "../../core/http.js";
-import { ProviderCredentialFailure } from "../../core/errors.js";
-import { OAuth } from "../../core/oauth.js";
+import { Effect, Result } from "effect";
+import { Responses, Value } from "@opendum/providers/core/helpers";
+import { RequestFailure } from "@opendum/providers/core/http";
+import { OAuth } from "@opendum/providers/core/oauth";
+import { OAuthProvider, type ProviderOptions } from "@opendum/providers/core/provider";
 import type {
-  CredentialRefresher,
-  Provider,
   ProviderAccount,
   ProviderFailure,
   ProviderRequest,
   RefreshedCredentials,
-  RefreshBufferProvider,
-} from "../../types.js";
-import { PERCH_APP_URL } from "../../endpoints.js";
+  ProviderCredentialFailure,
+} from "@opendum/providers/types";
+import { PERCH_APP_URL } from "@opendum/providers/auth/perch/constants";
 
 import {
   ACCESS_TTL_MS,
@@ -25,42 +22,32 @@ import {
   TURN_TICKET_HEADER,
   UpstreamError,
   type Json,
-} from "./auth.js";
-import { PerchPayload } from "./payload.js";
-import { PerchCompletion, PerchStream, sseGenerator } from "./stream.js";
+} from "@opendum/providers/upstreams/perch/auth";
+import { PerchPayload } from "@opendum/providers/upstreams/perch/payload";
+import { PerchCompletion, PerchStream, sseGenerator } from "@opendum/providers/upstreams/perch/stream";
 
-export type PerchOptions = {
-  registry: Registry;
-  transport: UpstreamTransport;
-};
-
-export class PerchProvider implements Provider, CredentialRefresher, RefreshBufferProvider {
+export class PerchProvider extends OAuthProvider {
   readonly name = "perch";
-
-  private readonly registry: Registry;
-
-  private readonly transport: UpstreamTransport;
-
-  private readonly exchange: OAuth;
-
+  protected readonly refreshBufferMs = REFRESH_BUFFER_MS;
   private readonly auth: PerchAuth;
+  private readonly oauth: OAuth;
 
-  constructor(options: PerchOptions) {
-    this.registry = options.registry;
-    this.transport = options.transport;
-    this.auth = new PerchAuth(options.transport);
-    this.exchange = new OAuth({
+  constructor(options: ProviderOptions) {
+    super(options);
+    this.oauth = new OAuth({
       provider: "perch",
       tokenUrl: async () => {
         const config = await this.auth.config();
-        return `${config.supabaseUrl}/auth/v1/token?grant_type=refresh_token`;
+        if (Result.isFailure(config)) return "";
+        return `${config.success.supabaseUrl}/auth/v1/token?grant_type=refresh_token`;
       },
       transport: options.transport,
       request: async (refreshToken) => {
         const headers = await this.auth.tokenHeaders();
+        const values = Result.isFailure(headers) ? {} : headers.success;
         return {
           method: "POST",
-          headers: { ...headers, Accept: "application/json" },
+          headers: { ...values, Accept: "application/json" },
           body: JSON.stringify({ refresh_token: refreshToken.trim() }),
         };
       },
@@ -72,25 +59,22 @@ export class PerchProvider implements Provider, CredentialRefresher, RefreshBuff
           expires_in?: number;
         };
         const accessToken = (token.access_token ?? "").trim();
-        if (!accessToken) throw new Error("perch token refresh returned empty access token");
+        if (!accessToken) return Result.fail("perch token refresh returned empty access token");
         let expiresAt = new Date(Date.now() + ACCESS_TTL_MS);
         if ((token.expires_at ?? 0) > 0) expiresAt = new Date(Math.trunc((token.expires_at as number) * 1000));
         else if ((token.expires_in ?? 0) > 0) expiresAt = new Date(Date.now() + (token.expires_in as number) * 1000);
         const nextRefresh = (token.refresh_token ?? "").trim() || refreshToken.trim();
-        return { accessToken, refreshToken: nextRefresh, expiresAt };
+        return Result.succeed({ accessToken, refreshToken: nextRefresh, expiresAt });
       },
     });
+    this.auth = new PerchAuth(options.transport);
   }
 
-  refreshBuffer(): number {
-    return REFRESH_BUFFER_MS;
-  }
-
-  refreshCredentials(
+  protected exchange(
     refreshToken: string,
     account: ProviderAccount
   ): Effect.Effect<RefreshedCredentials, ProviderCredentialFailure> {
-    return this.exchange.exchange(refreshToken, account);
+    return this.oauth.exchange(refreshToken, account);
   }
 
   makeRequest(request: ProviderRequest): Effect.Effect<Response, ProviderFailure> {
@@ -120,10 +104,14 @@ export class PerchProvider implements Provider, CredentialRefresher, RefreshBuff
     return RequestFailure.normalize(
       "perch",
       Effect.gen(function* () {
-        const { ticket, runId: ticketRunId } = yield* Effect.tryPromise({
+        const ticketResult = yield* Effect.tryPromise({
           try: () => auth.turnTicket(request.credentials),
           catch: (cause) => RequestFailure.transport("perch", cause),
         });
+        if (Result.isFailure(ticketResult)) {
+          return yield* Effect.fail(RequestFailure.transport("perch", new Error(ticketResult.failure)));
+        }
+        const { ticket, runId: ticketRunId } = ticketResult.success;
         const runId = ticketRunId.trim() || PerchAuth.runId();
 
         let attribution: Json | null = null;

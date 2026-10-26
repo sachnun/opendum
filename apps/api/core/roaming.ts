@@ -1,13 +1,13 @@
 import { Effect } from "effect";
-import type { PointPort } from "./repositories.js";
+import type { PointPort } from "@opendum/api/core/repositories";
 import type { Registry } from "@opendum/models/runtime";
 import {
   refundRoamingPoint,
   reserveRoamingPoint,
   settleRoamingPoint,
   type PointReservation,
-} from "./points.js";
-import type { UsageCounts } from "./types.js";
+} from "@opendum/api/core/points";
+import type { UsageCounts } from "@opendum/api/core/types";
 
 export class Roaming {
   constructor(

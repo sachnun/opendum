@@ -1,7 +1,7 @@
 import { Duration, Effect, Schedule } from "effect";
-import { FallbackPolicy, type FallbackState } from "./fallback.js";
-import { JSONPoster, RequestFailure, type EgressFetch, type FetchLike, type PostOptions } from "./request.js";
-import type { ProviderFallbackFailure, ProviderTransportFailure } from "./errors.js";
+import { FallbackPolicy, type FallbackState } from "@opendum/providers/core/fallback";
+import { JSONPoster, RequestFailure, type EgressFetch, type FetchLike, type PostOptions } from "@opendum/providers/core/request";
+import type { ProviderFallbackFailure, ProviderTransportFailure } from "@opendum/providers/core/errors";
 
 export type UpstreamTransport = {
   readonly direct: FetchLike;
@@ -138,7 +138,9 @@ export class EgressPoster {
         Effect.flatMap((response) => {
           if (!FallbackPolicy.triggers(response.status)) return Effect.succeed(response);
           if (attempt + 1 >= attemptsFor(response.status)) return Effect.succeed(response);
-          return Effect.promise(() => response.body?.cancel() ?? Promise.resolve()).pipe(
+          return Effect.promise(async () => {
+            await response.body?.cancel();
+          }).pipe(
             Effect.flatMap(() =>
               Effect.logDebug("egress retry", {
                 provider: this.options.provider,
@@ -173,14 +175,18 @@ export class EgressPoster {
         this.options.logger?.("egress preferred", { provider });
         const resp = yield* this.rotate();
         if (!FallbackPolicy.triggers(resp.status)) return resp;
-        yield* Effect.promise(() => resp.body?.cancel() ?? Promise.resolve());
+        yield* Effect.promise(async () => {
+        await resp.body?.cancel();
+      });
         return yield* this.policy.primary(provider, this.direct()(primary));
       }
 
       const resp = yield* this.policy.primary(provider, this.direct()(primary));
       if (!FallbackPolicy.triggers(resp.status)) return resp;
       this.options.logger?.("egress fallback", { provider, status: resp.status });
-      yield* Effect.promise(() => resp.body?.cancel() ?? Promise.resolve());
+      yield* Effect.promise(async () => {
+        await resp.body?.cancel();
+      });
       yield* this.policy.recordStrike(provider);
       return yield* this.rotate();
     }).pipe(Effect.mapError((cause) => RequestFailure.fallback(provider, cause)));

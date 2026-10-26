@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import { putQuota, encodeQuery } from "../cache.js";
+import { encodeQuery } from "@opendum/providers/quota/cache";
 import {
   baseInfo,
   clampFraction,
@@ -12,9 +12,9 @@ import {
   parseRecord,
   parseString,
   isoOf,
-} from "../helpers.js";
-import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay } from "../types.js";
-import { quotaAttempt, type Json } from "./shared.js";
+} from "@opendum/providers/quota/helpers";
+import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay } from "@opendum/providers/quota/types";
+import { quotaPayload, type Json } from "@opendum/providers/quota/fetchers/shared";
 
 export function kiroQuota(
   ctx: QuotaContext,
@@ -41,29 +41,22 @@ export function kiroQuota(
     "amz-sdk-request": "attempt=1; max=3",
   };
 
-  return quotaAttempt(ctx, account, forceRefresh, "kiro:GetUsageLimits", "POST", target, headers, body).pipe(
-    Effect.flatMap((attempt) => {
-      if (!attempt.ok) return Effect.succeed(errorInfo(attempt.message));
-      const { result } = attempt;
-      if (result.statusCode < 200 || result.statusCode >= 300) {
-        return Effect.succeed(
-          errorInfo(`Kiro usage limits quota endpoint failed: HTTP ${result.statusCode} ${result.raw}`)
-        );
-      }
-      const parsed = (() => {
-        try {
-          return JSON.parse(result.raw) as Json;
-        } catch {
-          return null;
-        }
-      })();
-      if (!parsed) return Effect.succeed(errorInfo("Kiro usage limits response was not valid JSON"));
-      const record = parseRecord(parsed.data) ?? parsed;
+  return quotaPayload(ctx, account, forceRefresh, {
+    cache: "kiro:GetUsageLimits",
+    method: "POST",
+    url: target,
+    headers,
+    body,
+    label: "Kiro usage limits",
+  }).pipe(
+    Effect.map((payload) => {
+      if (!payload.ok) return payload.info;
+      const record = parseRecord(payload.data.data) ?? payload.data;
       const groups = kiroGroups(record);
       if (groups.length === 0) {
-        return Effect.succeed(errorInfo("Kiro usage limits are unavailable for this account"));
+        return errorInfo("Kiro usage limits are unavailable for this account");
       }
-      return putQuota(ctx, result).pipe(Effect.as(baseInfo("success", groups)));
+      return baseInfo("success", groups);
     })
   );
 }

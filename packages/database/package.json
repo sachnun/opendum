@@ -12,7 +12,8 @@
     "./queries": "./queries/index.ts",
     "./repositories": "./repositories/index.ts",
     "./errors": "./errors.ts",
-    "./client": "./client.ts"
+    "./client": "./client.ts",
+    "./*": "./*.ts"
   },
   "scripts": {
     "db:push": "drizzle-kit push",

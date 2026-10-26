@@ -1,29 +1,27 @@
+import { Result } from "effect";
 import { Effect } from "effect";
 import { and, count, eq, inArray } from "drizzle-orm";
 
 import { db, customProvider, customProviderModel, providerAccount } from "@opendum/database";
 import { stripParams } from "@opendum/models/clean-key";
 import { idMap } from "@opendum/models/model-store";
-import { decrypt, encrypt, hashString } from "#web/lib/encryption.js";
-import { fetchExternalEffect } from "#web/lib/external.js";
-import { fromPromise } from "#web/lib/task.js";
-import { internal } from "#web/errors.js";
+import { decrypt, encrypt, hashString } from "@opendum/api/web/lib/encryption";
+import { fetchExternalEffect } from "@opendum/api/web/lib/external";
+import { fromPromise } from "@opendum/api/web/lib/task";
+import { internal } from "@opendum/api/web/errors";
 import type { CustomCreateInput, CustomModelInput, ModelsPreviewInput, CustomUpdateInput } from "@opendum/providers/contract";
-import { PROVIDER_ACCOUNT_KEYS } from "./account-providers.js";
+import { PROVIDER_ACCOUNT_KEYS } from "@opendum/api/web/services/account-providers";
 
 const KEY_ACCOUNT_EXPIRY = new Date("2100-01-01T00:00:00.000Z");
 const RELAY_ERROR_HEADER = "X-Opendum-Internal-Relay-Error";
 const VALIDATION_TIMEOUT_MS = 15000;
 
 function privateTarget(raw: string): boolean {
-  let parsed: URL;
-  try {
-    parsed = new URL(raw);
-  } catch {
-    return true;
-  }
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return true;
-  const host = parsed.hostname.toLowerCase();
+  const parsed = Result.try({ try: () => new URL(raw), catch: () => null });
+  if (Result.isFailure(parsed)) return true;
+  const target = parsed.success;
+  if (target.protocol !== "http:" && target.protocol !== "https:") return true;
+  const host = target.hostname.toLowerCase();
   if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal")) return true;
   const literal = host.replace(/^\[|\]$/g, "");
   if (/^\d+\.\d+\.\d+\.\d+$/.test(literal)) {

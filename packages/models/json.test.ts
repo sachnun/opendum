@@ -15,7 +15,7 @@ import {
   sortedUnique,
   stringAt,
   uniqueStrings,
-} from "./json.ts";
+} from "@opendum/models/json";
 
 describe("json accessors", () => {
   test("narrow records and reject arrays, null, and primitives", () => {

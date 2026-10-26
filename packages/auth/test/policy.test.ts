@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import type { Registry } from "@opendum/models/runtime";
-import { Policy } from "../policy.js";
-import { emptyAvailability } from "../types.js";
+import { Policy } from "@opendum/auth/policy";
+import { emptyAvailability } from "@opendum/auth/types";
 
 type Rule = { minTier?: string; allowedTiers?: string[] };
 
