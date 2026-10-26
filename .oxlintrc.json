@@ -1,12 +1,185 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["typescript", "unicorn", "oxc", "vue"],
+  "plugins": [
+    "typescript",
+    "unicorn",
+    "oxc",
+    "vue"
+  ],
   "categories": {
     "correctness": "error"
   },
-  "jsPlugins": ["eslint-plugin-no-comments"],
+  "jsPlugins": [
+    "eslint-plugin-no-comments",
+    "./.oxlint/plugin/index.mjs"
+  ],
   "rules": {
-    "no-comments/disallowComments": ["error", { "allow": ["eslint", "global"] }]
+    "no-comments/disallowComments": [
+      "error",
+      {
+        "allow": [
+          "eslint",
+          "global"
+        ]
+      }
+    ],
+    "class-methods-use-this": [
+      "error",
+      {
+        "enforceForClassFields": true,
+        "ignoreClassesWithImplements": "all",
+        "exceptMethods": [
+          "toParsed",
+          "toPayload"
+        ]
+      }
+    ],
+    "max-classes-per-file": [
+      "error",
+      8
+    ],
+    "no-useless-constructor": "error",
+    "no-dupe-class-members": "error",
+    "no-unused-private-class-members": "error",
+    "typescript/class-literal-property-style": [
+      "error",
+      "fields"
+    ],
+    "id-length": [
+      "error",
+      {
+        "min": 1,
+        "max": 40,
+        "exceptions": [
+          "_",
+          "__",
+          "id",
+          "x",
+          "y"
+        ]
+      }
+    ],
+    "naming/naming-convention": [
+      "error",
+      {
+        "selector": "default",
+        "format": [
+          "camelCase"
+        ],
+        "leadingUnderscore": "allow",
+        "trailingUnderscore": "forbid",
+        "maxSegments": 2
+      },
+      {
+        "selector": "variable",
+        "format": [
+          "camelCase",
+          "UPPER_CASE",
+          "PascalCase"
+        ],
+        "leadingUnderscore": "allowDouble",
+        "maxSegments": 3
+      },
+      {
+        "selector": "function",
+        "format": [
+          "camelCase"
+        ],
+        "maxSegments": 2
+      },
+      {
+        "selector": "parameter",
+        "format": [
+          "camelCase"
+        ],
+        "leadingUnderscore": "allowDouble",
+        "maxSegments": 3
+      },
+      {
+        "selector": "type",
+        "format": [
+          "PascalCase"
+        ],
+        "maxSegments": 3
+      },
+      {
+        "selector": "member",
+        "format": [
+          "camelCase",
+          "UPPER_CASE"
+        ],
+        "leadingUnderscore": "allow",
+        "maxSegments": 3
+      }
+    ]
   },
-  "ignorePatterns": ["**/.nuxt/**", "**/.output/**", "**/.edgeone/**", "**/dist/**", "**/coverage/**"]
+  "ignorePatterns": [
+    "**/.nuxt/**",
+    "**/.output/**",
+    "**/.edgeone/**",
+    "**/dist/**",
+    "**/coverage/**"
+  ],
+  "overrides": [
+    {
+      "files": [
+        "**/composables/**"
+      ],
+      "rules": {
+        "naming/naming-convention": [
+          "error",
+          {
+            "selector": "default",
+            "format": [
+              "camelCase"
+            ],
+            "leadingUnderscore": "allow",
+            "trailingUnderscore": "forbid",
+            "maxSegments": 3
+          },
+          {
+            "selector": "variable",
+            "format": [
+              "camelCase",
+              "UPPER_CASE",
+              "PascalCase"
+            ],
+            "leadingUnderscore": "allowDouble",
+            "maxSegments": 3
+          },
+          {
+            "selector": "function",
+            "format": [
+              "camelCase"
+            ],
+            "maxSegments": 3
+          },
+          {
+            "selector": "parameter",
+            "format": [
+              "camelCase"
+            ],
+            "leadingUnderscore": "allowDouble",
+            "maxSegments": 3
+          },
+          {
+            "selector": "type",
+            "format": [
+              "PascalCase"
+            ],
+            "maxSegments": 3
+          },
+          {
+            "selector": "member",
+            "format": [
+              "camelCase",
+              "UPPER_CASE"
+            ],
+            "leadingUnderscore": "allow",
+            "maxSegments": 3
+          }
+        ]
+      }
+    }
+  ]
 }
