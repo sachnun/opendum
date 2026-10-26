@@ -16,8 +16,7 @@ import {
 } from "./transform.js";
 import { ChatImageInliner } from "../../core/images.js";
 import { RequestFailure, type UpstreamTransport } from "../../core/http.js";
-import { ProviderCredentialFailure } from "../../core/errors.js";
-import { OAuth } from "../../core/oauth.js";
+import { OAuthBase } from "../../core/oauth.js";
 import { CodeAssist, type AccountInfo, type AntigravityOptions } from "./options.js";
 import { GeminiModel, GeminiTier } from "./model.js";
 import {
@@ -29,19 +28,12 @@ import {
 import {
   GeminiRequest,
 } from "./request.js";
-import type {
-  CredentialRefresher,
-  Provider,
-  ProviderAccount,
-  ProviderFailure,
-  ProviderRequest,
-  RefreshedCredentials,
-  RefreshBufferProvider,
-} from "../../types.js";
+import type { Provider, ProviderFailure, ProviderRequest } from "../../types.js";
 
 import { ANTIGRAVITY_TOKEN_ENDPOINT } from "../../endpoints.js";
 
 const OAUTH_TOKEN_ENDPOINT = ANTIGRAVITY_TOKEN_ENDPOINT;
+const REFRESH_BUFFER_MS = 60 * 60 * 1000;
 const MIN_THINKING_BUDGET = 1024;
 const MAX_OUTPUT_TOKENS = 64000;
 const SIGNATURE_PREFIX = "opendum:thought-signature";
@@ -50,7 +42,7 @@ const CLAUDE_BETA_HEADER = "interleaved-thinking-2025-05-14";
 const ANTIGRAVITY_SYSTEM_INSTRUCTION =
   "You are Antigravity, a powerful agentic AI coding assistant designed by the Google Deepmind team working on Advanced Agentic Coding.You are pair programming with a USER to solve their coding task. The task may require creating a new codebase, modifying or debugging an existing codebase, or simply answering a question.**Absolute paths only****Proactiveness**";
 
-export class AntigravityProvider implements Provider, CredentialRefresher, RefreshBufferProvider {
+export class AntigravityProvider extends OAuthBase implements Provider {
   readonly name = "antigravity";
   private readonly registry: Registry;
   private readonly transport: UpstreamTransport;
@@ -78,14 +70,9 @@ export class AntigravityProvider implements Provider, CredentialRefresher, Refre
   private readonly apiClient = "google-cloud-sdk vscode_cloudshelleditor/0.1";
   private readonly clientMetadata =
     '{"ideType":"IDE_UNSPECIFIED","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI"}';
-  private readonly exchange: OAuth;
 
   constructor(options: AntigravityOptions) {
-    this.registry = options.registry;
-    this.transport = options.transport;
-    this.redis = options.redis ?? null;
-    this.persistAccountInfo = options.persistAccountInfo;
-    this.exchange = new OAuth({
+    super({
       provider: "antigravity",
       tokenUrl: OAUTH_TOKEN_ENDPOINT,
       transport: options.transport,
@@ -116,17 +103,14 @@ export class AntigravityProvider implements Provider, CredentialRefresher, Refre
         };
       },
     });
+    this.registry = options.registry;
+    this.transport = options.transport;
+    this.redis = options.redis ?? null;
+    this.persistAccountInfo = options.persistAccountInfo;
   }
 
   refreshBuffer(): number {
-    return 60 * 60 * 1000;
-  }
-
-  refreshCredentials(
-    refreshToken: string,
-    account: ProviderAccount
-  ): Effect.Effect<RefreshedCredentials, ProviderCredentialFailure> {
-    return this.exchange.exchange(refreshToken, account);
+    return REFRESH_BUFFER_MS;
   }
 
   private setGoogleHeaders(headers: Record<string, string>, accessToken: string, stream: boolean): void {

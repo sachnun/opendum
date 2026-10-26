@@ -1,4 +1,5 @@
 import type { Registry } from "@opendum/models/runtime";
+import { ModelName } from "../../core/identity.js";
 import type { ProviderAccount } from "../../types.js";
 import { KIRO_REGION } from "../../endpoints.js";
 
@@ -6,8 +7,7 @@ export const API_BASE_URL = "https://q.%s.amazonaws.com/generateAssistantRespons
 
 export class KiroModel {
   static segment(model: string): string {
-    const parts = model.split("/");
-    return parts[parts.length - 1];
+    return ModelName.segment(model);
   }
 
   static normalize(registry: Registry, model: string): string {

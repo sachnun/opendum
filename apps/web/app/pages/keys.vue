@@ -1,6 +1,8 @@
 <script setup lang="ts">
 definePageMeta({ middleware: "auth", layout: "web" });
 
+import type { AccessMode } from "~~/lib/access-draft";
+
 const api = useApi();
 const { isAuditMode } = useAudit();
 const invalidation = useInvalidate();
@@ -8,7 +10,6 @@ const config = useRuntimeConfig();
 
 type KeyListItem = Awaited<ReturnType<typeof api.apiKeys.list>>[number];
 type ApiKeyOptions = Awaited<ReturnType<typeof api.apiKeys.options>>;
-type AccessMode = "all" | "whitelist" | "blacklist";
 type RateLimitRule = ApiKeyOptions["rateLimitsByKeyId"][string][number];
 
 const { data, error, refresh } = useAsyncData(dataKeys.apiKeys, async () => {
@@ -71,11 +72,7 @@ function keyActive(apiKey: KeyListItem) {
   return keyStatus(apiKey).label === "Active";
 }
 
-function modelMode(mode: string): AccessMode {
-  return mode === "whitelist" || mode === "blacklist" ? mode : "all";
-}
-
-function accountMode(mode: string): AccessMode {
+function accessMode(mode: string): AccessMode {
   return mode === "whitelist" || mode === "blacklist" ? mode : "all";
 }
 
@@ -354,7 +351,7 @@ function saveLimits(apiKeyId: string, rules: RateLimitRule[]) {
                   <ApiKeyModelAccess
                     :api-key-id="apiKey.id"
                     :available-models="options?.modelAccessModels ?? options?.availableModels ?? []"
-                    :initial-mode="modelMode(apiKey.modelAccessMode)"
+                    :initial-mode="accessMode(apiKey.modelAccessMode)"
                     :initial-models="apiKey.modelAccessList"
                     :readonly="isAuditMode"
                     @updated="updateModels(apiKey.id, $event)"
@@ -365,7 +362,7 @@ function saveLimits(apiKeyId: string, rules: RateLimitRule[]) {
                   <ApiKeyAccountAccess
                     :api-key-id="apiKey.id"
                     :available-accounts="options?.providerAccounts ?? []"
-                    :initial-mode="accountMode(apiKey.accountAccessMode)"
+                    :initial-mode="accessMode(apiKey.accountAccessMode)"
                     :initial-accounts="apiKey.accountAccessList"
                     :readonly="isAuditMode"
                     @updated="updateAccess(apiKey.id, $event)"

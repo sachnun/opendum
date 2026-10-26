@@ -1,4 +1,5 @@
 import { Value } from "../../core/helpers.js";
+import { ModelName } from "../../core/identity.js";
 import type { Registry } from "@opendum/models/runtime";
 import type { Json } from "./common.js";
 
@@ -14,8 +15,7 @@ const EFFORT_BUDGETS: Record<string, number> = {
 
 export class GeminiModel {
   static segment(model: string): string {
-    const parts = model.split("/");
-    return parts[parts.length - 1];
+    return ModelName.segment(model);
   }
 
   static isGemini3(model: string): boolean {

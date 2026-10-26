@@ -2,6 +2,7 @@ import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
 import type { OpendumRedis } from "@opendum/core/redis";
 import { Value, Payload, Responses, JSONText } from "../core/helpers.js";
+import { Jwt, ModelName } from "../core/identity.js";
 import { Collector } from "../transform/collector.js";
 import { anthropicUsage } from "../transform/anthropic.js";
 import {
@@ -12,16 +13,11 @@ import {
   callId,
 } from "../transform/responses.js";
 import { RequestFailure, type UpstreamTransport } from "../core/http.js";
-import { ProviderCredentialFailure } from "../core/errors.js";
-import { OAuth } from "../core/oauth.js";
+import { OAuthBase } from "../core/oauth.js";
 import type {
-  CredentialRefresher,
   Provider,
-  ProviderAccount,
   ProviderFailure,
   ProviderRequest,
-  RefreshedCredentials,
-  RefreshBufferProvider,
 } from "../types.js";
 
 import {
@@ -40,26 +36,8 @@ export const SUPPORTED_CODEX = new Set([
 
 type Json = Record<string, unknown>;
 
-function lastSegment(model: string): string {
-  const parts = model.split("/");
-  return parts[parts.length - 1];
-}
-
-function jwtClaims(token: string): Json | null {
-  const parts = token.split(".");
-  if (parts.length < 2) return null;
-  try {
-    const payload = Buffer.from(parts[1], "base64url").toString("utf8");
-    const parsed = JSON.parse(payload) as unknown;
-    if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) return parsed as Json;
-    return null;
-  } catch {
-    return null;
-  }
-}
-
 function claimString(claims: Json, key: string): string {
-  return Value.string(claims[key]).trim();
+  return Jwt.claim(claims, key);
 }
 
 function organizationId(claims: Json): string {
@@ -77,7 +55,7 @@ function organizationId(claims: Json): string {
 }
 
 function jwtAccount(token: string): string {
-  const claims = jwtClaims(token);
+  const claims = Jwt.claims(token);
   if (!claims) return "";
   const accountId = claimString(claims, "chatgpt_account_id");
   if (accountId) return accountId;
@@ -85,9 +63,7 @@ function jwtAccount(token: string): string {
 }
 
 function claimsWorkspace(claims: Json): string {
-  const auth = claims["https://api.openai.com/auth"];
-  const authClaims =
-    auth !== null && typeof auth === "object" && !Array.isArray(auth) ? (auth as Json) : null;
+  const authClaims = Jwt.nested(claims, "https://api.openai.com/auth");
   for (const source of [authClaims, claims]) {
     if (!source) continue;
     for (const key of ["chatgpt_workspace_id", "workspace_id", "organization_id"]) {
@@ -101,15 +77,11 @@ function claimsWorkspace(claims: Json): string {
 }
 
 function jwtTier(token: string): string {
-  const claims = jwtClaims(token);
+  const claims = Jwt.claims(token);
   if (!claims) return "";
-  const direct = Value.string(claims.chatgpt_plan_type);
-  if (direct) return direct.trim().toLowerCase();
-  const auth = claims["https://api.openai.com/auth"];
-  if (auth !== null && typeof auth === "object" && !Array.isArray(auth)) {
-    return Value.string((auth as Json).chatgpt_plan_type).trim().toLowerCase();
-  }
-  return "";
+  const direct = claimString(claims, "chatgpt_plan_type");
+  if (direct) return direct.toLowerCase();
+  return claimString(Jwt.nested(claims, "https://api.openai.com/auth") ?? {}, "chatgpt_plan_type").toLowerCase();
 }
 
 function toFloat(value: string): number {
@@ -187,20 +159,15 @@ export type CodexOptions = {
   onAccountId?: (accountId: string) => void;
 };
 
-export class CodexProvider implements Provider, CredentialRefresher, RefreshBufferProvider {
+export class CodexProvider extends OAuthBase implements Provider {
   readonly name = "codex";
   private readonly registry: Registry;
   private readonly transport: UpstreamTransport;
   private readonly redis: OpendumRedis | null;
   private readonly onAccountId: ((accountId: string) => void) | undefined;
-  private readonly exchange: OAuth;
 
   constructor(options: CodexOptions) {
-    this.registry = options.registry;
-    this.transport = options.transport;
-    this.redis = options.redis ?? null;
-    this.onAccountId = options.onAccountId;
-    this.exchange = new OAuth({
+    super({
       provider: "codex",
       tokenUrl: CODEX_TOKEN_ENDPOINT,
       transport: options.transport,
@@ -241,17 +208,14 @@ export class CodexProvider implements Provider, CredentialRefresher, RefreshBuff
         };
       },
     });
+    this.registry = options.registry;
+    this.transport = options.transport;
+    this.redis = options.redis ?? null;
+    this.onAccountId = options.onAccountId;
   }
 
   refreshBuffer(): number {
     return REFRESH_BUFFER_MS;
-  }
-
-  refreshCredentials(
-    refreshToken: string,
-    account: ProviderAccount
-  ): Effect.Effect<RefreshedCredentials, ProviderCredentialFailure> {
-    return this.exchange.exchange(refreshToken, account);
   }
 
   makeRequest(request: ProviderRequest): Effect.Effect<Response, ProviderFailure> {
@@ -413,7 +377,7 @@ export class CodexProvider implements Provider, CredentialRefresher, RefreshBuff
   }
 
   private resolveModel(model: string): string {
-    return this.registry.upstream(lastSegment(model), "codex");
+    return this.registry.upstream(ModelName.segment(model), "codex");
   }
 }
 

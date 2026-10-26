@@ -42,3 +42,20 @@ export class OAuth {
     });
   }
 }
+
+export abstract class OAuthBase {
+  protected readonly exchange: OAuth;
+
+  constructor(spec: Spec) {
+    this.exchange = new OAuth(spec);
+  }
+
+  abstract refreshBuffer(): number;
+
+  refreshCredentials(
+    refreshToken: string,
+    account: ProviderAccount
+  ): Effect.Effect<RefreshedCredentials, ProviderCredentialFailure> {
+    return this.exchange.exchange(refreshToken, account);
+  }
+}

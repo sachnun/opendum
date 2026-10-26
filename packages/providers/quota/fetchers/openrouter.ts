@@ -3,13 +3,12 @@ import {
   baseInfo,
   clampFraction,
   displayNumber,
-  errorInfo,
   expiredInfo,
   parseNumber,
   parseRecord,
 } from "../helpers.js";
 import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay } from "../types.js";
-import { jsonData, type Json } from "./shared.js";
+import { quotaPayload, type Json } from "./shared.js";
 
 export function openrouterQuota(
   ctx: QuotaContext,
@@ -27,15 +26,27 @@ export function openrouterQuota(
   const headers = { Authorization: `Bearer ${apiKey.trim()}`, Accept: "application/json" };
   return Effect.all(
     [
-      jsonData(ctx, account, forceRefresh, "openrouter:key", "GET", "https://openrouter.ai/api/v1/key", headers, null),
-      jsonData(ctx, account, forceRefresh, "openrouter:credits", "GET", "https://openrouter.ai/api/v1/credits", headers, null),
+      quotaPayload(ctx, account, forceRefresh, {
+        cache: "openrouter:key",
+        method: "GET",
+        url: "https://openrouter.ai/api/v1/key",
+        headers,
+        label: "OpenRouter key",
+      }),
+      quotaPayload(ctx, account, forceRefresh, {
+        cache: "openrouter:credits",
+        method: "GET",
+        url: "https://openrouter.ai/api/v1/credits",
+        headers,
+        label: "OpenRouter credits",
+      }),
     ],
     { concurrency: 2 }
   ).pipe(
     Effect.map(([key, credits]) => {
-      if (key.error && credits.error) return errorInfo(key.error);
-      const keyData = parseRecord(key.data?.data) ?? {};
-      const creditsData = parseRecord(credits.data?.data) ?? {};
+      if (!key.ok && !credits.ok) return key.info;
+      const keyData = key.ok ? (parseRecord(key.data.data) ?? {}) : {};
+      const creditsData = credits.ok ? (parseRecord(credits.data.data) ?? {}) : {};
       return baseInfo("success", quotaGroups(keyData, creditsData));
     })
   );

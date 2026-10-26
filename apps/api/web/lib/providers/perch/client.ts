@@ -1,8 +1,8 @@
 import { Effect } from "effect";
 import { fetchExternalEffect } from "#web/lib/external.js";
-import { fromPromise } from "#web/lib/task.js";
 import { unavailable } from "#web/errors.js";
-import { httpError } from "../provider-http-errors.js";
+import { ProviderResponse } from "../provider-response.js";
+import { Pkce } from "../pkce.js";
 import type { OAuthResult } from "../types.js";
 import {
   PERCH_ACCOUNT_PATH,
@@ -41,32 +41,19 @@ interface PerchAccountResponse {
   session?: PerchAccountSession;
 }
 
-function errorText(response: Response, body: string, endpointLabel: string): string {
-  return httpError("Perch", response, body, { endpointLabel });
-}
-
-function readText(response: Response) {
-  return fromPromise(() => response.text().catch(() => ""), "Failed to read Perch response");
-}
-
-function readJson<T>(response: Response, fallback: T) {
-  return fromPromise(
-    async () => ((await response.json().catch(() => fallback)) as T),
-    "Failed to read Perch response"
-  );
-}
+const response = new ProviderResponse("Perch");
 
 const authConfig = Effect.fn("perch.authConfig")(function* () {
-  const response = yield* fetchExternalEffect(`${PERCH_APP_URL}${PERCH_CONFIG_PATH}`, {
+  const result = yield* fetchExternalEffect(`${PERCH_APP_URL}${PERCH_CONFIG_PATH}`, {
     method: "GET",
     headers: { Accept: "application/json" },
     cache: "no-store",
   });
-  if (!response.ok) {
-    const body = yield* readText(response);
-    return yield* unavailable(errorText(response, body, "auth config endpoint"));
+  if (!result.ok) {
+    const body = yield* response.text(result);
+    return yield* unavailable(response.failure(result, body, "auth config endpoint"));
   }
-  const config = yield* readJson<Partial<PerchAuthConfig>>(response, {});
+  const config = yield* response.jsonOr<Partial<PerchAuthConfig>>(result, {});
   if (!config.supabaseUrl || !config.supabaseAnonKey) {
     return yield* unavailable("Perch auth config is incomplete. Please try again later.");
   }
@@ -82,21 +69,8 @@ function providerId(config: PerchAuthConfig) {
 }
 
 const pkcePair = Effect.fn("perch.pkcePair")(function* () {
-  const verifierBytes = new Uint8Array(32);
-  crypto.getRandomValues(verifierBytes);
-  const verifier = encodeBase64(verifierBytes);
-  const digest = yield* fromPromise(
-    () => crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)),
-    "Failed to build Perch PKCE challenge"
-  );
-  return { verifier, challenge: encodeBase64(new Uint8Array(digest)) };
+  return yield* Pkce.pair("Perch");
 });
-
-function encodeBase64(bytes: Uint8Array): string {
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
 
 function supabaseUrl(config: PerchAuthConfig): string {
   return config.supabaseUrl.replace(/\/+$/, "");
@@ -135,14 +109,14 @@ const selectPlan = Effect.fn("perch.selectStarterPlan")(function* (
   config: PerchAuthConfig,
   accessToken: string
 ) {
-  const response = yield* fetchExternalEffect(`${supabaseUrl(config)}/rest/v1/rpc/perch_ai_select_plan`, {
+  const result = yield* fetchExternalEffect(`${supabaseUrl(config)}/rest/v1/rpc/perch_ai_select_plan`, {
     method: "POST",
     headers: { ...authHeaders(config), Authorization: `Bearer ${accessToken}` },
     body: JSON.stringify({ p_plan_code: PERCH_PLAN_CODE }),
     cache: "no-store",
   });
-  const payload = yield* readJson<{ ok?: boolean; error?: string; reason?: string }>(response, {});
-  if (!response.ok || payload.ok === false) {
+  const payload = yield* response.jsonOr<{ ok?: boolean; error?: string; reason?: string }>(result, {});
+  if (!result.ok || payload.ok === false) {
     return yield* unavailable(
       payload.error === "banned"
         ? `Perch sign-in blocked: ${payload.reason ?? "account banned"}. Contact hello@perchai.app.`
@@ -158,7 +132,7 @@ const ensureSession = Effect.fn("perch.ensureSessionReady")(function* (accessTok
     cache: "no-store",
   });
   if (!accountResponse.ok) return;
-  const account = yield* readJson<PerchAccountResponse>(accountResponse, {});
+  const account = yield* response.jsonOr<PerchAccountResponse>(accountResponse, {});
   if (account.ok !== true || !account.session?.tierSelectionRequired) return;
   const config = yield* authConfig();
   yield* selectPlan(config, accessToken);
@@ -169,17 +143,17 @@ export const exchangeCode = Effect.fn("perch.exchangeOAuthCode")(function* (
   codeVerifier: string
 ) {
   const config = yield* authConfig();
-  const response = yield* fetchExternalEffect(`${supabaseUrl(config)}${PERCH_TOKEN_PATH}?grant_type=pkce`, {
+  const result = yield* fetchExternalEffect(`${supabaseUrl(config)}${PERCH_TOKEN_PATH}?grant_type=pkce`, {
     method: "POST",
     headers: authHeaders(config),
     body: JSON.stringify({ auth_code: code, code_verifier: codeVerifier }),
     cache: "no-store",
   });
-  if (!response.ok) {
-    const body = yield* readText(response);
-    return yield* unavailable(errorText(response, body, "token exchange endpoint"));
+  if (!result.ok) {
+    const body = yield* response.text(result);
+    return yield* unavailable(response.failure(result, body, "token exchange endpoint"));
   }
-  const tokens = yield* readJson<PerchTokenResponse>(response, {});
+  const tokens = yield* response.jsonOr<PerchTokenResponse>(result, {});
   if (!tokens.access_token) {
     return yield* unavailable("Perch token exchange returned an incomplete session.");
   }

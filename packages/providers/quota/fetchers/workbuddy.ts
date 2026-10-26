@@ -14,7 +14,7 @@ import {
   parseString,
 } from "../helpers.js";
 import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay } from "../types.js";
-import { quotaAttempt, type Json } from "./shared.js";
+import { QuotaJson, quotaAttempt, quotaPayload, type Json } from "./shared.js";
 
 const WORKBUDDY_SUMMARY_URL = "https://www.workbuddy.ai/billing/meter/get-user-resource-summary";
 const WORKBUDDY_FREE_URL = "https://www.workbuddy.ai/billing/meter/get-user-resource-free-packages";
@@ -41,43 +41,23 @@ export function workbuddyQuota(
   const userId = account.accountId?.trim() ?? "";
   if (userId) headers["X-User-Id"] = userId;
 
-  return quotaAttempt(
-    ctx,
-    account,
-    forceRefresh,
-    "workbuddy:resource-summary",
-    "POST",
-    WORKBUDDY_SUMMARY_URL,
+  return quotaPayload(ctx, account, forceRefresh, {
+    cache: "workbuddy:resource-summary",
+    method: "POST",
+    url: WORKBUDDY_SUMMARY_URL,
     headers,
-    {}
-  ).pipe(
-    Effect.flatMap((attempt) => {
-      if (!attempt.ok) return Effect.succeed(errorInfo(attempt.message));
-      const { result } = attempt;
-      if (result.statusCode === 401 || result.statusCode === 403) {
+    body: {},
+    label: "WorkBuddy",
+    expiredMessage: "WorkBuddy session is invalid or expired. Re-authenticate this account.",
+  }).pipe(
+    Effect.flatMap((payload) => {
+      if (!payload.ok) return Effect.succeed(payload.info);
+      if (payload.data.code !== 0) {
         return Effect.succeed(
-          expiredInfo("WorkBuddy session is invalid or expired. Re-authenticate this account.")
+          errorInfo(`WorkBuddy quota request failed: ${payload.data.code} ${payload.data.msg ?? ""}`)
         );
       }
-      if (result.statusCode < 200 || result.statusCode >= 300) {
-        return Effect.succeed(
-          errorInfo(`WorkBuddy quota endpoint failed: HTTP ${result.statusCode} ${result.raw}`)
-        );
-      }
-      const payload = (() => {
-        try {
-          return JSON.parse(result.raw) as { code?: number; msg?: string; data?: Json };
-        } catch {
-          return null;
-        }
-      })();
-      if (!payload) return Effect.succeed(errorInfo("WorkBuddy quota response was not valid JSON"));
-      if (payload.code !== 0) {
-        return Effect.succeed(
-          errorInfo(`WorkBuddy quota request failed: ${payload.code} ${payload.msg ?? ""}`)
-        );
-      }
-      const summary = payload.data ?? {};
+      const summary = parseRecord(payload.data.data) ?? {};
       const packages = parseArray(summary.Packages).map((raw) => (parseRecord(raw) ?? {}) as Json);
       return packageDetails(ctx, account, headers, forceRefresh, packages).pipe(
         Effect.flatMap((details) => {
@@ -85,7 +65,7 @@ export function workbuddyQuota(
           if (groups.length === 0) {
             return Effect.succeed(errorInfo("WorkBuddy quota response did not include usable quota data"));
           }
-          return putQuota(ctx, result).pipe(Effect.as(baseInfo("success", groups)));
+          return Effect.succeed(baseInfo("success", groups));
         })
       );
     })
@@ -155,18 +135,12 @@ function packageDetails(
       Effect.flatMap((attempt) => {
         if (!attempt.ok) return Effect.void;
         const { result } = attempt;
-        if (result.statusCode < 200 || result.statusCode >= 300) return Effect.void;
-        const payload = (() => {
-          try {
-            return JSON.parse(result.raw) as { code?: number; data?: { Accounts?: unknown[] } };
-          } catch {
-            return null;
-          }
-        })();
+        const payload = QuotaJson.parse(result.raw);
         if (!payload || payload.code !== 0) return Effect.void;
         return putQuota(ctx, result).pipe(
           Effect.flatMap(() => {
-            for (const raw of parseArray(payload.data?.Accounts)) {
+            const data = parseRecord(payload.data) ?? {};
+            for (const raw of parseArray(data.Accounts)) {
               const entry = parseRecord(raw);
               if (!entry) continue;
               const code = parseString(entry.PackageCode);

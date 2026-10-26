@@ -1,12 +1,7 @@
 import { Effect } from "effect";
-import {
-  baseInfo,
-  errorInfo,
-  expiredInfo,
-  parseNumber,
-} from "../helpers.js";
+import { baseInfo, expiredInfo, parseNumber } from "../helpers.js";
 import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay } from "../types.js";
-import { jsonData, type Json } from "./shared.js";
+import { quotaPayload, type Json } from "./shared.js";
 
 export function hyperQuota(
   ctx: QuotaContext,
@@ -21,20 +16,16 @@ export function hyperQuota(
       expiredInfo("API key is missing or invalid. Please reconnect this account.")
     );
   }
-  return jsonData(
-    ctx,
-    account,
-    forceRefresh,
-    "hyper:credits",
-    "GET",
-    "https://hyper.charm.land/v1/credits",
-    { Authorization: `Bearer ${apiKey.trim()}`, Accept: "application/json" },
-    null
-  ).pipe(
-    Effect.map(({ data, error }) => {
-      if (error || !data) return errorInfo(error ?? "Charm credits request failed");
-      return baseInfo("success", hyperGroups(data));
-    })
+  return quotaPayload(ctx, account, forceRefresh, {
+    cache: "hyper:credits",
+    method: "GET",
+    url: "https://hyper.charm.land/v1/credits",
+    headers: { Authorization: `Bearer ${apiKey.trim()}`, Accept: "application/json" },
+    label: "Charm credits",
+  }).pipe(
+    Effect.map((payload) =>
+      payload.ok ? baseInfo("success", hyperGroups(payload.data)) : payload.info
+    )
   );
 }
 

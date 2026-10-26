@@ -1,18 +1,11 @@
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
 import { Value, Payload, Ids, Responses, JSONText } from "../core/helpers.js";
+import { ModelName } from "../core/identity.js";
 import { RequestFailure, type UpstreamTransport } from "../core/http.js";
-import { ProviderCredentialFailure } from "../core/errors.js";
-import { OAuth } from "../core/oauth.js";
+import { OAuthBase } from "../core/oauth.js";
 import { Collector } from "../transform/collector.js";
-import type {
-  CredentialRefresher,
-  Provider,
-  ProviderAccount,
-  ProviderFailure,
-  ProviderRequest,
-  RefreshedCredentials,
-} from "../types.js";
+import type { Provider, ProviderFailure, ProviderRequest } from "../types.js";
 
 import { WORKBUDDY_BASE_URL, WORKBUDDY_DOMAIN } from "../endpoints.js";
 
@@ -23,6 +16,7 @@ const WORKBUDDY_REFRESH_SOURCE = "plugin";
 const WORKBUDDY_DEFAULT_SYSTEM = "You are a helpful assistant.";
 const DEFAULT_MAX_TOKENS = 32768;
 const FALLBACK_TTL = 31536000;
+const REFRESH_BUFFER_MS = 5 * 60 * 1000;
 const WORKBUDDY_IDE_TYPE = "WorkBuddy";
 const WORKBUDDY_IDE_NAME = "WorkBuddy";
 const WORKBUDDY_IDE_VERSION = "5.8.4";
@@ -50,11 +44,6 @@ export const SUPPORTED_WORKBUDDY = new Set([
 ]);
 
 type Json = Record<string, unknown>;
-
-function lastSegment(model: string): string {
-  const parts = model.split("/");
-  return parts[parts.length - 1];
-}
 
 function traceHeaders(): Record<string, string> {
   const traceId = Ids.hex(crypto.getRandomValues(new Uint8Array(16)));
@@ -116,16 +105,13 @@ export type WorkbuddyOptions = {
   transport: UpstreamTransport;
 };
 
-export class WorkbuddyProvider implements Provider, CredentialRefresher {
+export class WorkbuddyProvider extends OAuthBase implements Provider {
   readonly name = "workbuddy";
   private readonly registry: Registry;
   private readonly transport: UpstreamTransport;
-  private readonly exchange: OAuth;
 
   constructor(options: WorkbuddyOptions) {
-    this.registry = options.registry;
-    this.transport = options.transport;
-    this.exchange = new OAuth({
+    super({
       provider: "workbuddy",
       tokenUrl: `${WORKBUDDY_API_BASE}${WORKBUDDY_REFRESH_PATH}`,
       transport: options.transport,
@@ -156,13 +142,12 @@ export class WorkbuddyProvider implements Provider, CredentialRefresher {
         };
       },
     });
+    this.registry = options.registry;
+    this.transport = options.transport;
   }
 
-  refreshCredentials(
-    refreshToken: string,
-    account: ProviderAccount
-  ): Effect.Effect<RefreshedCredentials, ProviderCredentialFailure> {
-    return this.exchange.exchange(refreshToken, account);
+  refreshBuffer(): number {
+    return REFRESH_BUFFER_MS;
   }
 
   makeRequest(request: ProviderRequest): Effect.Effect<Response, ProviderFailure> {
@@ -186,7 +171,7 @@ export class WorkbuddyProvider implements Provider, CredentialRefresher {
     }
     let model = Value.string(request.body.model);
     if (model.startsWith("workbuddy/")) model = model.slice("workbuddy/".length);
-    let modelName = lastSegment(model);
+    let modelName = ModelName.segment(model);
     modelName = this.registry.upstream(modelName, "workbuddy") || model;
     const messages = Array.isArray(request.body.messages) ? request.body.messages : [];
     const normalizedMessages = ensureSystem(messages);

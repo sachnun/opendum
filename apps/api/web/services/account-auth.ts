@@ -13,6 +13,7 @@ import { startDeviceFlow as startWorkbuddyDevice, pollDeviceAuth as pollWorkbudd
 import { exchangeCode, initiateOAuth } from "#web/lib/providers/perch/index.js";
 import { startDeviceFlow as startClineDevice, pollDeviceAuth as pollClineDevice } from "#web/lib/providers/cline/index.js";
 import { clearFails } from "#web/lib/proxy/auth.js";
+import { isFailed, isPending, type DeviceCodeFlow } from "#web/lib/providers/provider-response.js";
 import type { OAuthResult } from "#web/lib/providers/types.js";
 import type { DeviceProviderKey, AuthProvider } from "@opendum/providers/provider-accounts";
 import type { ActionResult } from "#web/utils/api.js";
@@ -94,29 +95,69 @@ const OAUTH_PROVIDERS: Record<AuthProvider, {
   },
 };
 
-const DEVICE_PROVIDERS = {
-  codex: {
-    label: "Codex",
-    emailPrefix: "codex",
-    initiate: startCodexDevice,
-    poll: (input: DevicePollInput) => pollCodexDevice(input.deviceCode, input.userCode ?? ""),
-  },
-  workbuddy: {
-    label: "WorkBuddy",
-    emailPrefix: "workbuddy",
-    initiate: () => startWorkbuddyDevice(),
-    poll: (input: DevicePollInput) => pollWorkbuddyDevice(input.deviceCode),
-  },
-  cline: {
-    label: "Cline",
-    emailPrefix: "cline",
-    initiate: () => startClineDevice(),
-    poll: (input: DevicePollInput) => pollClineDevice(input.deviceCode),
-  },
-} satisfies Record<DeviceProviderKey, { label: string; emailPrefix: string; initiate: () => Effect.Effect<unknown, ServiceFailure>; poll: (input: DevicePollInput) => Effect.Effect<unknown, ServiceFailure> }>;
+type DeviceEntry = {
+  label: string;
+  emailPrefix: string;
+  flow: DeviceCodeFlow;
+};
+
+function deviceEntry(
+  label: string,
+  emailPrefix: string,
+  flow: DeviceCodeFlow
+): DeviceEntry {
+  return { label, emailPrefix, flow };
+}
+
+const DEVICE_PROVIDERS: Record<DeviceProviderKey, DeviceEntry> = {
+  codex: deviceEntry("Codex", "codex", {
+    startDeviceFlow: () => startCodexDevice(),
+    pollDeviceAuth: (deviceCode, userCode) => pollCodexDevice(deviceCode, userCode),
+  }),
+  workbuddy: deviceEntry("WorkBuddy", "workbuddy", {
+    startDeviceFlow: () => startWorkbuddyDevice(),
+    pollDeviceAuth: (deviceCode) => pollWorkbuddyDevice(deviceCode),
+  }),
+  cline: deviceEntry("Cline", "cline", {
+    startDeviceFlow: () => startClineDevice(),
+    pollDeviceAuth: (deviceCode) => pollClineDevice(deviceCode),
+  }),
+};
 
 function encryptRefresh(refreshToken: string | undefined): string {
   return refreshToken ? encrypt(refreshToken) : "";
+}
+
+function accountValues(oauthResult: OAuthResult, email: string, accountId: string | null) {
+  return {
+    accessToken: encrypt(oauthResult.accessToken),
+    refreshToken: encryptRefresh(oauthResult.refreshToken),
+    expiresAt: oauthResult.expiresAt,
+    email,
+    ...(oauthResult.projectId ? { projectId: oauthResult.projectId } : {}),
+    ...(oauthResult.tier ? { tier: oauthResult.tier } : {}),
+    ...(accountId ? { accountId } : {}),
+    isActive: true,
+    disabledUntil: null,
+  };
+}
+
+type AccountFilter = { email: string } | { accountId: string };
+
+function findAccount(userId: string, provider: ProviderAccountKey, filter: AccountFilter) {
+  const match =
+    "email" in filter
+      ? eq(providerAccount.email, filter.email)
+      : eq(providerAccount.accountId, filter.accountId);
+  return fromPromise(
+    () =>
+      db
+        .select({ id: providerAccount.id, email: providerAccount.email })
+        .from(providerAccount)
+        .where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, provider), match))
+        .limit(1),
+    "Failed to load provider account"
+  );
 }
 
 const upsertAccount = Effect.fn("accountAuth.upsertAccount")(function* (
@@ -128,38 +169,10 @@ const upsertAccount = Effect.fn("accountAuth.upsertAccount")(function* (
 ) {
   const email = options.email || oauthResult.email || `${provider}-${Date.now()}`;
   const accountId = options.accountId ?? oauthResult.accountId ?? null;
-  const foundByEmail = yield* fromPromise(
-    () =>
-      db
-        .select({ id: providerAccount.id, email: providerAccount.email })
-        .from(providerAccount)
-        .where(
-          and(
-            eq(providerAccount.userId, userId),
-            eq(providerAccount.provider, provider),
-            eq(providerAccount.email, email)
-          )
-        )
-        .limit(1),
-    "Failed to load provider account"
-  );
+  const foundByEmail = yield* findAccount(userId, provider, { email });
   const foundByAccount =
     !foundByEmail[0] && accountId && options.dedupeByAccountId
-      ? yield* fromPromise(
-          () =>
-            db
-              .select({ id: providerAccount.id, email: providerAccount.email })
-              .from(providerAccount)
-              .where(
-                and(
-                  eq(providerAccount.userId, userId),
-                  eq(providerAccount.provider, provider),
-                  eq(providerAccount.accountId, accountId)
-                )
-              )
-              .limit(1),
-          "Failed to load provider account"
-        )
+      ? yield* findAccount(userId, provider, { accountId })
       : [];
   const existingAccount = foundByEmail[0] ?? foundByAccount[0] ?? null;
 
@@ -172,17 +185,7 @@ const upsertAccount = Effect.fn("accountAuth.upsertAccount")(function* (
       () =>
         db
           .update(providerAccount)
-          .set({
-            accessToken: encrypt(oauthResult.accessToken),
-            refreshToken: encryptRefresh(oauthResult.refreshToken),
-            expiresAt: oauthResult.expiresAt,
-            email: resolvedEmail,
-            ...(oauthResult.projectId ? { projectId: oauthResult.projectId } : {}),
-            ...(oauthResult.tier ? { tier: oauthResult.tier } : {}),
-            ...(accountId ? { accountId } : {}),
-            isActive: true,
-            disabledUntil: null,
-          })
+          .set(accountValues(oauthResult, resolvedEmail, accountId))
           .where(eq(providerAccount.id, existingAccount.id)),
       "Failed to update provider account"
     );
@@ -206,14 +209,10 @@ const upsertAccount = Effect.fn("accountAuth.upsertAccount")(function* (
         userId,
         provider,
         name: `${label} ${(countResult[0]?.value ?? 0) + 1}`,
-        accessToken: encrypt(oauthResult.accessToken),
-        refreshToken: encryptRefresh(oauthResult.refreshToken),
-        expiresAt: oauthResult.expiresAt,
-        email,
         projectId: oauthResult.projectId,
         tier: oauthResult.tier,
         accountId,
-        isActive: true,
+        ...accountValues(oauthResult, email, accountId),
       }),
     "Failed to create provider account"
   );
@@ -333,8 +332,8 @@ export const initiateDeviceAuth = Effect.fn("accountAuth.initiateDeviceAuth")(fu
   input: DeviceAuthInput
 ) {
   const config = DEVICE_PROVIDERS[input.provider];
-  const data = yield* config.initiate().pipe(
-    Effect.mapError((failure: { message?: string; cause?: unknown }) => internal(failure.message ?? "Account auth failed", failure.cause))
+  const data = yield* config.flow.startDeviceFlow().pipe(
+    Effect.mapError((failure) => internal(failure.message || "Account auth failed", failure.cause))
   );
   return { success: true as const, data };
 });
@@ -344,22 +343,18 @@ export const pollAuth = Effect.fn("accountAuth.pollAuth")(function* (
   input: DevicePollInput
 ) {
   const config = DEVICE_PROVIDERS[input.provider];
-  const result = yield* config.poll(input);
-  if (result && typeof result === "object" && "pending" in result) {
+  const result = yield* config.flow.pollDeviceAuth(input.deviceCode, input.userCode ?? "");
+  if (isPending(result)) {
     return {
       success: true as const,
-      data: {
-        status: "pending" as const,
-        retryAfterSeconds:
-          "retryAfterSeconds" in result ? (result.retryAfterSeconds as number | undefined) : undefined,
-      },
+      data: { status: "pending" as const, retryAfterSeconds: result.retryAfterSeconds },
     };
   }
-  if (result && typeof result === "object" && "error" in result) {
-    return { success: true as const, data: { status: "error" as const, message: String(result.error) } };
+  if (isFailed(result)) {
+    return { success: true as const, data: { status: "error" as const, message: result.error } };
   }
 
-  const oauthResult = result as OAuthResult;
+  const oauthResult = result;
   const provider = input.provider;
   const email = oauthResult.email || `${config.emailPrefix}-${Date.now()}`;
   const saved = yield* upsertAccount(

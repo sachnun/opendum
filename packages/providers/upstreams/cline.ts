@@ -2,17 +2,8 @@ import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
 import { Value } from "../core/helpers.js";
 import { JSONPoster, type UpstreamTransport } from "../core/http.js";
-import { ProviderCredentialFailure } from "../core/errors.js";
-import { OAuth } from "../core/oauth.js";
-import type {
-  CredentialRefresher,
-  Provider,
-  ProviderAccount,
-  ProviderFailure,
-  ProviderRequest,
-  RefreshedCredentials,
-  RefreshBufferProvider,
-} from "../types.js";
+import { OAuthBase } from "../core/oauth.js";
+import type { Provider, ProviderFailure, ProviderRequest } from "../types.js";
 
 import { CLINE_BASE_URL } from "../endpoints.js";
 
@@ -39,16 +30,13 @@ export type ClineOptions = {
   transport: UpstreamTransport;
 };
 
-export class ClineProvider implements Provider, CredentialRefresher, RefreshBufferProvider {
+export class ClineProvider extends OAuthBase implements Provider {
   readonly name = "cline";
   private readonly registry: Registry;
   private readonly transport: UpstreamTransport;
-  private readonly exchange: OAuth;
 
   constructor(options: ClineOptions) {
-    this.registry = options.registry;
-    this.transport = options.transport;
-    this.exchange = new OAuth({
+    super({
       provider: "cline",
       tokenUrl: `${CLINE_API_BASE}${CLINE_REFRESH_PATH}`,
       transport: options.transport,
@@ -70,17 +58,12 @@ export class ClineProvider implements Provider, CredentialRefresher, RefreshBuff
         };
       },
     });
+    this.registry = options.registry;
+    this.transport = options.transport;
   }
 
   refreshBuffer(): number {
     return REFRESH_BUFFER_MS;
-  }
-
-  refreshCredentials(
-    refreshToken: string,
-    account: ProviderAccount
-  ): Effect.Effect<RefreshedCredentials, ProviderCredentialFailure> {
-    return this.exchange.exchange(refreshToken, account);
   }
 
   makeRequest(request: ProviderRequest): Effect.Effect<Response, ProviderFailure> {

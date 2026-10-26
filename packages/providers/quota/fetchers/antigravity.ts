@@ -1,5 +1,4 @@
 import { Effect } from "effect";
-import { putQuota } from "../cache.js";
 import {
   baseInfo,
   clampFraction,
@@ -11,7 +10,7 @@ import {
   isoOf,
 } from "../helpers.js";
 import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay } from "../types.js";
-import { quotaAttempt, type Json } from "./shared.js";
+import { quotaPayload, type Json } from "./shared.js";
 
 export function antigravityQuota(
   ctx: QuotaContext,
@@ -31,36 +30,23 @@ export function antigravityQuota(
   ];
 
   const attemptEndpoint = (endpoint: string): Effect.Effect<AccountQuotaInfo, string> =>
-    quotaAttempt(
-      ctx,
-      account,
-      forceRefresh,
-      "antigravity:fetchAvailableModels",
-      "POST",
-      `${endpoint}/v1internal:fetchAvailableModels`,
-      {
+    quotaPayload(ctx, account, forceRefresh, {
+      cache: "antigravity:fetchAvailableModels",
+      method: "POST",
+      url: `${endpoint}/v1internal:fetchAvailableModels`,
+      headers: {
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
         "User-Agent": `antigravity/2.26.0 ${process.platform}/${process.arch}`,
       },
-      { project: projectId }
-    ).pipe(
-      Effect.flatMap((attempt) => {
-        if (!attempt.ok) return Effect.fail(attempt.message);
-        const { result } = attempt;
-        if (result.statusCode < 200 || result.statusCode >= 300) {
-          return Effect.fail(`HTTP ${result.statusCode} ${result.raw}`);
-        }
-        const parsed = (() => {
-          try {
-            return JSON.parse(result.raw) as Json;
-          } catch {
-            return null;
-          }
-        })();
-        if (!parsed) return Effect.fail("response was not valid JSON");
-        return putQuota(ctx, result).pipe(Effect.as(baseInfo("success", antigravityGroups(parsed))));
-      })
+      body: { project: projectId },
+      label: "Antigravity",
+    }).pipe(
+      Effect.flatMap((payload) =>
+        payload.ok
+          ? Effect.succeed(baseInfo("success", antigravityGroups(payload.data)))
+          : Effect.fail(payload.info.error)
+      )
     );
 
   const combined = endpoints.reduce<Effect.Effect<AccountQuotaInfo, string> | null>(

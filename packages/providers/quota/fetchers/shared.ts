@@ -1,7 +1,9 @@
-import { Effect, Option } from "effect";
+import { Effect } from "effect";
 import { quotaJson, putQuota, type QuotaJsonResult } from "../cache.js";
 import { asError } from "../../core/errors.js";
-import type { QuotaAccount, QuotaContext } from "../types.js";
+import { Value } from "../../core/values.js";
+import { errorInfo, expiredInfo } from "../helpers.js";
+import type { AccountQuotaInfo, QuotaAccount, QuotaContext } from "../types.js";
 
 export type Json = Record<string, unknown>;
 
@@ -32,34 +34,71 @@ export function quotaAttempt(
   );
 }
 
-export type QuotaJsonData = { data: Json | null; error: string | null };
+export class QuotaJson {
+  static parse(text: string): Json | null {
+    try {
+      return Value.record(JSON.parse(text));
+    } catch {
+      return null;
+    }
+  }
 
-export function jsonData(
+  static expiredStatus(status: number): boolean {
+    return status === 401 || status === 403;
+  }
+
+  static failedStatus(status: number): boolean {
+    return status < 200 || status >= 300;
+  }
+}
+
+export type QuotaPayloadOptions = {
+  cache: string;
+  method: string;
+  url: string;
+  headers: Record<string, string>;
+  body?: unknown;
+  label: string;
+  expiredMessage?: string;
+};
+
+export type QuotaPayload =
+  | { readonly ok: true; readonly data: Json; readonly result: QuotaJsonResult }
+  | { readonly ok: false; readonly info: AccountQuotaInfo; readonly result?: QuotaJsonResult };
+
+export function quotaPayload(
   ctx: QuotaContext,
   account: QuotaAccount,
   forceRefresh: boolean,
-  cacheName: string,
-  method: string,
-  target: string,
-  headers: Record<string, string>,
-  body: unknown
-): Effect.Effect<QuotaJsonData> {
-  return quotaAttempt(ctx, account, forceRefresh, cacheName, method, target, headers, body).pipe(
+  options: QuotaPayloadOptions
+): Effect.Effect<QuotaPayload> {
+  const failure = (info: AccountQuotaInfo, result?: QuotaJsonResult) =>
+    Effect.succeed<QuotaPayload>({ ok: false, info, result });
+  return quotaAttempt(
+    ctx,
+    account,
+    forceRefresh,
+    options.cache,
+    options.method,
+    options.url,
+    options.headers,
+    options.body ?? null
+  ).pipe(
     Effect.flatMap((attempt) => {
-      if (!attempt.ok) return Effect.succeed<QuotaJsonData>({ data: null, error: attempt.message });
+      if (!attempt.ok) return failure(errorInfo(attempt.message));
       const { result } = attempt;
-      if (result.statusCode < 200 || result.statusCode >= 300) {
-        return Effect.succeed<QuotaJsonData>({
-          data: null,
-          error: `HTTP ${result.statusCode} ${result.raw}`,
-        });
+      if (options.expiredMessage && QuotaJson.expiredStatus(result.statusCode)) {
+        return failure(expiredInfo(options.expiredMessage), result);
       }
-      return Effect.gen(function* () {
-        const parsed = yield* Effect.try(() => JSON.parse(result.raw) as Json).pipe(Effect.option);
-        if (Option.isNone(parsed)) return { data: null, error: "response was not valid JSON" };
-        yield* putQuota(ctx, result);
-        return { data: parsed.value, error: null };
-      });
+      if (QuotaJson.failedStatus(result.statusCode)) {
+        return failure(
+          errorInfo(`${options.label} quota endpoint failed: HTTP ${result.statusCode} ${result.raw}`),
+          result
+        );
+      }
+      const data = QuotaJson.parse(result.raw);
+      if (!data) return failure(errorInfo(`${options.label} response was not valid JSON`), result);
+      return putQuota(ctx, result).pipe(Effect.as({ ok: true as const, data, result }));
     })
   );
 }

@@ -3,6 +3,15 @@ export class Value {
     return typeof value === "string" ? value : "";
   }
 
+  static trimmed(value: unknown): string {
+    return Value.string(value).trim();
+  }
+
+  static record(value: unknown): Record<string, unknown> | null {
+    if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
+    return value as Record<string, unknown>;
+  }
+
   static stringOr(value: unknown, fallback: string): string {
     const str = Value.string(value);
     return str !== "" ? str : fallback;

@@ -1,4 +1,5 @@
 import { Ids, Value } from "../../core/helpers.js";
+import { ModelName } from "../../core/identity.js";
 import { KiroBracket, KiroEvents, type Json } from "./events.js";
 
 export const THINKING_START = "<thinking>";
@@ -267,8 +268,7 @@ export class BracketCalls {
 
 export class KiroNames {
   static lastSegment(model: string): string {
-    const parts = model.split("/");
-    return parts[parts.length - 1];
+    return ModelName.segment(model);
   }
 
   static truncate(value: string, maxLen: number): string {

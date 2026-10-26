@@ -28,10 +28,10 @@ import type {
   AccountUpdateData,
 } from "../../lib/api-types";
 import type { DeviceProviderKey, AuthProvider } from "@opendum/providers/provider-accounts";
+import type { AccessMode } from "../../lib/access-draft";
 import { apiUrl } from "../../lib/api-url";
 import { apiClient } from "../../lib/orpc";
 
-type AccessMode = "all" | "whitelist" | "blacklist";
 type PlaygroundEndpoint = "chat_completions" | "messages" | "responses";
 type RateLimitRule = { target: string; targetType: "model" | "family"; perMinute: number | null; perHour: number | null; perDay: number | null };
 

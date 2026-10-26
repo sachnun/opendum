@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import { putQuota } from "./cache.js";
+import { quotaPayload } from "./fetchers/shared.js";
 import {
   baseInfo,
   clampFraction,
@@ -12,7 +12,6 @@ import {
   parseRecord,
   isoOf,
 } from "./helpers.js";
-import { quotaAttempt } from "./fetchers/shared.js";
 import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay } from "./types.js";
 
 type Json = Record<string, unknown>;
@@ -32,44 +31,26 @@ export function fetchQuota(
     return Effect.succeed(expiredInfo("Perch access token is missing. Re-authenticate this account."));
   }
   const headers = { Authorization: `Bearer ${token}`, Accept: "application/json" };
-  return quotaAttempt(ctx, account, forceRefresh, "perch:account", "GET", PERCH_ACCOUNT_URL, headers, null).pipe(
-    Effect.flatMap((attempt) => {
-      if (!attempt.ok) return Effect.succeed(errorInfo(attempt.message));
-      const { result } = attempt;
-      if (result.statusCode === 401 || result.statusCode === 403) {
-        return Effect.succeed(
-          expiredInfo("Perch session is invalid or expired. Re-authenticate this account.")
-        );
+  return quotaPayload(ctx, account, forceRefresh, {
+    cache: "perch:account",
+    method: "GET",
+    url: PERCH_ACCOUNT_URL,
+    headers,
+    label: "Perch account",
+    expiredMessage: "Perch session is invalid or expired. Re-authenticate this account.",
+  }).pipe(
+    Effect.map((payload) => {
+      if (!payload.ok) return payload.info;
+      if (payload.data.ok !== true) {
+        return errorInfo("Perch account request was rejected. Re-authenticate this account.");
       }
-      if (result.statusCode < 200 || result.statusCode >= 300) {
-        return Effect.succeed(
-          errorInfo(`Perch account quota endpoint failed: HTTP ${result.statusCode} ${result.raw}`)
-        );
-      }
-      const payload = (() => {
-        try {
-          return JSON.parse(result.raw) as Json;
-        } catch {
-          return null;
-        }
-      })();
-      if (!payload) return Effect.succeed(errorInfo("Perch account response was not valid JSON"));
-      if (payload.ok !== true) {
-        return Effect.succeed(
-          errorInfo("Perch account request was rejected. Re-authenticate this account.")
-        );
-      }
-      const session = parseRecord(payload.session) ?? {};
+      const session = parseRecord(payload.data.session) ?? {};
       if (session.tierSelectionRequired === true) {
-        return Effect.succeed(
-          expiredInfo("Perch account has no active plan yet. Re-authenticate to select the Starter plan.")
-        );
+        return expiredInfo("Perch account has no active plan yet. Re-authenticate to select the Starter plan.");
       }
-      const groups = quotaGroups(payload, session);
-      if (groups.length === 0) {
-        return Effect.succeed(errorInfo("Perch account has no usage or allowance data"));
-      }
-      return putQuota(ctx, result).pipe(Effect.as(baseInfo("success", groups)));
+      const groups = quotaGroups(payload.data, session);
+      if (groups.length === 0) return errorInfo("Perch account has no usage or allowance data");
+      return baseInfo("success", groups);
     })
   );
 }

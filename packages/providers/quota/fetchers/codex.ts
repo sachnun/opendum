@@ -1,15 +1,8 @@
 import { Effect } from "effect";
-import { putQuota } from "../cache.js";
-import {
-  baseInfo,
-  errorInfo,
-  resetText,
-  parseNumber,
-  parseRecord,
-  parseString,
-} from "../helpers.js";
+import { baseInfo, errorInfo, resetText, parseNumber, parseRecord, parseString } from "../helpers.js";
 import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay } from "../types.js";
-import { quotaAttempt, fallbackTier, type Json } from "./shared.js";
+import { Jwt } from "../../core/identity.js";
+import { quotaPayload, fallbackTier, type Json } from "./shared.js";
 
 export function codexQuota(
   ctx: QuotaContext,
@@ -29,62 +22,36 @@ export function codexQuota(
   const accountId = account.accountId?.trim() || jwtAccount(accessToken);
   if (accountId) headers["ChatGPT-Account-Id"] = accountId;
 
-  return quotaAttempt(
-    ctx,
-    account,
-    forceRefresh,
-    "codex:usage",
-    "GET",
-    "https://chatgpt.com/backend-api/wham/usage",
+  return quotaPayload(ctx, account, forceRefresh, {
+    cache: "codex:usage",
+    method: "GET",
+    url: "https://chatgpt.com/backend-api/wham/usage",
     headers,
-    null
-  ).pipe(
-    Effect.flatMap((attempt) => {
-      if (!attempt.ok) return Effect.succeed(errorInfo(attempt.message));
-      const { result } = attempt;
-      const headerResult = headerGroups(result.header, defaultTier);
-      if (result.statusCode < 200 || result.statusCode >= 300) {
-        if (headerResult.length > 0) return Effect.succeed(baseInfo("success", headerResult));
-        return Effect.succeed(
-          errorInfo(`Codex quota endpoint failed: HTTP ${result.statusCode} ${result.raw}`)
-        );
+    label: "Codex",
+  }).pipe(
+    Effect.map((payload) => {
+      if (!payload.ok) {
+        const fallbackHeaders = payload.result ? headerGroups(payload.result.header, defaultTier) : [];
+        return fallbackHeaders.length > 0 ? baseInfo("success", fallbackHeaders) : payload.info;
       }
-      const payload = (() => {
-        try {
-          return JSON.parse(result.raw) as Json;
-        } catch {
-          return {} as Json;
-        }
-      })();
-      const tier = parseString(payload.plan_type) || defaultTier;
-      const apiResult = apiGroups(payload, tier);
+      const headerResult = headerGroups(payload.result.header, defaultTier);
+      const tier = parseString(payload.data.plan_type) || defaultTier;
+      const apiResult = apiGroups(payload.data, tier);
       const groups = apiResult.length > 0 ? apiResult : headerResult;
       if (groups.length === 0) {
-        return Effect.succeed(errorInfo("Codex quota payload did not include usable quota data"));
+        return errorInfo("Codex quota payload did not include usable quota data");
       }
-      return putQuota(ctx, result).pipe(Effect.as(baseInfo("success", groups)));
+      return baseInfo("success", groups);
     })
   );
 }
 
 function jwtAccount(token: string): string {
-  const parts = token.split(".");
-  if (parts.length < 2 || !parts[1].trim()) return "";
-  let claims: Json;
-  try {
-    claims = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8")) as Json;
-  } catch {
-    return "";
-  }
-  const authClaims = parseRecord(claims["https://api.openai.com/auth"]);
-  if (authClaims) {
-    for (const key of ["chatgpt_workspace_id", "workspace_id", "organization_id"]) {
-      const value = parseString(authClaims[key]);
-      if (value) return value;
-    }
-  }
-  for (const key of ["chatgpt_workspace_id", "workspace_id", "organization_id"]) {
-    const value = parseString(claims[key]);
+  const claims = Jwt.claims(token);
+  if (!claims) return "";
+  for (const source of [Jwt.nested(claims, "https://api.openai.com/auth"), claims]) {
+    if (!source) continue;
+    const value = Jwt.first(source, ["chatgpt_workspace_id", "workspace_id", "organization_id"]);
     if (value) return value;
   }
   return "";

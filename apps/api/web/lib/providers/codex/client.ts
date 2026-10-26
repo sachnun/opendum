@@ -1,14 +1,16 @@
-import { Buffer } from "node:buffer";
 import { eq } from "drizzle-orm";
 
-import { db, providerAccount, type ProviderAccount } from "@opendum/database";
-import { decrypt, encrypt } from "#web/lib/encryption.js";
+import { db, providerAccount } from "@opendum/database";
+import { decrypt } from "#web/lib/encryption.js";
 import { Effect } from "effect";
 import { fetchExternalEffect } from "#web/lib/external.js";
 import { fromPromise } from "#web/lib/task.js";
 import { badRequest, unavailable } from "#web/errors.js";
+import { Jwt, Value } from "@opendum/providers";
 import type { OAuthResult } from "../types.js";
-import { httpError } from "../provider-http-errors.js";
+import { saveTokens, tokenExpired, type CredentialAccount as Credential } from "../credentials.js";
+import { Pkce } from "../pkce.js";
+import { ProviderResponse, failedResult, pendingResult } from "../provider-response.js";
 import {
   BROWSER_REDIRECT_URI,
   CLIENT_ID,
@@ -56,193 +58,93 @@ interface SessionPayload {
   user?: SessionUser;
 }
 
+const response = new ProviderResponse("Codex");
+
 export function codeVerifier(): string {
-  const array = new Uint8Array(32);
-  crypto.getRandomValues(array);
-  return btoa(String.fromCharCode(...array))
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
+  return Pkce.verifier();
 }
 
-export const generateCodeChallenge = Effect.fn("codex.generateCodeChallenge")(function* (
-  verifier: string
-) {
-  const data = new TextEncoder().encode(verifier);
-  const digest = yield* fromPromise(
-    () => crypto.subtle.digest("SHA-256", data),
-    "Failed to build Codex code challenge"
-  );
-  const base64 = btoa(String.fromCharCode(...new Uint8Array(digest)));
-  return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-});
+export const generateCodeChallenge = (verifier: string) => Pkce.challenge(verifier, "Codex");
 
-function nonEmpty(value: unknown): string | null {
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
-}
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== "object") {
-    return null;
-  }
-
-  return value as Record<string, unknown>;
-}
-
-function organizationId(claims: Record<string, unknown> | null): string | null {
-  if (!claims) {
-    return null;
-  }
-
-  const organizations = claims.organizations;
-  if (!Array.isArray(organizations)) {
-    return null;
-  }
-
-  const normalizedOrganizations = organizations
-    .map((item) => asRecord(item))
+function organizationId(claims: Record<string, unknown>): string | null {
+  const organizations = Array.isArray(claims.organizations) ? claims.organizations : [];
+  const normalized = organizations
+    .map((item) => Value.record(item))
     .filter((item): item is Record<string, unknown> => item !== null);
-
-  const defaultOrganization = normalizedOrganizations.find(
+  const preferred = normalized.filter(
     (organization) => organization.is_default === true || organization.default === true
   );
-
-  if (defaultOrganization) {
-    const defaultOrganizationId = nonEmpty(defaultOrganization.id);
-    if (defaultOrganizationId) {
-      return defaultOrganizationId;
-    }
+  for (const organization of [...preferred, ...normalized]) {
+    const value = Jwt.first(organization, ["id"]);
+    if (value) return value;
   }
-
-  for (const organization of normalizedOrganizations) {
-    const organizationId = nonEmpty(organization.id);
-    if (organizationId) {
-      return organizationId;
-    }
-  }
-
   return null;
 }
 
-function jwtClaims(token: string): Record<string, unknown> | null {
-  try {
-    const parts = token.split(".");
-    if (parts.length < 2) return null;
-
-    const payloadPart = parts[1];
-    if (!payloadPart) return null;
-    const payload = payloadPart.replace(/-/g, "+").replace(/_/g, "/");
-    const padded = payload + "=".repeat((4 - (payload.length % 4)) % 4);
-    return asRecord(JSON.parse(Buffer.from(padded, "base64").toString("utf8")));
-  } catch {
-    return null;
-  }
+function claimScope(claims: Record<string, unknown>, key: string): string {
+  return Jwt.claim(Jwt.nested(claims, "https://api.openai.com/auth") ?? {}, key)
+    || Jwt.claim(claims, key);
 }
 
-function claimsEmail(decoded: Record<string, unknown>): string | null {
-  const profileClaims = asRecord(decoded["https://api.openai.com/profile"]);
-  const emailCandidates = [
-    nonEmpty(profileClaims?.email),
-    nonEmpty(decoded.email),
-  ];
-
-  for (const candidate of emailCandidates) {
-    if (candidate) {
-      return candidate;
-    }
-  }
-
-  return null;
+function claimsEmail(claims: Record<string, unknown>): string | null {
+  const profile = Jwt.nested(claims, "https://api.openai.com/profile");
+  return Jwt.claim(profile ?? {}, "email") || Jwt.claim(claims, "email") || null;
 }
 
-function claimsExpiry(decoded: Record<string, unknown>): Date | null {
-  if (typeof decoded.exp !== "number" || !Number.isFinite(decoded.exp) || decoded.exp <= 0) {
-    return null;
-  }
-
-  const expiresAt = new Date(decoded.exp * 1000);
+function claimsExpiry(claims: Record<string, unknown>): Date | null {
+  const exp = claims.exp;
+  if (typeof exp !== "number" || !Number.isFinite(exp) || exp <= 0) return null;
+  const expiresAt = new Date(exp * 1000);
   return Number.isNaN(expiresAt.getTime()) ? null : expiresAt;
 }
 
-function claimsWorkspace(decoded: Record<string, unknown>): string | null {
-  const authClaims = asRecord(decoded["https://api.openai.com/auth"]);
-
-  const workspaceCandidates = [
-    nonEmpty(authClaims?.chatgpt_workspace_id),
-    nonEmpty(authClaims?.workspace_id),
-    nonEmpty(authClaims?.organization_id),
-    organizationId(authClaims),
-    nonEmpty(decoded.chatgpt_workspace_id),
-    nonEmpty(decoded.workspace_id),
-    nonEmpty(decoded.organization_id),
-    organizationId(decoded),
-  ];
-
-  for (const candidate of workspaceCandidates) {
-    if (candidate) {
-      return candidate;
-    }
+function claimsWorkspace(claims: Record<string, unknown>): string | null {
+  const auth = Jwt.nested(claims, "https://api.openai.com/auth");
+  for (const source of [auth ?? {}, claims]) {
+    const value =
+      Jwt.first(source, ["chatgpt_workspace_id", "workspace_id", "organization_id"])
+      || organizationId(source);
+    if (value) return value;
   }
-
   return null;
 }
 
-function claimsAccount(decoded: Record<string, unknown>): string | null {
-  const authClaims = asRecord(decoded["https://api.openai.com/auth"]);
-  const accountCandidates = [
-    nonEmpty(authClaims?.chatgpt_account_id),
-    nonEmpty(decoded.chatgpt_account_id),
-  ];
-
-  for (const candidate of accountCandidates) {
-    if (candidate) {
-      return candidate;
-    }
-  }
-
-  return null;
+function claimsAccount(claims: Record<string, unknown>): string | null {
+  return claimScope(claims, "chatgpt_account_id") || null;
 }
 
-function claimsTier(decoded: Record<string, unknown>): string | null {
-  const authClaims = asRecord(decoded["https://api.openai.com/auth"]);
-  const tierCandidates = [
-    nonEmpty(authClaims?.chatgpt_plan_type),
-    nonEmpty(decoded.chatgpt_plan_type),
-  ];
+function nonEmpty(value: unknown): string | null {
+  return Value.trimmed(value) || null;
+}
 
-  for (const candidate of tierCandidates) {
-    if (candidate) {
-      return candidate.toLowerCase();
-    }
-  }
+function jwtClaims(token: string): Record<string, unknown> | null {
+  return Jwt.claims(token);
+}
 
-  return null;
+function claimsTier(claims: Record<string, unknown>): string | null {
+  const value = claimScope(claims, "chatgpt_plan_type");
+  return value ? value.toLowerCase() : null;
 }
 
 function jwtAccount(token: string): string | null {
-  const decoded = jwtClaims(token);
-  return decoded ? claimsAccount(decoded) : null;
+  const claims = Jwt.claims(token);
+  return claims ? claimsAccount(claims) : null;
 }
 
 function jwtWorkspace(token: string): string | null {
-  const decoded = jwtClaims(token);
-  return decoded ? claimsWorkspace(decoded) : null;
+  const claims = Jwt.claims(token);
+  return claims ? claimsWorkspace(claims) : null;
 }
 
 function jwtTier(token: string): string | null {
-  const decoded = jwtClaims(token);
-  return decoded ? claimsTier(decoded) : null;
+  const claims = Jwt.claims(token);
+  return claims ? claimsTier(claims) : null;
 }
 
 function parseSession(sessionJson: string): SessionPayload {
   try {
     const parsed = JSON.parse(sessionJson) as unknown;
-    const record = asRecord(parsed);
+    const record = Value.record(parsed);
     if (!record) {
       throw new Error("ChatGPT session payload must be a JSON object");
     }
@@ -255,12 +157,7 @@ function parseSession(sessionJson: string): SessionPayload {
   }
 }
 
-function tokenExpired(expiresAt: Date): boolean {
-  const bufferMs = REFRESH_BUFFER_SECONDS * 1000;
-  return Date.now() > expiresAt.getTime() - bufferMs;
-}
-
-type CredentialAccount = Pick<ProviderAccount, "id" | "accessToken" | "refreshToken" | "expiresAt" | "accountId">;
+type CredentialAccount = Credential & { accountId: string | null };
 
 function buildResult(tokens: CodexTokenResponse, refreshToken?: string): OAuthResult {
   const accountId =
@@ -340,7 +237,7 @@ const exchangeCodexCode = Effect.fn("codex.exchangeCode")(function* (
     body.code_verifier = codeVerifier;
   }
 
-  const response = yield* fetchExternalEffect(TOKEN_ENDPOINT, {
+  const result = yield* fetchExternalEffect(TOKEN_ENDPOINT, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
@@ -349,20 +246,16 @@ const exchangeCodexCode = Effect.fn("codex.exchangeCode")(function* (
     body: new URLSearchParams(body),
   });
 
-  if (!response.ok) {
-    const error = yield* readText(response);
-    return yield* unavailable(
-      httpError("Codex", response, error, {
-        endpointLabel: "token exchange endpoint",
-      })
-    );
+  if (!result.ok) {
+    const error = yield* response.text(result);
+    return yield* unavailable(response.failure(result, error, "token exchange endpoint"));
   }
 
-  return buildResult(yield* readJson<CodexTokenResponse>(response));
+  return buildResult(yield* response.json<CodexTokenResponse>(result));
 });
 
 const refreshCodexToken = Effect.fn("codex.refreshToken")(function* (refreshToken: string) {
-  const response = yield* fetchExternalEffect(TOKEN_ENDPOINT, {
+  const result = yield* fetchExternalEffect(TOKEN_ENDPOINT, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
@@ -375,22 +268,18 @@ const refreshCodexToken = Effect.fn("codex.refreshToken")(function* (refreshToke
     }),
   });
 
-  if (!response.ok) {
-    const error = yield* readText(response);
-    return yield* unavailable(
-      httpError("Codex", response, error, {
-        endpointLabel: "token refresh endpoint",
-      })
-    );
+  if (!result.ok) {
+    const error = yield* response.text(result);
+    return yield* unavailable(response.failure(result, error, "token refresh endpoint"));
   }
 
-  return buildResult(yield* readJson<CodexTokenResponse>(response), refreshToken);
+  return buildResult(yield* response.json<CodexTokenResponse>(result), refreshToken);
 });
 
 const validCredentials = Effect.fn("codex.getValidCredentials")(function* (
   account: CredentialAccount
 ) {
-  let accessToken = decrypt(account.accessToken);
+  const accessToken = decrypt(account.accessToken);
   const refreshTokenValue = account.refreshToken ? decrypt(account.refreshToken) : "";
 
   const resolvedAccountId = jwtAccount(accessToken);
@@ -412,7 +301,7 @@ const validCredentials = Effect.fn("codex.getValidCredentials")(function* (
     );
   }
 
-  if (!tokenExpired(account.expiresAt)) return accessToken;
+  if (!tokenExpired(account.expiresAt, REFRESH_BUFFER_SECONDS)) return accessToken;
 
   if (!refreshTokenValue.trim()) {
     return yield* badRequest(
@@ -427,26 +316,13 @@ const validCredentials = Effect.fn("codex.getValidCredentials")(function* (
   );
   if (!refreshed) return accessToken;
 
-  const updateData: Record<string, unknown> = {
-    accessToken: encrypt(refreshed.accessToken),
-    refreshToken: encrypt(refreshed.refreshToken ?? ""),
-    expiresAt: refreshed.expiresAt,
-  };
-
-  if (refreshed.accountId) {
-    updateData.accountId = refreshed.accountId;
-    account.accountId = refreshed.accountId;
-  }
-  if (refreshed.tier) {
-    updateData.tier = refreshed.tier;
-  }
-
-  yield* fromPromise(
-    () =>
-      db
-        .update(providerAccount)
-        .set(updateData)
-        .where(eq(providerAccount.id, account.id)),
+  yield* saveTokens(
+    account.id,
+    { ...refreshed, refreshToken: refreshed.refreshToken ?? "" },
+    (value) => ({
+      ...(value.accountId ? { accountId: value.accountId } : {}),
+      ...(value.tier ? { tier: value.tier } : {}),
+    }),
     "Failed to persist refreshed Codex credentials"
   );
 
@@ -460,7 +336,7 @@ export const codexProvider = {
 };
 
 export const startDeviceFlow = Effect.fn("codex.initiateDeviceCodeFlow")(function* () {
-  const response = yield* fetchExternalEffect(DEVICE_CODE_ENDPOINT, {
+  const result = yield* fetchExternalEffect(DEVICE_CODE_ENDPOINT, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -470,16 +346,12 @@ export const startDeviceFlow = Effect.fn("codex.initiateDeviceCodeFlow")(functio
     body: JSON.stringify({ client_id: CLIENT_ID }),
   });
 
-  if (!response.ok) {
-    const error = yield* readText(response);
-    return yield* unavailable(
-      httpError("Codex", response, error, {
-        endpointLabel: "device code endpoint",
-      })
-    );
+  if (!result.ok) {
+    const error = yield* response.text(result);
+    return yield* unavailable(response.failure(result, error, "device code endpoint"));
   }
 
-  const data = yield* readJson<DeviceCodeResponse>(response);
+  const data = yield* response.json<DeviceCodeResponse>(result);
   return {
     deviceCode: data.device_auth_id,
     userCode: data.user_code,
@@ -492,7 +364,7 @@ export const startDeviceFlow = Effect.fn("codex.initiateDeviceCodeFlow")(functio
 
 export const pollDeviceAuth = Effect.fn("codex.pollDeviceCodeAuthorization")(
   function* (deviceAuthId: string, userCode: string) {
-    const response = yield* fetchExternalEffect(DEVICE_TOKEN_ENDPOINT, {
+    const result = yield* fetchExternalEffect(DEVICE_TOKEN_ENDPOINT, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -502,10 +374,10 @@ export const pollDeviceAuth = Effect.fn("codex.pollDeviceCodeAuthorization")(
       body: JSON.stringify({ device_auth_id: deviceAuthId, user_code: userCode }),
     });
 
-    if (response.ok) {
-      const data = yield* readJson<DeviceTokenResponse>(response);
+    if (result.ok) {
+      const data = yield* response.json<DeviceTokenResponse>(result);
       if (!data.authorization_code || !data.code_verifier) {
-        return { error: "Codex device auth polling endpoint returned incomplete authorization data" };
+        return failedResult("Codex device auth polling endpoint returned incomplete authorization data");
       }
       return yield* codexProvider.exchangeCode(
         data.authorization_code,
@@ -514,22 +386,10 @@ export const pollDeviceAuth = Effect.fn("codex.pollDeviceCodeAuthorization")(
       );
     }
 
-    if (response.status === 403 || response.status === 404) {
-      return { pending: true as const, retryAfterSeconds: 8 };
-    }
+    if (result.status === 403 || result.status === 404) return pendingResult(8);
 
-    const error = yield* readText(response);
-    return {
-      error: httpError("Codex", response, error, {
-        endpointLabel: "device auth polling endpoint",
-      }),
-    };
+    const error = yield* response.text(result);
+    return failedResult(response.failure(result, error, "device auth polling endpoint"));
 });
 
-function readText(response: Response) {
-  return fromPromise(() => response.text(), "Failed to read Codex response");
-}
 
-function readJson<T>(response: Response) {
-  return fromPromise(async () => ((await response.json()) as T), "Failed to read Codex response");
-}

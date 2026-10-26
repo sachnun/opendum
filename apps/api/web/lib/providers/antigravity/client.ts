@@ -1,13 +1,9 @@
-import { eq } from "drizzle-orm";
-
-import { db, providerAccount, type ProviderAccount } from "@opendum/database";
-import { decrypt, encrypt } from "#web/lib/encryption.js";
 import { Effect } from "effect";
 import { fetchExternalEffect } from "#web/lib/external.js";
-import { fromPromise } from "#web/lib/task.js";
 import { unavailable } from "#web/errors.js";
 import type { OAuthResult } from "../types.js";
-import { httpError } from "../provider-http-errors.js";
+import { ProviderResponse } from "../provider-response.js";
+import { validToken, type CredentialAccount } from "../credentials.js";
 import {
   AUTH_HEADERS,
   CLIENT_ID,
@@ -18,10 +14,7 @@ import {
   REFRESH_BUFFER_SECONDS,
 } from "./constants.js";
 
-function tokenExpired(expiresAt: Date): boolean {
-  const bufferMs = REFRESH_BUFFER_SECONDS * 1000;
-  return Date.now() > expiresAt.getTime() - bufferMs;
-}
+const response = new ProviderResponse("Antigravity");
 
 function normalizeTier(value: unknown): string {
   return typeof value === "string" ? value.trim().toLowerCase() : "";
@@ -33,7 +26,7 @@ function isPaid(value: string): boolean {
   return normalized === "paid" || normalized === "standard-tier" || normalized.startsWith("g1-");
 }
 
-type CredentialAccount = Pick<ProviderAccount, "id" | "accessToken" | "refreshToken" | "expiresAt" | "email">;
+type AccountCredentials = CredentialAccount & { email: string };
 
 const exchangeAntigravityCode = Effect.fn("antigravity.exchangeCode")(function* (
   code: string,
@@ -52,23 +45,19 @@ const exchangeAntigravityCode = Effect.fn("antigravity.exchangeCode")(function* 
     body.code_verifier = codeVerifier;
   }
 
-  const response = yield* fetchExternalEffect("https://oauth2.googleapis.com/token", {
+  const result = yield* fetchExternalEffect("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams(body),
   });
 
-  if (!response.ok) {
-    const error = yield* readText(response);
-    return yield* unavailable(
-      httpError("Antigravity", response, error, {
-        endpointLabel: "token exchange endpoint",
-      })
-    );
+  if (!result.ok) {
+    const error = yield* response.text(result);
+    return yield* unavailable(response.failure(result, error, "token exchange endpoint"));
   }
 
-  const tokens = yield* readJson<{ access_token: string; refresh_token: string; expires_in: number }>(
-    response
+  const tokens = yield* response.json<{ access_token: string; refresh_token: string; expires_in: number }>(
+    result
   );
   const accountInfo = yield* fetchAccountInfo(tokens.access_token);
 
@@ -83,7 +72,7 @@ const exchangeAntigravityCode = Effect.fn("antigravity.exchangeCode")(function* 
 });
 
 const refreshAntigravityToken = Effect.fn("antigravity.refreshToken")(function* (refreshToken: string) {
-  const response = yield* fetchExternalEffect("https://oauth2.googleapis.com/token", {
+  const result = yield* fetchExternalEffect("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -94,17 +83,13 @@ const refreshAntigravityToken = Effect.fn("antigravity.refreshToken")(function* 
     }),
   });
 
-  if (!response.ok) {
-    const error = yield* readText(response);
-    return yield* unavailable(
-      httpError("Antigravity", response, error, {
-        endpointLabel: "token refresh endpoint",
-      })
-    );
+  if (!result.ok) {
+    const error = yield* response.text(result);
+    return yield* unavailable(response.failure(result, error, "token refresh endpoint"));
   }
 
-  const tokens = yield* readJson<{ access_token: string; refresh_token?: string; expires_in: number }>(
-    response
+  const tokens = yield* response.json<{ access_token: string; refresh_token?: string; expires_in: number }>(
+    result
   );
   const accountInfo = yield* fetchAccountInfo(tokens.access_token);
 
@@ -119,35 +104,19 @@ const refreshAntigravityToken = Effect.fn("antigravity.refreshToken")(function* 
 });
 
 const validCredentials = Effect.fn("antigravity.getValidCredentials")(function* (
-  account: CredentialAccount
+  account: AccountCredentials
 ) {
-  const accessToken = decrypt(account.accessToken);
-  if (!tokenExpired(account.expiresAt)) return accessToken;
-
-  const refreshed = yield* refreshAntigravityToken(decrypt(account.refreshToken)).pipe(
-    Effect.catch((error) =>
-      new Date() < account.expiresAt ? Effect.succeed(null) : Effect.fail(error)
-    )
-  );
-  if (!refreshed) return accessToken;
-
-  yield* fromPromise(
-    () =>
-      db
-        .update(providerAccount)
-        .set({
-          accessToken: encrypt(refreshed.accessToken),
-          refreshToken: encrypt(refreshed.refreshToken!),
-          expiresAt: refreshed.expiresAt,
-          projectId: refreshed.projectId,
-          tier: refreshed.tier,
-          email: refreshed.email || account.email,
-        })
-        .where(eq(providerAccount.id, account.id)),
-    "Failed to persist refreshed Antigravity credentials"
-  );
-
-  return refreshed.accessToken;
+  return yield* validToken(account, {
+    bufferSeconds: REFRESH_BUFFER_SECONDS,
+    message: "Failed to persist refreshed Antigravity credentials",
+    refresh: refreshAntigravityToken,
+    patch: (refreshed) => ({
+      projectId: refreshed.projectId,
+      tier: refreshed.tier,
+      email: refreshed.email || account.email,
+    }),
+    tolerateFailure: true,
+  });
 });
 
 export const antigravityProvider = {
@@ -171,7 +140,7 @@ const fetchAccountInfo = Effect.fn("antigravity.fetchAccountInfo")(function* (ac
 
   for (const baseEndpoint of LOAD_ENDPOINTS) {
     const loaded = yield* Effect.gen(function* () {
-      const response = yield* fetchExternalEffect(`${baseEndpoint}/v1internal:loadCodeAssist`, {
+      const attempt = yield* fetchExternalEffect(`${baseEndpoint}/v1internal:loadCodeAssist`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -184,12 +153,12 @@ const fetchAccountInfo = Effect.fn("antigravity.fetchAccountInfo")(function* (ac
         }),
       });
 
-      if (!response.ok) {
-        const errorText = yield* readText(response);
-        return { ok: false as const, message: `loadCodeAssist at ${baseEndpoint}: ${response.status} ${errorText}` };
+      if (!attempt.ok) {
+        const errorText = yield* response.text(attempt);
+        return { ok: false as const, message: `loadCodeAssist at ${baseEndpoint}: ${attempt.status} ${errorText}` };
       }
 
-      const data = yield* readJson<Record<string, unknown>>(response);
+      const data = yield* response.json<Record<string, unknown>>(attempt);
       return { ok: true as const, data };
     }).pipe(Effect.catch((error) => Effect.succeed({ ok: false as const, message: `loadCodeAssist at ${baseEndpoint}: ${error.message}` })));
 
@@ -242,7 +211,7 @@ const fetchAccountInfo = Effect.fn("antigravity.fetchAccountInfo")(function* (ac
       },
     });
     if (!userInfoResponse.ok) return "";
-    const userInfo = yield* readJson<{ email?: string }>(userInfoResponse);
+    const userInfo = yield* response.json<{ email?: string }>(userInfoResponse);
     return userInfo.email ?? "";
   }).pipe(Effect.catch(() => Effect.succeed("")));
 
@@ -300,7 +269,7 @@ const onboardUser = Effect.fn("antigravity.onboardUser")(function* (
 
   for (const baseEndpoint of ONBOARD_USER_ENDPOINTS) {
     const onboarded = yield* Effect.gen(function* () {
-      const response = yield* fetchExternalEffect(`${baseEndpoint}/v1internal:onboardUser`, {
+      const created = yield* fetchExternalEffect(`${baseEndpoint}/v1internal:onboardUser`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -310,9 +279,9 @@ const onboardUser = Effect.fn("antigravity.onboardUser")(function* (
         body: JSON.stringify(onboardRequest),
       });
 
-      if (!response.ok) return null;
+      if (!created.ok) return null;
 
-      let lroData = yield* readJson<Record<string, unknown>>(response);
+      let lroData = yield* response.json<Record<string, unknown>>(created);
 
       for (let i = 0; i < 30 && !lroData.done; i++) {
         yield* Effect.sleep("2 seconds");
@@ -328,7 +297,7 @@ const onboardUser = Effect.fn("antigravity.onboardUser")(function* (
         });
 
         if (pollResponse.ok) {
-          lroData = yield* readJson<Record<string, unknown>>(pollResponse);
+          lroData = yield* response.json<Record<string, unknown>>(pollResponse);
         }
       }
 
@@ -346,10 +315,4 @@ const onboardUser = Effect.fn("antigravity.onboardUser")(function* (
   return null;
 });
 
-function readText(response: Response) {
-  return fromPromise(() => response.text(), "Failed to read Antigravity response");
-}
 
-function readJson<T>(response: Response) {
-  return fromPromise(async () => ((await response.json()) as T), "Failed to read Antigravity response");
-}

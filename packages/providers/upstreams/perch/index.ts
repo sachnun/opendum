@@ -2,17 +2,8 @@ import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
 import { Responses, Value } from "../../core/helpers.js";
 import { RequestFailure, type UpstreamTransport } from "../../core/http.js";
-import { ProviderCredentialFailure } from "../../core/errors.js";
-import { OAuth } from "../../core/oauth.js";
-import type {
-  CredentialRefresher,
-  Provider,
-  ProviderAccount,
-  ProviderFailure,
-  ProviderRequest,
-  RefreshedCredentials,
-  RefreshBufferProvider,
-} from "../../types.js";
+import { OAuthBase } from "../../core/oauth.js";
+import type { Provider, ProviderFailure, ProviderRequest } from "../../types.js";
 import { PERCH_APP_URL } from "../../endpoints.js";
 
 import {
@@ -34,22 +25,17 @@ export type PerchOptions = {
   transport: UpstreamTransport;
 };
 
-export class PerchProvider implements Provider, CredentialRefresher, RefreshBufferProvider {
+export class PerchProvider extends OAuthBase implements Provider {
   readonly name = "perch";
 
   private readonly registry: Registry;
 
   private readonly transport: UpstreamTransport;
 
-  private readonly exchange: OAuth;
-
   private readonly auth: PerchAuth;
 
   constructor(options: PerchOptions) {
-    this.registry = options.registry;
-    this.transport = options.transport;
-    this.auth = new PerchAuth(options.transport);
-    this.exchange = new OAuth({
+    super({
       provider: "perch",
       tokenUrl: async () => {
         const config = await this.auth.config();
@@ -80,17 +66,13 @@ export class PerchProvider implements Provider, CredentialRefresher, RefreshBuff
         return { accessToken, refreshToken: nextRefresh, expiresAt };
       },
     });
+    this.registry = options.registry;
+    this.transport = options.transport;
+    this.auth = new PerchAuth(options.transport);
   }
 
   refreshBuffer(): number {
     return REFRESH_BUFFER_MS;
-  }
-
-  refreshCredentials(
-    refreshToken: string,
-    account: ProviderAccount
-  ): Effect.Effect<RefreshedCredentials, ProviderCredentialFailure> {
-    return this.exchange.exchange(refreshToken, account);
   }
 
   makeRequest(request: ProviderRequest): Effect.Effect<Response, ProviderFailure> {
