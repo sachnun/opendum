@@ -12,8 +12,7 @@ on:
       - packages/models/ranking.generated.ts
       - packages/models/sort.ts
       - packages/models/stats.ts
-      - packages/providers/package.json
-      - packages/providers/provider-accounts.ts
+      - packages/providers/**
       - package.json
       - bun.lock
   workflow_run:
