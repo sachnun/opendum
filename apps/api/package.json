@@ -30,5 +30,8 @@
     "nitro": "3.0.260903-beta",
     "rollup": "^4.65.0",
     "typescript": "^6.0.3"
+  },
+  "exports": {
+    "./*": "./*.ts"
   }
 }

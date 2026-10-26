@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { anthropicStream, passthrough, passthroughStream } from "../core/stream.js";
-import type { ResponseContext, StreamRecorder, UsageCounts } from "../core/types.js";
+import { anthropicStream, passthrough, passthroughStream } from "@opendum/api/core/stream";
+import type { ResponseContext, StreamRecorder, UsageCounts } from "@opendum/api/core/types";
 
 function sseResponse(chunks: string[]): Response {
   const encoder = new TextEncoder();

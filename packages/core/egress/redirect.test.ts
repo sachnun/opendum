@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import type { Fetch } from "./guard.js";
-import { MAX_REDIRECTS, Fetcher, Redirects } from "./redirect.js";
-import { PrivateHostError } from "./ssrf.js";
+import type { Fetch } from "@opendum/core/egress/guard";
+import { MAX_REDIRECTS, Fetcher, Redirects } from "@opendum/core/egress/redirect";
+import { PrivateHostError } from "@opendum/core/egress/ssrf";
 
 type StubCall = {
   url: string;

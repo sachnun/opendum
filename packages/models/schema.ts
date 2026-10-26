@@ -1,7 +1,7 @@
 import { Effect, Schema } from "effect";
 
-import { ModelParseFailure } from "./errors.ts";
-import type { ModelData, ProviderModelConfig } from "./types.ts";
+import { ModelParseFailure } from "@opendum/models/errors";
+import type { ModelData, ProviderModelConfig } from "@opendum/models/types";
 
 const OptionalString = Schema.optional(Schema.String);
 const OptionalBoolean = Schema.optional(Schema.Boolean);

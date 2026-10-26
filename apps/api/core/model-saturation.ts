@@ -2,7 +2,7 @@ import { Effect, Result } from "effect";
 import type { OpendumRedis } from "@opendum/core/redis";
 import { saturationKey } from "@opendum/core/redis/keys";
 import { tryAsync } from "@opendum/core/best-effort";
-import { Coerce, Safe } from "./helpers.js";
+import { Coerce, Safe } from "@opendum/api/core/helpers";
 
 const SATURATION_CODE = 14003;
 const SATURATION_MARKERS = ["model busy", "saturated", "模型繁忙", "請求量已飽和", "请求量已饱和"];

@@ -6,7 +6,7 @@ import {
   asError,
   isRetryable as retryableStatus,
   failureMessage,
-} from "../errors.ts";
+} from "@opendum/models/errors";
 
 export const MAX_FETCH_ATTEMPTS = 3;
 export const FETCH_TIMEOUT_MS = 20_000;

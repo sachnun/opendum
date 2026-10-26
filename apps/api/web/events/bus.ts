@@ -2,7 +2,7 @@ import type { AccountsData, LiveTopic, ModelsData, ServerEvent, UsageData } from
 import { EventPublisher } from "@orpc/server";
 import { Duration, Effect, Match, Queue, Ref, Stream } from "effect";
 
-import { proxyEvents } from "../../core/events.js";
+import { proxyEvents } from "@opendum/api/core/events";
 
 const POINTS_DEBOUNCE = Duration.millis(1_500);
 const SNAPSHOT_DEBOUNCE = Duration.millis(400);
@@ -18,7 +18,7 @@ export interface EventSnapshots {
 export type SnapshotBuilder = (
   userId: string,
   topics: LiveTopic[]
-) => Effect.Effect<Partial<EventSnapshots>, import("#web/errors.js").ServiceFailure>;
+) => Effect.Effect<Partial<EventSnapshots>, import("@opendum/api/web/errors").ServiceFailure>;
 
 type TopicSignal = { userId: string; topic: LiveTopic };
 type UsageSignal = { userId: string };

@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 
-import { fromPromise } from "#web/lib/task.js";
+import { fromPromise } from "@opendum/api/web/lib/task";
 
 export class Pkce {
   static verifier(): string {

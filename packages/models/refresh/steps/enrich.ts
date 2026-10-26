@@ -1,11 +1,11 @@
-import { folderOf } from "#models/model/families.ts";
-import { buildIndex, persist, moveFiles, generatedDir } from "#models/model-store.ts";
-import { applyMerge, planCanonicalization } from "#models/model/canonicalize.ts";
-import { modelProbes } from "#models/model/probes.ts";
-import { exists, remove, rename } from "#models/fs.ts";
-import { basename, dirname, join } from "#models/paths.ts";
-import { flags, dataDir, runScript } from "./shared.ts";
-import type { ModelData } from "#models/types.ts";
+import { folderOf } from "@opendum/models/model/families";
+import { buildIndex, persist, moveFiles, generatedDir } from "@opendum/models/model-store";
+import { applyMerge, planCanonicalization } from "@opendum/models/model/canonicalize";
+import { modelProbes } from "@opendum/models/model/probes";
+import { exists, remove, rename } from "@opendum/models/fs";
+import { basename, dirname, join } from "@opendum/models/paths";
+import { flags, dataDir, runScript } from "@opendum/models/refresh/core/env";
+import type { ModelData } from "@opendum/models/types";
 import {
   modelPatch,
   externalRegistries,
@@ -13,7 +13,7 @@ import {
   type ModelMetadataInput,
   type ModelMetadataPatch,
   type Registries,
-} from "#models/sync/metadata.ts";
+} from "@opendum/models/sync/metadata";
 
 const modelsDir = dataDir();
 

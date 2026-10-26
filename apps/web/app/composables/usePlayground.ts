@@ -1,7 +1,7 @@
 import { SORT_ORDER, categorize } from "@opendum/models/ranking";
 import { compareEntries } from "@opendum/models/sort";
 import { BY_KEY, accountPath, labelOf, type ProviderAccountKey } from "@opendum/providers/provider-accounts";
-import type { PlaygroundOptions } from "../../lib/api-types";
+import type { PlaygroundOptions } from "~~/lib/api-types";
 import {
   Body,
   Completion,
@@ -14,7 +14,7 @@ import {
   Sse,
   Tokens,
   ToolCalls,
-} from "../../lib/playground-protocol";
+} from "~~/lib/playground-protocol";
 import type {
   ReasoningEffort,
   PlaygroundEndpoint,
@@ -24,7 +24,7 @@ import type {
   ParsedCompletionData,
   ResponseMetrics,
   PlaygroundSettings,
-} from "../../lib/playground-protocol";
+} from "~~/lib/playground-protocol";
 
 export function usePlayground() {
 

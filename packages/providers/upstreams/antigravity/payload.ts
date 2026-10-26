@@ -1,7 +1,7 @@
-import { Payload, Value } from "../../core/helpers.js";
-import { ToolNames, anySlice, mapSlice, type Json } from "./common.js";
-import { GeminiTier } from "./model.js";
-import { GeminiSchema } from "./transform.js";
+import { Payload, Value } from "@opendum/providers/core/helpers";
+import { ToolNames, anySlice, mapSlice, type Json } from "@opendum/providers/upstreams/antigravity/common";
+import { GeminiTier } from "@opendum/providers/upstreams/antigravity/model";
+import { GeminiSchema } from "@opendum/providers/upstreams/antigravity/transform";
 
 const TOOL_ARTIFACT_MARKER = /^\s*(Tool:\s*\w+|(?:thought|think)\s*:)/i;
 

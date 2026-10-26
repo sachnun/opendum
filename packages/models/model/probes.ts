@@ -1,4 +1,4 @@
-import type { ModelData } from "../types.ts";
+import type { ModelData } from "@opendum/models/types";
 
 export interface ProbeSource {
   id: string;

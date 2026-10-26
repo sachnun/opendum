@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { guardedFetch } from "./guard.js";
+import { guardedFetch } from "@opendum/core/egress/guard";
 
 function messageOf(error: unknown): string {
   if (!(error instanceof Error)) return String(error);

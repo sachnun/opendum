@@ -1,7 +1,7 @@
 import type { Registry } from "@opendum/models/runtime";
 import type { OpendumRedis } from "@opendum/core/redis";
-import type { Json } from "./common.js";
-import type { UpstreamTransport } from "../../core/http.js";
+import type { Json } from "@opendum/providers/upstreams/antigravity/common";
+import type { UpstreamTransport } from "@opendum/providers/core/http";
 
 export type AccountInfo = {
   projectId: string;

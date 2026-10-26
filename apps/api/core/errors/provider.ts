@@ -1,6 +1,6 @@
 import { Result } from "effect";
-import { Safe } from "../helpers.js";
-import { HEADERS_TIMEOUT_MESSAGE } from "../upstream-timeout.js";
+import { Safe } from "@opendum/api/core/helpers";
+import { HEADERS_TIMEOUT_MESSAGE } from "@opendum/api/core/upstream-timeout";
 
 export class ProviderError {
   static sanitize(status: number, body: string): { message: string; type: string } {

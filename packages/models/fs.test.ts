@@ -24,9 +24,9 @@ import {
   saveText,
   writeBytes,
   writeText,
-} from "./fs.ts";
-import { join } from "./paths.ts";
-import { makeDir, removeDir } from "./test-support.ts";
+} from "@opendum/models/fs";
+import { join } from "@opendum/models/paths";
+import { makeDir, removeDir } from "@opendum/models/test-support";
 import { Effect, Exit } from "effect";
 
 describe("bun fs primitives", () => {

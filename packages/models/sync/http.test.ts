@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { MAX_FETCH_ATTEMPTS, runJson, runText, sleep } from "./http.ts";
+import { MAX_FETCH_ATTEMPTS, runJson, runText, sleep } from "@opendum/models/sync/http";
 
 type Stub = (url: string, init?: RequestInit) => Promise<Response>;
 

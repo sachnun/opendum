@@ -1,13 +1,13 @@
 import { expect, test } from "bun:test";
 
-import { canonicalIndex } from "./canonical.ts";
+import { canonicalIndex } from "@opendum/models/model/canonical";
 import {
   applyMerge,
   planCanonicalization,
   type CanonicalMerge,
   type CanonicalizationModel,
-} from "./canonicalize.ts";
-import type { ModelData } from "../types.ts";
+} from "@opendum/models/model/canonicalize";
+import type { ModelData } from "@opendum/models/types";
 
 function index() {
   return canonicalIndex({

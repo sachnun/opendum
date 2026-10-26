@@ -2,7 +2,7 @@ import { Effect } from "effect";
 import { fetchQuota as providerQuota, isQuota } from "@opendum/providers/quota";
 import type { QuotaContext, QuotaJournal } from "@opendum/providers/quota";
 import { decrypt } from "@opendum/core/crypto";
-import type { ProxyContext } from "./context.js";
+import type { ProxyContext } from "@opendum/api/core/context";
 
 export type AccountQuotaOutcome =
   | { status: "success"; data: unknown }

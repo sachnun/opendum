@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { Collector } from "./collector.js";
+import { Collector } from "@opendum/providers/transform/collector";
 
 type Json = Record<string, unknown>;
 

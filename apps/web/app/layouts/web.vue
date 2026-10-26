@@ -8,11 +8,11 @@ import {
 } from "~~/lib/account-overview";
 
 import type { AccountsData, ModelsData, UsageData } from "@opendum/providers/contract";
-import type { NavItem, NavSubItem, ProviderAccountIndicator } from "../../lib/navigation";
-import type { AccountOverviewData, MeData } from "../../lib/api-types";
-import { isSwitch, primaryNavigation, hrefOf } from "../../lib/navigation";
+import type { NavItem, NavSubItem, ProviderAccountIndicator } from "~~/lib/navigation";
+import type { AccountOverviewData, MeData } from "~~/lib/api-types";
+import { isSwitch, primaryNavigation, hrefOf } from "~~/lib/navigation";
 import { hrefMap, accountPath, PROVIDER_ACCOUNT_DEFINITIONS } from "@opendum/providers/provider-accounts";
-import { avatarUrl } from "../../lib/utils";
+import { avatarUrl } from "~~/lib/utils";
 
 const route = useRoute();
 const { user: authUser, signOut: endSession } = useAuth();

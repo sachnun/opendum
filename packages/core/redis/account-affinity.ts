@@ -1,6 +1,6 @@
 import { Effect } from "effect";
-import type { OpendumRedis } from "./client.js";
-import { affinityKey } from "./keys.js";
+import type { OpendumRedis } from "@opendum/core/redis/client";
+import { affinityKey } from "@opendum/core/redis/keys";
 
 const DEFAULT_TTL_SECONDS = 24 * 60 * 60;
 const LOG_INTERVAL_MS = 30_000;

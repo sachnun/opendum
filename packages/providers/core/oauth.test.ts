@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import { Effect } from "effect";
-import type { ProviderAccount } from "../types.js";
-import type { UpstreamTransport } from "./http.js";
-import { OAuth, type Spec } from "./oauth.js";
+import type { ProviderAccount } from "@opendum/providers/types";
+import type { UpstreamTransport } from "@opendum/providers/core/http";
+import { OAuth, type Spec } from "@opendum/providers/core/oauth";
 
 const account = { id: "acc-1" } as unknown as ProviderAccount;
 

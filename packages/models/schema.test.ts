@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { Effect, Exit } from "effect";
 
-import { ModelParseFailure } from "./errors.ts";
+import { ModelParseFailure } from "@opendum/models/errors";
 import {
   ModelDataSchema,
   ProviderConfigSchema,
@@ -10,7 +10,7 @@ import {
   validateModel,
   validateConfig,
   validateRegistry,
-} from "./schema.ts";
+} from "@opendum/models/schema";
 
 describe("model data schema", () => {
   test("keeps unknown keys while validating known ones", () => {

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import { Effect, Exit } from "effect";
 
-import { FallbackPolicy, NoFallbackState, RedisFallbackRouter } from "./fallback.js";
-import { ProviderFallbackFailure } from "./errors.js";
-import { RequestFailure, Retry } from "./http.js";
+import { FallbackPolicy, NoFallbackState, RedisFallbackRouter } from "@opendum/providers/core/fallback";
+import { ProviderFallbackFailure } from "@opendum/providers/core/errors";
+import { RequestFailure, Retry } from "@opendum/providers/core/http";
 
 describe("fallback router", () => {
   it("keeps a best effort sticky check failure on the success channel", async () => {

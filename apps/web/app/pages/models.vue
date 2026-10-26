@@ -2,7 +2,7 @@
 import { SORT_ORDER, anchorId } from "@opendum/models/ranking";
 import { compareEntries } from "@opendum/models/sort";
 import { dayKeys, emptyStats, hourKeys, LOOKBACK_HOURS, MODEL_STATS_DAYS, type ModelStats } from "@opendum/models/stats";
-import { costEntries, costPoints, type ModelCost } from "../../lib/model-cost";
+import { costEntries, costPoints, type ModelCost } from "~~/lib/model-cost";
 import type { UsageData } from "@opendum/providers/contract";
 import { labelOf } from "@opendum/providers/provider-accounts";
 

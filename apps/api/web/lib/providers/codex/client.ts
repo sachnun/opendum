@@ -1,16 +1,16 @@
 import { eq } from "drizzle-orm";
 
 import { db, providerAccount } from "@opendum/database";
-import { decrypt } from "#web/lib/encryption.js";
+import { decrypt } from "@opendum/api/web/lib/encryption";
 import { Effect } from "effect";
-import { fetchExternalEffect } from "#web/lib/external.js";
-import { fromPromise } from "#web/lib/task.js";
-import { badRequest, unavailable } from "#web/errors.js";
+import { fetchExternalEffect } from "@opendum/api/web/lib/external";
+import { fromPromise } from "@opendum/api/web/lib/task";
+import { badRequest, unavailable } from "@opendum/api/web/errors";
 import { Jwt, Value } from "@opendum/providers";
-import type { OAuthResult } from "../types.js";
-import { saveTokens, tokenExpired, type CredentialAccount as Credential } from "../credentials.js";
-import { Pkce } from "../pkce.js";
-import { ProviderResponse, failedResult, pendingResult } from "../provider-response.js";
+import type { OAuthResult } from "@opendum/api/web/lib/providers/types";
+import { saveTokens, tokenExpired, type CredentialAccount as Credential } from "@opendum/api/web/lib/providers/credentials";
+import { Pkce } from "@opendum/api/web/lib/providers/pkce";
+import { ProviderResponse, failedResult, pendingResult } from "@opendum/api/web/lib/providers/provider-response";
 import {
   BROWSER_REDIRECT_URI,
   CLIENT_ID,
@@ -21,7 +21,7 @@ import {
   DEVICE_VERIFICATION_URL,
   REFRESH_BUFFER_SECONDS,
   TOKEN_ENDPOINT,
-} from "./constants.js";
+} from "@opendum/api/web/lib/providers/codex/constants";
 
 interface CodexTokenResponse {
   access_token: string;

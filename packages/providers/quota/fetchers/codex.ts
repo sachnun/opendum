@@ -1,8 +1,8 @@
 import { Effect } from "effect";
-import { baseInfo, errorInfo, resetText, parseNumber, parseRecord, parseString } from "../helpers.js";
-import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay } from "../types.js";
-import { Jwt } from "../../core/identity.js";
-import { quotaPayload, fallbackTier, type Json } from "./shared.js";
+import { baseInfo, errorInfo, resetText, parseNumber, parseRecord, parseString } from "@opendum/providers/quota/helpers";
+import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay } from "@opendum/providers/quota/types";
+import { Jwt } from "@opendum/providers/core/identity";
+import { quotaPayload, fallbackTier, type Json } from "@opendum/providers/quota/fetchers/shared";
 
 export function codexQuota(
   ctx: QuotaContext,

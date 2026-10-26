@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { dayKeys, emptyStats, hourKeys } from "./stats.ts";
+import { dayKeys, emptyStats, hourKeys } from "@opendum/models/stats";
 
 test("dayKeys returns ascending UTC day keys ending today", () => {
   const keys = dayKeys(3);

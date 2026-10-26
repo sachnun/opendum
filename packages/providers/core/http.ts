@@ -10,14 +10,14 @@ export {
   type FallbackPostOptions,
   type Logger,
   type UpstreamTransport,
-} from "./transport.js";
+} from "@opendum/providers/core/transport";
 export {
   JSONPoster,
   RequestFailure,
   type EgressFetch,
   type FetchLike,
   type PostOptions,
-} from "./request.js";
+} from "@opendum/providers/core/request";
 export type {
   ProviderCredentialFailure,
   ProviderFallbackFailure,
@@ -27,4 +27,4 @@ export type {
   QuotaFailure,
   QuotaFetchFailure,
   QuotaJournalFailure,
-} from "./errors.js";
+} from "@opendum/providers/core/errors";

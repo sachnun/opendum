@@ -4,7 +4,7 @@ import type {
   ResponseMetrics,
   ScenarioMessage,
   ToolCallData,
-} from "./types";
+} from "~~/lib/playground/types";
 
 export class Content {
   static text(content: unknown): string {

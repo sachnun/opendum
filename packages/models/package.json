@@ -14,14 +14,12 @@
     "./errors": "./errors.ts",
     "./ranking": "./ranking.ts",
     "./sort": "./sort.ts",
-    "./stats": "./stats.ts"
-  },
-  "imports": {
-    "#models/*": "./*"
+    "./stats": "./stats.ts",
+    "./*": "./*.ts"
   },
   "scripts": {
-    "refresh": "bun ./scripts/models.ts",
-    "family-ranking": "bun ./scripts/family-ranking.ts",
+    "refresh": "bun ./refresh/run.ts",
+    "family-ranking": "bun ./refresh/steps/family-ranking.ts",
     "test": "bun test",
     "typecheck": "bun check"
   },

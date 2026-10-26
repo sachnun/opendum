@@ -1,7 +1,7 @@
 import { formatDistanceToNowStrict } from "date-fns";
 
-import type { ProviderDetailData } from "./api-types";
-import { statusTag, stripStatus, type ErrorStatusTag } from "./account-errors";
+import type { ProviderDetailData } from "~~/lib/api-types";
+import { statusTag, stripStatus, type ErrorStatusTag } from "~~/lib/account-errors";
 
 export type StatDeltaTone = "positive" | "negative" | "neutral";
 

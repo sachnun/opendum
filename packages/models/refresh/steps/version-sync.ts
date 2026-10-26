@@ -1,4 +1,4 @@
-import { readText, writeText } from "../fs.ts";
+import { readText, writeText } from "@opendum/models/fs";
 
 export interface CliVersionTarget {
   label: string;

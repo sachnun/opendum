@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { avatarUrl, cn, messageOf } from "./utils";
+import { avatarUrl, cn, messageOf } from "~~/lib/utils";
 
 test("messageOf prefers the most specific message", () => {
   expect(messageOf(new Error("boom"))).toBe("boom");

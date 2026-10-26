@@ -2,8 +2,8 @@ import { describe, expect, it } from "bun:test";
 import { Effect } from "effect";
 import { drizzle } from "drizzle-orm/bun-sql";
 
-import { listOrphaned } from "./queries/usage-points.js";
-import type { DbExecutor } from "./client.js";
+import { listOrphaned } from "@opendum/database/queries/usage-points";
+import type { DbExecutor } from "@opendum/database/client";
 
 function captureSql(): { database: DbExecutor; statements: Array<{ sql: string; params: unknown[] }> } {
   const statements: Array<{ sql: string; params: unknown[] }> = [];

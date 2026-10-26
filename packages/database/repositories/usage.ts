@@ -1,5 +1,5 @@
-import type { DbExecutor } from "../client.js";
-import { insertUsageLog } from "../queries/index.js";
+import type { DbExecutor } from "@opendum/database/client";
+import { insertUsageLog } from "@opendum/database/queries/index";
 
 export class Usage {
   constructor(private readonly database: DbExecutor) {}

@@ -1,7 +1,7 @@
 import { eventIterator, oc } from "@orpc/contract";
 import { z } from "zod";
 
-import { modelItem, modelStatsSchema } from "./models.js";
+import { modelItem, modelStatsSchema } from "@opendum/providers/contract/models";
 
 const dateSchema = z.union([z.string(), z.date()]);
 const nullableDateSchema = dateSchema.nullable();

@@ -1,13 +1,13 @@
-import { familyOf, ruleOf, providerSet } from "#web/lib/proxy/models.js";
+import { familyOf, ruleOf, providerSet } from "@opendum/api/web/lib/proxy/models";
 import { compareEntries } from "@opendum/models/sort";
 import {
   COOLDOWN_RECOVERY_RATIO,
   MODEL_DEGRADED_THRESHOLD,
   IDLE_DECAY_MS,
   UNHEALTHY_THRESHOLD,
-} from "./types.js";
-import type { HealthRow, AccountRow } from "./types.js";
-import { INDICATOR_WEIGHT, type ProviderAccountIndicator } from "../account-stats.js";
+} from "@opendum/api/web/services/accounts/types";
+import type { HealthRow, AccountRow } from "@opendum/api/web/services/accounts/types";
+import { INDICATOR_WEIGHT, type ProviderAccountIndicator } from "@opendum/api/web/services/account-stats";
 
 export class Clock {
   static ms(value: Date | string | null | undefined): number | null {

@@ -1,31 +1,31 @@
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
 import type { OpendumRedis } from "@opendum/core/redis";
-import { Value, Payload, Responses, JSONText } from "../core/helpers.js";
-import { Jwt, ModelName } from "../core/identity.js";
-import { Collector } from "../transform/collector.js";
-import { anthropicUsage } from "../transform/anthropic.js";
+import { Value, Payload, Responses, JSONText } from "@opendum/providers/core/helpers";
+import { Jwt, ModelName } from "@opendum/providers/core/identity";
+import { Collector } from "@opendum/providers/transform/collector";
+import { anthropicUsage } from "@opendum/providers/transform/anthropic";
 import {
   toolsFor,
   toInput,
   inputOf,
   sseStream,
   callId,
-} from "../transform/responses.js";
-import { RequestFailure, type UpstreamTransport } from "../core/http.js";
-import { OAuthBase } from "../core/oauth.js";
+} from "@opendum/providers/transform/responses";
+import { RequestFailure, type UpstreamTransport } from "@opendum/providers/core/http";
+import { OAuthBase } from "@opendum/providers/core/oauth";
 import type {
   Provider,
   ProviderFailure,
   ProviderRequest,
-} from "../types.js";
+} from "@opendum/providers/types";
 
 import {
   CODEX_BASE_URL,
   CODEX_CLIENT_ID,
   CODEX_ORIGINATOR,
   CODEX_TOKEN_ENDPOINT,
-} from "../endpoints.js";
+} from "@opendum/providers/endpoints";
 const REFRESH_BUFFER_MS = 5 * 60 * 1000;
 
 export const SUPPORTED_CODEX = new Set([

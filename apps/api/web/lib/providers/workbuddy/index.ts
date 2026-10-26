@@ -1,5 +1,5 @@
 export {
   startDeviceFlow,
   pollDeviceAuth,
-} from "./client.js";
-export * from "./constants.js";
+} from "@opendum/api/web/lib/providers/workbuddy/client";
+export * from "@opendum/api/web/lib/providers/workbuddy/constants";

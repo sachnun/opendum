@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { modelPatch, type ModelMetadataInput, type ResolvedMetadata } from "./metadata.ts";
+import { modelPatch, type ModelMetadataInput, type ResolvedMetadata } from "@opendum/models/sync/metadata";
 
 function efforts(values: string[]): unknown {
   return { reasoning_options: [{ type: "effort", values }] };

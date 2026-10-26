@@ -1,5 +1,5 @@
-import { Value, Payload, Ids, JSONText } from "../core/helpers.js";
-import { ChatImageInliner, type ImageFetch } from "../core/images.js";
+import { Value, Payload, Ids, JSONText } from "@opendum/providers/core/helpers";
+import { ChatImageInliner, type ImageFetch } from "@opendum/providers/core/images";
 
 type Json = Record<string, unknown>;
 

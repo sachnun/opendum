@@ -7,25 +7,25 @@ import {
   versionKey,
   type OpendumRedis,
 } from "@opendum/core/redis";
-import { Policy } from "./policy.js";
-import { Cache } from "./cache.js";
-import { Keys } from "./keys.js";
-import { Availability } from "./availability.js";
-import { CustomModels } from "./custom-models.js";
-import { disabled } from "./results.js";
+import { Policy } from "@opendum/auth/policy";
+import { Cache } from "@opendum/auth/cache";
+import { Keys } from "@opendum/auth/keys";
+import { Availability } from "@opendum/auth/availability";
+import { CustomModels } from "@opendum/auth/custom-models";
+import { disabled } from "@opendum/auth/results";
 import {
   listed,
   accessMode,
   modelList,
   parseModel,
-} from "./normalize.js";
-import { type CustomProviderReader, customStore } from "./store/custom.js";
+} from "@opendum/auth/normalize";
+import { type CustomProviderReader, customStore } from "@opendum/auth/store/custom";
 import {
   type AccountModelAvailability,
   type AuthResult,
   type ModelAccess,
   type ModelValidationResult,
-} from "./types.js";
+} from "@opendum/auth/types";
 
 const VERSION_TTL = 30 * 24 * 60 * 60;
 const BUMP_TTL = 15;
@@ -180,4 +180,4 @@ export class AuthService {
   }
 }
 
-export { isAuthless, authlessAccount } from "./authless.js";
+export { isAuthless, authlessAccount } from "@opendum/auth/authless";

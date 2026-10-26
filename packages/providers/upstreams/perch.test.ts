@@ -1,11 +1,11 @@
 import { describe, expect, it } from "bun:test";
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
-import { PERCH_APP_URL, PERCH_CONFIG_PATH } from "../endpoints.js";
-import type { UpstreamTransport } from "../core/http.js";
-import type { ProviderAccount } from "../types.js";
-import { PerchProvider } from "./perch/index.js";
-import { PerchCompletion } from "./perch/stream.js";
+import { PERCH_APP_URL, PERCH_CONFIG_PATH } from "@opendum/providers/endpoints";
+import type { UpstreamTransport } from "@opendum/providers/core/http";
+import type { ProviderAccount } from "@opendum/providers/types";
+import { PerchProvider } from "@opendum/providers/upstreams/perch/index";
+import { PerchCompletion } from "@opendum/providers/upstreams/perch/stream";
 
 const account = { id: "acc-1" } as unknown as ProviderAccount;
 const SUPABASE_URL = "https://perch-supabase.test";

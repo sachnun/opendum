@@ -1,9 +1,9 @@
 import { Effect } from "effect";
 import type { DatabaseFailure } from "@opendum/database";
 import type { Registry } from "@opendum/models/runtime";
-import { invalid, valid } from "./results.js";
-import type { ModelRecord, CustomProviderReader } from "./store/custom.js";
-import type { ModelValidationResult } from "./types.js";
+import { invalid, valid } from "@opendum/auth/results";
+import type { ModelRecord, CustomProviderReader } from "@opendum/auth/store/custom";
+import type { ModelValidationResult } from "@opendum/auth/types";
 
 export class CustomModels {
   constructor(

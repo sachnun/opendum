@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from "bun:test";
-import { UnroxyEgress } from "./unroxy.js";
+import { UnroxyEgress } from "@opendum/core/egress/unroxy";
 
 const encoder = new TextEncoder();
 

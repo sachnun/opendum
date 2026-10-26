@@ -1,7 +1,7 @@
 import { Result } from "effect";
-import { Coerce, Safe } from "./helpers.js";
-import { SseScanner } from "./sse.js";
-import type { UsageCounts } from "./types.js";
+import { Coerce, Safe } from "@opendum/api/core/helpers";
+import { SseScanner } from "@opendum/api/core/sse";
+import type { UsageCounts } from "@opendum/api/core/types";
 
 type Json = Record<string, unknown>;
 

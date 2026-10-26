@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { decrypt, encrypt, hashString } from "./cryptojs.js";
+import { decrypt, encrypt, hashString } from "@opendum/core/crypto/cryptojs";
 
 describe("cryptojs", () => {
   const secret = "test-secret";

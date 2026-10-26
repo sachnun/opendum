@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import { quotaPayload } from "./fetchers/shared.js";
+import { quotaPayload } from "@opendum/providers/quota/fetchers/shared";
 import {
   baseInfo,
   clampFraction,
@@ -11,8 +11,8 @@ import {
   parseNumber,
   parseRecord,
   isoOf,
-} from "./helpers.js";
-import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay } from "./types.js";
+} from "@opendum/providers/quota/helpers";
+import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay } from "@opendum/providers/quota/types";
 
 type Json = Record<string, unknown>;
 

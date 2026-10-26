@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { ProviderRegistry } from "./registry.js";
+import { ProviderRegistry } from "@opendum/providers/registry";
 import type { Registry } from "@opendum/models/runtime";
 
 const EXPECTED = [

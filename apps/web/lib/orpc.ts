@@ -2,7 +2,7 @@ import type { ApiContractClient } from "@opendum/providers/contract";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 
-import { accessToken } from "./auth-token";
+import { accessToken } from "~~/lib/auth-token";
 
 export interface ClientOptions {
   baseUrl: string;

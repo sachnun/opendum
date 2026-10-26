@@ -2,8 +2,8 @@ import { Effect } from "effect";
 import { db, providerAccount, proxyApiKey, usageLog } from "@opendum/database";
 import { and, eq, gte, lte, sql } from "drizzle-orm";
 
-import { fromPromise } from "#web/lib/task.js";
-import { internal } from "#web/errors.js";
+import { fromPromise } from "@opendum/api/web/lib/task";
+import { internal } from "@opendum/api/web/errors";
 
 import type { AnalyticsDataInput, AnalyticsFilterInput, AnalyticsPeriod, AnalyticsSeriesInput, AnalyticsUsageInput } from "@opendum/providers/contract";
 

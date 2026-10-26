@@ -1,5 +1,5 @@
 import { describe, expect, it, mock } from "bun:test";
-import type { Database } from "./client.js";
+import type { Database } from "@opendum/database/client";
 
 const noop = () => mock(async () => undefined);
 

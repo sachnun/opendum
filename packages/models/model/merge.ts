@@ -1,4 +1,4 @@
-import type { ModelData, ProviderModelConfig } from "../types.ts";
+import type { ModelData, ProviderModelConfig } from "@opendum/models/types";
 
 export const GENERATED_FIELDS: ReadonlySet<string> = new Set([
   "id",

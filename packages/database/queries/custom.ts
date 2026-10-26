@@ -1,8 +1,8 @@
 import { and, asc, eq } from "drizzle-orm";
 import { Effect } from "effect";
-import { db, type DbExecutor } from "../client.js";
-import { tryDb } from "../errors.js";
-import { customProvider, customProviderModel } from "../schema/custom.js";
+import { db, type DbExecutor } from "@opendum/database/client";
+import { tryDb } from "@opendum/database/errors";
+import { customProvider, customProviderModel } from "@opendum/database/schema/custom";
 
 export const listCustomProviders = Effect.fn("db.listCustomProviders")(function* (
   userId: string,

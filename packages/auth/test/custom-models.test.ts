@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
-import { CustomModels } from "../custom-models.js";
-import type { ModelRecord, CustomProviderReader } from "../store/custom.js";
+import { CustomModels } from "@opendum/auth/custom-models";
+import type { ModelRecord, CustomProviderReader } from "@opendum/auth/store/custom";
 
 function modelRecord(overrides: Partial<ModelRecord> & { modelId: string }): ModelRecord {
   return {

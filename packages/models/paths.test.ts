@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { basename, dirname, extname, fileUrl, join, moduleDir, relative, resolve, sep } from "./paths.ts";
+import { basename, dirname, extname, fileUrl, join, moduleDir, relative, resolve, sep } from "@opendum/models/paths";
 
 describe("posix path helpers", () => {
   test("join matches node:path semantics", () => {

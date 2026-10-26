@@ -3,8 +3,8 @@ import type {
   ProviderAccountCounts,
   ProviderAccountIndicator,
   ProviderAccountIndicators,
-} from "./navigation";
-import type { AccountOverviewData, AccountPingData } from "./api-types";
+} from "~~/lib/navigation";
+import type { AccountOverviewData, AccountPingData } from "~~/lib/api-types";
 import { NAV_ITEMS, categorize } from "@opendum/models/ranking";
 import { PROVIDER_ACCOUNT_DEFINITIONS } from "@opendum/providers/provider-accounts";
 

@@ -2,8 +2,8 @@ import { Effect } from "effect";
 import { and, eq, inArray, isNull, lte, or } from "drizzle-orm";
 
 import { db, customProvider, customProviderModel, providerAccount } from "@opendum/database";
-import { fromPromise } from "../task.js";
-import { supportsModel, aliasOf } from "./models.js";
+import { fromPromise } from "@opendum/api/web/lib/task";
+import { supportsModel, aliasOf } from "@opendum/api/web/lib/proxy/models";
 
 export interface CustomProviderModels {
   slug: string;

@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 
-import { SORT_ORDER } from "./ranking.ts";
-import { compareEntries, compareIds } from "./sort.ts";
+import { SORT_ORDER } from "@opendum/models/ranking";
+import { compareEntries, compareIds } from "@opendum/models/sort";
 
 const FEATURED_FAMILIES = SORT_ORDER.filter((family) => family !== "Others");
 const TOP_FAMILY = FEATURED_FAMILIES[0]!;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { percentRemaining } from "./quota-display";
+import { percentRemaining } from "~~/lib/quota-display";
 
 describe("quota display helpers", () => {
   it("clamps the remaining percentage", () => {

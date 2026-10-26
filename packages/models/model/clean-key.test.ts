@@ -6,7 +6,7 @@ import {
   aliasesOf,
   largestSize,
   PARAMETER_INFO_PATTERNS,
-} from "./clean-key.ts";
+} from "@opendum/models/model/clean-key";
 
 test("stripParams preserves empty input", () => {
   expect(stripParams("")).toBe("");

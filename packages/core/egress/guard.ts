@@ -6,7 +6,7 @@ import {
   fetch as undiciFetch,
   type RequestInit as UndiciRequestInit,
 } from "undici/index.js";
-import { PrivateHostError, isPrivate } from "./ssrf.js";
+import { PrivateHostError, isPrivate } from "@opendum/core/egress/ssrf";
 
 export type GuardedFetchOptions = {
   headersTimeout?: number;

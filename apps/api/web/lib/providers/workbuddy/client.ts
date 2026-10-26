@@ -1,8 +1,8 @@
 import { Effect } from "effect";
-import { fetchExternalEffect } from "#web/lib/external.js";
-import { unavailable } from "#web/errors.js";
-import { failedResult, pendingResult, ProviderResponse } from "../provider-response.js";
-import type { OAuthResult } from "../types.js";
+import { fetchExternalEffect } from "@opendum/api/web/lib/external";
+import { unavailable } from "@opendum/api/web/errors";
+import { failedResult, pendingResult, ProviderResponse } from "@opendum/api/web/lib/providers/provider-response";
+import type { OAuthResult } from "@opendum/api/web/lib/providers/types";
 import {
   ACCOUNTS_PATH,
   AUTH_STATE_PATH,
@@ -15,7 +15,7 @@ import {
   WORKBUDDY_BASE_URL,
   WORKBUDDY_DOMAIN,
   WORKBUDDY_PLATFORM,
-} from "./constants.js";
+} from "@opendum/api/web/lib/providers/workbuddy/constants";
 
 interface WorkbuddyStateResponse {
   code?: number;

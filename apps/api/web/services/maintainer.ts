@@ -2,9 +2,9 @@ import { Effect } from "effect";
 import { and, asc, eq, ilike, inArray, ne, or, sql } from "drizzle-orm";
 
 import { db, providerAccount, proxyApiKey, user } from "@opendum/database";
-import { fromPromise } from "#web/lib/task.js";
-import { PROVIDER_ACCOUNT_KEYS } from "./account-providers.js";
-import { indicatorOf } from "./account-stats.js";
+import { fromPromise } from "@opendum/api/web/lib/task";
+import { PROVIDER_ACCOUNT_KEYS } from "@opendum/api/web/services/account-providers";
+import { indicatorOf } from "@opendum/api/web/services/account-stats";
 
 interface UserSearchInput {
   q?: string;

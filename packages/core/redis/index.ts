@@ -1,4 +1,4 @@
-export { acquireRedis, closeRedis, openRedis } from "./client.js";
-export type { OpendumRedis } from "./client.js";
-export * from "./keys.js";
-export { AccountAffinity, OWN_ACCOUNT_SCOPE, SHARED_ACCOUNT_SCOPE, preferSticky } from "./account-affinity.js";
+export { acquireRedis, closeRedis, openRedis } from "@opendum/core/redis/client";
+export type { OpendumRedis } from "@opendum/core/redis/client";
+export * from "@opendum/core/redis/keys";
+export { AccountAffinity, OWN_ACCOUNT_SCOPE, SHARED_ACCOUNT_SCOPE, preferSticky } from "@opendum/core/redis/account-affinity";

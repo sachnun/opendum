@@ -2,8 +2,8 @@ import { mkdir as fsMkdir, rename as fsRename } from "node:fs/promises";
 
 import { Effect } from "effect";
 
-import { ModelParseFailure, ModelReadFailure, ModelWriteFailure, asError } from "./errors.ts";
-import { dirname } from "./paths.ts";
+import { ModelParseFailure, ModelReadFailure, ModelWriteFailure, asError } from "@opendum/models/errors";
+import { dirname } from "@opendum/models/paths";
 
 const decoder = new TextDecoder();
 const encoder = new TextEncoder();

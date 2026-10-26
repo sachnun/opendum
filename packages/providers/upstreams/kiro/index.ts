@@ -1,9 +1,9 @@
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
-import { Value, Ids, Responses } from "../../core/helpers.js";
-import { RequestFailure, type UpstreamTransport } from "../../core/http.js";
-import { OAuthBase } from "../../core/oauth.js";
-import { KIRO_REFRESH_ENDPOINT } from "../../endpoints.js";
+import { Value, Ids, Responses } from "@opendum/providers/core/helpers";
+import { RequestFailure, type UpstreamTransport } from "@opendum/providers/core/http";
+import { OAuthBase } from "@opendum/providers/core/oauth";
+import { KIRO_REFRESH_ENDPOINT } from "@opendum/providers/endpoints";
 import {
   BracketCalls,
   KiroAccount,
@@ -14,8 +14,8 @@ import {
   KiroUsage,
   Parser,
   type Json,
-} from "./transform.js";
-import type { Provider, ProviderFailure, ProviderRequest } from "../../types.js";
+} from "@opendum/providers/upstreams/kiro/transform";
+import type { Provider, ProviderFailure, ProviderRequest } from "@opendum/providers/types";
 
 const REFRESH_BUFFER_MS = 5 * 60 * 1000;
 

@@ -1,7 +1,7 @@
 import { Effect } from "effect";
-import { tryAsync } from "../best-effort.js";
-import { assertPublic } from "./ssrf.js";
-import { guardedFetch, type Fetch, type FetchHandle, type GuardedFetchOptions } from "./guard.js";
+import { tryAsync } from "@opendum/core/best-effort";
+import { assertPublic } from "@opendum/core/egress/ssrf";
+import { guardedFetch, type Fetch, type FetchHandle, type GuardedFetchOptions } from "@opendum/core/egress/guard";
 
 export const MAX_REDIRECTS = 10;
 

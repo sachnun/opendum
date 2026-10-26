@@ -7,9 +7,9 @@ import {
   ModelsDirectoryFailure,
   asError,
   failureMessage,
-} from "./errors.ts";
-import { tryLoad } from "./registry.ts";
-import { tryRead } from "./model-store.ts";
+} from "@opendum/models/errors";
+import { tryLoad } from "@opendum/models/registry";
+import { tryRead } from "@opendum/models/model-store";
 
 function failureOf<E>(exit: Exit.Exit<unknown, E>): E {
   const option = Exit.findErrorOption(exit);

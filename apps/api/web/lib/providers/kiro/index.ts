@@ -2,5 +2,5 @@ export {
   kiroProvider,
   codeVerifier,
   authUrl,
-} from "./client.js";
-export * from "./constants.js";
+} from "@opendum/api/web/lib/providers/kiro/client";
+export * from "@opendum/api/web/lib/providers/kiro/constants";

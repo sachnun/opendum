@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { FAMILY_RULES, familyOf, folderOf } from "./families.ts";
+import { FAMILY_RULES, familyOf, folderOf } from "@opendum/models/model/families";
 
 test("folderOf maps mocked prefix names to rule folders", () => {
   const cases: Array<[string, string]> = [

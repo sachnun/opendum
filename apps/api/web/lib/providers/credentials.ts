@@ -2,8 +2,8 @@ import { eq } from "drizzle-orm";
 import { Effect } from "effect";
 
 import { db, providerAccount, type ProviderAccount } from "@opendum/database";
-import { decrypt, encrypt } from "#web/lib/encryption.js";
-import { fromPromise } from "#web/lib/task.js";
+import { decrypt, encrypt } from "@opendum/api/web/lib/encryption";
+import { fromPromise } from "@opendum/api/web/lib/task";
 
 export type CredentialAccount = Pick<
   ProviderAccount,

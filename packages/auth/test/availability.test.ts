@@ -2,9 +2,9 @@ import { describe, expect, it } from "bun:test";
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
 import type { OpendumRedis } from "@opendum/core/redis";
-import { Policy } from "../policy.js";
-import { Availability, type Queries } from "../availability.js";
-import type { CustomModels } from "../custom-models.js";
+import { Policy } from "@opendum/auth/policy";
+import { Availability, type Queries } from "@opendum/auth/availability";
+import type { CustomModels } from "@opendum/auth/custom-models";
 
 type Options = {
   aliases?: Record<string, string>;

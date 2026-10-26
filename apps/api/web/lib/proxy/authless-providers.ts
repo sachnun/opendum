@@ -1,4 +1,4 @@
-import { authlessModels } from "./models.js";
+import { authlessModels } from "@opendum/api/web/lib/proxy/models";
 
 export const AUTHLESS_PROVIDER_KEYS = ["opencode"] as const;
 

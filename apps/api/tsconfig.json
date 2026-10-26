@@ -1,13 +1,24 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "lib": ["ESNext", "DOM"],
-    "types": ["node", "bun"],
-    "allowImportingTsExtensions": true,
-    "resolveJsonModule": true,
-    "paths": {
-      "#web/*": ["./web/*"]
-    }
+    "lib": [
+      "ESNext",
+      "DOM"
+    ],
+    "types": [
+      "node",
+      "bun"
+    ],
+    "resolveJsonModule": true
   },
-  "include": ["core/**/*", "handlers/**/*", "plugins/**/*", "routes/**/*", "test/**/*", "web/**/*", "*.ts", "nitro.config.ts"]
+  "include": [
+    "core/**/*",
+    "handlers/**/*",
+    "plugins/**/*",
+    "routes/**/*",
+    "test/**/*",
+    "web/**/*",
+    "*.ts",
+    "nitro.config.ts"
+  ]
 }

@@ -1,4 +1,4 @@
-import type { ModelInfo, ProviderAccessRule, ProviderModelConfig } from "./registry.ts";
+import type { ModelInfo, ProviderAccessRule, ProviderModelConfig } from "@opendum/models/registry";
 
 export type Catalog = {
   info(model: string): ModelInfo | null;

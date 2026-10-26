@@ -1,8 +1,8 @@
 import { Effect } from "effect";
-import { fetchExternalEffect } from "#web/lib/external.js";
-import { unavailable } from "#web/errors.js";
-import { failedResult, pendingResult, ProviderResponse } from "../provider-response.js";
-import type { OAuthResult } from "../types.js";
+import { fetchExternalEffect } from "@opendum/api/web/lib/external";
+import { unavailable } from "@opendum/api/web/errors";
+import { failedResult, pendingResult, ProviderResponse } from "@opendum/api/web/lib/providers/provider-response";
+import type { OAuthResult } from "@opendum/api/web/lib/providers/types";
 import {
   ACCESS_TTL,
   CLIENT_ID,
@@ -13,7 +13,7 @@ import {
   DEVICE_EXPIRY,
   POLLING_INTERVAL_SECONDS,
   WORKOS_BASE_URL,
-} from "./constants.js";
+} from "@opendum/api/web/lib/providers/cline/constants";
 
 interface CodeResponse {
   device_code?: string;

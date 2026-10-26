@@ -7,13 +7,13 @@ import {
   aaScore,
   tryDecode,
   type AaEntry,
-} from "#models/sync/aa.ts";
-import { modelProbes } from "#models/model/probes.ts";
-import { fetchBytes, fetchText, orThrow } from "#models/sync/http.ts";
-import { buildIndex, generatedPath, read, writeGenerated } from "#models/model-store.ts";
-import { exists, readText } from "#models/fs.ts";
-import { dataDir } from "./shared.ts";
-import type { ModelData } from "#models/types.ts";
+} from "@opendum/models/sync/aa";
+import { modelProbes } from "@opendum/models/model/probes";
+import { fetchBytes, fetchText, orThrow } from "@opendum/models/sync/http";
+import { buildIndex, generatedPath, read, writeGenerated } from "@opendum/models/model-store";
+import { exists, readText } from "@opendum/models/fs";
+import { dataDir } from "@opendum/models/refresh/core/env";
+import type { ModelData } from "@opendum/models/types";
 
 const LEADERBOARD_URL = "https://artificialanalysis.ai/leaderboards/models";
 const USER_AGENT = "Mozilla/5.0 (compatible; opendum-model-sync)";

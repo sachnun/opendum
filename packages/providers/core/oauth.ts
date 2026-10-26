@@ -1,7 +1,7 @@
 import { Effect } from "effect";
-import type { ProviderAccount, RefreshedCredentials } from "../types.js";
-import { ProviderCredentialFailure, asError } from "./errors.js";
-import type { UpstreamTransport } from "./http.js";
+import type { ProviderAccount, RefreshedCredentials } from "@opendum/providers/types";
+import { ProviderCredentialFailure, asError } from "@opendum/providers/core/errors";
+import type { UpstreamTransport } from "@opendum/providers/core/http";
 
 export type Spec = {
   provider: string;

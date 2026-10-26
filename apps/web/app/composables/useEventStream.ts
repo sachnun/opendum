@@ -2,9 +2,9 @@ import type { AccountsData, LiveTopic, ModelsData, ServerEvent, UsageData } from
 import { consumeEventIterator } from "@orpc/client";
 import { Duration, Effect, Match, Schedule } from "effect";
 
-import { apiUrl } from "../../lib/api-url";
-import { apiClient } from "../../lib/orpc";
-import { liveEventKey } from "./useLiveEvent";
+import { apiUrl } from "~~/lib/api-url";
+import { apiClient } from "~~/lib/orpc";
+import { liveEventKey } from "~/composables/useLiveEvent";
 
 const SUBSCRIBED_TOPICS: LiveTopic[] = ["points", "accounts", "models", "usage"];
 const IDLE_TIMEOUT_MS = 45_000;

@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import type { ActionResult, CustomListItem, CustomModelRow, ErrorHistoryResult, AccountUpdateData, ProviderDetailData, ProviderStats, QuotaGroupDisplay, QuotaProviderKey } from "../../lib/api-types";
+import type { ActionResult, CustomListItem, CustomModelRow, ErrorHistoryResult, AccountUpdateData, ProviderDetailData, ProviderStats, QuotaGroupDisplay, QuotaProviderKey } from "~~/lib/api-types";
 import type { AccountsData, UsageData } from "@opendum/providers/contract";
 import { BY_KEY, providerOf, QUOTA_PROVIDER_KEYS, type ProviderAccountKey } from "@opendum/providers/provider-accounts";
-import { COMMON_HEADER_NAMES } from "../../lib/headers";
-import { messageOf } from "../../lib/utils";
+import { COMMON_HEADER_NAMES } from "~~/lib/headers";
+import { messageOf } from "~~/lib/utils";
 
 definePageMeta({
   middleware: ["provider", "auth"],

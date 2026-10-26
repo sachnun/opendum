@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { fetchExternal } from "../web/lib/external.js";
+import { fetchExternal } from "@opendum/api/web/lib/external";
 
 describe("external fetch", () => {
   it("rejects non https targets", async () => {

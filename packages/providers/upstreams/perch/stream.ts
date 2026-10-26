@@ -1,6 +1,6 @@
-import { Ids, Value } from "../../core/helpers.js";
-import { Collector } from "../../transform/collector.js";
-import { PerchUsage, UpstreamError, type Json } from "./auth.js";
+import { Ids, Value } from "@opendum/providers/core/helpers";
+import { Collector } from "@opendum/providers/transform/collector";
+import { PerchUsage, UpstreamError, type Json } from "@opendum/providers/upstreams/perch/auth";
 
 export class PerchToolCalls {
   static fromEvent(event: Json): unknown[] {

@@ -1,5 +1,5 @@
-import { uniqueSorted } from "./collections.ts";
-import type { ModelInfo } from "./registry.ts";
+import { uniqueSorted } from "@opendum/models/collections";
+import type { ModelInfo } from "@opendum/models/registry";
 
 export type Source = {
   canonical(model: string): string;

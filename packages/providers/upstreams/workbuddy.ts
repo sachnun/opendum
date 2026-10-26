@@ -1,13 +1,13 @@
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
-import { Value, Payload, Ids, Responses, JSONText } from "../core/helpers.js";
-import { ModelName } from "../core/identity.js";
-import { RequestFailure, type UpstreamTransport } from "../core/http.js";
-import { OAuthBase } from "../core/oauth.js";
-import { Collector } from "../transform/collector.js";
-import type { Provider, ProviderFailure, ProviderRequest } from "../types.js";
+import { Value, Payload, Ids, Responses, JSONText } from "@opendum/providers/core/helpers";
+import { ModelName } from "@opendum/providers/core/identity";
+import { RequestFailure, type UpstreamTransport } from "@opendum/providers/core/http";
+import { OAuthBase } from "@opendum/providers/core/oauth";
+import { Collector } from "@opendum/providers/transform/collector";
+import type { Provider, ProviderFailure, ProviderRequest } from "@opendum/providers/types";
 
-import { WORKBUDDY_BASE_URL, WORKBUDDY_DOMAIN } from "../endpoints.js";
+import { WORKBUDDY_BASE_URL, WORKBUDDY_DOMAIN } from "@opendum/providers/endpoints";
 
 const WORKBUDDY_API_BASE = WORKBUDDY_BASE_URL;
 const WORKBUDDY_CHAT_PATH = "/v2/chat/completions";

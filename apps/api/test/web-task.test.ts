@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import { Effect, Exit } from "effect";
 
-import { ServiceFailure, asFailure, badRequest, forbidden, internal, notFound, unauthorized, unavailable } from "#web/errors.js";
-import { fromPromise, fromSync, toResult, toVoid, withContext } from "#web/lib/task.js";
+import { ServiceFailure, asFailure, badRequest, forbidden, internal, notFound, unauthorized, unavailable } from "@opendum/api/web/errors";
+import { fromPromise, fromSync, toResult, toVoid, withContext } from "@opendum/api/web/lib/task";
 
 describe("web errors", () => {
   it("maps status codes to tagged failures", () => {

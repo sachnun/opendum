@@ -9,8 +9,8 @@ import {
   setImpersonation,
   type AccessTokenClaims,
   type AuthUser,
-} from "../../lib/auth-token";
-import { apiUrl } from "../../lib/api-url";
+} from "~~/lib/auth-token";
+import { apiUrl } from "~~/lib/api-url";
 
 function sanitizeRedirect(value: string | undefined): string | null {
   if (!value || !value.startsWith("/") || value.startsWith("//")) return null;

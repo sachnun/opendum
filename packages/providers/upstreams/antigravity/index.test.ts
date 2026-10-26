@@ -1,10 +1,10 @@
 import { describe, expect, it } from "bun:test";
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
-import { ANTIGRAVITY_TOKEN_ENDPOINT } from "../../endpoints.js";
-import type { UpstreamTransport } from "../../core/http.js";
-import type { ProviderAccount } from "../../types.js";
-import { AntigravityProvider } from "./index.js";
+import { ANTIGRAVITY_TOKEN_ENDPOINT } from "@opendum/providers/endpoints";
+import type { UpstreamTransport } from "@opendum/providers/core/http";
+import type { ProviderAccount } from "@opendum/providers/types";
+import { AntigravityProvider } from "@opendum/providers/upstreams/antigravity/index";
 
 const account = { id: "acc-1" } as unknown as ProviderAccount;
 const USERINFO_ENDPOINT = "https://www.googleapis.com/oauth2/v2/userinfo";

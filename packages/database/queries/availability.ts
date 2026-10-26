@@ -1,10 +1,10 @@
 import { and, eq, inArray, isNull, lte, ne, or } from "drizzle-orm";
 import { Effect } from "effect";
-import { db, type DbExecutor } from "../client.js";
-import { tryDb } from "../errors.js";
-import { providerAccount, accountDisabledModel } from "../schema/accounts.js";
-import { disabledModel } from "../schema/keys.js";
-import { userSharingSetting } from "../schema/usage.js";
+import { db, type DbExecutor } from "@opendum/database/client";
+import { tryDb } from "@opendum/database/errors";
+import { providerAccount, accountDisabledModel } from "@opendum/database/schema/accounts";
+import { disabledModel } from "@opendum/database/schema/keys";
+import { userSharingSetting } from "@opendum/database/schema/usage";
 
 export const disabledByUser = Effect.fn("db.disabledByUser")(function* (
   userId: string,

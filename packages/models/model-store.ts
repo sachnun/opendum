@@ -1,9 +1,9 @@
 import { Effect } from "effect";
 
-import { aliasesOf, isDate } from "./model/clean-key.ts";
-import { folderOf } from "./model/families.ts";
-import { mergeData, splitData } from "./model/merge.ts";
-import { ModelParseFailure, ModelWriteFailure, asError } from "./errors.ts";
+import { aliasesOf, isDate } from "@opendum/models/model/clean-key";
+import { folderOf } from "@opendum/models/model/families";
+import { mergeData, splitData } from "@opendum/models/model/merge";
+import { ModelParseFailure, ModelWriteFailure, asError } from "@opendum/models/errors";
 import {
   exists,
   listJson,
@@ -11,9 +11,9 @@ import {
   tryRemove,
   tryRename,
   saveText,
-} from "./fs.ts";
-import { basename, dirname, join, relative, sep } from "./paths.ts";
-import type { JsonValue, ModelData, ModelIndex, ModelIndexEntry } from "./types.ts";
+} from "@opendum/models/fs";
+import { basename, dirname, join, relative, sep } from "@opendum/models/paths";
+import type { JsonValue, ModelData, ModelIndex, ModelIndexEntry } from "@opendum/models/types";
 
 const MODEL_EXT = ".json";
 
@@ -361,6 +361,7 @@ export function prune(modelsDir: string): Promise<string[]> {
 export interface Options {
   providerConfig?: Map<string, Record<string, JsonValue>>;
   managedProviderConfigKeys?: string[];
+  dryRun?: boolean;
 }
 
 export interface Result {
@@ -380,6 +381,13 @@ export async function sync(
   const added: string[] = [];
   const removed: string[] = [];
   const updated: string[] = [];
+  const persistIf = async (
+    entry: Pick<ModelIndexEntry, "modelsDir" | "relativeId">,
+    data: ModelData,
+  ): Promise<void> => {
+    if (options.dryRun === true) return;
+    await persist(entry, data);
+  };
 
   function extraConfig(modelKey: string): Record<string, JsonValue> {
     return options.providerConfig?.get(modelKey) ?? {};
@@ -433,7 +441,7 @@ export async function sync(
     }
     if (changed) {
       parent.entry.data.aliases = [...existingAliases].sort();
-      await persist(parent.entry, parent.entry.data);
+      await persistIf(parent.entry, parent.entry.data);
       updated.push(parent.baseKey);
     }
     modelMap.delete(modelKey);
@@ -494,7 +502,7 @@ export async function sync(
       }
     }
 
-    await persist(entry, entry.data);
+    await persistIf(entry, entry.data);
     removed.push(modelId);
   }
 
@@ -536,7 +544,7 @@ export async function sync(
       }
 
       if (changed) {
-        await persist(existing, existing.data);
+        await persistIf(existing, existing.data);
         updated.push(modelKey);
       }
     } else {
@@ -582,7 +590,7 @@ export async function sync(
         }
 
         if (touched) {
-          await persist({ modelsDir, relativeId }, existing);
+          await persistIf({ modelsDir, relativeId }, existing);
           updated.push(modelKey);
         }
         continue;
@@ -602,7 +610,7 @@ export async function sync(
         };
       }
 
-      await persist({ modelsDir, relativeId }, data);
+      await persistIf({ modelsDir, relativeId }, data);
       added.push(modelKey);
     }
   }

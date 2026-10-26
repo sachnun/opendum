@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { Effect } from "effect";
 
-import { ScraperFailure, orderScripts, runSteps } from "./refresh.ts";
+import { ScraperFailure, orderScripts, runSteps } from "@opendum/models/refresh";
 
 describe("refresh orchestration", () => {
   test("orders provider scrapers before the metadata tail", () => {

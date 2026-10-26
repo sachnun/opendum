@@ -1,5 +1,5 @@
 import type { ComputedRef } from "vue";
-import type { AccountQuotaInfo, ProviderDetailData, QuotaProviderKey } from "../../lib/api-types";
+import type { AccountQuotaInfo, ProviderDetailData, QuotaProviderKey } from "~~/lib/api-types";
 
 type Account = ProviderDetailData["accounts"][number];
 

@@ -1,12 +1,12 @@
 import { Effect } from "effect";
 import type { AccountsData, LiveTopic, ModelsData, ProviderDetailPayload, UsageData } from "@opendum/providers/contract";
 
-import { statsByModel } from "#web/lib/model-stats.js";
-import { buildAccountStats } from "#web/services/account-stats.js";
-import { accountsDetailed, getAccountOverview, listAccounts } from "#web/services/accounts.js";
-import { familyCounts, listModels } from "#web/services/models.js";
-import { pointStatus } from "#web/services/points.js";
-import { configureSnapshots, type EventSnapshots } from "./bus.js";
+import { statsByModel } from "@opendum/api/web/lib/model-stats";
+import { buildAccountStats } from "@opendum/api/web/services/account-stats";
+import { accountsDetailed, getAccountOverview, listAccounts } from "@opendum/api/web/services/accounts";
+import { familyCounts, listModels } from "@opendum/api/web/services/models";
+import { pointStatus } from "@opendum/api/web/services/points";
+import { configureSnapshots, type EventSnapshots } from "@opendum/api/web/events/bus";
 
 const buildAccounts = Effect.fn("snapshots.buildAccounts")(function* (userId: string) {
   const overview = yield* getAccountOverview(userId, { autoPin: true });

@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import { encodeQuery } from "../cache.js";
+import { encodeQuery } from "@opendum/providers/quota/cache";
 import {
   baseInfo,
   clampFraction,
@@ -12,9 +12,9 @@ import {
   parseRecord,
   parseString,
   isoOf,
-} from "../helpers.js";
-import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay } from "../types.js";
-import { quotaPayload, type Json } from "./shared.js";
+} from "@opendum/providers/quota/helpers";
+import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay } from "@opendum/providers/quota/types";
+import { quotaPayload, type Json } from "@opendum/providers/quota/fetchers/shared";
 
 export function kiroQuota(
   ctx: QuotaContext,

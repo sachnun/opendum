@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import { putQuota } from "../cache.js";
+import { putQuota } from "@opendum/providers/quota/cache";
 import {
   baseInfo,
   clampFraction,
@@ -12,9 +12,9 @@ import {
   parseNumber,
   parseRecord,
   parseString,
-} from "../helpers.js";
-import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay } from "../types.js";
-import { QuotaJson, quotaAttempt, quotaPayload, type Json } from "./shared.js";
+} from "@opendum/providers/quota/helpers";
+import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay } from "@opendum/providers/quota/types";
+import { QuotaJson, quotaAttempt, quotaPayload, type Json } from "@opendum/providers/quota/fetchers/shared";
 
 const WORKBUDDY_SUMMARY_URL = "https://www.workbuddy.ai/billing/meter/get-user-resource-summary";
 const WORKBUDDY_FREE_URL = "https://www.workbuddy.ai/billing/meter/get-user-resource-free-packages";

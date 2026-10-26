@@ -8,7 +8,7 @@ import {
   resolveCanonical,
   resolveFrom,
   type CanonicalSources,
-} from "./canonical.ts";
+} from "@opendum/models/model/canonical";
 
 function sources(): CanonicalSources {
   return {

@@ -6,10 +6,10 @@ export {
   hashString,
   pkcs7Pad,
   pkcs7Unpad,
-} from "./cryptojs.js";
+} from "@opendum/core/crypto/cryptojs";
 export {
   hmacHex,
   playgroundSignature,
   signaturesMatch,
   equalHex,
-} from "./signature.js";
+} from "@opendum/core/crypto/signature";

@@ -13,7 +13,7 @@ import {
   paidTier,
   maskText,
   type StatMetric,
-} from "./account-format";
+} from "~~/lib/account-format";
 
 describe("account format helpers", () => {
   it("formats durations and numbers", () => {

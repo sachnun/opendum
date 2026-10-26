@@ -1,17 +1,17 @@
 import type { Registry } from "@opendum/models/runtime";
 import type { OpendumRedis } from "@opendum/core/redis";
-import { Transport, type EgressFetch, type Logger } from "./core/http.js";
-import type { FallbackState } from "./core/fallback.js";
-import { CompatProvider, SUPPORTED_HARBOR, SUPPORTED_HYPER, SUPPORTED_KILO, SUPPORTED_NVIDIA, SUPPORTED_OPENROUTER, SUPPORTED_ZENMUX } from "./upstreams/openai-compatible.js";
-import { OpencodeProvider } from "./upstreams/opencode.js";
-import { ClineProvider } from "./upstreams/cline.js";
-import { WorkbuddyProvider } from "./upstreams/workbuddy.js";
-import { PerchProvider } from "./upstreams/perch/index.js";
-import { CodexProvider } from "./upstreams/codex.js";
-import { KiroProvider } from "./upstreams/kiro/index.js";
-import { AntigravityProvider } from "./upstreams/antigravity/index.js";
-import { WorkersAiProvider } from "./upstreams/workers-ai.js";
-import type { AuthlessProvider, CredentialRefresher, Provider } from "./types.js";
+import { Transport, type EgressFetch, type Logger } from "@opendum/providers/core/http";
+import type { FallbackState } from "@opendum/providers/core/fallback";
+import { CompatProvider, SUPPORTED_HARBOR, SUPPORTED_HYPER, SUPPORTED_KILO, SUPPORTED_NVIDIA, SUPPORTED_OPENROUTER, SUPPORTED_ZENMUX } from "@opendum/providers/upstreams/openai-compatible";
+import { OpencodeProvider } from "@opendum/providers/upstreams/opencode";
+import { ClineProvider } from "@opendum/providers/upstreams/cline";
+import { WorkbuddyProvider } from "@opendum/providers/upstreams/workbuddy";
+import { PerchProvider } from "@opendum/providers/upstreams/perch/index";
+import { CodexProvider } from "@opendum/providers/upstreams/codex";
+import { KiroProvider } from "@opendum/providers/upstreams/kiro/index";
+import { AntigravityProvider } from "@opendum/providers/upstreams/antigravity/index";
+import { WorkersAiProvider } from "@opendum/providers/upstreams/workers-ai";
+import type { AuthlessProvider, CredentialRefresher, Provider } from "@opendum/providers/types";
 
 export type ProviderRegistryOptions = {
   models: Registry;

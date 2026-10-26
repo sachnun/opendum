@@ -1,7 +1,7 @@
 import { Effect, Schedule } from "effect";
 import type { DatabaseFailure } from "@opendum/database";
-import { refundRoamingPoint, type PointReservation } from "./points.js";
-import type { PointPort } from "./repositories.js";
+import { refundRoamingPoint, type PointReservation } from "@opendum/api/core/points";
+import type { PointPort } from "@opendum/api/core/repositories";
 
 export const ORPHAN_AGE_MS = 15 * 60 * 1000;
 export const ROAMING_RECONCILE_BATCH = 200;

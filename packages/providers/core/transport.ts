@@ -1,7 +1,7 @@
 import { Duration, Effect, Schedule } from "effect";
-import { FallbackPolicy, type FallbackState } from "./fallback.js";
-import { JSONPoster, RequestFailure, type EgressFetch, type FetchLike, type PostOptions } from "./request.js";
-import type { ProviderFallbackFailure, ProviderTransportFailure } from "./errors.js";
+import { FallbackPolicy, type FallbackState } from "@opendum/providers/core/fallback";
+import { JSONPoster, RequestFailure, type EgressFetch, type FetchLike, type PostOptions } from "@opendum/providers/core/request";
+import type { ProviderFallbackFailure, ProviderTransportFailure } from "@opendum/providers/core/errors";
 
 export type UpstreamTransport = {
   readonly direct: FetchLike;

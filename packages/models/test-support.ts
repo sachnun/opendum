@@ -2,8 +2,8 @@ import { mkdirSync, rmSync } from "node:fs";
 
 import { Effect } from "effect";
 
-import { listJson, readText, remove, writeText } from "./fs.ts";
-import { join } from "./paths.ts";
+import { listJson, readText, remove, writeText } from "@opendum/models/fs";
+import { join } from "@opendum/models/paths";
 
 export function tmpRoot(): string {
   return Bun.env["TMPDIR"] ?? Bun.env["TMP"] ?? Bun.env["TEMP"] ?? "/tmp";

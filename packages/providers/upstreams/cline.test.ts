@@ -1,10 +1,10 @@
 import { describe, expect, it } from "bun:test";
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
-import { CLINE_BASE_URL } from "../endpoints.js";
-import type { UpstreamTransport } from "../core/http.js";
-import type { ProviderAccount } from "../types.js";
-import { ClineProvider } from "./cline.js";
+import { CLINE_BASE_URL } from "@opendum/providers/endpoints";
+import type { UpstreamTransport } from "@opendum/providers/core/http";
+import type { ProviderAccount } from "@opendum/providers/types";
+import { ClineProvider } from "@opendum/providers/upstreams/cline";
 
 const account = { id: "acc-1" } as unknown as ProviderAccount;
 

@@ -1,7 +1,7 @@
 import type { Registry } from "@opendum/models/runtime";
-import { invalid, valid } from "./results.js";
-import { parseModel } from "./normalize.js";
-import type { AccountModelAvailability, ModelValidationResult } from "./types.js";
+import { invalid, valid } from "@opendum/auth/results";
+import { parseModel } from "@opendum/auth/normalize";
+import type { AccountModelAvailability, ModelValidationResult } from "@opendum/auth/types";
 
 export class Policy {
   constructor(private readonly registry: Registry) {}

@@ -2,9 +2,9 @@ import { Effect } from "effect";
 import { AuthService } from "@opendum/auth";
 import type { AccountModelAvailability } from "@opendum/auth";
 import type { OpendumRedis } from "@opendum/core/redis";
-import { getRedisClient } from "../redis.js";
-import { fromEffect, fromPromise } from "../task.js";
-import { registry } from "./models.js";
+import { getRedisClient } from "@opendum/api/web/lib/redis";
+import { fromEffect, fromPromise } from "@opendum/api/web/lib/task";
+import { registry } from "@opendum/api/web/lib/proxy/models";
 
 const VALIDATION_PREFIX = "opendum:api-key:validation";
 const LAST_USED_PREFIX = "opendum:api-key:last-used";

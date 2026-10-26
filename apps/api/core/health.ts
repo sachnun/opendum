@@ -1,18 +1,18 @@
 import { Effect } from "effect";
 import type { DatabaseFailure } from "@opendum/database";
-import type { HealthPort, AccountPort } from "./repositories.js";
+import type { HealthPort, AccountPort } from "@opendum/api/core/repositories";
 import type { OpendumRedis } from "@opendum/core/redis";
 import type { Registry } from "@opendum/models/runtime";
-import { upsertHistory } from "./error-history.js";
+import { upsertHistory } from "@opendum/api/core/error-history";
 import {
   recoveryCount,
   unhealthyCount,
   isSynthetic,
   healthStatus,
   successRecovery,
-} from "./service-helpers.js";
-import type { Failure } from "./types.js";
-import { trackWork } from "./pending.js";
+} from "@opendum/api/core/service-helpers";
+import type { Failure } from "@opendum/api/core/types";
+import { trackWork } from "@opendum/api/core/pending";
 
 export const MAX_ERROR_LEN = 10000;
 

@@ -1,9 +1,9 @@
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
-import { Value } from "../core/helpers.js";
-import { ChatImageInliner } from "../core/images.js";
-import { JSONPoster, RequestFailure, type UpstreamTransport } from "../core/http.js";
-import type { Provider, ProviderFailure, ProviderRequest } from "../types.js";
+import { Value } from "@opendum/providers/core/helpers";
+import { ChatImageInliner } from "@opendum/providers/core/images";
+import { JSONPoster, RequestFailure, type UpstreamTransport } from "@opendum/providers/core/http";
+import type { Provider, ProviderFailure, ProviderRequest } from "@opendum/providers/types";
 
 export const SUPPORTED_WORKERS_AI = new Set([
   "model", "messages", "audio", "temperature", "top_p", "max_tokens", "max_completion_tokens",

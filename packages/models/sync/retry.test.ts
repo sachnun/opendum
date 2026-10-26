@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import { Effect, Exit } from "effect";
 
-import { fetchDecoded, fetchJson, retryTransient, orThrow } from "./http.ts";
-import { ModelFetchFailure } from "../errors.ts";
+import { fetchDecoded, fetchJson, retryTransient, orThrow } from "@opendum/models/sync/http";
+import { ModelFetchFailure } from "@opendum/models/errors";
 
 type Stub = (url: string, init?: RequestInit) => Promise<Response>;
 

@@ -3,9 +3,9 @@ import { toExpJWT } from "better-auth/plugins";
 
 process.env.BETTER_AUTH_SECRET ??= "test-secret";
 
-const { ACCESS_TOKEN_TTL, roleOf } = await import("../web/auth.js");
-const { claimsOf, authUser } = await import("../web/lib/claims.js");
-const { handoffUrl, webOrigin, safePath, loginUrl } = await import("../web/lib/handoff.js");
+const { ACCESS_TOKEN_TTL, roleOf } = await import("@opendum/api/web/auth");
+const { claimsOf, authUser } = await import("@opendum/api/web/lib/claims");
+const { handoffUrl, webOrigin, safePath, loginUrl } = await import("@opendum/api/web/lib/handoff");
 
 describe("access token claims", () => {
   it("maps a jwt payload to user claims", () => {

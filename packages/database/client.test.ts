@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
 
-import * as relations from "./relations.js";
-import * as schema from "./schema/index.js";
+import * as relations from "@opendum/database/relations";
+import * as schema from "@opendum/database/schema/index";
 
 const UNREACHABLE_URL = "postgres://opendum:opendum@127.0.0.1:1/opendum?sslmode=require";
 

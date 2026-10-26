@@ -2,8 +2,8 @@ import { and, eq, inArray, ne, sql } from "drizzle-orm";
 
 import { Effect } from "effect";
 import { db, providerAccount, usageLog } from "@opendum/database";
-import { fromPromise } from "./task.js";
-import { MODEL_REGISTRY, aliasOf } from "./proxy/models.js";
+import { fromPromise } from "@opendum/api/web/lib/task";
+import { MODEL_REGISTRY, aliasOf } from "@opendum/api/web/lib/proxy/models";
 
 export const ROAMING_MINIMUM_POINTS = 1;
 

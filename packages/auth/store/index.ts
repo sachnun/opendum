@@ -1,1 +1,1 @@
-export * from "./custom.js";
+export * from "@opendum/auth/store/custom";

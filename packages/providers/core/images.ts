@@ -1,6 +1,6 @@
 import { lookup } from "node:dns/promises";
 import { isPrivate } from "@opendum/core/egress";
-import { Value, Payload } from "./helpers.js";
+import { Value, Payload } from "@opendum/providers/core/helpers";
 
 export type ImageFetch = (url: string, init?: RequestInit) => Promise<Response>;
 

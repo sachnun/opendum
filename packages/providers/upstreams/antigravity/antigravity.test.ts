@@ -2,8 +2,8 @@ import { describe, expect, it } from "bun:test";
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
 
-import { AntigravityProvider } from "./index.js";
-import { GeminiResponse } from "./transform.js";
+import { AntigravityProvider } from "@opendum/providers/upstreams/antigravity/index";
+import { GeminiResponse } from "@opendum/providers/upstreams/antigravity/transform";
 
 const STREAM = [
   'data: {"candidates":[{"content":{"parts":[{"text":"hello"}]},"finishReason":"STOP"}]}',

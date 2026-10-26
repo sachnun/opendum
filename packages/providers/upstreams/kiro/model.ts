@@ -1,7 +1,7 @@
 import type { Registry } from "@opendum/models/runtime";
-import { ModelName } from "../../core/identity.js";
-import type { ProviderAccount } from "../../types.js";
-import { KIRO_REGION } from "../../endpoints.js";
+import { ModelName } from "@opendum/providers/core/identity";
+import type { ProviderAccount } from "@opendum/providers/types";
+import { KIRO_REGION } from "@opendum/providers/endpoints";
 
 export const API_BASE_URL = "https://q.%s.amazonaws.com/generateAssistantResponse";
 

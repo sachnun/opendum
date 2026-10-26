@@ -1,9 +1,9 @@
 import { describe, expect, it, mock } from "bun:test";
 import { Effect } from "effect";
 
-import type { PointPort } from "../core/repositories.js";
-import { reconcileOrphans, ORPHAN_AGE_MS } from "../core/roaming-reconcile.js";
-import { fakes } from "./fakes.js";
+import type { PointPort } from "@opendum/api/core/repositories";
+import { reconcileOrphans, ORPHAN_AGE_MS } from "@opendum/api/core/roaming-reconcile";
+import { fakes } from "@opendum/api/test/fakes";
 
 function pointPort(overrides: Partial<PointPort> = {}): PointPort {
   const base = fakes().points;

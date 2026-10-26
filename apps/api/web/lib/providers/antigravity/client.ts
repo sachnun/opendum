@@ -1,9 +1,9 @@
 import { Effect } from "effect";
-import { fetchExternalEffect } from "#web/lib/external.js";
-import { unavailable } from "#web/errors.js";
-import type { OAuthResult } from "../types.js";
-import { ProviderResponse } from "../provider-response.js";
-import { validToken, type CredentialAccount } from "../credentials.js";
+import { fetchExternalEffect } from "@opendum/api/web/lib/external";
+import { unavailable } from "@opendum/api/web/errors";
+import type { OAuthResult } from "@opendum/api/web/lib/providers/types";
+import { ProviderResponse } from "@opendum/api/web/lib/providers/provider-response";
+import { validToken, type CredentialAccount } from "@opendum/api/web/lib/providers/credentials";
 import {
   AUTH_HEADERS,
   CLIENT_ID,
@@ -12,7 +12,7 @@ import {
   LOAD_ENDPOINTS,
   ONBOARD_USER_ENDPOINTS,
   REFRESH_BUFFER_SECONDS,
-} from "./constants.js";
+} from "@opendum/api/web/lib/providers/antigravity/constants";
 
 const response = new ProviderResponse("Antigravity");
 

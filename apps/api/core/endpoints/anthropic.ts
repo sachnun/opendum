@@ -1,6 +1,6 @@
 import { Result } from "effect";
-import { Coerce, Records, Safe } from "../helpers.js";
-import { usageOf } from "../usage.js";
+import { Coerce, Records, Safe } from "@opendum/api/core/helpers";
+import { usageOf } from "@opendum/api/core/usage";
 
 type Json = Record<string, unknown>;
 

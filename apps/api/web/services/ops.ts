@@ -3,10 +3,10 @@ import { assertPublic, PrivateHostError } from "@opendum/core/egress";
 import { Effect, Result } from "effect";
 
 import type { QuotaInput, RelayInput, RelayResult } from "@opendum/providers/contract";
-import type { ProxyContext } from "../../core/context.js";
-import { Safe } from "../../core/helpers.js";
-import { fetchQuota } from "../../core/quota.js";
-import { fromPromise } from "#web/lib/task.js";
+import type { ProxyContext } from "@opendum/api/core/context";
+import { Safe } from "@opendum/api/core/helpers";
+import { fetchQuota } from "@opendum/api/core/quota";
+import { fromPromise } from "@opendum/api/web/lib/task";
 
 const RELAY_TIMEOUT_MS = 20 * 1000;
 

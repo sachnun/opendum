@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it } from "bun:test";
 import { Effect } from "effect";
 import type { OpendumRedis } from "@opendum/core/redis";
 import type { Registry } from "@opendum/models/runtime";
-import { Health, MAX_ERROR_LEN } from "../core/health.js";
-import { fakes, type Fakes } from "./fakes.js";
+import { Health, MAX_ERROR_LEN } from "@opendum/api/core/health";
+import { fakes, type Fakes } from "@opendum/api/test/fakes";
 
 type Options = ConstructorParameters<typeof Health>[0];
 

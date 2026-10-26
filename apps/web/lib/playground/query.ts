@@ -1,4 +1,4 @@
-import type { PlaygroundEndpoint, ReasoningEffort } from "./types";
+import type { PlaygroundEndpoint, ReasoningEffort } from "~~/lib/playground/types";
 
 const ENDPOINTS: PlaygroundEndpoint[] = ["chat_completions", "messages", "responses"];
 const EFFORTS: ReasoningEffort[] = ["none", "low", "medium", "high", "xhigh", "max"];

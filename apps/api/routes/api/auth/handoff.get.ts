@@ -2,8 +2,8 @@ import { defineHandler } from "nitro";
 import { getQuery, HTTPError } from "h3";
 import { Effect } from "effect";
 
-import { webOrigin, safePath, loginUrl } from "#web/lib/handoff.js";
-import { sessionOf, mintAccessToken } from "#web/utils/session.js";
+import { webOrigin, safePath, loginUrl } from "@opendum/api/web/lib/handoff";
+import { sessionOf, mintAccessToken } from "@opendum/api/web/utils/session";
 
 function redirectTo(location: string): Response {
   return new Response(null, { status: 302, headers: { location } });

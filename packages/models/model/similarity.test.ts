@@ -8,7 +8,7 @@ import {
   resolveCandidates,
   similarityScore,
   stripDate,
-} from "./similarity.ts";
+} from "@opendum/models/model/similarity";
 
 test("normalizeName strips provider prefix, suffixes and separators", () => {
   expect(normalizeName("vendor/Mock-Model:free")).toBe("mock-model");

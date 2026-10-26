@@ -1,5 +1,5 @@
 import { Context, Effect, Layer, ManagedRuntime } from "effect";
-import { createAuth, type AuthInstance, type AuthSession } from "./auth.js";
+import { createAuth, type AuthInstance, type AuthSession } from "@opendum/api/web/auth";
 
 export class IdentityService {
   readonly auth: AuthInstance;

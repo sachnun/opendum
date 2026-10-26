@@ -1,15 +1,15 @@
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
-import { Value, Responses } from "../core/helpers.js";
+import { Value, Responses } from "@opendum/providers/core/helpers";
 import {
   buildPayload,
   sseStream,
   type ResponsesNativeProvider,
-} from "../transform/responses.js";
-import { ChatImageInliner } from "../core/images.js";
-import { fromMessages } from "../transform/anthropic.js";
-import { ModelConfig } from "../core/model-config.js";
-import type { FallbackState } from "../core/fallback.js";
+} from "@opendum/providers/transform/responses";
+import { ChatImageInliner } from "@opendum/providers/core/images";
+import { fromMessages } from "@opendum/providers/transform/anthropic";
+import { ModelConfig } from "@opendum/providers/core/model-config";
+import type { FallbackState } from "@opendum/providers/core/fallback";
 import {
   EgressJSONPoster,
   FallbackPoster,
@@ -19,8 +19,8 @@ import {
   type Logger,
   type ProviderTransportFailure,
   type UpstreamTransport,
-} from "../core/http.js";
-import type { Provider, ProviderAccount, ProviderFailure, ProviderRequest } from "../types.js";
+} from "@opendum/providers/core/http";
+import type { Provider, ProviderAccount, ProviderFailure, ProviderRequest } from "@opendum/providers/types";
 
 export const SUPPORTED_ZENMUX = new Set([
   "model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream",

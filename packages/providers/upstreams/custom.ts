@@ -1,7 +1,7 @@
-import type { FallbackState } from "../core/fallback.js";
-import { CompatProvider } from "./openai-compatible.js";
-import type { Logger, UpstreamTransport } from "../core/http.js";
-import type { Provider } from "../types.js";
+import type { FallbackState } from "@opendum/providers/core/fallback";
+import { CompatProvider } from "@opendum/providers/upstreams/openai-compatible";
+import type { Logger, UpstreamTransport } from "@opendum/providers/core/http";
+import type { Provider } from "@opendum/providers/types";
 
 export type CustomProviderRecord = {
   slug: string;

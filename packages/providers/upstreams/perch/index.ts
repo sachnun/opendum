@@ -1,10 +1,10 @@
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
-import { Responses, Value } from "../../core/helpers.js";
-import { RequestFailure, type UpstreamTransport } from "../../core/http.js";
-import { OAuthBase } from "../../core/oauth.js";
-import type { Provider, ProviderFailure, ProviderRequest } from "../../types.js";
-import { PERCH_APP_URL } from "../../endpoints.js";
+import { Responses, Value } from "@opendum/providers/core/helpers";
+import { RequestFailure, type UpstreamTransport } from "@opendum/providers/core/http";
+import { OAuthBase } from "@opendum/providers/core/oauth";
+import type { Provider, ProviderFailure, ProviderRequest } from "@opendum/providers/types";
+import { PERCH_APP_URL } from "@opendum/providers/endpoints";
 
 import {
   ACCESS_TTL_MS,
@@ -16,9 +16,9 @@ import {
   TURN_TICKET_HEADER,
   UpstreamError,
   type Json,
-} from "./auth.js";
-import { PerchPayload } from "./payload.js";
-import { PerchCompletion, PerchStream, sseGenerator } from "./stream.js";
+} from "@opendum/providers/upstreams/perch/auth";
+import { PerchPayload } from "@opendum/providers/upstreams/perch/payload";
+import { PerchCompletion, PerchStream, sseGenerator } from "@opendum/providers/upstreams/perch/stream";
 
 export type PerchOptions = {
   registry: Registry;

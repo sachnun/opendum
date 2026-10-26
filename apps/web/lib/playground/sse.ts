@@ -1,6 +1,6 @@
 import { createParser, type EventSourceMessage } from "eventsource-parser";
-import { Completion, Tokens } from "./parsing";
-import type { ParsedCompletionData, PlaygroundEndpoint } from "./types";
+import { Completion, Tokens } from "~~/lib/playground/parsing";
+import type { ParsedCompletionData, PlaygroundEndpoint } from "~~/lib/playground/types";
 
 export class Sse {
   static handle(

@@ -1,9 +1,9 @@
 import { Effect } from "effect";
 import { db, pinnedProvider, accountModelHealth } from "@opendum/database";
-import { fromPromise } from "#web/lib/task.js";
-import { getRedisClient } from "#web/lib/redis.js";
+import { fromPromise } from "@opendum/api/web/lib/task";
+import { getRedisClient } from "@opendum/api/web/lib/redis";
 import { asc, eq, inArray } from "drizzle-orm";
-import { PROVIDER_ACCOUNT_KEYS } from "../account-providers.js";
+import { PROVIDER_ACCOUNT_KEYS } from "@opendum/api/web/services/account-providers";
 import {
   AUTO_PIN_SENTINEL,
   ENTRY_KEY_PREFIX,
@@ -11,7 +11,7 @@ import {
   type HealthRow,
   type AccountReadOptions,
   type HistoryEntry,
-} from "./types.js";
+} from "@opendum/api/web/services/accounts/types";
 
 export type ErrorEntry = {
   id: string;

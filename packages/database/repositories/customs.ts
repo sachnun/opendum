@@ -1,9 +1,9 @@
-import type { DbExecutor } from "../client.js";
+import type { DbExecutor } from "@opendum/database/client";
 import {
   getCustomProvider,
   customModels,
   listCustomProviders,
-} from "../queries/index.js";
+} from "@opendum/database/queries/index";
 
 export class Customs {
   constructor(private readonly database: DbExecutor) {}

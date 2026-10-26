@@ -1,9 +1,9 @@
 import { Effect } from "effect";
-import { fetchExternalEffect } from "#web/lib/external.js";
-import { unavailable } from "#web/errors.js";
-import { ProviderResponse } from "../provider-response.js";
-import { Pkce } from "../pkce.js";
-import type { OAuthResult } from "../types.js";
+import { fetchExternalEffect } from "@opendum/api/web/lib/external";
+import { unavailable } from "@opendum/api/web/errors";
+import { ProviderResponse } from "@opendum/api/web/lib/providers/provider-response";
+import { Pkce } from "@opendum/api/web/lib/providers/pkce";
+import type { OAuthResult } from "@opendum/api/web/lib/providers/types";
 import {
   PERCH_ACCOUNT_PATH,
   PERCH_APP_URL,
@@ -11,7 +11,7 @@ import {
   PERCH_TOKEN_PATH,
   PERCH_REDIRECT_URI,
   PERCH_PLAN_CODE,
-} from "./constants.js";
+} from "@opendum/api/web/lib/providers/perch/constants";
 
 interface PerchAuthConfig {
   supabaseUrl: string;

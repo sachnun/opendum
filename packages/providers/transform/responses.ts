@@ -1,5 +1,5 @@
-import { Value, Payload, Ids, Responses, JSONText } from "../core/helpers.js";
-import { ResponsesImageInliner } from "../core/images.js";
+import { Value, Payload, Ids, Responses, JSONText } from "@opendum/providers/core/helpers";
+import { ResponsesImageInliner } from "@opendum/providers/core/images";
 
 type Json = Record<string, unknown>;
 

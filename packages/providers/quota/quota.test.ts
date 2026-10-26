@@ -11,8 +11,8 @@ import {
   isoOf,
   fallbackTier,
   withoutToken,
-} from "./index.js";
-import type { AccountQuotaInfo, QuotaContext, QuotaFetcher } from "./index.js";
+} from "@opendum/providers/quota/index";
+import type { AccountQuotaInfo, QuotaContext, QuotaFetcher } from "@opendum/providers/quota/index";
 
 describe("quota helpers", () => {
   it("clamps fractions", () => {

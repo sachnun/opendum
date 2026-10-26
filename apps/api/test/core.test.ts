@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test";
-import { Chat, Messages, Responses, adapters, transformAnthropicToOpenAI, transformOpenAIToAnthropic } from "../core/endpoints.js";
-import { SseScanner } from "../core/sse.js";
-import { routeFailure } from "../core/types.js";
-import { ProviderError } from "../core/errors.js";
+import { Chat, Messages, Responses, adapters, transformAnthropicToOpenAI, transformOpenAIToAnthropic } from "@opendum/api/core/endpoints";
+import { SseScanner } from "@opendum/api/core/sse";
+import { routeFailure } from "@opendum/api/core/types";
+import { ProviderError } from "@opendum/api/core/errors";
 
 describe("chat completions parse", () => {
   it("rejects a missing model", () => {

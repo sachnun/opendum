@@ -1,12 +1,12 @@
-import { hashString } from "#web/lib/encryption.js";
+import { hashString } from "@opendum/api/web/lib/encryption";
 import { Effect } from "effect";
-import { fetchExternalEffect } from "#web/lib/external.js";
-import { badRequest, unavailable } from "#web/errors.js";
-import type { OAuthResult } from "../types.js";
-import { Pkce } from "../pkce.js";
-import { ProviderResponse } from "../provider-response.js";
+import { fetchExternalEffect } from "@opendum/api/web/lib/external";
+import { badRequest, unavailable } from "@opendum/api/web/errors";
+import type { OAuthResult } from "@opendum/api/web/lib/providers/types";
+import { Pkce } from "@opendum/api/web/lib/providers/pkce";
+import { ProviderResponse } from "@opendum/api/web/lib/providers/provider-response";
 import { Jwt } from "@opendum/providers";
-import { validToken, type CredentialAccount } from "../credentials.js";
+import { validToken, type CredentialAccount } from "@opendum/api/web/lib/providers/credentials";
 import {
   AUTHORIZE_ENDPOINT,
   BROWSER_REDIRECT_URI,
@@ -14,7 +14,7 @@ import {
   REFRESH_BUFFER_SECONDS,
   REFRESH_ENDPOINT,
   TOKEN_ENDPOINT,
-} from "./constants.js";
+} from "@opendum/api/web/lib/providers/kiro/constants";
 
 interface ExchangeResponse {
   accessToken: string;

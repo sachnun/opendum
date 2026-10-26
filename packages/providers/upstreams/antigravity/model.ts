@@ -1,7 +1,7 @@
-import { Value } from "../../core/helpers.js";
-import { ModelName } from "../../core/identity.js";
+import { Value } from "@opendum/providers/core/helpers";
+import { ModelName } from "@opendum/providers/core/identity";
 import type { Registry } from "@opendum/models/runtime";
-import type { Json } from "./common.js";
+import type { Json } from "@opendum/providers/upstreams/antigravity/common";
 
 const GEMINI_FLASH_BUDGETS: Record<string, number> = { minimal: 1024, low: 1024, medium: 8192, high: 16384 };
 const GEMINI_PRO_BUDGETS: Record<string, number> = { minimal: 1024, low: 2048, medium: 16384, high: 32768 };

@@ -8,9 +8,9 @@ import {
   toChat,
   cacheKey,
   usageOf,
-} from "./responses.js";
-import { Payload } from "../core/helpers.js";
-import { fromMessages, payloadFor } from "./anthropic.js";
+} from "@opendum/providers/transform/responses";
+import { Payload } from "@opendum/providers/core/helpers";
+import { fromMessages, payloadFor } from "@opendum/providers/transform/anthropic";
 
 function streamOf(text: string): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();

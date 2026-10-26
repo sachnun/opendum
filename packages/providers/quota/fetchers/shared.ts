@@ -1,9 +1,9 @@
 import { Effect } from "effect";
-import { quotaJson, putQuota, type QuotaJsonResult } from "../cache.js";
-import { asError } from "../../core/errors.js";
-import { Value } from "../../core/values.js";
-import { errorInfo, expiredInfo } from "../helpers.js";
-import type { AccountQuotaInfo, QuotaAccount, QuotaContext } from "../types.js";
+import { quotaJson, putQuota, type QuotaJsonResult } from "@opendum/providers/quota/cache";
+import { asError } from "@opendum/providers/core/errors";
+import { Value } from "@opendum/providers/core/values";
+import { errorInfo, expiredInfo } from "@opendum/providers/quota/helpers";
+import type { AccountQuotaInfo, QuotaAccount, QuotaContext } from "@opendum/providers/quota/types";
 
 export type Json = Record<string, unknown>;
 

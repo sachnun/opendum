@@ -9,7 +9,7 @@ import {
   normalizeEndpoint,
   parseParams,
   stripStatus,
-} from "./account-errors";
+} from "~~/lib/account-errors";
 
 describe("account error helpers", () => {
   it("maps status codes", () => {

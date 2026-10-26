@@ -1,16 +1,16 @@
 import type { ContractRouterClient } from "@orpc/contract";
 
-import { accountsContract } from "./accounts.js";
-import { adminContract } from "./admin.js";
-import { analyticsContract } from "./analytics.js";
-import { eventsContract } from "./events.js";
-import { keysContract } from "./keys.js";
-import { modelsContract } from "./models.js";
-import { playgroundContract } from "./playground.js";
-import { pointsContract } from "./points.js";
-import { providersContract } from "./providers.js";
-import { sessionContract } from "./session.js";
-import { sharingContract } from "./sharing.js";
+import { accountsContract } from "@opendum/providers/contract/accounts";
+import { adminContract } from "@opendum/providers/contract/admin";
+import { analyticsContract } from "@opendum/providers/contract/analytics";
+import { eventsContract } from "@opendum/providers/contract/events";
+import { keysContract } from "@opendum/providers/contract/keys";
+import { modelsContract } from "@opendum/providers/contract/models";
+import { playgroundContract } from "@opendum/providers/contract/playground";
+import { pointsContract } from "@opendum/providers/contract/points";
+import { providersContract } from "@opendum/providers/contract/providers";
+import { sessionContract } from "@opendum/providers/contract/session";
+import { sharingContract } from "@opendum/providers/contract/sharing";
 
 export const contract = {
   models: modelsContract,
@@ -29,15 +29,15 @@ export const contract = {
 export type ApiContract = typeof contract;
 export type ApiContractClient = ContractRouterClient<ApiContract>;
 
-export * from "./accounts.js";
-export * from "./admin.js";
-export * from "./analytics.js";
-export * from "./common.js";
-export * from "./events.js";
-export * from "./keys.js";
-export * from "./models.js";
-export * from "./playground.js";
-export * from "./points.js";
-export * from "./providers.js";
-export * from "./session.js";
-export * from "./sharing.js";
+export * from "@opendum/providers/contract/accounts";
+export * from "@opendum/providers/contract/admin";
+export * from "@opendum/providers/contract/analytics";
+export * from "@opendum/providers/contract/common";
+export * from "@opendum/providers/contract/events";
+export * from "@opendum/providers/contract/keys";
+export * from "@opendum/providers/contract/models";
+export * from "@opendum/providers/contract/playground";
+export * from "@opendum/providers/contract/points";
+export * from "@opendum/providers/contract/providers";
+export * from "@opendum/providers/contract/session";
+export * from "@opendum/providers/contract/sharing";

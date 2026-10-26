@@ -2,10 +2,10 @@ import { and, eq, gt, gte, inArray, ne, sql } from "drizzle-orm";
 
 import { db, normalizeEmail, pointTransaction, providerEmailRegistry, proxyApiKey, user, userPointBalance, type Database } from "@opendum/database";
 import { Effect } from "effect";
-import { publishPoints } from "#web/events/bus.js";
-import { fromPromise } from "#web/lib/task.js";
-import { badRequest } from "#web/errors.js";
-import { roamingByKey as roamingPoints } from "#web/lib/roaming-points.js";
+import { publishPoints } from "@opendum/api/web/events/bus";
+import { fromPromise } from "@opendum/api/web/lib/task";
+import { badRequest } from "@opendum/api/web/errors";
+import { roamingByKey as roamingPoints } from "@opendum/api/web/lib/roaming-points";
 
 export const UPDATE_COST = 20;
 export const DAILY_ACCESS_POINTS = 5;

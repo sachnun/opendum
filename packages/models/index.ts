@@ -6,5 +6,5 @@ export function modelsDir(cwd: string = process.cwd()): string {
   return resolve(cwd, MODELS_DATA_DIR);
 }
 
-export { FAMILY_RULES, familyOf, folderOf } from "./model/families.ts";
-export type { FamilyRule } from "./model/families.ts";
+export { FAMILY_RULES, familyOf, folderOf } from "@opendum/models/model/families";
+export type { FamilyRule } from "@opendum/models/model/families";

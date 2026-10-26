@@ -1,7 +1,7 @@
 import { oc } from "@orpc/contract";
 import { z } from "zod";
 
-import { emptyInputSchema } from "./common.js";
+import { emptyInputSchema } from "@opendum/providers/contract/common";
 
 const ACCESS_ENTRY_LIMIT = 500;
 const RATE_RULE_LIMIT = 500;

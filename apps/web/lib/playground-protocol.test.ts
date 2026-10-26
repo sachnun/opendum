@@ -7,7 +7,7 @@ import {
   ErrorText,
   Params,
   Tokens,
-} from "./playground-protocol";
+} from "~~/lib/playground-protocol";
 
 const settings = {
   endpoint: "chat_completions" as const,

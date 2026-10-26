@@ -3,8 +3,8 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { admin, bearer, jwt } from "better-auth/plugins";
 import { eq } from "drizzle-orm";
 import { db as defaultDb, schema, user, type Database } from "@opendum/database";
-import { ensureBalance } from "./services/points.js";
-import { roleOf as maintainerRole } from "./utils/maintainers.js";
+import { ensureBalance } from "@opendum/api/web/services/points";
+import { roleOf as maintainerRole } from "@opendum/api/web/utils/maintainers";
 
 export const ACCESS_TOKEN_TTL = "7d";
 export const ACCESS_TOKEN_ISSUER = "opendum";

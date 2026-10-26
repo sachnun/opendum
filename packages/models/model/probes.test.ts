@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { probeSets, modelProbes } from "./probes.ts";
+import { probeSets, modelProbes } from "@opendum/models/model/probes";
 
 test("modelProbes collects id, fileId, aliases and upstreams", () => {
   const probes = modelProbes({

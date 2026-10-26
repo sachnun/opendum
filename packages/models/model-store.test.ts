@@ -1,10 +1,10 @@
 import { expect, test } from "bun:test";
 
-import { idMap, buildIndex, upstream, prune, moveFiles, sync, writeGenerated, write } from "./model-store.ts";
-import { readText } from "./fs.ts";
-import { join } from "./paths.ts";
-import { makeDir, removeDir } from "./test-support.ts";
-import type { ModelData } from "./types.ts";
+import { idMap, buildIndex, upstream, prune, moveFiles, sync, writeGenerated, write } from "@opendum/models/model-store";
+import { readText } from "@opendum/models/fs";
+import { join } from "@opendum/models/paths";
+import { makeDir, removeDir } from "@opendum/models/test-support";
+import type { ModelData } from "@opendum/models/types";
 
 async function tempWorkspace<A>(run: (dataDir: string, generatedDir: string) => A | Promise<A>): Promise<A> {
   const root = makeDir("models-registry-");
@@ -200,5 +200,26 @@ test("sync still folds real revision suffixes into the parent", async () => {
     await sync(dataDir, "openrouter", new Map([["mock-model", "vendor/mock-model"]]));
     const result = await sync(dataDir, "openrouter", new Map([["mock-model-2", "vendor/mock-model-2"]]));
     expect(result.added).toEqual([]);
+  });
+});
+
+test("sync dry run reports changes without writing files", async () => {
+  await tempWorkspace(async (dataDir) => {
+    const result = await sync(dataDir, "demo", new Map([["demo-model", "demo-model"]]), {
+      dryRun: true,
+    });
+
+    expect(result.added).toEqual(["demo-model"]);
+    expect(Object.keys(buildIndex(dataDir))).toEqual([]);
+  });
+});
+
+test("sync persists changes when dry run is disabled", async () => {
+  await tempWorkspace(async (dataDir) => {
+    const result = await sync(dataDir, "demo", new Map([["demo-model", "demo-model"]]));
+
+    expect(result.added).toEqual(["demo-model"]);
+    const entry = Object.values(buildIndex(dataDir))[0];
+    expect(entry?.data.providers).toEqual(["demo"]);
   });
 });

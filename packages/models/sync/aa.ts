@@ -1,7 +1,7 @@
 import { Effect } from "effect";
 
-import { ModelDecodeFailure, asError } from "../errors.ts";
-import { decryptAes, decodeText, fromHex, gunzip, sha256Bytes } from "../fs.ts";
+import { ModelDecodeFailure, asError } from "@opendum/models/errors";
+import { decryptAes, decodeText, fromHex, gunzip, sha256Bytes } from "@opendum/models/fs";
 
 export interface AaEntry {
   slug: string;

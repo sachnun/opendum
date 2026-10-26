@@ -4,13 +4,13 @@ import {
   sseCompletion,
   buildPayload,
   sseJson,
-} from "../transform/responses.js";
+} from "@opendum/providers/transform/responses";
 import {
   messagesStream,
   payloadFor,
-} from "../transform/anthropic.js";
-import { Value, Ids, Responses } from "../core/helpers.js";
-import { ModelConfig } from "../core/model-config.js";
+} from "@opendum/providers/transform/anthropic";
+import { Value, Ids, Responses } from "@opendum/providers/core/helpers";
+import { ModelConfig } from "@opendum/providers/core/model-config";
 import {
   EgressPoster,
   FallbackPoster,
@@ -20,9 +20,9 @@ import {
   type Logger,
   type ProviderTransportFailure,
   type UpstreamTransport,
-} from "../core/http.js";
-import type { FallbackState } from "../core/fallback.js";
-import type { Provider, ProviderFailure, ProviderRequest } from "../types.js";
+} from "@opendum/providers/core/http";
+import type { FallbackState } from "@opendum/providers/core/fallback";
+import type { Provider, ProviderFailure, ProviderRequest } from "@opendum/providers/types";
 
 const CHAT_ENDPOINT = "https://opencode.ai/inference/v1/chat/completions";
 const RESPONSES_ENDPOINT = "https://opencode.ai/inference/v1/responses";

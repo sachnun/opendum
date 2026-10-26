@@ -5,7 +5,7 @@ export type {
   QuotaFetcher,
   QuotaGroupDisplay,
   QuotaJournal,
-} from "./types.js";
+} from "@opendum/providers/quota/types";
 export {
   baseInfo,
   clampFraction,
@@ -18,9 +18,9 @@ export {
   parseNumber,
   parseRecord,
   isoOf,
-} from "./helpers.js";
-export { encodeQuery, quotaJson, putQuota } from "./cache.js";
-export { Quotas, fetchQuota, isQuota, withoutToken } from "./registry.js";
-export { fallbackTier } from "./fetchers/shared.js";
-export { QuotaFetchFailure, QuotaJournalFailure } from "../core/errors.js";
-export type { QuotaFailure } from "../core/errors.js";
+} from "@opendum/providers/quota/helpers";
+export { encodeQuery, quotaJson, putQuota } from "@opendum/providers/quota/cache";
+export { Quotas, fetchQuota, isQuota, withoutToken } from "@opendum/providers/quota/registry";
+export { fallbackTier } from "@opendum/providers/quota/fetchers/shared";
+export { QuotaFetchFailure, QuotaJournalFailure } from "@opendum/providers/core/errors";
+export type { QuotaFailure } from "@opendum/providers/core/errors";

@@ -1,4 +1,4 @@
-import { Value, Payload, Ids } from "../../core/helpers.js";
+import { Value, Payload, Ids } from "@opendum/providers/core/helpers";
 import {
   RETIRED_MODEL_PATTERN,
   ToolNames,
@@ -6,8 +6,8 @@ import {
   defaultAny,
   mapSlice,
   type Json,
-} from "./common.js";
-import type { AntigravityProvider } from "./index.js";
+} from "@opendum/providers/upstreams/antigravity/common";
+import type { AntigravityProvider } from "@opendum/providers/upstreams/antigravity/index";
 
 export type ToolSchemaMap = Record<string, Record<string, { typ: string }>>;
 

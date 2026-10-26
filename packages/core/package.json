@@ -12,7 +12,8 @@
     "./signature": "./crypto/signature.ts",
     "./redis": "./redis/index.ts",
     "./redis/keys": "./redis/keys.ts",
-    "./egress": "./egress/index.ts"
+    "./egress": "./egress/index.ts",
+    "./*": "./*.ts"
   },
   "scripts": {
     "test": "bun test",

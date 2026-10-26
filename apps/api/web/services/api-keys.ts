@@ -2,17 +2,17 @@ import { Effect } from "effect";
 import { and, asc, desc, eq, inArray, lte } from "drizzle-orm";
 
 import { db, providerAccount, proxyApiKey, keyRateLimit } from "@opendum/database";
-import { fromPromise } from "#web/lib/task.js";
-import { internal, notFound } from "#web/errors.js";
-import { decrypt, encrypt, mintKey, keyPreview, hashString } from "#web/lib/encryption.js";
-import { modelAvailability, invalidateValidation } from "#web/lib/proxy/auth.js";
-import { authlessAccounts, isSynthetic } from "#web/lib/proxy/authless-providers.js";
-import { customModels } from "#web/lib/proxy/custom-providers.js";
-import { allFamilies, allModels, familyOf, providersFor, supportsModel, aliasOf } from "#web/lib/proxy/models.js";
-import { roamingByKey as roamingPoints } from "#web/lib/roaming-points.js";
+import { fromPromise } from "@opendum/api/web/lib/task";
+import { internal, notFound } from "@opendum/api/web/errors";
+import { decrypt, encrypt, mintKey, keyPreview, hashString } from "@opendum/api/web/lib/encryption";
+import { modelAvailability, invalidateValidation } from "@opendum/api/web/lib/proxy/auth";
+import { authlessAccounts, isSynthetic } from "@opendum/api/web/lib/proxy/authless-providers";
+import { customModels } from "@opendum/api/web/lib/proxy/custom-providers";
+import { allFamilies, allModels, familyOf, providersFor, supportsModel, aliasOf } from "@opendum/api/web/lib/proxy/models";
+import { roamingByKey as roamingPoints } from "@opendum/api/web/lib/roaming-points";
 import { compareEntries } from "@opendum/models/sort";
-import { PROVIDER_ACCOUNT_KEYS } from "./account-providers.js";
-import { UPDATE_COST, debitUserPoints } from "./points.js";
+import { PROVIDER_ACCOUNT_KEYS } from "@opendum/api/web/services/account-providers";
+import { UPDATE_COST, debitUserPoints } from "@opendum/api/web/services/points";
 import { accessModeSchema, type AccessMode, type CreateInput, type AccountAccessInput, type ExpirationInput, type ModelAccessInput, type NameInput, type RateLimitsInput, type RoamingInput } from "@opendum/providers/contract";
 
 const MIN_LENGTH = 3;
@@ -81,7 +81,7 @@ const withOwned = Effect.fn("apiKeys.withOwned")(function* <T>(
   userId: string,
   id: string,
   failureMessage: string,
-  action: (apiKey: OwnedApiKey) => import("effect").Effect.Effect<T, import("#web/errors.js").ServiceFailure>
+  action: (apiKey: OwnedApiKey) => import("effect").Effect.Effect<T, import("@opendum/api/web/errors").ServiceFailure>
 ) {
   const apiKey = yield* getOwned(userId, id);
   if (!apiKey) return yield* notFound("API key not found");

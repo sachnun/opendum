@@ -9,7 +9,7 @@ import {
   setTokens,
   setImpersonation,
 } from "~~/lib/auth-token";
-import { stateKeys } from "~~/app/utils/dataKeys";
+import { stateKeys } from "~/utils/dataKeys";
 
 const fetchMock = mock((..._args: unknown[]) => Promise.resolve<unknown>({}));
 

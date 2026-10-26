@@ -1,9 +1,17 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "types": ["node", "bun"],
+    "types": [
+      "node",
+      "bun"
+    ],
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true
   },
-  "include": ["*.ts", "model/**/*.ts", "sync/**/*.ts", "scripts/models.ts", "scripts/enrich.ts", "scripts/aa.ts", "scripts/family-ranking.ts"]
+  "include": [
+    "*.ts",
+    "model/**/*.ts",
+    "sync/**/*.ts",
+    "refresh/**/*.ts"
+  ]
 }

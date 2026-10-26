@@ -4,9 +4,9 @@ import { Effect } from "effect";
 import type { Provider, ProviderRegistry } from "@opendum/providers";
 import type { Registry } from "@opendum/models/runtime";
 import { AccountAffinity, type OpendumRedis } from "@opendum/core/redis";
-import { ProxyService } from "../core/service.js";
-import { Chat } from "../core/endpoints.js";
-import { fakes } from "./fakes.js";
+import { ProxyService } from "@opendum/api/core/service";
+import { Chat } from "@opendum/api/core/endpoints";
+import { fakes } from "@opendum/api/test/fakes";
 
 function memoryRedis(): OpendumRedis {
   const store = new Map<string, string>();

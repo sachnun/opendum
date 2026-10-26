@@ -1,11 +1,11 @@
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
-import { Value } from "../core/helpers.js";
-import { JSONPoster, type UpstreamTransport } from "../core/http.js";
-import { OAuthBase } from "../core/oauth.js";
-import type { Provider, ProviderFailure, ProviderRequest } from "../types.js";
+import { Value } from "@opendum/providers/core/helpers";
+import { JSONPoster, type UpstreamTransport } from "@opendum/providers/core/http";
+import { OAuthBase } from "@opendum/providers/core/oauth";
+import type { Provider, ProviderFailure, ProviderRequest } from "@opendum/providers/types";
 
-import { CLINE_BASE_URL } from "../endpoints.js";
+import { CLINE_BASE_URL } from "@opendum/providers/endpoints";
 
 const CLINE_API_BASE = CLINE_BASE_URL;
 const CLINE_REFRESH_PATH = "/auth/refresh";

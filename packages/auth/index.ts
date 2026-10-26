@@ -1,9 +1,9 @@
-export { AuthService, isAuthless } from "./service.js";
-export { parseModel } from "./normalize.js";
+export { AuthService, isAuthless } from "@opendum/auth/service";
+export { parseModel } from "@opendum/auth/normalize";
 export {
   emptyResult,
   emptyAvailability,
-} from "./types.js";
+} from "@opendum/auth/types";
 export type {
   AccountAccess,
   AccountModelAvailability,
@@ -11,10 +11,10 @@ export type {
   ModelAccess,
   ModelValidationResult,
   RateLimitRule,
-} from "./types.js";
-export { customStore } from "./store/custom.js";
+} from "@opendum/auth/types";
+export { customStore } from "@opendum/auth/store/custom";
 export type {
   ModelRecord,
   CustomProviderReader,
   CustomProviderRecord,
-} from "./store/custom.js";
+} from "@opendum/auth/store/custom";

@@ -17,18 +17,18 @@ import {
   type ProviderRegistry,
   type RefreshedCredentials,
 } from "@opendum/providers";
-import { Delay, Safe } from "./helpers.js";
-import { HeadersTimeout, HEADERS_TIMEOUT_MESSAGE } from "./upstream-timeout.js";
+import { Delay, Safe } from "@opendum/api/core/helpers";
+import { HeadersTimeout, HEADERS_TIMEOUT_MESSAGE } from "@opendum/api/core/upstream-timeout";
 import {
   accessDenial,
   needsRefresh,
   isSynthetic,
   refreshStatus,
   bufferFor,
-} from "./service-helpers.js";
-import { ProviderPerformance } from "./provider-performance.js";
-import { AccountError, FailureMap, ProviderError, ProviderQuota, Workbuddy } from "./errors.js";
-import { upsertHistory } from "./error-history.js";
+} from "@opendum/api/core/service-helpers";
+import { ProviderPerformance } from "@opendum/api/core/provider-performance";
+import { AccountError, FailureMap, ProviderError, ProviderQuota, Workbuddy } from "@opendum/api/core/errors";
+import { upsertHistory } from "@opendum/api/core/error-history";
 import {
   accountRotations,
   modelSaturationHolds,
@@ -40,31 +40,31 @@ import {
   tokenRefreshes,
   upstreamErrors,
   upstreamTtft,
-} from "./metrics.js";
-import { checkAndIncrement } from "./ratelimit.js";
-import { stripImages } from "./content.js";
+} from "@opendum/api/core/metrics";
+import { checkAndIncrement } from "@opendum/api/core/ratelimit";
+import { stripImages } from "@opendum/api/core/content";
 import {
   adjustRoamingPoints,
   creditSharingPoint,
   roamingPoints,
   type PointReservation,
-} from "./points.js";
-import { Health, MAX_ERROR_LEN } from "./health.js";
+} from "@opendum/api/core/points";
+import { Health, MAX_ERROR_LEN } from "@opendum/api/core/health";
 import {
   ModelSaturation,
   SATURATION_MAX_RETRIES,
   MAX_WAIT_MS,
   isSaturated,
   type ModelSaturationOptions,
-} from "./model-saturation.js";
-import { Rotation } from "./rotation.js";
-import { Playground } from "./playground.js";
-import { Roaming } from "./roaming.js";
-import { trackPending, trackWork } from "./pending.js";
-import { Usage } from "./usage-log.js";
-import { proxyEvents, type ProxyEvents } from "./events.js";
-import { repositories, type PointPort, type Repositories } from "./repositories.js";
-import type { Adapter } from "./endpoints.js";
+} from "@opendum/api/core/model-saturation";
+import { Rotation } from "@opendum/api/core/rotation";
+import { Playground } from "@opendum/api/core/playground";
+import { Roaming } from "@opendum/api/core/roaming";
+import { trackPending, trackWork } from "@opendum/api/core/pending";
+import { Usage } from "@opendum/api/core/usage-log";
+import { proxyEvents, type ProxyEvents } from "@opendum/api/core/events";
+import { repositories, type PointPort, type Repositories } from "@opendum/api/core/repositories";
+import type { Adapter } from "@opendum/api/core/endpoints";
 import type {
   Failure,
   ParsedEndpointRequest,
@@ -74,8 +74,8 @@ import type {
   StreamRecorder,
   SuccessRecord,
   UsageCounts,
-} from "./types.js";
-import { routeFailure } from "./types.js";
+} from "@opendum/api/core/types";
+import { routeFailure } from "@opendum/api/core/types";
 
 const LOCK_PREFIX = "opendum:provider-account:refresh-lock:";
 const LOCK_TTL_SECONDS = 120;
@@ -1487,6 +1487,6 @@ export class ProxyService implements StreamRecorder {
 }
 
 
-export { sessionKey } from "./service-helpers.js";
+export { sessionKey } from "@opendum/api/core/service-helpers";
 
 export { creditSharingPoint, adjustRoamingPoints, roamingPoints };

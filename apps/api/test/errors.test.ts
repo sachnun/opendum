@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { ProviderError, Workbuddy } from "../core/errors.js";
+import { ProviderError, Workbuddy } from "@opendum/api/core/errors";
 
 const NOW = new Date("2026-10-16T00:00:00.000Z");
 const THIRTY_MINUTES_MS = 30 * 60 * 1000;

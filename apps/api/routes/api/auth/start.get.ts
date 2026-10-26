@@ -2,9 +2,9 @@ import { defineHandler } from "nitro";
 import { getQuery, HTTPError } from "h3";
 import { z } from "zod";
 
-import { createAuth } from "#web/auth.js";
-import { handoffUrl, webOrigin, safePath } from "#web/lib/handoff.js";
-import { requestOrigin } from "#web/lib/request-origin.js";
+import { createAuth } from "@opendum/api/web/auth";
+import { handoffUrl, webOrigin, safePath } from "@opendum/api/web/lib/handoff";
+import { requestOrigin } from "@opendum/api/web/lib/request-origin";
 
 const providerSchema = z.enum(["github", "google"]);
 

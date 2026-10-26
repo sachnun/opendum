@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { gzip, sha256Bytes } from "../fs.ts";
+import { gzip, sha256Bytes } from "@opendum/models/fs";
 
 import {
   aaIndex,
@@ -10,7 +10,7 @@ import {
   parseManifest,
   aaScore,
   stripEffort,
-} from "./aa.ts";
+} from "@opendum/models/sync/aa";
 
 function leaderboardHtml(models: unknown[], key = "models"): string {
   const inner = `{"${key}":${JSON.stringify(models)}}`;

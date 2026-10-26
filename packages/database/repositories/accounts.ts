@@ -1,4 +1,4 @@
-import type { DbExecutor } from "../client.js";
+import type { DbExecutor } from "@opendum/database/client";
 import {
   disableFailedAccount,
   credentialsById,
@@ -11,7 +11,7 @@ import {
   sharedAccounts,
   recordAccountError,
   updateRefreshedCredentials,
-} from "../queries/index.js";
+} from "@opendum/database/queries/index";
 
 export class Accounts {
   constructor(private readonly database: DbExecutor) {}

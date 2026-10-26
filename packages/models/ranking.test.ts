@@ -5,7 +5,7 @@ import {
   SORT_ORDER,
   categorize,
   anchorId,
-} from "./ranking.ts";
+} from "@opendum/models/ranking";
 
 const FEATURED_FAMILIES = SORT_ORDER.filter((family) => family !== "Others");
 

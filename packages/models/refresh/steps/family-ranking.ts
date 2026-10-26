@@ -1,7 +1,7 @@
 import { flagshipRanking, loadEntries } from "@opendum/models/runtime";
-import { readText, writeText } from "#models/fs.ts";
-import { join } from "#models/paths.ts";
-import { dataDir, runScript } from "./shared.ts";
+import { readText, writeText } from "@opendum/models/fs";
+import { join } from "@opendum/models/paths";
+import { dataDir, runScript } from "@opendum/models/refresh/core/env";
 
 const MIN_FLAGSHIP_SCORE = 20;
 

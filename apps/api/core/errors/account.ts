@@ -1,4 +1,4 @@
-import { Coerce, Safe } from "../helpers.js";
+import { Coerce, Safe } from "@opendum/api/core/helpers";
 
 const TEXT_LIMIT = 200;
 const RAW_LIMIT = 2000;

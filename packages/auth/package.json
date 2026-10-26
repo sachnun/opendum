@@ -7,7 +7,8 @@
     ".": "./index.ts",
     "./service": "./service.ts",
     "./types": "./types.ts",
-    "./custom-store": "./store/custom.ts"
+    "./custom-store": "./store/custom.ts",
+    "./*": "./*.ts"
   },
   "scripts": {
     "test": "bun test --pass-with-no-tests",

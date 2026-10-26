@@ -1,6 +1,6 @@
 import { Buffer } from "node:buffer";
 
-import { Value } from "./values.js";
+import { Value } from "@opendum/providers/core/values";
 
 export type Claims = Record<string, unknown>;
 

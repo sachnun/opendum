@@ -1,7 +1,7 @@
 import { SQL } from "bun";
 import { drizzle, type BunSQLDatabase } from "drizzle-orm/bun-sql";
-import * as relations from "./relations.js";
-import * as schema from "./schema/index.js";
+import * as relations from "@opendum/database/relations";
+import * as schema from "@opendum/database/schema/index";
 
 export const fullSchema = { ...schema, ...relations };
 

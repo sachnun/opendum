@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { Policy } from "./policy.ts";
-import type { ModelInfo } from "./registry.ts";
+import { Policy } from "@opendum/models/policy";
+import type { ModelInfo } from "@opendum/models/registry";
 
 function policyOf(models: Record<string, ModelInfo>): Policy {
   return new Policy({

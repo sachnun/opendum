@@ -1,9 +1,9 @@
 import { Effect } from "effect";
 
-import { fromPromise } from "#web/lib/task.js";
-import type { ServiceFailure } from "#web/errors.js";
-import type { OAuthResult } from "./types.js";
-import { httpError } from "./provider-http-errors.js";
+import { fromPromise } from "@opendum/api/web/lib/task";
+import type { ServiceFailure } from "@opendum/api/web/errors";
+import type { OAuthResult } from "@opendum/api/web/lib/providers/types";
+import { httpError } from "@opendum/api/web/lib/providers/provider-http-errors";
 
 export class ProviderResponse {
   private readonly label: string;

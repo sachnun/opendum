@@ -2,35 +2,35 @@ import { Duration, Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
 import type { OpendumRedis } from "@opendum/core/redis";
 
-import { Value, Payload, Ids, Responses } from "../../core/helpers.js";
+import { Value, Payload, Ids, Responses } from "@opendum/providers/core/helpers";
 import {
   anySlice,
   defaultAny,
   type Json,
-} from "./common.js";
+} from "@opendum/providers/upstreams/antigravity/common";
 import {
   GeminiCompletion,
   GeminiResponse,
   GeminiSchema,
   GeminiStream,
-} from "./transform.js";
-import { ChatImageInliner } from "../../core/images.js";
-import { RequestFailure, type UpstreamTransport } from "../../core/http.js";
-import { OAuthBase } from "../../core/oauth.js";
-import { CodeAssist, type AccountInfo, type AntigravityOptions } from "./options.js";
-import { GeminiModel, GeminiTier } from "./model.js";
+} from "@opendum/providers/upstreams/antigravity/transform";
+import { ChatImageInliner } from "@opendum/providers/core/images";
+import { RequestFailure, type UpstreamTransport } from "@opendum/providers/core/http";
+import { OAuthBase } from "@opendum/providers/core/oauth";
+import { CodeAssist, type AccountInfo, type AntigravityOptions } from "@opendum/providers/upstreams/antigravity/options";
+import { GeminiModel, GeminiTier } from "@opendum/providers/upstreams/antigravity/model";
 import {
   GeminiArtifacts,
   GeminiPayload,
   GeminiTierDetector,
   GeminiToolBlocks,
-} from "./payload.js";
+} from "@opendum/providers/upstreams/antigravity/payload";
 import {
   GeminiRequest,
-} from "./request.js";
-import type { Provider, ProviderFailure, ProviderRequest } from "../../types.js";
+} from "@opendum/providers/upstreams/antigravity/request";
+import type { Provider, ProviderFailure, ProviderRequest } from "@opendum/providers/types";
 
-import { ANTIGRAVITY_TOKEN_ENDPOINT } from "../../endpoints.js";
+import { ANTIGRAVITY_TOKEN_ENDPOINT } from "@opendum/providers/endpoints";
 
 const OAUTH_TOKEN_ENDPOINT = ANTIGRAVITY_TOKEN_ENDPOINT;
 const REFRESH_BUFFER_MS = 60 * 60 * 1000;

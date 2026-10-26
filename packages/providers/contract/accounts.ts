@@ -1,8 +1,8 @@
 import { oc } from "@orpc/contract";
 import { z } from "zod";
 
-import { emptyInputSchema } from "./common.js";
-import { DEVICE_PROVIDER_KEYS, OAUTH_PROVIDER_KEYS, QUOTA_PROVIDER_KEYS } from "../provider-accounts.js";
+import { emptyInputSchema } from "@opendum/providers/contract/common";
+import { DEVICE_PROVIDER_KEYS, OAUTH_PROVIDER_KEYS, QUOTA_PROVIDER_KEYS } from "@opendum/providers/provider-accounts";
 
 const PROVIDER_KEY_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/;
 const QUOTA_BATCH_LIMIT = 100;

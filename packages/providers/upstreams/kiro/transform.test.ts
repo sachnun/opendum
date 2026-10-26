@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { KiroCompletion, KiroRequest, Parser } from "./transform.js";
+import { KiroCompletion, KiroRequest, Parser } from "@opendum/providers/upstreams/kiro/transform";
 
 type Json = Record<string, unknown>;
 

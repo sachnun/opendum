@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { HTTPError, mockEvent } from "h3";
-import errorHandler from "../error.js";
-import { errorEnvelope, formatPath, inferencePath } from "../handlers/errors.js";
+import errorHandler from "@opendum/api/error";
+import { errorEnvelope, formatPath, inferencePath } from "@opendum/api/handlers/errors";
 
 const fallback = () => ({ status: 500 });
 

@@ -7,12 +7,12 @@ import { tryLoad } from "@opendum/models/runtime";
 import { Fetcher, UnroxyEgress, type Fetch } from "@opendum/core/egress";
 import { ProviderRegistry, RedisFallbackRouter, type EgressFetch } from "@opendum/providers";
 import { db, closeDatabase } from "@opendum/database";
-import { ProxyService } from "./service.js";
-import { reconcileOrphans, reconcileLoop } from "./roaming-reconcile.js";
-import { proxyConfig } from "../config.js";
-import { ProxyContextTag, type ProxyContext } from "./services.js";
+import { ProxyService } from "@opendum/api/core/service";
+import { reconcileOrphans, reconcileLoop } from "@opendum/api/core/roaming-reconcile";
+import { proxyConfig } from "@opendum/api/config";
+import { ProxyContextTag, type ProxyContext } from "@opendum/api/core/services";
 
-export type { ProxyContext } from "./services.js";
+export type { ProxyContext } from "@opendum/api/core/services";
 
 export function dirFor(): string {
   const cwd = process.cwd();

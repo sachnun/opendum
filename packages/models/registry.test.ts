@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "bun:test";
 import { fileURLToPath } from "node:url";
-import { Registry, scoreFor } from "./registry.ts";
+import { Registry, scoreFor } from "@opendum/models/registry";
 
 const dataDir = fileURLToPath(new URL("./data", import.meta.url));
 const registry = Registry.load(dataDir);

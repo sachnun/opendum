@@ -4,7 +4,7 @@ import {
   RAW_MESSAGE_LIMIT,
   ERROR_STRING_LIMIT,
   type PlaygroundEndpoint,
-} from "./types";
+} from "~~/lib/playground/types";
 
 export class ErrorText {
   static fromResponse(text: string): string {

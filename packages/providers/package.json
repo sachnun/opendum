@@ -15,7 +15,8 @@
     "./quota": "./quota/index.ts",
     "./quota/types": "./quota/types.ts",
     "./contract": "./contract/index.ts",
-    "./contract/types": "./contract/types.ts"
+    "./contract/types": "./contract/types.ts",
+    "./*": "./*.ts"
   },
   "scripts": {
     "test": "bun test",
