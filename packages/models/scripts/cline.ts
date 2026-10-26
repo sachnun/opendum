@@ -1,17 +1,17 @@
 import { idMap, sync } from "#models/model-store.ts";
-import { runFetchJson } from "#models/sync/http.ts";
-import { stripParamInfoKey } from "#models/model/clean-key.ts";
+import { fetchJson } from "#models/sync/http.ts";
+import { stripParams } from "#models/model/clean-key.ts";
 import { arrayAt, idsOf } from "#models/json.ts";
-import { packageModelsDir, runScript } from "./shared.ts";
+import { dataDir, runScript } from "./shared.ts";
 
 const PROVIDER_NAME = "cline";
 
-const CLINE_RECOMMENDED_MODELS_URL =
+const RECOMMENDED_URL =
   "https://api.cline.bot/api/v1/ai/cline/recommended-models";
 
 const MIN_EXPECTED_MODELS = 1;
 
-function toModelKey(modelId: string): string {
+function modelKey(modelId: string): string {
   const slashIndex = modelId.indexOf("/");
   const baseModelId = slashIndex === -1 ? modelId : modelId.slice(slashIndex + 1);
 
@@ -20,12 +20,12 @@ function toModelKey(modelId: string): string {
     .replace(/[^a-zA-Z0-9._-]/g, "-")
     .replace(/-{2,}/g, "-");
 
-  const cleaned = stripParamInfoKey(modelKey);
+  const cleaned = stripParams(modelKey);
   return cleaned.endsWith("-free") ? cleaned.slice(0, -"-free".length) : cleaned;
 }
 
-async function fetchClineFreeModelIds(): Promise<string[]> {
-  const payload = await runFetchJson(CLINE_RECOMMENDED_MODELS_URL, {
+async function freeIds(): Promise<string[]> {
+  const payload = await fetchJson(RECOMMENDED_URL, {
     label: "Cline recommended models",
   });
   const free = arrayAt(payload, "free");
@@ -41,10 +41,10 @@ async function fetchClineFreeModelIds(): Promise<string[]> {
 }
 
 async function main(): Promise<void> {
-  const modelsDir = packageModelsDir();
+  const modelsDir = dataDir();
 
-  const modelIds = await fetchClineFreeModelIds();
-  const modelMap = idMap(modelIds, toModelKey);
+  const modelIds = await freeIds();
+  const modelMap = idMap(modelIds, modelKey);
 
   const result = await sync(modelsDir, PROVIDER_NAME, modelMap);
 

@@ -116,7 +116,7 @@ function harness(replies: Array<Reply>, accounts = ["acc-1", "acc-2"]): Harness 
     resolveAlias: (model: string) => model,
     lookupKeys: (model: string) => [model],
     isVisionModel: () => true,
-    isSupportedByProvider: () => true,
+    supportsProvider: () => true,
     isAuthless: () => false,
     rule: () => null,
     modelCost: () => null,
@@ -175,8 +175,8 @@ describe("transient upstream retry before rotation", () => {
     await response.text();
     expect(response.status).toBe(200);
     expect(seen).toEqual(["acc-1", "acc-1"]);
-    expect(repositories.health.markUsageLimitedHealth.mock.calls.length).toBe(0);
-    expect(repositories.health.setAccountUsageLimited.mock.calls.length).toBe(0);
+    expect(repositories.health.markUsageLimited.mock.calls.length).toBe(0);
+    expect(repositories.health.markLimited.mock.calls.length).toBe(0);
   });
 
   it("retries the same account on a temporary server fault", async () => {
@@ -229,8 +229,8 @@ describe("workbuddy usage limit handling", () => {
     const response = await call();
     await response.text();
     expect(response.status).toBe(429);
-    expect(repositories.health.markUsageLimitedHealth.mock.calls.length).toBe(1);
-    const limited = repositories.health.setAccountUsageLimited.mock.calls[0]?.[0];
+    expect(repositories.health.markUsageLimited.mock.calls.length).toBe(1);
+    const limited = repositories.health.markLimited.mock.calls[0]?.[0];
     expect(limited?.id).toBe("acc-1");
     expect(limited?.disabledUntil.toISOString()).toBe("2099-10-24T05:34:16.000Z");
   });

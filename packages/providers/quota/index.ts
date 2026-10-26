@@ -7,20 +7,20 @@ export type {
   QuotaJournal,
 } from "./types.js";
 export {
-  baseQuotaInfo,
+  baseInfo,
   clampFraction,
   displayNumber,
-  errorQuotaInfo,
-  expiredQuotaInfo,
+  errorInfo,
+  expiredInfo,
   formatFloat,
-  formatTimeUntilReset,
-  formatTimeUntilResetIso,
-  parseQuotaNumber,
-  parseQuotaRecord,
-  parseResetIso,
+  resetText,
+  resetIso,
+  parseNumber,
+  parseRecord,
+  isoOf,
 } from "./helpers.js";
-export { encodeQuery, getQuotaJson, putQuotaCache } from "./cache.js";
+export { encodeQuery, quotaJson, putQuota } from "./cache.js";
 export { Quotas, fetchQuota, isQuota, withoutToken } from "./registry.js";
-export { quotaFallbackTier } from "./fetchers/shared.js";
+export { fallbackTier } from "./fetchers/shared.js";
 export { QuotaFetchFailure, QuotaJournalFailure } from "../core/errors.js";
 export type { QuotaFailure } from "../core/errors.js";

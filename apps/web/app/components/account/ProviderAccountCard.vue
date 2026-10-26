@@ -1,44 +1,44 @@
 <script setup lang="ts">
 import {
-  getErrorMessageModel,
-  isImmediatelyRecoverableErrorCode,
-  normalizePlaygroundEndpoint,
-  addAdditionalPlaygroundParams,
-  addPlaygroundParam,
-  parseErrorParameters,
-  parseStoredErrorMessage,
-  stripStatusFromErrorMessage,
+  messageModel,
+  isRecoverable,
+  normalizeEndpoint,
+  addParams,
+  addParam,
+  parseParams,
+  parseMessage,
+  stripStatus,
 } from "~~/lib/account-errors";
 import {
-  collectStatValues,
+  statValues,
   compactNumber,
-  expandDailyPoints,
-  expandDurationPoints,
-  formatDateTime,
+  dailyPoints,
+  durationPoints,
+  dateTime,
   formatDuration,
-  formatHourLabel,
-  formatRelativeTime,
-  formatSignedDuration,
-  formatSignedInteger,
-  formatSignedPercent,
-  formatTierBadgeLabel,
-  getAccountHeader,
-  getErrorEntryPreview,
-  getErrorEntryRelativeTime,
-  getErrorEntryStatusTag,
-  isPaidTierValue,
-  isPreviousDayLabel,
-  maskSensitiveText,
-  toTimeMs,
+  hourLabel,
+  relativeTime,
+  signedDuration,
+  signedInteger,
+  signedPercent,
+  tierLabel,
+  accountHeader,
+  errorPreview,
+  errorTime,
+  errorStatus,
+  paidTier,
+  prevDay,
+  maskText,
+  timeOf,
   type Account,
   type DurationPoint,
   type ErrorPreviewEntry,
   type StatDeltaTone,
   type StatMetric,
 } from "~~/lib/account-format";
-import { quotaPercentRemaining, quotaResetTitle } from "~~/lib/quota-display";
+import { percentRemaining, resetTitle } from "~~/lib/quota-display";
 
-import type { AccountQuotaInfo, ErrorHistoryResult, ProviderAccountUpdateData, ProviderDetailData, QuotaGroupDisplay } from "~~/lib/api-types";
+import type { AccountQuotaInfo, ErrorHistoryResult, AccountUpdateData, ProviderDetailData, QuotaGroupDisplay } from "~~/lib/api-types";
 import { QUOTA_PROVIDER_KEYS } from "@opendum/providers/provider-accounts";
 
 
@@ -56,9 +56,9 @@ type StatHit = { text: string; tone: StatDeltaTone; version: number };
 
 
 const QUOTA_PROVIDERS = new Set<string>(QUOTA_PROVIDER_KEYS);
-const ERROR_PREVIEW_SWIPE_THRESHOLD_PX = 45;
-const ERROR_PREVIEW_VISIBLE_COUNT = 9;
-const ERROR_PREVIEW_CENTER_INDEX = 4;
+const SWIPE_THRESHOLD = 45;
+const PREVIEW_COUNT = 9;
+const PREVIEW_CENTER = 4;
 
 
 const props = defineProps<{
@@ -78,9 +78,9 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  renamed: [account: ProviderAccountUpdateData];
-  "active-updated": [account: ProviderAccountUpdateData];
-  "temporarily-disabled": [account: ProviderAccountUpdateData];
+  renamed: [account: AccountUpdateData];
+  "active-updated": [account: AccountUpdateData];
+  "temporarily-disabled": [account: AccountUpdateData];
   deleted: [accountId: string];
   "errors-resolved": [accountId: string];
 }>();
@@ -97,16 +97,16 @@ const {
   temporaryOffAmount,
   temporaryOffUnit,
   temporaryOffError,
-  temporaryOffDialogOpen,
-  getTemporaryOffUntil,
-  startTemporaryOffLongPress,
-  finishTemporaryOffLongPress,
-  handleTemporaryOffToggleClick,
+  dialogOpen,
+  offUntil,
+  startLongPress,
+  finishLongPress,
+  toggleClick,
   toggleActive,
   disableTemporarily,
   renameAccount,
   deleteAccount,
-} = useProviderAccountActions(props, {
+} = useAccountActions(props, {
   onActiveUpdated: (data) => emit("active-updated", data),
   onTemporarilyDisabled: (data) => emit("temporarily-disabled", data),
   onRenamed: (data) => {
@@ -131,12 +131,12 @@ const copiedSession = ref(false);
 const sessionLoading = ref(false);
 const statHitEffects = ref<Record<string, StatHit>>({});
 const previousStatValues = ref<Record<string, number> | null>(null);
-const previousStatAnimationContextKey = ref<string | null>(null);
-const pendingStatBaselineContextKey = ref<string | null>(null);
+const prevAnimKey = ref<string | null>(null);
+const pendingBaselineKey = ref<string | null>(null);
 const activeErrorIndex = ref(0);
 const cardRoot = ref<HTMLElement | null>(null);
-let errorPreviewDragStartX: number | null = null;
-let suppressNextErrorPreviewClick = false;
+let dragStartX: number | null = null;
+let suppressClick = false;
 
 
 
@@ -194,42 +194,42 @@ let suppressNextErrorPreviewClick = false;
 
 
 
-const accountHeader = computed(() => getAccountHeader(props.account));
-const accountTitle = computed(() => accountHeader.value.title || "Provider account");
+const header = computed(() => accountHeader(props.account));
+const accountTitle = computed(() => header.value.title || "Provider account");
 const historyError = computed(() => props.errorHistoryError ?? null);
 const historyEntries = computed(() => props.errorHistory ?? null);
 const subtitle = computed(() => {
-  return accountHeader.value.subtitle;
+  return header.value.subtitle;
 });
-const subtitleDisplay = computed(() => (subtitle.value ? (isSubtitleVisible.value ? subtitle.value : maskSensitiveText(subtitle.value)) : null));
-const dailyPoints = computed(() => expandDailyPoints(props.account.stats.dailyRequests));
-const dailyValues = computed(() => dailyPoints.value.map((point) => point.count));
-const durationPoints = computed(() => expandDurationPoints(props.account.stats.durationLast24Hours));
-const durationValues = computed(() => durationPoints.value.map((point) => point.avgDuration ?? 0));
+const subtitleDisplay = computed(() => (subtitle.value ? (isSubtitleVisible.value ? subtitle.value : maskText(subtitle.value)) : null));
+const daily = computed(() => dailyPoints(props.account.stats.dailyRequests));
+const dailyValues = computed(() => daily.value.map((point) => point.count));
+const duration = computed(() => durationPoints(props.account.stats.durationLast24Hours));
+const durationValues = computed(() => duration.value.map((point) => point.avgDuration ?? 0));
 const durationLabelPoints = computed(() => {
-  const points = durationPoints.value;
+  const points = duration.value;
   const tickCount = Math.min(5, points.length);
   const indexes = Array.from(new Set(Array.from({ length: tickCount }, (_, index) => Math.round((index / (tickCount - 1 || 1)) * (points.length - 1)))));
   return indexes.map((index) => points[index]).filter(Boolean) as DurationPoint[];
 });
 const statMetrics = computed<StatMetric[]>(() => [
-  { key: "totalRequests", label: "Requests", value: props.account.stats.totalRequests.toLocaleString(), numericValue: props.account.stats.totalRequests, formatDelta: formatSignedInteger },
-  { key: "totalTokens", label: "Token", value: compactNumber(props.account.stats.totalTokens), numericValue: props.account.stats.totalTokens, formatDelta: formatSignedInteger },
-  { key: "successRate", label: "Success", value: props.account.stats.successRate === null ? "-" : `${props.account.stats.successRate}%`, numericValue: props.account.stats.successRate ?? Number.NaN, formatDelta: formatSignedPercent },
-  { key: "avgDuration", label: "Latency", value: formatDuration(props.account.stats.avgDurationLastDay), numericValue: props.account.stats.avgDurationLastDay ?? Number.NaN, formatDelta: formatSignedDuration, getTone: (delta) => delta > 0 ? "negative" : "positive" },
+  { key: "totalRequests", label: "Requests", value: props.account.stats.totalRequests.toLocaleString(), numericValue: props.account.stats.totalRequests, formatDelta: signedInteger },
+  { key: "totalTokens", label: "Token", value: compactNumber(props.account.stats.totalTokens), numericValue: props.account.stats.totalTokens, formatDelta: signedInteger },
+  { key: "successRate", label: "Success", value: props.account.stats.successRate === null ? "-" : `${props.account.stats.successRate}%`, numericValue: props.account.stats.successRate ?? Number.NaN, formatDelta: signedPercent },
+  { key: "avgDuration", label: "Latency", value: formatDuration(props.account.stats.avgDurationLastDay), numericValue: props.account.stats.avgDurationLastDay ?? Number.NaN, formatDelta: signedDuration, getTone: (delta) => delta > 0 ? "negative" : "positive" },
 ]);
-const statAnimationContextKey = computed(() => {
+const animKey = computed(() => {
   const userKey = isAuditMode.value ? `audit:${auditUser.value?.id ?? ""}` : "self";
   return `${props.account.id}:${userKey}:${auditRefreshVersion.value}`;
 });
 const usageStats = computed(() => statMetrics.value.map((stat) => ({ ...stat, hit: props.animateDeltas === false ? undefined : statHitEffects.value[stat.key] })));
 const effectiveTier = computed(() => props.account.tier);
 const normalizedTier = computed(() => effectiveTier.value?.trim().toLowerCase() || "");
-const tierBadgeLabel = computed(() => formatTierBadgeLabel(normalizedTier.value, props.account.provider));
+const tierBadgeLabel = computed(() => tierLabel(normalizedTier.value, props.account.provider));
 const showTierBadge = computed(() => props.showTier && tierBadgeLabel.value !== "");
 const supportsQuotaMonitor = computed(() => QUOTA_PROVIDERS.has(props.account.provider));
 const usageChartColor = computed(() => props.account.isActive ? "var(--chart-1)" : "var(--muted-foreground)");
-const usageChartColorAlt = computed(() => props.account.isActive ? "var(--chart-2)" : "var(--muted-foreground)");
+const chartColorAlt = computed(() => props.account.isActive ? "var(--chart-2)" : "var(--muted-foreground)");
 const activeDisabledUntil = computed(() => {
   if (!props.account.disabledUntil) return null;
 
@@ -238,72 +238,72 @@ const activeDisabledUntil = computed(() => {
   return disabledUntil;
 });
 const accountStatusLabel = computed(() => {
-  if (activeDisabledUntil.value) return `Cooldown ${formatRelativeTime(activeDisabledUntil.value).replace(/^in\s+/, "")}`;
+  if (activeDisabledUntil.value) return `Cooldown ${relativeTime(activeDisabledUntil.value).replace(/^in\s+/, "")}`;
   return props.account.isActive ? "On" : "Off";
 });
 const accountStatusTitle = computed(() => activeDisabledUntil.value ? `Temporarily disabled until ${activeDisabledUntil.value.toLocaleString()}` : undefined);
 const temporaryOffPreview = computed(() => {
-  const until = getTemporaryOffUntil();
+  const until = offUntil();
   if (!until) return "Select a valid future duration.";
-  return `${formatRelativeTime(until)} (${formatDateTime(until)})`;
+  return `${relativeTime(until)} (${dateTime(until)})`;
 });
-function getRecoveredTimeMs(): number {
-  return Math.max(toTimeMs(props.account.lastSuccessAt) ?? 0, toTimeMs(props.account.lastRecoveredByRotationAt) ?? 0, toTimeMs(props.account.lastUsedAt) ?? 0);
+function recoveredAt(): number {
+  return Math.max(timeOf(props.account.lastSuccessAt) ?? 0, timeOf(props.account.lastRecoveredAt) ?? 0, timeOf(props.account.lastUsedAt) ?? 0);
 }
 
 
 
-function getRecoveredErrorToneClass(entry: ErrorPreviewEntry | null | undefined, recovered: boolean): string {
+function recoveredTone(entry: ErrorPreviewEntry | null | undefined, recovered: boolean): string {
   if (!recovered) return "text-red-500";
-  if (isImmediatelyRecoverableErrorCode(entry?.errorCode)) return "text-foreground";
+  if (isRecoverable(entry?.errorCode)) return "text-foreground";
   return "text-amber-400";
 }
 
-function getErrorToneClass(entry: ErrorPreviewEntry | null | undefined): string {
-  const errorMs = toTimeMs(entry?.createdAt);
+function errorTone(entry: ErrorPreviewEntry | null | undefined): string {
+  const errorMs = timeOf(entry?.createdAt);
   if (!errorMs) return "text-muted-foreground";
 
-  const recoveredMs = getRecoveredTimeMs();
-  const hasRecoveredAfterError = recoveredMs > errorMs;
+  const recoveredMs = recoveredAt();
+  const recovered = recoveredMs > errorMs;
 
-  const model = entry?.model?.trim() || (entry?.errorMessage ? getErrorMessageModel(entry.errorMessage, entry.errorCode) : null);
+  const model = entry?.model?.trim() || (entry?.errorMessage ? messageModel(entry.errorMessage, entry.errorCode) : null);
   if (model) {
     const health = props.modelHealth?.[model];
-    const modelRecoveredMs = toTimeMs(health?.lastSuccessAt);
-    const hasModelRecoveredAfterError = Boolean(modelRecoveredMs && modelRecoveredMs > errorMs);
+    const modelRecoveredMs = timeOf(health?.lastSuccessAt);
+    const modelRecovered = Boolean(modelRecoveredMs && modelRecoveredMs > errorMs);
 
-    return getRecoveredErrorToneClass(entry, hasModelRecoveredAfterError || hasRecoveredAfterError);
+    return recoveredTone(entry, modelRecovered || recovered);
   }
 
-  return getRecoveredErrorToneClass(entry, hasRecoveredAfterError);
+  return recoveredTone(entry, recovered);
 }
 
-const allErrorPreviewEntries = computed<ErrorPreviewEntry[]>(() => {
+const allPreviewEntries = computed<ErrorPreviewEntry[]>(() => {
   return (historyEntries.value ?? [])
     .map((entry) => ({
       id: entry.id,
-      model: entry.model ?? getErrorMessageModel(entry.errorMessage, entry.errorCode),
+      model: entry.model ?? messageModel(entry.errorMessage, entry.errorCode),
       errorCode: entry.errorCode,
       errorMessage: entry.errorMessage,
       createdAt: entry.createdAt,
     }))
-    .sort((a, b) => (toTimeMs(b.createdAt) ?? 0) - (toTimeMs(a.createdAt) ?? 0));
+    .sort((a, b) => (timeOf(b.createdAt) ?? 0) - (timeOf(a.createdAt) ?? 0));
 });
-const errorPreviewWindowStart = computed(() => {
-  const total = allErrorPreviewEntries.value.length;
-  if (total <= ERROR_PREVIEW_VISIBLE_COUNT) return 0;
+const previewStart = computed(() => {
+  const total = allPreviewEntries.value.length;
+  if (total <= PREVIEW_COUNT) return 0;
 
-  return Math.min(Math.max(activeErrorIndex.value - ERROR_PREVIEW_CENTER_INDEX, 0), total - ERROR_PREVIEW_VISIBLE_COUNT);
+  return Math.min(Math.max(activeErrorIndex.value - PREVIEW_CENTER, 0), total - PREVIEW_COUNT);
 });
-const errorPreviewEntries = computed<ErrorPreviewEntry[]>(() => allErrorPreviewEntries.value.slice(errorPreviewWindowStart.value, errorPreviewWindowStart.value + ERROR_PREVIEW_VISIBLE_COUNT));
-const activeErrorEntry = computed<ErrorPreviewEntry | null>(() => allErrorPreviewEntries.value[activeErrorIndex.value] ?? allErrorPreviewEntries.value[0] ?? null);
-const errorPreviewToneClass = computed(() => {
-  const toneClass = getErrorToneClass(activeErrorEntry.value);
+const errorPreviewEntries = computed<ErrorPreviewEntry[]>(() => allPreviewEntries.value.slice(previewStart.value, previewStart.value + PREVIEW_COUNT));
+const activeErrorEntry = computed<ErrorPreviewEntry | null>(() => allPreviewEntries.value[activeErrorIndex.value] ?? allPreviewEntries.value[0] ?? null);
+const previewTone = computed(() => {
+  const toneClass = errorTone(activeErrorEntry.value);
   return toneClass === "text-foreground" ? "text-foreground/80" : toneClass;
 });
 
-function getErrorPreviewSliderDotClass(entry: ErrorPreviewEntry, isActive: boolean): string {
-  const toneClass = getErrorToneClass(entry);
+function dotClass(entry: ErrorPreviewEntry, isActive: boolean): string {
+  const toneClass = errorTone(entry);
 
   if (isActive) {
     if (toneClass === "text-red-500") return "w-4 bg-red-500";
@@ -317,25 +317,25 @@ function getErrorPreviewSliderDotClass(entry: ErrorPreviewEntry, isActive: boole
   return "w-1.5 bg-muted-foreground/35";
 }
 
-const displayErrorMessage = computed(() => activeErrorEntry.value ? stripStatusFromErrorMessage(activeErrorEntry.value.errorMessage, activeErrorEntry.value.errorCode) : "");
-const errorDetails = computed(() => activeErrorEntry.value ? parseStoredErrorMessage(activeErrorEntry.value.errorMessage, activeErrorEntry.value.errorCode) : null);
+const displayErrorMessage = computed(() => activeErrorEntry.value ? stripStatus(activeErrorEntry.value.errorMessage, activeErrorEntry.value.errorCode) : "");
+const errorDetails = computed(() => activeErrorEntry.value ? parseMessage(activeErrorEntry.value.errorMessage, activeErrorEntry.value.errorCode) : null);
 const errorPlaygroundRoute = computed(() => {
   const details = errorDetails.value;
   const query: Record<string, string> = { accountId: props.account.id };
   const model = details?.model?.trim();
-  const endpoint = normalizePlaygroundEndpoint(details?.endpoint);
-  const params = parseErrorParameters(details?.parameters);
+  const endpoint = normalizeEndpoint(details?.endpoint);
+  const params = parseParams(details?.parameters);
 
   if (model) query.model = model;
   if (endpoint) query.endpoint = endpoint;
   if (params) {
-    addPlaygroundParam(query, params, "stream");
-    addPlaygroundParam(query, params, "temperature");
-    addPlaygroundParam(query, params, "top_p");
-    addPlaygroundParam(query, params, "max_tokens", ["max_output_tokens", "max_completion_tokens"]);
-    addPlaygroundParam(query, params, "presence_penalty");
-    addPlaygroundParam(query, params, "frequency_penalty");
-    addPlaygroundParam(query, params, "reasoning_effort");
+    addParam(query, params, "stream");
+    addParam(query, params, "temperature");
+    addParam(query, params, "top_p");
+    addParam(query, params, "max_tokens", ["max_output_tokens", "max_completion_tokens"]);
+    addParam(query, params, "presence_penalty");
+    addParam(query, params, "frequency_penalty");
+    addParam(query, params, "reasoning_effort");
 
     const outputConfig = params.output_config;
     if (!query.reasoning_effort && outputConfig && typeof outputConfig === "object" && !Array.isArray(outputConfig)) {
@@ -349,13 +349,13 @@ const errorPlaygroundRoute = computed(() => {
       if (typeof effort === "string" && effort.trim()) query.reasoning_effort = effort.trim();
     }
 
-    addAdditionalPlaygroundParams(query, params);
+    addParams(query, params);
   }
 
   return { path: "/play", query };
 });
-const hasPreviousErrorPreview = computed(() => activeErrorIndex.value < allErrorPreviewEntries.value.length - 1);
-const hasNewerErrorPreview = computed(() => activeErrorIndex.value > 0);
+const hasPrevious = computed(() => activeErrorIndex.value < allPreviewEntries.value.length - 1);
+const hasNewer = computed(() => activeErrorIndex.value > 0);
 
 watch(
   () => [props.account.id, props.account.lastErrorAt] as const,
@@ -366,32 +366,32 @@ watch(
   },
 );
 
-watch([statMetrics, statAnimationContextKey, () => props.animateDeltas], ([items, contextKey, animateDeltas]) => {
-  const nextValues = collectStatValues(items);
+watch([statMetrics, animKey, () => props.animateDeltas], ([items, contextKey, animateDeltas]) => {
+  const nextValues = statValues(items);
 
   if (animateDeltas === false) {
     previousStatValues.value = nextValues;
-    previousStatAnimationContextKey.value = contextKey;
-    pendingStatBaselineContextKey.value = null;
+    prevAnimKey.value = contextKey;
+    pendingBaselineKey.value = null;
     statHitEffects.value = {};
     return;
   }
 
   const previousValues = previousStatValues.value;
-  const previousContextKey = previousStatAnimationContextKey.value;
+  const previousContextKey = prevAnimKey.value;
   const contextChanged = previousContextKey !== contextKey;
 
   if (contextChanged) {
     previousStatValues.value = nextValues;
-    previousStatAnimationContextKey.value = contextKey;
-    pendingStatBaselineContextKey.value = previousContextKey === null ? null : contextKey;
+    prevAnimKey.value = contextKey;
+    pendingBaselineKey.value = previousContextKey === null ? null : contextKey;
     statHitEffects.value = {};
     return;
   }
 
-  if (!previousValues || pendingStatBaselineContextKey.value === contextKey) {
+  if (!previousValues || pendingBaselineKey.value === contextKey) {
     previousStatValues.value = nextValues;
-    pendingStatBaselineContextKey.value = null;
+    pendingBaselineKey.value = null;
     return;
   }
 
@@ -414,11 +414,11 @@ watch([statMetrics, statAnimationContextKey, () => props.animateDeltas], ([items
   }
 
   previousStatValues.value = nextValues;
-  previousStatAnimationContextKey.value = contextKey;
+  prevAnimKey.value = contextKey;
   statHitEffects.value = nextHitEffects;
 }, { immediate: true });
 
-watch(allErrorPreviewEntries, (entries) => {
+watch(allPreviewEntries, (entries) => {
   if (activeErrorIndex.value >= entries.length) activeErrorIndex.value = Math.max(0, entries.length - 1);
 });
 
@@ -426,23 +426,23 @@ watch(allErrorPreviewEntries, (entries) => {
 
 
 
-function quotaBarColor(group: QuotaGroupDisplay): string {
+function barColor(group: QuotaGroupDisplay): string {
   if (!props.account.isActive) return "bg-muted-foreground/50";
 
-  const percentRemaining = quotaPercentRemaining(group);
-  if (percentRemaining <= 10) return "bg-red-500";
-  if (percentRemaining <= 25) return "bg-orange-500";
-  if (percentRemaining <= 50) return "bg-yellow-500";
+  const percent = percentRemaining(group);
+  if (percent <= 10) return "bg-red-500";
+  if (percent <= 25) return "bg-orange-500";
+  if (percent <= 50) return "bg-yellow-500";
   return "bg-green-500";
 }
 
-function quotaTextColor(group: QuotaGroupDisplay): string {
+function textColor(group: QuotaGroupDisplay): string {
   if (!props.account.isActive) return "text-muted-foreground";
 
-  const percentRemaining = quotaPercentRemaining(group);
-  if (percentRemaining <= 10) return "text-red-400";
-  if (percentRemaining <= 25) return "text-orange-400";
-  if (percentRemaining <= 50) return "text-yellow-400";
+  const percent = percentRemaining(group);
+  if (percent <= 10) return "text-red-400";
+  if (percent <= 25) return "text-orange-400";
+  if (percent <= 50) return "text-yellow-400";
   return "text-green-400";
 }
 
@@ -461,7 +461,7 @@ async function resolveErrors() {
   }
 }
 
-async function copyToClipboard(value: string): Promise<boolean> {
+async function copyText(value: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(value);
     return true;
@@ -476,22 +476,22 @@ function resetFlag(flag: { value: boolean }) {
   }, 1500);
 }
 
-async function copyErrorPreview(event: Event) {
+async function copyPreview(event: Event) {
   event.stopPropagation();
   event.preventDefault();
 
-  if (!activeErrorEntry.value || !(await copyToClipboard(activeErrorEntry.value.errorMessage))) return;
+  if (!activeErrorEntry.value || !(await copyText(activeErrorEntry.value.errorMessage))) return;
   copiedErrorPreview.value = true;
   resetFlag(copiedErrorPreview);
 }
 
-async function copyErrorDetails() {
-  if (!activeErrorEntry.value || !(await copyToClipboard(activeErrorEntry.value.errorMessage))) return;
+async function copyDetails() {
+  if (!activeErrorEntry.value || !(await copyText(activeErrorEntry.value.errorMessage))) return;
   copiedErrorDetails.value = true;
   resetFlag(copiedErrorDetails);
 }
 
-async function copyAllErrors() {
+async function copyErrors() {
   const parts: string[] = [];
 
   if (historyEntries.value && historyEntries.value.length > 0) {
@@ -502,7 +502,7 @@ async function copyAllErrors() {
 
   if (parts.length === 0) return;
 
-  if (!(await copyToClipboard(parts.join("\n\n---\n\n")))) return;
+  if (!(await copyText(parts.join("\n\n---\n\n")))) return;
   copiedAllErrors.value = true;
   resetFlag(copiedAllErrors);
 }
@@ -511,7 +511,7 @@ async function copySession() {
   sessionLoading.value = true;
   try {
     const result = await api.accounts.copySession({ id: props.account.id });
-    if (!result.success || !(await copyToClipboard(result.data.session))) return;
+    if (!result.success || !(await copyText(result.data.session))) return;
     copiedSession.value = true;
     resetFlag(copiedSession);
   } finally {
@@ -525,45 +525,45 @@ async function copySession() {
 
 
 
-function showNewerErrorPreview(event?: Event) {
+function showNewer(event?: Event) {
   event?.stopPropagation();
   activeErrorIndex.value = Math.max(0, activeErrorIndex.value - 1);
 }
 
-function showPreviousErrorPreview(event?: Event) {
+function showPrevious(event?: Event) {
   event?.stopPropagation();
-  activeErrorIndex.value = Math.min(allErrorPreviewEntries.value.length - 1, activeErrorIndex.value + 1);
+  activeErrorIndex.value = Math.min(allPreviewEntries.value.length - 1, activeErrorIndex.value + 1);
 }
 
-function openActiveErrorDialog() {
-  if (suppressNextErrorPreviewClick) {
-    suppressNextErrorPreviewClick = false;
+function openDialog() {
+  if (suppressClick) {
+    suppressClick = false;
     return;
   }
 
   errorDialogOpen.value = true;
 }
 
-function handleErrorPreviewPointerDown(event: PointerEvent) {
+function dragDown(event: PointerEvent) {
   if (event.pointerType === "mouse" && event.button !== 0) return;
-  errorPreviewDragStartX = event.clientX;
+  dragStartX = event.clientX;
 }
 
-function handleErrorPreviewPointerEnd(event: PointerEvent) {
-  if (errorPreviewDragStartX === null) return;
+function dragUp(event: PointerEvent) {
+  if (dragStartX === null) return;
 
-  const deltaX = event.clientX - errorPreviewDragStartX;
-  errorPreviewDragStartX = null;
+  const deltaX = event.clientX - dragStartX;
+  dragStartX = null;
 
-  if (Math.abs(deltaX) < ERROR_PREVIEW_SWIPE_THRESHOLD_PX) return;
+  if (Math.abs(deltaX) < SWIPE_THRESHOLD) return;
 
-  suppressNextErrorPreviewClick = true;
-  if (deltaX < 0) showPreviousErrorPreview(event);
-  else showNewerErrorPreview(event);
+  suppressClick = true;
+  if (deltaX < 0) showPrevious(event);
+  else showNewer(event);
 }
 
-function cancelErrorPreviewPointer() {
-  errorPreviewDragStartX = null;
+function cancelDrag() {
+  dragStartX = null;
 }
 </script>
 
@@ -577,7 +577,7 @@ function cancelErrorPreviewPointer() {
         <div class="flex min-w-0 items-center justify-between gap-2">
           <UiCardTitle class="min-w-0 truncate text-lg">{{ accountTitle }}</UiCardTitle>
           <div class="flex shrink-0 items-center justify-end gap-1 whitespace-nowrap">
-            <UiBadge v-if="showTierBadge" variant="outline" :class="isPaidTierValue(normalizedTier, account.provider) ? 'border-green-500 text-green-600' : ''">
+            <UiBadge v-if="showTierBadge" variant="outline" :class="paidTier(normalizedTier, account.provider) ? 'border-green-500 text-green-600' : ''">
               {{ tierBadgeLabel }}
             </UiBadge>
             <UiBadge v-if="account.status === 'failed'" variant="outline" class="border-destructive/60 text-destructive gap-1">
@@ -620,15 +620,15 @@ function cancelErrorPreviewPointer() {
               />
             </div>
             <div class="mb-2">
-              <UsageSparkline :values="durationValues" :color="usageChartColorAlt" :aria-label="`Average duration trend for ${accountTitle} over last 24 hours`" class="h-6" :height="24" />
+              <UsageSparkline :values="durationValues" :color="chartColorAlt" :aria-label="`Average duration trend for ${accountTitle} over last 24 hours`" class="h-6" :height="24" />
               <div class="mt-0.5 grid grid-cols-5 text-[9px]">
-                <span v-for="point in durationLabelPoints" :key="point.time" :class="['truncate text-center', isPreviousDayLabel(point.time) ? 'text-muted-foreground' : 'text-foreground/80']">{{ formatHourLabel(point.time) }}</span>
+                <span v-for="point in durationLabelPoints" :key="point.time" :class="['truncate text-center', prevDay(point.time) ? 'text-muted-foreground' : 'text-foreground/80']">{{ hourLabel(point.time) }}</span>
               </div>
             </div>
             <UsageSparkline :values="dailyValues" :color="usageChartColor" :aria-label="`Requests trend for ${accountTitle}`" />
           </div>
 
-          <div class="flex justify-between"><span class="text-muted-foreground">Last used</span><span class="font-medium">{{ account.lastUsedAt ? formatRelativeTime(account.lastUsedAt) : '-' }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">Last used</span><span class="font-medium">{{ account.lastUsedAt ? relativeTime(account.lastUsedAt) : '-' }}</span></div>
 
           <div :class="['min-h-14', activeErrorEntry ? '' : 'hidden sm:block']">
             <div class="space-y-1.5 pt-2">
@@ -637,16 +637,16 @@ function cancelErrorPreviewPointer() {
                   v-if="activeErrorEntry"
                   tabindex="-1"
                   class="flex h-full cursor-pointer touch-pan-y flex-col rounded-sm border border-border/60 bg-muted/30 px-2 pt-2 pb-2 text-left select-none hover:bg-muted/40"
-                  @click="openActiveErrorDialog"
-                  @pointerdown="handleErrorPreviewPointerDown"
-                  @pointerup="handleErrorPreviewPointerEnd"
-                  @pointerleave="cancelErrorPreviewPointer"
-                  @pointercancel="cancelErrorPreviewPointer"
+                  @click="openDialog"
+                  @pointerdown="dragDown"
+                  @pointerup="dragUp"
+                  @pointerleave="cancelDrag"
+                  @pointercancel="cancelDrag"
                 >
                   <div class="flex items-center justify-between gap-1">
-                    <span v-if="getErrorEntryStatusTag(activeErrorEntry)" class="flex min-w-0 items-center gap-1.5">
-                      <UiBadge variant="outline" class="h-5 shrink-0 px-1.5 py-0 text-[10px] font-medium">{{ getErrorEntryStatusTag(activeErrorEntry)?.code }}</UiBadge>
-                      <span class="truncate text-xs text-muted-foreground">{{ getErrorEntryStatusTag(activeErrorEntry)?.label }}</span>
+                    <span v-if="errorStatus(activeErrorEntry)" class="flex min-w-0 items-center gap-1.5">
+                      <UiBadge variant="outline" class="h-5 shrink-0 px-1.5 py-0 text-[10px] font-medium">{{ errorStatus(activeErrorEntry)?.code }}</UiBadge>
+                      <span class="truncate text-xs text-muted-foreground">{{ errorStatus(activeErrorEntry)?.label }}</span>
                     </span>
                     <span v-else class="text-xs text-muted-foreground">No status code</span>
                     <UiTooltip text="Copy">
@@ -654,7 +654,7 @@ function cancelErrorPreviewPointer() {
                         type="button"
                         class="shrink-0 cursor-pointer rounded p-0.5"
                         aria-label="Copy error message"
-                        @click="copyErrorPreview"
+                        @click="copyPreview"
                       >
                         <UiIcon v-if="copiedErrorPreview" name="i-lucide-check" class="size-3 text-muted-foreground" />
                         <UiIcon v-else name="i-lucide-copy" class="size-3 text-muted-foreground" />
@@ -662,10 +662,10 @@ function cancelErrorPreviewPointer() {
                     </UiTooltip>
                   </div>
                   <div class="mt-1 flex min-h-0 flex-1 items-center">
-                    <span :class="['line-clamp-4 break-all text-xs', errorPreviewToneClass]">{{ getErrorEntryPreview(activeErrorEntry) }}</span>
+                    <span :class="['line-clamp-4 break-all text-xs', previewTone]">{{ errorPreview(activeErrorEntry) }}</span>
                   </div>
                   <div class="mt-1 flex items-center justify-between gap-2 text-[10px] text-muted-foreground/80">
-                    <span>{{ getErrorEntryRelativeTime(activeErrorEntry) }}</span>
+                    <span>{{ errorTime(activeErrorEntry) }}</span>
                     <span class="min-w-0 truncate text-right font-mono">{{ activeErrorEntry.model }}</span>
                   </div>
                 </div>
@@ -676,7 +676,7 @@ function cancelErrorPreviewPointer() {
 
               <div class="flex items-center justify-between gap-2">
                 <UiTooltip text="Newer">
-                  <UiButton type="button" variant="outline" size="icon-sm" class="h-6 w-6" :disabled="!hasNewerErrorPreview" aria-label="Show newer error" @click="showNewerErrorPreview">
+                  <UiButton type="button" variant="outline" size="icon-sm" class="h-6 w-6" :disabled="!hasNewer" aria-label="Show newer error" @click="showNewer">
                     <UiIcon name="i-lucide-chevron-left" class="size-3.5" />
                   </UiButton>
                 </UiTooltip>
@@ -686,12 +686,12 @@ function cancelErrorPreviewPointer() {
                     <span
                       v-for="(entry, index) in errorPreviewEntries"
                       :key="index"
-                      :class="['h-1.5 rounded-full', getErrorPreviewSliderDotClass(entry, errorPreviewWindowStart + index === activeErrorIndex)]"
+                      :class="['h-1.5 rounded-full', dotClass(entry, previewStart + index === activeErrorIndex)]"
                     />
                   </template>
                 </div>
                 <UiTooltip text="Older">
-                  <UiButton type="button" variant="outline" size="icon-sm" class="h-6 w-6" :disabled="!hasPreviousErrorPreview" aria-label="Show previous error" @click="showPreviousErrorPreview">
+                  <UiButton type="button" variant="outline" size="icon-sm" class="h-6 w-6" :disabled="!hasPrevious" aria-label="Show previous error" @click="showPrevious">
                     <UiIcon name="i-lucide-chevron-right" class="size-3.5" />
                   </UiButton>
                 </UiTooltip>
@@ -710,16 +710,16 @@ function cancelErrorPreviewPointer() {
                   <div class="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 text-xs">
                     <span class="min-w-0 overflow-hidden truncate text-muted-foreground">{{ group.displayName }}</span>
                     <span class="flex min-w-0 max-w-28 shrink-0 items-center justify-end gap-1.5 overflow-hidden">
-                      <UiTooltip v-if="group.resetInHuman" :text="quotaResetTitle(group)">
+                      <UiTooltip v-if="group.resetInHuman" :text="resetTitle(group)">
                         <span class="block max-w-20 truncate text-[10px] text-muted-foreground">
                           {{ group.resetInHuman }}
                         </span>
                       </UiTooltip>
-                      <span :class="['shrink-0 font-mono', quotaTextColor(group)]">{{ quotaPercentRemaining(group) }}%</span>
+                      <span :class="['shrink-0 font-mono', textColor(group)]">{{ percentRemaining(group) }}%</span>
                     </span>
                   </div>
                   <div class="h-1.5 overflow-hidden rounded-full bg-muted">
-                    <div class="h-full transition-all duration-300" :class="quotaBarColor(group)" :style="{ width: `${quotaPercentRemaining(group)}%` }" />
+                    <div class="h-full transition-all duration-300" :class="barColor(group)" :style="{ width: `${percentRemaining(group)}%` }" />
                   </div>
                 </div>
               </div>
@@ -755,11 +755,11 @@ function cancelErrorPreviewPointer() {
               :model-value="account.isActive"
               :disabled="readonly || isToggling || isTemporaryDisabling"
               :title="account.isActive ? 'Disable' : 'Enable'"
-              @pointerdown="startTemporaryOffLongPress"
-              @pointerup="finishTemporaryOffLongPress"
-              @pointerleave="finishTemporaryOffLongPress"
-              @pointercancel="finishTemporaryOffLongPress"
-              @click.capture="handleTemporaryOffToggleClick"
+              @pointerdown="startLongPress"
+              @pointerup="finishLongPress"
+              @pointerleave="finishLongPress"
+              @pointercancel="finishLongPress"
+              @click.capture="toggleClick"
               @update:model-value="toggleActive"
             />
           </div>
@@ -770,7 +770,7 @@ function cancelErrorPreviewPointer() {
       </UiCardContent>
     </UiCard>
 
-    <UiDialog v-model:open="temporaryOffDialogOpen" :ui="{ content: 'sm:max-w-md' }">
+    <UiDialog v-model:open="dialogOpen" :ui="{ content: 'sm:max-w-md' }">
       <template #content>
         <div class="space-y-1.5 pr-6">
           <h2 class="text-lg font-semibold">Disable Temporarily</h2>
@@ -793,7 +793,7 @@ function cancelErrorPreviewPointer() {
         <p class="rounded-md border border-border/70 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">This account will turn back on {{ temporaryOffPreview }}.</p>
         <p v-if="temporaryOffError" class="text-sm text-red-500">{{ temporaryOffError }}</p>
         <div class="flex justify-end gap-2">
-          <UiButton variant="outline" :disabled="isTemporaryDisabling" @click="temporaryOffDialogOpen = false">Cancel</UiButton>
+          <UiButton variant="outline" :disabled="isTemporaryDisabling" @click="dialogOpen = false">Cancel</UiButton>
           <UiButton :disabled="isTemporaryDisabling" @click="disableTemporarily">{{ isTemporaryDisabling ? 'Disabling...' : 'Disable' }}</UiButton>
         </div>
       </template>
@@ -818,12 +818,12 @@ function cancelErrorPreviewPointer() {
         <div class="flex items-center justify-between gap-3">
           <div class="flex items-center gap-1">
             <UiTooltip text="Copy all">
-              <UiButton type="button" variant="outline" size="icon-sm" aria-label="Copy all errors" @click="copyAllErrors">
+              <UiButton type="button" variant="outline" size="icon-sm" aria-label="Copy all errors" @click="copyErrors">
                 <UiIcon :name="copiedAllErrors ? 'i-lucide-check' : 'i-lucide-clipboard-list'" class="size-4" />
               </UiButton>
             </UiTooltip>
             <UiTooltip text="Copy">
-              <UiButton type="button" variant="outline" size="icon-sm" aria-label="Copy error details" @click="copyErrorDetails">
+              <UiButton type="button" variant="outline" size="icon-sm" aria-label="Copy error details" @click="copyDetails">
                 <UiIcon :name="copiedErrorDetails ? 'i-lucide-check' : 'i-lucide-copy'" class="size-4" />
               </UiButton>
             </UiTooltip>

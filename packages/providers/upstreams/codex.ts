@@ -1,29 +1,17 @@
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
 import type { OpendumRedis } from "@opendum/core/redis";
-import {
-  cloneAnyMap,
-  defaultStringValue,
-  extractInstructions,
-  filterKeys,
-  jsonResponse,
-  normalizeToolChoice,
-  numberFromAny,
-  parseSseDataLines,
-  stringSlice,
-  stringValue,
-  uniqueStrings,
-} from "../core/helpers.js";
+import { Value, Payload, Responses, JSONText } from "../core/helpers.js";
 import { Collector } from "../transform/collector.js";
+import { anthropicUsage } from "../transform/anthropic.js";
 import {
-  convertToolsForResponses,
-  messagesToResponsesInput,
-  normalizeResponsesInput,
-  responseUsageToChatUsage,
-  responsesSseToChatStream,
-  toChatCallId,
+  toolsFor,
+  toInput,
+  inputOf,
+  sseStream,
+  callId,
 } from "../transform/responses.js";
-import { transportFailure, type UpstreamTransport } from "../core/http.js";
+import { RequestFailure, type UpstreamTransport } from "../core/http.js";
 import { ProviderCredentialFailure } from "../core/errors.js";
 import { OAuth } from "../core/oauth.js";
 import type {
@@ -37,12 +25,12 @@ import type {
 } from "../types.js";
 
 import {
-  CODEX_API_BASE_URL,
+  CODEX_BASE_URL,
   CODEX_CLIENT_ID,
   CODEX_ORIGINATOR,
   CODEX_TOKEN_ENDPOINT,
 } from "../endpoints.js";
-const CODEX_REFRESH_BUFFER_MS = 5 * 60 * 1000;
+const REFRESH_BUFFER_MS = 5 * 60 * 1000;
 
 export const SUPPORTED_CODEX = new Set([
   "model", "instructions", "store", "input", "stream", "tools", "tool_choice",
@@ -52,7 +40,7 @@ export const SUPPORTED_CODEX = new Set([
 
 type Json = Record<string, unknown>;
 
-function lastModelSegment(model: string): string {
+function lastSegment(model: string): string {
   const parts = model.split("/");
   return parts[parts.length - 1];
 }
@@ -70,73 +58,73 @@ function jwtClaims(token: string): Json | null {
   }
 }
 
-function firstStringClaim(claims: Json, key: string): string {
-  return stringValue(claims[key]).trim();
+function claimString(claims: Json, key: string): string {
+  return Value.string(claims[key]).trim();
 }
 
-function extractOrganizationId(claims: Json): string {
+function organizationId(claims: Json): string {
   const organizations = Array.isArray(claims.organizations) ? claims.organizations : [];
   for (const preferDefault of [true, false]) {
     for (const raw of organizations) {
       const org = (raw ?? {}) as Json;
       const isDefault = org.is_default === true || org.default === true;
       if (preferDefault && !isDefault) continue;
-      const value = stringValue(org.id).trim();
+      const value = Value.string(org.id).trim();
       if (value) return value;
     }
   }
   return "";
 }
 
-function extractAccountIdFromJwt(token: string): string {
+function jwtAccount(token: string): string {
   const claims = jwtClaims(token);
   if (!claims) return "";
-  const accountId = firstStringClaim(claims, "chatgpt_account_id");
+  const accountId = claimString(claims, "chatgpt_account_id");
   if (accountId) return accountId;
-  return extractWorkspaceIdFromClaims(claims);
+  return claimsWorkspace(claims);
 }
 
-function extractWorkspaceIdFromClaims(claims: Json): string {
+function claimsWorkspace(claims: Json): string {
   const auth = claims["https://api.openai.com/auth"];
   const authClaims =
     auth !== null && typeof auth === "object" && !Array.isArray(auth) ? (auth as Json) : null;
   for (const source of [authClaims, claims]) {
     if (!source) continue;
     for (const key of ["chatgpt_workspace_id", "workspace_id", "organization_id"]) {
-      const value = firstStringClaim(source, key);
+      const value = claimString(source, key);
       if (value) return value;
     }
-    const orgId = extractOrganizationId(source);
+    const orgId = organizationId(source);
     if (orgId) return orgId;
   }
   return "";
 }
 
-function extractTierFromJwt(token: string): string {
+function jwtTier(token: string): string {
   const claims = jwtClaims(token);
   if (!claims) return "";
-  const direct = stringValue(claims.chatgpt_plan_type);
+  const direct = Value.string(claims.chatgpt_plan_type);
   if (direct) return direct.trim().toLowerCase();
   const auth = claims["https://api.openai.com/auth"];
   if (auth !== null && typeof auth === "object" && !Array.isArray(auth)) {
-    return stringValue((auth as Json).chatgpt_plan_type).trim().toLowerCase();
+    return Value.string((auth as Json).chatgpt_plan_type).trim().toLowerCase();
   }
   return "";
 }
 
-function parseFloatString(value: string): number {
+function toFloat(value: string): number {
   const parsed = Number(value.trim());
   if (!Number.isFinite(parsed) || parsed < 0) return 0;
   return parsed > 100 ? 100 : parsed;
 }
 
-function parseIntString(value: string): number | null {
+function toInt(value: string): number | null {
   if (!value.trim()) return null;
   const parsed = Number.parseInt(value.trim(), 10);
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function parseBoolString(value: string): boolean {
+function parseBool(value: string): boolean {
   const normalized = value.trim().toLowerCase();
   return normalized === "true" || normalized === "1";
 }
@@ -147,22 +135,22 @@ function resetTimestamp(value: number | null): number | null {
 }
 
 function quotaWindow(used: string, windowMinutes: string, resetAt: string): Json {
-  const usedPercent = parseFloatString(used);
+  const usedPercent = toFloat(used);
   let remaining = 100 - usedPercent;
   if (remaining < 0) remaining = 0;
-  const reset = parseIntString(resetAt);
+  const reset = toInt(resetAt);
   return {
     usedPercent,
     remainingPercent: remaining,
     remainingFraction: remaining / 100,
-    windowMinutes: parseIntString(windowMinutes),
+    windowMinutes: toInt(windowMinutes),
     resetAt: reset,
     resetTimestamp: resetTimestamp(reset),
     isExhausted: usedPercent >= 100,
   };
 }
 
-function parseCodexQuotaHeaders(headers: Headers): Json | null {
+function readQuota(headers: Headers): Json | null {
   const primaryUsed = headers.get("x-codex-primary-used-percent") ?? "";
   const secondaryUsed = headers.get("x-codex-secondary-used-percent") ?? "";
   const credits = headers.get("x-codex-credits-has-credits") ?? "";
@@ -184,8 +172,8 @@ function parseCodexQuotaHeaders(headers: Headers): Json | null {
   }
   if (credits) {
     snapshot.credits = {
-      hasCredits: parseBoolString(credits),
-      unlimited: parseBoolString(headers.get("x-codex-credits-unlimited") ?? ""),
+      hasCredits: parseBool(credits),
+      unlimited: parseBool(headers.get("x-codex-credits-unlimited") ?? ""),
       balance: (headers.get("x-codex-credits-balance") ?? "") || null,
     };
   }
@@ -239,11 +227,11 @@ export class CodexProvider implements Provider, CredentialRefresher, RefreshBuff
         if (!accessToken) throw new Error("codex token refresh returned empty access token");
         const nextRefresh = token.refresh_token || refreshToken;
         const expiresIn = token.expires_in && token.expires_in > 0 ? token.expires_in : 3600;
-        let accountId = extractAccountIdFromJwt(accessToken);
-        if (!accountId && token.id_token) accountId = extractAccountIdFromJwt(token.id_token);
+        let accountId = jwtAccount(accessToken);
+        if (!accountId && token.id_token) accountId = jwtAccount(token.id_token);
         let tier = "";
-        if (token.id_token) tier = extractTierFromJwt(token.id_token);
-        if (!tier) tier = extractTierFromJwt(accessToken);
+        if (token.id_token) tier = jwtTier(token.id_token);
+        if (!tier) tier = jwtTier(accessToken);
         return {
           accessToken,
           refreshToken: nextRefresh,
@@ -256,7 +244,7 @@ export class CodexProvider implements Provider, CredentialRefresher, RefreshBuff
   }
 
   refreshBuffer(): number {
-    return CODEX_REFRESH_BUFFER_MS;
+    return REFRESH_BUFFER_MS;
   }
 
   refreshCredentials(
@@ -267,11 +255,11 @@ export class CodexProvider implements Provider, CredentialRefresher, RefreshBuff
   }
 
   makeRequest(request: ProviderRequest): Effect.Effect<Response, ProviderFailure> {
-    const modelName = this.resolveModel(stringValue(request.body.model));
+    const modelName = this.resolveModel(Value.string(request.body.model));
     const account = request.account;
     let accountId = account.accountId?.trim() ?? "";
     if (!accountId) {
-      const extracted = extractAccountIdFromJwt(request.credentials);
+      const extracted = jwtAccount(request.credentials);
       if (extracted) {
         accountId = extracted;
         this.onAccountId?.(extracted);
@@ -279,7 +267,7 @@ export class CodexProvider implements Provider, CredentialRefresher, RefreshBuff
     }
     if (!this.isModelAllowed(modelName)) {
       return Effect.succeed(
-        jsonResponse(400, {
+        Responses.json(400, {
           error: {
             message: `Model "${modelName}" is not supported for Codex when using a ChatGPT account. Use one of: ${this.supportedModelNames().join(
               ", "
@@ -301,25 +289,25 @@ export class CodexProvider implements Provider, CredentialRefresher, RefreshBuff
       "User-Agent": `opencode/1.19.4 (${process.platform} ${process.platform}; ${process.arch})`,
     };
     if (accountId) headers["ChatGPT-Account-Id"] = accountId;
-    const sessionId = stringValue(request.body._sessionId);
+    const sessionId = Value.string(request.body._sessionId);
     if (sessionId) headers.session_id = sessionId;
 
     const transport = this.transport;
     return Effect.gen({ self: this }, function* () {
       const resp = yield* Effect.tryPromise({
         try: () =>
-          transport.direct(CODEX_API_BASE_URL, {
+          transport.direct(CODEX_BASE_URL, {
             method: "POST",
             headers,
             body: JSON.stringify(payload),
           }),
-        catch: (cause) => transportFailure("codex", cause, CODEX_API_BASE_URL),
+        catch: (cause) => RequestFailure.transport("codex", cause, CODEX_BASE_URL),
       });
       if (resp.status < 200 || resp.status >= 300) return resp;
-      request.onUpstreamResponseStart?.();
-      void this.updateQuotaFromHeaders(account.id, resp.headers);
+      request.onResponseStart?.();
+      void this.applyQuota(account.id, resp.headers);
       if (request.stream && resp.body) {
-        return new Response(responsesSseToChatStream(resp.body, modelName), {
+        return new Response(sseStream(resp.body, modelName), {
           status: 200,
           headers: {
             "Content-Type": "text/event-stream",
@@ -329,13 +317,13 @@ export class CodexProvider implements Provider, CredentialRefresher, RefreshBuff
         });
       }
       const text = yield* Effect.promise(() => resp.text());
-      return jsonResponse(200, responsesStreamToCompletion(text, modelName));
+      return Responses.json(200, fromResponses(text, modelName));
     });
   }
 
-  private async updateQuotaFromHeaders(accountId: string, headers: Headers): Promise<void> {
+  private async applyQuota(accountId: string, headers: Headers): Promise<void> {
     if (!this.redis || !accountId) return;
-    const snapshot = parseCodexQuotaHeaders(headers);
+    const snapshot = readQuota(headers);
     if (!snapshot) return;
     snapshot.status = "success";
     snapshot.source = "headers";
@@ -369,33 +357,33 @@ export class CodexProvider implements Provider, CredentialRefresher, RefreshBuff
   private buildPayload(body: Json, modelName: string, upstreamStream: boolean): Json {
     const messages = Array.isArray(body.messages) ? body.messages : [];
     const payload: Json = { model: modelName, store: false, stream: upstreamStream };
-    const instructions = stringValue(body.instructions);
+    const instructions = Value.string(body.instructions);
     if (instructions) {
       payload.instructions = instructions;
     } else {
-      const derived = extractInstructions(messages);
+      const derived = Payload.instructions(messages);
       payload.instructions = derived || "You are Codex, an expert coding assistant.";
     }
     if (Array.isArray(body._responsesInput) && body._responsesInput.length > 0) {
-      payload.input = normalizeResponsesInput(body._responsesInput);
+      payload.input = inputOf(body._responsesInput);
     } else {
-      payload.input = messagesToResponsesInput(messages);
+      payload.input = toInput(messages);
     }
-    const tools = convertToolsForResponses(body.tools);
+    const tools = toolsFor(body.tools);
     if (tools.length > 0) {
       payload.tools = tools;
       if (body.tool_choice === undefined || body.tool_choice === null) payload.tool_choice = "auto";
     }
     if (body.tool_choice !== undefined && body.tool_choice !== null) {
-      payload.tool_choice = normalizeToolChoice(body.tool_choice);
+      payload.tool_choice = Payload.toolChoice(body.tool_choice);
     }
     if (body.parallel_tool_calls !== undefined && body.parallel_tool_calls !== null) {
       payload.parallel_tool_calls = body.parallel_tool_calls;
     }
     if (body.reasoning !== null && typeof body.reasoning === "object" && !Array.isArray(body.reasoning)) {
-      payload.reasoning = cloneAnyMap(body.reasoning as Json);
+      payload.reasoning = Payload.clone(body.reasoning as Json);
     } else {
-      const effort = stringValue(body.reasoning_effort);
+      const effort = Value.string(body.reasoning_effort);
       if (effort) payload.reasoning = { effort };
     }
     const reasoning = payload.reasoning;
@@ -408,33 +396,33 @@ export class CodexProvider implements Provider, CredentialRefresher, RefreshBuff
     ) {
       (reasoning as Json).summary = "auto";
     }
-    let include = stringSlice(body.include);
+    let include = Value.strings(body.include);
     if (body._includeReasoning === true || tools.length > 0) {
       include.push("reasoning.encrypted_content");
     }
-    if (include.length > 0) payload.include = uniqueStrings(include);
+    if (include.length > 0) payload.include = Value.unique(include);
     for (const key of ["previous_response_id", "service_tier"]) {
       if (body[key] !== undefined && body[key] !== null) payload[key] = body[key];
     }
-    const sessionId = stringValue(body._sessionId);
+    const sessionId = Value.string(body._sessionId);
     if (sessionId) {
       payload.prompt_cache_key = sessionId;
       payload.client_metadata = { session_id: sessionId };
     }
-    return filterKeys(payload, SUPPORTED_CODEX);
+    return Payload.filter(payload, SUPPORTED_CODEX);
   }
 
   private resolveModel(model: string): string {
-    return this.registry.upstream(lastModelSegment(model), "codex");
+    return this.registry.upstream(lastSegment(model), "codex");
   }
 }
 
-export function responsesStreamToCompletion(text: string, model: string): Json {
-  const events = parseSseDataLines(text);
+export function fromResponses(text: string, model: string): Json {
+  const events = JSONText.sseLines(text);
   const collector = new Collector({
     model,
     nullContent: true,
-    normalizeArgs: (args) => defaultStringValue(args, "{}"),
+    normalizeArgs: (args) => Value.stringOr(args, "{}"),
     forceFinish: true,
   });
   const reasoningParts = new Map<string, string>();
@@ -451,19 +439,19 @@ export function responsesStreamToCompletion(text: string, model: string): Json {
   const addReasoningItem = (item: Json): void => {
     if (Array.isArray(item.summary) && item.summary.length > 0) {
       item.summary.forEach((raw, index) => {
-        const value = typeof raw === "string" ? raw : stringValue((raw as Json)?.text);
+        const value = typeof raw === "string" ? raw : Value.string((raw as Json)?.text);
         if (value) appendReasoning(`summary:${index}`, value);
       });
       return;
     }
     if (Array.isArray(item.content) && item.content.length > 0) {
       item.content.forEach((raw, index) => {
-        const value = stringValue((raw as Json)?.text);
+        const value = Value.string((raw as Json)?.text);
         if (value) appendReasoning(`text:${index}`, value);
       });
       return;
     }
-    const textValue = stringValue(item.text);
+    const textValue = Value.string(item.text);
     if (textValue) appendReasoning("text:0", textValue);
   };
 
@@ -471,28 +459,28 @@ export function responsesStreamToCompletion(text: string, model: string): Json {
   let status = "";
   let rawUsage: unknown = {};
   for (const event of events) {
-    switch (stringValue(event.type)) {
+    switch (Value.string(event.type)) {
       case "response.output_text.delta":
-        collector.addContent(stringValue(event.delta));
+        collector.addContent(Value.string(event.delta));
         break;
       case "response.reasoning.delta":
       case "response.reasoning_text.delta":
-        appendReasoning(`text:${numberFromAny(event.content_index)}`, stringValue(event.delta));
+        appendReasoning(`text:${Value.number(event.content_index)}`, Value.string(event.delta));
         break;
       case "response.reasoning_summary_text.delta":
-        appendReasoning(`summary:${numberFromAny(event.summary_index)}`, stringValue(event.delta));
+        appendReasoning(`summary:${Value.number(event.summary_index)}`, Value.string(event.delta));
         break;
       case "response.reasoning_text.done":
-        appendReasoning(`text:${numberFromAny(event.content_index)}`, stringValue(event.text));
+        appendReasoning(`text:${Value.number(event.content_index)}`, Value.string(event.text));
         break;
       case "response.reasoning_summary_text.done":
-        appendReasoning(`summary:${numberFromAny(event.summary_index)}`, stringValue(event.text));
+        appendReasoning(`summary:${Value.number(event.summary_index)}`, Value.string(event.text));
         break;
       case "response.reasoning_summary_part.done": {
         const part = (event.part ?? {}) as Json;
-        let value = stringValue(part.text);
-        if (!value) value = stringValue(event.text);
-        appendReasoning(`summary:${numberFromAny(event.summary_index)}`, value);
+        let value = Value.string(part.text);
+        if (!value) value = Value.string(event.text);
+        appendReasoning(`summary:${Value.number(event.summary_index)}`, value);
         break;
       }
       case "response.output_item.added": {
@@ -511,7 +499,7 @@ export function responsesStreamToCompletion(text: string, model: string): Json {
       case "response.function_call_arguments.delta":
       case "response.custom_tool_call_input.delta":
         if (currentTool) {
-          currentTool.arguments = stringValue(currentTool.arguments) + stringValue(event.delta);
+          currentTool.arguments = Value.string(currentTool.arguments) + Value.string(event.delta);
         }
         break;
       case "response.function_call_arguments.done":
@@ -519,12 +507,12 @@ export function responsesStreamToCompletion(text: string, model: string): Json {
         const item = (event.item ?? {}) as Json;
         if (item.type === "reasoning") addReasoningItem(item);
         if (currentTool) {
-          const callId = toChatCallId(defaultStringValue(currentTool.call_id, stringValue(currentTool.id)));
+          const mappedId = callId(Value.stringOr(currentTool.call_id, Value.string(currentTool.id)));
           collector.addToolCall({
-            key: callId,
-            id: callId,
-            name: stringValue(currentTool.name),
-            arguments: stringValue(currentTool.arguments),
+            key: mappedId,
+            id: mappedId,
+            name: Value.string(currentTool.name),
+            arguments: Value.string(currentTool.arguments),
           });
           currentTool = null;
         }
@@ -533,7 +521,7 @@ export function responsesStreamToCompletion(text: string, model: string): Json {
       case "response.completed":
       case "response.done": {
         const response = (event.response ?? event) as Json;
-        status = stringValue(response.status);
+        status = Value.string(response.status);
         rawUsage = response.usage;
         break;
       }
@@ -548,6 +536,6 @@ export function responsesStreamToCompletion(text: string, model: string): Json {
     .join("\n\n");
   collector.addReasoning(reasoningText);
   collector.setFinish(status === "incomplete" ? "length" : "stop");
-  collector.setUsage(responseUsageToChatUsage(rawUsage));
+  collector.setUsage(anthropicUsage(rawUsage));
   return collector.toCompletion();
 }

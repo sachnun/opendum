@@ -1,14 +1,14 @@
 import type { DbExecutor } from "../client.js";
 import {
   disableFailedAccount,
-  getAccountCredentialsByID,
-  getAccountOwnerUserID,
+  credentialsById,
+  ownerId,
   getForcedAccount,
   getQuotaAccount,
-  listDisabledAccountIDs,
+  disabledIds,
   listEligibleAccounts,
-  listExpiringRefreshableAccounts,
-  listSharedEligibleAccounts,
+  expiringAccounts,
+  sharedAccounts,
   recordAccountError,
   updateRefreshedCredentials,
 } from "../queries/index.js";
@@ -20,16 +20,16 @@ export class Accounts {
     return listEligibleAccounts(params, this.database);
   }
 
-  listSharedEligibleAccounts(params: Parameters<typeof listSharedEligibleAccounts>[0]) {
-    return listSharedEligibleAccounts(params, this.database);
+  sharedAccounts(params: Parameters<typeof sharedAccounts>[0]) {
+    return sharedAccounts(params, this.database);
   }
 
-  listDisabledAccountIDs(params: Parameters<typeof listDisabledAccountIDs>[0]) {
-    return listDisabledAccountIDs(params, this.database);
+  disabledIds(params: Parameters<typeof disabledIds>[0]) {
+    return disabledIds(params, this.database);
   }
 
-  listExpiringRefreshableAccounts(params: Parameters<typeof listExpiringRefreshableAccounts>[0]) {
-    return listExpiringRefreshableAccounts(params, this.database);
+  expiringAccounts(params: Parameters<typeof expiringAccounts>[0]) {
+    return expiringAccounts(params, this.database);
   }
 
   getForcedAccount(id: string, userId: string) {
@@ -40,12 +40,12 @@ export class Accounts {
     return getQuotaAccount(id, userId, provider, this.database);
   }
 
-  getAccountCredentialsByID(id: string) {
-    return getAccountCredentialsByID(id, this.database);
+  credentialsById(id: string) {
+    return credentialsById(id, this.database);
   }
 
-  getAccountOwnerUserID(id: string) {
-    return getAccountOwnerUserID(id, this.database);
+  ownerId(id: string) {
+    return ownerId(id, this.database);
   }
 
   updateRefreshedCredentials(params: Parameters<typeof updateRefreshedCredentials>[0]) {

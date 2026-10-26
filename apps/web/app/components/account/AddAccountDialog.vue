@@ -38,7 +38,7 @@ const {
   copiedLink,
   copiedDeviceCode,
   copiedCallbackUrl,
-  isApiKeyVisible,
+  apiKeyVisible,
   isLoading,
   isFetchingUrl,
   isPolling,
@@ -49,30 +49,30 @@ const {
   finishStep,
   dialogOpen,
   displayedSteps,
-  shouldPreventOutsideClose,
-  handleCustomCreated,
+  preventOutsideClose,
+  customCreated,
   selectProvider,
   selectCustom,
-  selectLoginMethod,
+  selectLogin,
   copyText,
   openPopup,
-  openOAuthUrl,
-  openDeviceAuthUrl,
-  openApiKeyPortal,
-  handleConnectApiKey,
-  handleConnectCodexSession,
-  handleCallbackInput,
-  pasteCallbackUrl,
-  handleCallbackPaste,
+  oauthUrl,
+  deviceUrl,
+  keyPortal,
+  connectKey,
+  connectCodex,
+  callbackInput,
+  pasteCallback,
+  callbackPaste,
   goBack,
-  goBackFromDevicePolling,
+  backPolling,
   providerOptions,
   chatgptSessionPlaceholder,
   providerConfigs,
   callbackPlaceholder,
 } = useAccountConnect(props, {
   onConnected: (result) => emit("connected", result),
-  onCustomCreated: (slug) => emit("customCreated", slug),
+  customCreated: (slug) => emit("customCreated", slug),
 });
 </script>
 
@@ -84,7 +84,7 @@ const {
 
   <UiDialog
     v-model:open="dialogOpen"
-    :prevent-outside-close="shouldPreventOutsideClose"
+    :prevent-outside-close="preventOutsideClose"
     :prevent-escape-close="isPolling"
     :ui="{ content: 'max-h-[calc(100dvh-1rem)] p-4 sm:max-w-lg sm:p-6' }"
   >
@@ -174,7 +174,7 @@ const {
                 'flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-muted/40 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent',
                 selectedMethod === method.key ? 'border-foreground/30 bg-muted/30' : 'border-border',
               )"
-              @click="selectLoginMethod(method.key)"
+              @click="selectLogin(method.key)"
             >
               <span class="flex items-center gap-2 text-sm font-medium">
                 {{ method.name }}
@@ -194,7 +194,7 @@ const {
               </p>
             </div>
             <div class="flex gap-2">
-              <UiButton variant="outline" class="flex-1" :disabled="isFetchingUrl || !authUrl" @click="openOAuthUrl">
+              <UiButton variant="outline" class="flex-1" :disabled="isFetchingUrl || !authUrl" @click="oauthUrl">
                 <UiIcon :name="isFetchingUrl ? 'i-lucide-loader-2' : 'i-lucide-external-link'" :class="['size-4', isFetchingUrl ? 'animate-spin' : '']" />
                 Open {{ selectedConfig.name }} Login
               </UiButton>
@@ -231,7 +231,7 @@ const {
               </div>
             </div>
             <div class="flex gap-2">
-              <UiButton variant="outline" class="flex-1" :disabled="isFetchingUrl || !deviceCodeInfo" @click="openDeviceAuthUrl">
+              <UiButton variant="outline" class="flex-1" :disabled="isFetchingUrl || !deviceCodeInfo" @click="deviceUrl">
                 <UiIcon :name="isFetchingUrl ? 'i-lucide-loader-2' : 'i-lucide-external-link'" :class="['size-4', isFetchingUrl ? 'animate-spin' : '']" />
                 Open {{ selectedConfig.name }} Login
               </UiButton>
@@ -283,7 +283,7 @@ const {
               <p class="break-all text-xs text-muted-foreground">{{ selectedConfig.apiKeyPortalUrl }}</p>
             </div>
             <div class="flex gap-2">
-              <UiButton type="button" variant="outline" class="flex-1" @click="openApiKeyPortal">
+              <UiButton type="button" variant="outline" class="flex-1" @click="keyPortal">
                 <UiIcon name="i-lucide-external-link" class="size-4" />
                 Open {{ selectedConfig.name }} Portal
               </UiButton>
@@ -315,8 +315,8 @@ const {
                 :placeholder="callbackPlaceholder(provider)"
                 :disabled="isLoading"
                 class="h-9 w-full rounded-md border border-input bg-background px-3 pr-9 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50"
-                @input="handleCallbackInput"
-                @paste="handleCallbackPaste"
+                @input="callbackInput"
+                @paste="callbackPaste"
               >
               <UiTooltip :text="copiedCallbackUrl ? 'Pasted' : 'Paste'">
                 <button
@@ -324,7 +324,7 @@ const {
                   :disabled="isLoading"
                   class="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
                   aria-label="Paste callback URL"
-                  @click="pasteCallbackUrl"
+                  @click="pasteCallback"
                 >
                   <UiIcon :name="isLoading ? 'i-lucide-loader-2' : copiedCallbackUrl ? 'i-lucide-check' : 'i-lucide-clipboard-paste'" :class="['size-4', isLoading ? 'animate-spin' : '']" />
                 </button>
@@ -340,7 +340,7 @@ const {
           autocomplete="off"
           data-lpignore="true"
           data-1p-ignore="true"
-          @submit.prevent="handleConnectCodexSession"
+          @submit.prevent="connectCodex"
         >
           <div class="space-y-2">
             <label for="chatgpt-session-json" class="text-sm font-medium">
@@ -377,7 +377,7 @@ const {
           autocomplete="off"
           data-lpignore="true"
           data-1p-ignore="true"
-          @submit.prevent="handleConnectApiKey"
+          @submit.prevent="connectKey"
         >
           <div class="space-y-2">
             <p class="text-sm font-medium">Connect {{ selectedConfig.name }}</p>
@@ -406,18 +406,18 @@ const {
                 :disabled="isLoading"
                 :class="cn(
                   'h-9 w-full rounded-md border border-input bg-background px-3 pr-9 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50',
-                  isApiKeyVisible ? '' : '[text-security:disc] [-webkit-text-security:disc]',
+                  apiKeyVisible ? '' : '[text-security:disc] [-webkit-text-security:disc]',
                 )"
               >
-              <UiTooltip :text="isApiKeyVisible ? 'Hide' : 'Show'">
+              <UiTooltip :text="apiKeyVisible ? 'Hide' : 'Show'">
                 <button
                   type="button"
                   :disabled="isLoading"
                   class="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
-                  :aria-label="isApiKeyVisible ? 'Hide API key' : 'Show API key'"
-                  @click="isApiKeyVisible = !isApiKeyVisible"
+                  :aria-label="apiKeyVisible ? 'Hide API key' : 'Show API key'"
+                  @click="apiKeyVisible = !apiKeyVisible"
                 >
-                  <UiIcon :name="isApiKeyVisible ? 'i-lucide-eye-off' : 'i-lucide-eye'" class="size-4" />
+                  <UiIcon :name="apiKeyVisible ? 'i-lucide-eye-off' : 'i-lucide-eye'" class="size-4" />
                 </button>
               </UiTooltip>
             </div>
@@ -479,7 +479,7 @@ const {
       </div>
 
       <div class="flex flex-row items-center justify-between gap-2">
-        <UiButton v-if="isPolling" type="button" variant="ghost" @click="goBackFromDevicePolling">
+        <UiButton v-if="isPolling" type="button" variant="ghost" @click="backPolling">
           <UiIcon name="i-lucide-arrow-left" class="size-4" />
           Back
         </UiButton>
@@ -495,7 +495,7 @@ const {
         </UiButton>
       </div>
       </template>
-      <CustomProviderSetup v-else @cancel="customMode = false" @created="handleCustomCreated" />
+      <CustomProviderSetup v-else @cancel="customMode = false" @created="customCreated" />
     </template>
   </UiDialog>
 </template>

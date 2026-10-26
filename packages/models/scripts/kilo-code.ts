@@ -1,14 +1,14 @@
 import { idMap, sync } from "#models/model-store.ts";
-import { fetchDecoded, runOrThrow } from "#models/sync/http.ts";
-import { stripParamInfoKey } from "#models/model/clean-key.ts";
-import { arrayAt, asTrimmedString, booleanAt, stringAt } from "#models/json.ts";
-import { packageModelsDir, runScript } from "./shared.ts";
+import { fetchDecoded, orThrow } from "#models/sync/http.ts";
+import { stripParams } from "#models/model/clean-key.ts";
+import { arrayAt, trimmed, booleanAt, stringAt } from "#models/json.ts";
+import { dataDir, runScript } from "./shared.ts";
 
-const KILO_CODE_MODELS_URL = "https://api.kilo.ai/api/gateway/models";
+const MODELS_URL = "https://api.kilo.ai/api/gateway/models";
 
-function toModelKey(modelId: string): string {
+function modelKey(modelId: string): string {
   if (modelId.startsWith("kilo-auto/")) {
-    return stripParamInfoKey(modelId.replace("/", "-"));
+    return stripParams(modelId.replace("/", "-"));
   }
 
   const withoutProvider = modelId.includes("/")
@@ -22,10 +22,10 @@ function toModelKey(modelId: string): string {
     .replace(/[^a-zA-Z0-9._-]/g, "-")
     .replace(/-{2,}/g, "-");
 
-  return stripParamInfoKey(modelKey);
+  return stripParams(modelKey);
 }
 
-function freeModelIds(payload: unknown): string[] {
+function freeModels(payload: unknown): string[] {
   const data = arrayAt(payload, "data");
   if (data.length === 0) {
     throw new Error("Unexpected Kilo Gateway /models payload format");
@@ -34,33 +34,33 @@ function freeModelIds(payload: unknown): string[] {
   const ids: string[] = [];
   for (const model of data) {
     if (booleanAt(model, "isFree") !== true) continue;
-    const id = asTrimmedString(stringAt(model, "id"));
+    const id = trimmed(stringAt(model, "id"));
     if (id) ids.push(id);
   }
   return ids;
 }
 
-async function fetchKiloCodeModelIds(): Promise<string[]> {
-  return runOrThrow(
+async function idsFrom(): Promise<string[]> {
+  return orThrow(
     fetchDecoded(
-      KILO_CODE_MODELS_URL,
+      MODELS_URL,
       { label: "Kilo Code models", headers: { Accept: "application/json" } },
-      async (response) => freeModelIds(await response.json())
+      async (response) => freeModels(await response.json())
     )
   );
 }
 
 async function main(): Promise<void> {
-  const modelsDir = packageModelsDir();
+  const modelsDir = dataDir();
 
-  const modelIds = await fetchKiloCodeModelIds();
-  const modelMap = idMap(modelIds, toModelKey);
-  const providerConfigByModel = new Map(
+  const modelIds = await idsFrom();
+  const modelMap = idMap(modelIds, modelKey);
+  const providerConfig = new Map(
     [...modelMap.keys()].map((modelKey) => [modelKey, { authless: true, free: true }])
   );
 
   const result = await sync(modelsDir, "kilo_code", modelMap, {
-    providerConfigByModel,
+    providerConfig,
     managedProviderConfigKeys: ["authless", "free"],
   });
 

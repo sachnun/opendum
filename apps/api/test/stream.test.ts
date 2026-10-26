@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { anthropicStream, passthroughNonStream, passthroughStream } from "../core/stream.js";
+import { anthropicStream, passthrough, passthroughStream } from "../core/stream.js";
 import type { ResponseContext, StreamRecorder, UsageCounts } from "../core/types.js";
 
 function sseResponse(chunks: string[]): Response {
@@ -13,7 +13,7 @@ function sseResponse(chunks: string[]): Response {
   return new Response(body, { status: 200 });
 }
 
-function sseResponseThenError(chunk: string, error: Error): Response {
+function sseError(chunk: string, error: Error): Response {
   const encoder = new TextEncoder();
   const body = new ReadableStream<Uint8Array>({
     start(controller) {
@@ -26,7 +26,7 @@ function sseResponseThenError(chunk: string, error: Error): Response {
   return new Response(body, { status: 200 });
 }
 
-async function readBodyText(response: Response): Promise<string> {
+async function bodyText(response: Response): Promise<string> {
   const reader = response.body?.getReader();
   if (!reader) return "";
   const decoder = new TextDecoder();
@@ -45,7 +45,7 @@ function context(response: Response, provider = "openai", usage?: UsageCounts): 
     accountId: "acc-1",
     provider,
     requestStartMs: Date.now() - 10,
-    upstreamFirstResponseMs: Date.now(),
+    firstResponseMs: Date.now(),
     startMs: Date.now() - 20,
     userId: "user-1",
     apiKeyId: "key-1",
@@ -103,7 +103,7 @@ describe("passthroughStream", () => {
 
   it("reports an error completion instead of recording success", async () => {
     let completion = "";
-    const ctx = context(sseResponseThenError('data: {"choices":[{"delta":{"content":"hi"}}]}\n\n', new Error("boom")));
+    const ctx = context(sseError('data: {"choices":[{"delta":{"content":"hi"}}]}\n\n', new Error("boom")));
     ctx.onStreamComplete = (reason) => {
       completion = reason;
     };
@@ -147,7 +147,7 @@ describe("passthroughStream", () => {
   });
 });
 
-describe("passthroughNonStream", () => {
+describe("passthrough", () => {
   it("records json usage", async () => {
     const usage: UsageCounts = { inputTokens: 0, outputTokens: 0, cachedTokens: 0, cacheWriteTokens: 0 };
     const ctx = context(
@@ -162,7 +162,7 @@ describe("passthroughNonStream", () => {
       usage
     );
     const { recorder: rec, recorded } = recorder();
-    const response = await passthroughNonStream(ctx, rec);
+    const response = await passthrough(ctx, rec);
     expect(response.status).toBe(200);
     expect(usage.inputTokens).toBe(9);
     expect(usage.cachedTokens).toBe(1);
@@ -183,7 +183,7 @@ describe("anthropicStream", () => {
     );
     const { recorder: rec } = recorder();
     const response = await anthropicStream(ctx, rec);
-    const text = await readBodyText(response);
+    const text = await bodyText(response);
     expect(text).toMatch(/event: message_start/);
     expect(text).toMatch(/event: content_block_start/);
     expect(text).toMatch(/"type":"thinking_delta"/);

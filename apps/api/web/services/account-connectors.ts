@@ -4,41 +4,41 @@ import { and, count as countFn, eq } from "drizzle-orm";
 import type { CreateAccountInput } from "@opendum/providers/contract";
 
 import { db, providerAccount } from "@opendum/database";
-import { publishAccountsChanged } from "#web/events/bus.js";
+import { publishAccounts } from "#web/events/bus.js";
 import { encrypt, hashString } from "#web/lib/encryption.js";
-import { clearRefreshFailCount } from "#web/lib/proxy/auth.js";
+import { clearFails } from "#web/lib/proxy/auth.js";
 import { fetchExternalEffect } from "#web/lib/external.js";
 import { fromPromise } from "#web/lib/task.js";
-import { getProviderModelMap } from "#web/lib/proxy/models.js";
+import { providerModels } from "#web/lib/proxy/models.js";
 import { API_BASE_URL as nvidiaApiBaseUrl } from "#web/lib/providers/nvidia/constants.js";
 import { API_BASE_URL as openRouterApiBaseUrl } from "#web/lib/providers/openrouter/constants.js";
 import { API_BASE_URL as zenmuxApiBaseUrl } from "#web/lib/providers/zenmux/constants.js";
 import { API_BASE_URL as harborApiBaseUrl } from "#web/lib/providers/harbor/constants.js";
 import { API_BASE_URL as hyperApiBaseUrl } from "#web/lib/providers/hyper/constants.js";
-import { formatProviderHttpError, isLikelyCloudflareChallenge } from "#web/lib/providers/provider-http-errors.js";
-import { getCloudflareValidationUrl } from "#web/lib/providers/cloudflare/constants.js";
-import { API_KEY_PROVIDER_KEYS, type ApiKeyProviderKey } from "@opendum/providers/provider-accounts";
+import { httpError, isChallenge } from "#web/lib/providers/provider-http-errors.js";
+import { validationUrl } from "#web/lib/providers/cloudflare/constants.js";
+import { KEY_PROVIDERS, type KeyProvider } from "@opendum/providers/provider-accounts";
 import type { ServiceFailure } from "#web/errors.js";
 
-const API_KEY_PROVIDER_ACCOUNT_EXPIRY = new Date("2100-01-01T00:00:00.000Z");
-const API_KEY_VALIDATION_TIMEOUT_MS = 15000;
-const INTERNAL_RELAY_ERROR_HEADER = "X-Opendum-Internal-Relay-Error";
+const KEY_ACCOUNT_EXPIRY = new Date("2100-01-01T00:00:00.000Z");
+const VALIDATION_TIMEOUT_MS = 15000;
+const RELAY_ERROR_HEADER = "X-Opendum-Internal-Relay-Error";
 
 const MODELS_VALIDATION = { validationPath: "/models", requireSuccessfulStatus: true, skipInference: false } as const;
 const CHAT_AUTH_PROBE = { validationPath: "/chat/completions", requireSuccessfulStatus: false, skipInference: true } as const;
 
-const API_KEY_PROVIDER_SETTINGS = {
-  nvidia_nim: { label: "Nvidia", baseUrl: nvidiaApiBaseUrl, modelMap: getProviderModelMap("nvidia_nim"), ...CHAT_AUTH_PROBE },
-  openrouter: { label: "OpenRouter", baseUrl: openRouterApiBaseUrl, modelMap: getProviderModelMap("openrouter"), ...MODELS_VALIDATION },
-  zenmux: { label: "ZenMux", baseUrl: zenmuxApiBaseUrl, modelMap: getProviderModelMap("zenmux"), ...CHAT_AUTH_PROBE },
-  harbor: { label: "Harbor", baseUrl: harborApiBaseUrl, modelMap: getProviderModelMap("harbor"), ...MODELS_VALIDATION },
-  hyper: { label: "Charm", baseUrl: hyperApiBaseUrl, modelMap: getProviderModelMap("hyper"), ...CHAT_AUTH_PROBE },
-} satisfies Record<ApiKeyProviderKey, { label: string; baseUrl: string; modelMap: Record<string, string>; validationPath: "/models" | "/chat/completions"; requireSuccessfulStatus: boolean; skipInference?: boolean }>;
+const KEY_SETTINGS = {
+  nvidia_nim: { label: "Nvidia", baseUrl: nvidiaApiBaseUrl, modelMap: providerModels("nvidia_nim"), ...CHAT_AUTH_PROBE },
+  openrouter: { label: "OpenRouter", baseUrl: openRouterApiBaseUrl, modelMap: providerModels("openrouter"), ...MODELS_VALIDATION },
+  zenmux: { label: "ZenMux", baseUrl: zenmuxApiBaseUrl, modelMap: providerModels("zenmux"), ...CHAT_AUTH_PROBE },
+  harbor: { label: "Harbor", baseUrl: harborApiBaseUrl, modelMap: providerModels("harbor"), ...MODELS_VALIDATION },
+  hyper: { label: "Charm", baseUrl: hyperApiBaseUrl, modelMap: providerModels("hyper"), ...CHAT_AUTH_PROBE },
+} satisfies Record<KeyProvider, { label: string; baseUrl: string; modelMap: Record<string, string>; validationPath: "/models" | "/chat/completions"; requireSuccessfulStatus: boolean; skipInference?: boolean }>;
 
 type ConnectResult = { email: string; isUpdate: boolean };
 
-function buildValidationRequest(provider: ApiKeyProviderKey, apiKey: string) {
-  const { baseUrl, modelMap, validationPath, skipInference } = API_KEY_PROVIDER_SETTINGS[provider];
+function validationRequest(provider: KeyProvider, apiKey: string) {
+  const { baseUrl, modelMap, validationPath, skipInference } = KEY_SETTINGS[provider];
   const validationModel = Object.values(modelMap)[0];
   const isPost = validationPath === "/chat/completions";
   const headers: Record<string, string> = { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", Accept: "application/json" };
@@ -61,12 +61,12 @@ function failWith(message: string) {
   return { success: false as const, error: message };
 }
 
-const validateProviderApiKey = Effect.fn("accountConnectors.validateApiKey")(function* (
-  provider: ApiKeyProviderKey,
+const validateKey = Effect.fn("accountConnectors.validateApiKey")(function* (
+  provider: KeyProvider,
   apiKey: string
 ) {
-  const { label, validationPath, requireSuccessfulStatus } = API_KEY_PROVIDER_SETTINGS[provider];
-  const { validationModel, url, method, headers, body } = buildValidationRequest(provider, apiKey);
+  const { label, validationPath, requireSuccessfulStatus } = KEY_SETTINGS[provider];
+  const { validationModel, url, method, headers, body } = validationRequest(provider, apiKey);
   if (validationPath === "/chat/completions" && !validationModel) {
     return failWith(`${label} API key validation model is not configured.`);
   }
@@ -75,21 +75,21 @@ const validateProviderApiKey = Effect.fn("accountConnectors.validateApiKey")(fun
     method,
     headers,
     body,
-    signal: AbortSignal.timeout(API_KEY_VALIDATION_TIMEOUT_MS),
+    signal: AbortSignal.timeout(VALIDATION_TIMEOUT_MS),
   }).pipe(
     Effect.catch(() =>
       Effect.succeed(
         new Response(null, {
           status: 599,
-          headers: { [INTERNAL_RELAY_ERROR_HEADER]: "timeout" },
+          headers: { [RELAY_ERROR_HEADER]: "timeout" },
         })
       )
     )
   );
-  if (response.headers.get(INTERNAL_RELAY_ERROR_HEADER) === "timeout") {
+  if (response.headers.get(RELAY_ERROR_HEADER) === "timeout") {
     return failWith(`${label} API key validation timed out. Please try again.`);
   }
-  if (response.headers.get(INTERNAL_RELAY_ERROR_HEADER) === "1") {
+  if (response.headers.get(RELAY_ERROR_HEADER) === "1") {
     return failWith(`Unable to validate ${label} API key through the proxy. Please try again.`);
   }
 
@@ -97,9 +97,9 @@ const validateProviderApiKey = Effect.fn("accountConnectors.validateApiKey")(fun
     ? ""
     : yield* fromPromise(() => response.text().catch(() => ""), "Failed to read provider response");
 
-  if (isLikelyCloudflareChallenge(response, responseText)) {
+  if (isChallenge(response, responseText)) {
     return failWith(
-      formatProviderHttpError(label, response, responseText, { endpointLabel: "API key validation endpoint" })
+      httpError(label, response, responseText, { endpointLabel: "API key validation endpoint" })
     );
   }
   if (response.status === 401 || response.status === 403) {
@@ -120,19 +120,19 @@ const validateProviderApiKey = Effect.fn("accountConnectors.validateApiKey")(fun
   return { success: true as const, data: undefined };
 });
 
-const connectApiKeyProviderAccount = Effect.fn("accountConnectors.connectApiKey")(function* (
+const connectKeyProvider = Effect.fn("accountConnectors.apiKeyConnect")(function* (
   userId: string,
-  provider: ApiKeyProviderKey,
+  provider: KeyProvider,
   apiKey: string,
   accountName?: string,
   platformKey?: string
 ) {
   const normalizedApiKey = apiKey.trim();
   if (!normalizedApiKey) return failWith("API key is required");
-  const validationResult = yield* validateProviderApiKey(provider, normalizedApiKey);
+  const validationResult = yield* validateKey(provider, normalizedApiKey);
   if (!validationResult.success) return validationResult;
 
-  const { label } = API_KEY_PROVIDER_SETTINGS[provider];
+  const { label } = KEY_SETTINGS[provider];
   const identifier = `${provider}-${hashString(normalizedApiKey).slice(0, 16)}`;
   const normalizedAccountName = accountName?.trim();
   const normalizedPlatformKey = platformKey?.trim() || null;
@@ -160,7 +160,7 @@ const connectApiKeyProviderAccount = Effect.fn("accountConnectors.connectApiKey"
           .set({
             accessToken: encrypt(normalizedApiKey),
             refreshToken: encrypt(normalizedApiKey),
-            expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY,
+            expiresAt: KEY_ACCOUNT_EXPIRY,
             ...(normalizedAccountName ? { name: normalizedAccountName } : {}),
             ...(normalizedPlatformKey ? { accountId: normalizedPlatformKey } : {}),
             isActive: true,
@@ -169,7 +169,7 @@ const connectApiKeyProviderAccount = Effect.fn("accountConnectors.connectApiKey"
           .where(eq(providerAccount.id, existingAccount.id)),
       "Failed to update provider account"
     );
-    yield* clearRefreshFailCount(existingAccount.id);
+    yield* clearFails(existingAccount.id);
     return { success: true as const, data: { email: identifier, isUpdate: true } satisfies ConnectResult };
   }
 
@@ -189,7 +189,7 @@ const connectApiKeyProviderAccount = Effect.fn("accountConnectors.connectApiKey"
         name: normalizedAccountName || `${label} ${(countResult[0]?.value ?? 0) + 1}`,
         accessToken: encrypt(normalizedApiKey),
         refreshToken: encrypt(normalizedApiKey),
-        expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY,
+        expiresAt: KEY_ACCOUNT_EXPIRY,
         email: identifier,
         ...(normalizedPlatformKey ? { accountId: normalizedPlatformKey } : {}),
         isActive: true,
@@ -210,24 +210,24 @@ const connectCloudflare = Effect.fn("accountConnectors.connectCloudflare")(funct
   if (!normalizedApiToken) return failWith("API token is required");
   if (!normalizedAccountId) return failWith("Cloudflare Account ID is required");
 
-  const response = yield* fetchExternalEffect(getCloudflareValidationUrl(normalizedAccountId), {
+  const response = yield* fetchExternalEffect(validationUrl(normalizedAccountId), {
     method: "GET",
     headers: { Authorization: `Bearer ${normalizedApiToken}`, Accept: "application/json" },
-    signal: AbortSignal.timeout(API_KEY_VALIDATION_TIMEOUT_MS),
+    signal: AbortSignal.timeout(VALIDATION_TIMEOUT_MS),
   }).pipe(
     Effect.catch(() =>
       Effect.succeed(
         new Response(null, {
           status: 599,
-          headers: { [INTERNAL_RELAY_ERROR_HEADER]: "timeout" },
+          headers: { [RELAY_ERROR_HEADER]: "timeout" },
         })
       )
     )
   );
-  if (response.headers.get(INTERNAL_RELAY_ERROR_HEADER) === "timeout") {
+  if (response.headers.get(RELAY_ERROR_HEADER) === "timeout") {
     return failWith("Cloudflare validation timed out. Please try again.");
   }
-  if (response.headers.get(INTERNAL_RELAY_ERROR_HEADER) === "1") {
+  if (response.headers.get(RELAY_ERROR_HEADER) === "1") {
     return failWith("Unable to validate Cloudflare credentials through the proxy. Please try again.");
   }
   if (!response.ok) {
@@ -235,9 +235,9 @@ const connectCloudflare = Effect.fn("accountConnectors.connectCloudflare")(funct
       () => response.text().catch(() => ""),
       "Failed to read provider response"
     );
-    if (isLikelyCloudflareChallenge(response, responseText)) {
+    if (isChallenge(response, responseText)) {
       return failWith(
-        formatProviderHttpError("Cloudflare", response, responseText, {
+        httpError("Cloudflare", response, responseText, {
           endpointLabel: "credentials validation endpoint",
         })
       );
@@ -274,7 +274,7 @@ const connectCloudflare = Effect.fn("accountConnectors.connectCloudflare")(funct
           .set({
             accessToken: encrypt(normalizedApiToken),
             refreshToken: encrypt(normalizedApiToken),
-            expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY,
+            expiresAt: KEY_ACCOUNT_EXPIRY,
             accountId: normalizedAccountId,
             ...(normalizedAccountName ? { name: normalizedAccountName } : {}),
             isActive: true,
@@ -283,7 +283,7 @@ const connectCloudflare = Effect.fn("accountConnectors.connectCloudflare")(funct
           .where(eq(providerAccount.id, existingAccount.id)),
       "Failed to update provider account"
     );
-    yield* clearRefreshFailCount(existingAccount.id);
+    yield* clearFails(existingAccount.id);
     return { success: true as const, data: { email: identifier, isUpdate: true } satisfies ConnectResult };
   }
 
@@ -303,7 +303,7 @@ const connectCloudflare = Effect.fn("accountConnectors.connectCloudflare")(funct
         name: normalizedAccountName || `Cloudflare ${(countResult[0]?.value ?? 0) + 1}`,
         accessToken: encrypt(normalizedApiToken),
         refreshToken: encrypt(normalizedApiToken),
-        expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY,
+        expiresAt: KEY_ACCOUNT_EXPIRY,
         email: identifier,
         accountId: normalizedAccountId,
         isActive: true,
@@ -323,10 +323,10 @@ type Connector = (
 
 const ACCOUNT_CONNECTORS: Record<string, Connector> = {
   ...Object.fromEntries(
-    API_KEY_PROVIDER_KEYS.map((provider) => [
+    KEY_PROVIDERS.map((provider) => [
       provider,
       (userId: string, input: CreateAccountInput) =>
-        connectApiKeyProviderAccount(userId, provider, input.token, input.name, input.platformKey),
+        connectKeyProvider(userId, provider, input.token, input.name, input.platformKey),
     ])
   ),
   workers_ai: (userId: string, input: CreateAccountInput) =>
@@ -345,6 +345,6 @@ export const createAccount = Effect.fn("accountConnectors.createAccount")(functi
   const result = yield* connect(userId, input).pipe(
     Effect.catch((failure) => Effect.succeed(failWith(failure.message)))
   );
-  if (result.success) publishAccountsChanged(userId);
+  if (result.success) publishAccounts(userId);
   return result;
 });

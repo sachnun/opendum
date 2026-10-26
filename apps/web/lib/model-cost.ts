@@ -19,6 +19,6 @@ export function costEntries(cost: ModelCost): Array<{ label: string; value: numb
   });
 }
 
-export function formatCostPoints(value: number): string {
+export function costPoints(value: number): string {
   return value.toLocaleString("en-US", { maximumFractionDigits: 3 });
 }

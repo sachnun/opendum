@@ -1,59 +1,49 @@
 import { Effect } from "effect";
-import { db, pinnedProvider, providerAccount, providerAccountDisabledModel, providerAccountModelHealth } from "@opendum/database";
+import { db, pinnedProvider, providerAccount, accountDisabledModel, accountModelHealth } from "@opendum/database";
 import { fromPromise } from "#web/lib/task.js";
 import { internal } from "#web/errors.js";
-import type { AccountSessionInput, AccountStatsInput, DeleteAccountInput, ErrorHistoryBatchInput, ErrorHistoryInput, ProviderDetailInput, ProviderInput, ResolveErrorsInput, SetAccountModelEnabledInput, TogglePinnedProviderInput, UpdateAccountInput } from "@opendum/providers/contract";
-import { publishAccountsChanged } from "#web/events/bus.js";
-import { getModelLookupKeys, getProviderModelSet, resolveModelAlias } from "#web/lib/proxy/models.js";
-import { clearRefreshFailCount, invalidateDisabledModelsCache } from "#web/lib/proxy/auth.js";
+import type { AccountSessionInput, AccountStatsInput, DeleteAccountInput, HistoryBatchInput, ErrorHistoryInput, ProviderDetailInput, ProviderInput, ResolveErrorsInput, ModelToggleInput, PinToggleInput, UpdateAccountInput } from "@opendum/providers/contract";
+import { publishAccounts } from "#web/events/bus.js";
+import { keysOf, providerSet, aliasOf } from "#web/lib/proxy/models.js";
+import { clearFails, invalidateDisabled } from "#web/lib/proxy/auth.js";
 import { decrypt } from "#web/lib/encryption.js";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
-import { isKnownProvider, PROVIDER_ACCOUNT_KEYS } from "./account-providers.js";
+import { isKnown, PROVIDER_ACCOUNT_KEYS } from "./account-providers.js";
 import { customProviderModels } from "./custom-providers.js";
 import { trackProviderEmail } from "./points.js";
-import { buildAccountStats, buildEmptyProviderStats, getProviderSummaryStats, type ProviderAccountIndicator, type ProviderStats } from "./account-stats.js";
+import { buildAccountStats, emptyStats, providerSummary, type ProviderAccountIndicator, type ProviderStats } from "./account-stats.js";
 import {
+  AccountState,
+  Clock,
+  ErrorHistory,
+  Health,
+  HealthRows,
+  ModelList,
+  Pins,
+  Tier,
   UNHEALTHY_THRESHOLD,
   type AccountHealthAggregate,
-  type AccountModelHealthSummaryRow,
+  type HealthRow,
   type AccountOverviewSummary,
   type AccountReadOptions,
-  accountHasActiveCooldown,
-  accountTierCanAccessModel,
-  buildAccountHealthByAccountId,
-  buildAccountPingSummaries,
-  deleteRedisErrorHistory,
-  getAccountSummaryHealthRows,
-  getCooldownRecoveryAccountIds,
-  getPinnedProviderKeys,
-  getProviderModelsForAccountTier,
-  hasActionableHealthWarning,
-  providerModelIsAccessibleByAccounts,
-  readRedisErrorHistories,
-  readRedisErrorHistory,
-  sortProviderModels,
-  toTimeMs,
-  withEffectiveActive,
-  withEffectiveModelHealth,
 } from "./accounts-helpers.js";
-export { getProviderModelsForAccountTier };
 
 export { createAccount } from "./account-connectors.js";
 
 const ACCOUNT_COOLDOWN_MS = 10 * 60 * 1000;
-const DEFAULT_ERROR_HISTORY_ROWS = 100;
-const MAX_ERROR_HISTORY_ROWS = 200;
+const DEFAULT_HISTORY_ROWS = 100;
+const MAX_HISTORY_ROWS = 200;
 
-type AccountModelHealthRecoveryRow = AccountModelHealthSummaryRow & {
+type HealthRecoveryRow = HealthRow & {
   id: string;
   updatedAt: Date | string | null;
   createdAt: Date | string | null;
 };
 
-interface AccountOverviewReadOptions extends AccountReadOptions {}
+interface OverviewOptions extends AccountReadOptions {}
 
 const PROVIDER_KEY_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/;
-const providerAccountListColumns = {
+const listColumns = {
   id: providerAccount.id,
   provider: providerAccount.provider,
   name: providerAccount.name,
@@ -70,13 +60,13 @@ const providerAccountListColumns = {
   consecutiveErrors: providerAccount.consecutiveErrors,
   lastErrorAt: providerAccount.lastErrorAt,
   lastSuccessAt: providerAccount.lastSuccessAt,
-  lastRecoveredByRotationAt: providerAccount.lastRecoveredByRotationAt,
+  lastRecoveredAt: providerAccount.lastRecoveredAt,
   lastErrorCode: providerAccount.lastErrorCode,
   successCount: providerAccount.successCount,
   createdAt: providerAccount.createdAt,
 };
 
-const providerAccountLastUsedOrder = [sql`${providerAccount.lastUsedAt} desc nulls last`, desc(providerAccount.createdAt), desc(providerAccount.id)] as const;
+const lastUsedOrder = [sql`${providerAccount.lastUsedAt} desc nulls last`, desc(providerAccount.createdAt), desc(providerAccount.id)] as const;
 
 export const listAccounts = Effect.fn("accounts.list")(function* (userId: string) {
   return yield* listAccountsInner(userId).pipe(
@@ -89,28 +79,28 @@ const listAccountsInner = Effect.fnUntraced(function* (userId: string) {
   const accounts = yield* fromPromise(
     () =>
       db
-        .select(providerAccountListColumns)
+        .select(listColumns)
         .from(providerAccount)
         .where(eq(providerAccount.userId, userId))
         .orderBy(asc(providerAccount.createdAt)),
     "Failed to list accounts"
   );
   return accounts.map((account) => ({
-    ...withEffectiveActive(account, now),
+    ...AccountState.withActive(account, now),
     unhealthyCount: account.consecutiveErrors,
   }));
 });
 
-export const listAccountsByProvider = Effect.fn("accounts.listByProvider")(function* (
+export const listByProvider = Effect.fn("accounts.listByProvider")(function* (
   userId: string,
   input: ProviderInput
 ) {
-  return yield* listAccountsByProviderInner(userId, input).pipe(
+  return yield* listInner(userId, input).pipe(
     Effect.mapError((failure) => internal("Failed to list provider accounts", failure.cause ?? failure))
   );
 });
 
-const listAccountsByProviderInner = Effect.fnUntraced(function* (
+const listInner = Effect.fnUntraced(function* (
   userId: string,
   input: ProviderInput
 ) {
@@ -118,21 +108,21 @@ const listAccountsByProviderInner = Effect.fnUntraced(function* (
   const accounts = yield* fromPromise(
     () =>
       db
-        .select(providerAccountListColumns)
+        .select(listColumns)
         .from(providerAccount)
         .where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, input.provider)))
-        .orderBy(...providerAccountLastUsedOrder),
+        .orderBy(...lastUsedOrder),
     "Failed to list provider accounts"
   );
   return accounts.map((account) => ({
-    ...withEffectiveActive(account, now),
+    ...AccountState.withActive(account, now),
     unhealthyCount: account.consecutiveErrors,
   }));
 });
 
 export const getAccountOverview = Effect.fn("accounts.overview")(function* (
   userId: string,
-  options: AccountOverviewReadOptions = {}
+  options: OverviewOptions = {}
 ) {
   return yield* buildAccountOverview(userId, options).pipe(
     Effect.mapError((failure) => internal("Failed to load account summaries", failure.cause ?? failure))
@@ -141,7 +131,7 @@ export const getAccountOverview = Effect.fn("accounts.overview")(function* (
 
 const buildAccountOverview = Effect.fnUntraced(function* (
   userId: string,
-  options: AccountOverviewReadOptions = {}
+  options: OverviewOptions = {}
 ) {
   {
     const now = new Date();
@@ -161,20 +151,20 @@ const buildAccountOverview = Effect.fnUntraced(function* (
           lastErrorAt: providerAccount.lastErrorAt,
           lastErrorCode: providerAccount.lastErrorCode,
           lastSuccessAt: providerAccount.lastSuccessAt,
-          lastRecoveredByRotationAt: providerAccount.lastRecoveredByRotationAt,
+          lastRecoveredAt: providerAccount.lastRecoveredAt,
         })
         .from(providerAccount)
             .where(eq(providerAccount.userId, userId)),
         "Failed to load accounts"
       ),
-      getProviderSummaryStats(userId),
+      providerSummary(userId),
     ], { concurrency: "unbounded" });
     const [pinnedProviders, healthRows] = yield* Effect.all([
-      getPinnedProviderKeys(userId, accounts.map((account) => account.provider), options),
-      getAccountSummaryHealthRows(accounts.map((account) => account.id)),
+      Pins.load(userId, accounts.map((account) => account.provider), options),
+      HealthRows.load(accounts.map((account) => account.id)),
     ], { concurrency: "unbounded" });
 
-    const pingSummaries = buildAccountPingSummaries(accounts, buildAccountHealthByAccountId(healthRows, now, getCooldownRecoveryAccountIds(accounts, now)), now);
+    const pingSummaries = Health.pingSummaries(accounts, Health.aggregate(healthRows, now, AccountState.cooldownRecoveryIds(accounts, now)), now);
 
     const providerKeys = Array.from(new Set<string>([...PROVIDER_ACCOUNT_KEYS, ...accounts.map((account) => account.provider)]));
     const summaries = Object.fromEntries(
@@ -182,7 +172,7 @@ const buildAccountOverview = Effect.fnUntraced(function* (
         provider,
         {
           ...(pingSummaries[provider] ?? { connected: 0, active: 0, indicator: "normal" as ProviderAccountIndicator }),
-          stats: providerStats[provider] ?? buildEmptyProviderStats(),
+          stats: providerStats[provider] ?? emptyStats(),
         },
       ])
     ) as Record<string, AccountOverviewSummary>;
@@ -219,16 +209,16 @@ const buildAccountPing = Effect.fnUntraced(function* (
         lastErrorAt: providerAccount.lastErrorAt,
         lastErrorCode: providerAccount.lastErrorCode,
         lastSuccessAt: providerAccount.lastSuccessAt,
-        lastRecoveredByRotationAt: providerAccount.lastRecoveredByRotationAt,
+        lastRecoveredAt: providerAccount.lastRecoveredAt,
       })
       .from(providerAccount)
       .where(eq(providerAccount.userId, userId)), "Failed to load accounts");
     const [pinnedProviders, healthRows] = yield* Effect.all([
-      getPinnedProviderKeys(userId, accounts.map((account) => account.provider), options),
-      getAccountSummaryHealthRows(accounts.map((account) => account.id)),
+      Pins.load(userId, accounts.map((account) => account.provider), options),
+      HealthRows.load(accounts.map((account) => account.id)),
     ], { concurrency: "unbounded" });
 
-    const pingSummaries = buildAccountPingSummaries(accounts, buildAccountHealthByAccountId(healthRows, now, getCooldownRecoveryAccountIds(accounts, now)), now);
+    const pingSummaries = Health.pingSummaries(accounts, Health.aggregate(healthRows, now, AccountState.cooldownRecoveryIds(accounts, now)), now);
 
     return {
       summaries: Object.fromEntries(pinnedProviders.map((provider) => [provider, pingSummaries[provider]])),
@@ -238,7 +228,7 @@ const buildAccountPing = Effect.fnUntraced(function* (
   }
 });
 
-export const getAccountsByProviderDetailed = Effect.fn("accounts.detail")(function* (
+export const accountsDetailed = Effect.fn("accounts.detail")(function* (
   userId: string,
   input: ProviderDetailInput
 ) {
@@ -256,78 +246,78 @@ const buildAccountDetail = Effect.fnUntraced(function* (
   {
     const now = new Date();
     const accounts = yield* fromPromise(() => db
-      .select(providerAccountListColumns)
+      .select(listColumns)
       .from(providerAccount)
       .where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, input.provider)))
-      .orderBy(...providerAccountLastUsedOrder), "Failed to load provider accounts");
+      .orderBy(...lastUsedOrder), "Failed to load provider accounts");
 
     const accountIds = accounts.map((account) => account.id);
-    const isBuiltin = isKnownProvider(input.provider);
+    const isBuiltin = isKnown(input.provider);
     const customModels = isBuiltin ? [] : yield* customProviderModels(userId, input.provider);
-    const providerModels = isBuiltin ? Array.from(getProviderModelSet(input.provider)) : customModels;
-    const supportedModelsByAccountId = Object.fromEntries(accounts.map((account) => [
+    const providerModels = isBuiltin ? Array.from(providerSet(input.provider)) : customModels;
+    const supportedByAccount = Object.fromEntries(accounts.map((account) => [
       account.id,
-      isBuiltin ? getProviderModelsForAccountTier(input.provider, account.tier) : customModels,
+      isBuiltin ? Tier.modelsFor(input.provider, account.tier) : customModels,
     ]));
-    const supportedModels = sortProviderModels(
+    const supportedModels = ModelList.sort(
       isBuiltin
         ? providerModels.filter((model) =>
             input.provider === "codex"
               ? true
-              : providerModelIsAccessibleByAccounts(model, input.provider, accounts)
+              : Tier.accessibleByAccounts(model, input.provider, accounts)
           )
         : providerModels
     );
-    const freeSupportedModels = isBuiltin ? getProviderModelsForAccountTier(input.provider, "free") : customModels;
-    const healthModelKeys = Array.from(new Set(supportedModels.flatMap((model) => getModelLookupKeys(model))));
+    const freeSupportedModels = isBuiltin ? Tier.modelsFor(input.provider, "free") : customModels;
+    const healthModelKeys = Array.from(new Set(supportedModels.flatMap((model) => keysOf(model))));
     const [disabledModelRows, healthRows, pinnedProviders] = yield* Effect.all([
       accountIds.length > 0
         ? fromPromise(
             () =>
               db
-                .select({ providerAccountId: providerAccountDisabledModel.providerAccountId, model: providerAccountDisabledModel.model })
-                .from(providerAccountDisabledModel)
-                .where(inArray(providerAccountDisabledModel.providerAccountId, accountIds)),
+                .select({ providerAccountId: accountDisabledModel.providerAccountId, model: accountDisabledModel.model })
+                .from(accountDisabledModel)
+                .where(inArray(accountDisabledModel.providerAccountId, accountIds)),
             "Failed to load disabled account models"
           )
         : Effect.succeed([]),
       accountIds.length > 0 && healthModelKeys.length > 0
         ? fromPromise(() => db
             .select({
-              providerAccountId: providerAccountModelHealth.providerAccountId,
-              model: providerAccountModelHealth.model,
-              status: providerAccountModelHealth.status,
-              statusChangedAt: providerAccountModelHealth.statusChangedAt,
-              consecutiveErrors: providerAccountModelHealth.consecutiveErrors,
-              lastErrorAt: providerAccountModelHealth.lastErrorAt,
-              lastErrorCode: providerAccountModelHealth.lastErrorCode,
-              lastSuccessAt: providerAccountModelHealth.lastSuccessAt,
-              unhealthyCountUpdatedAt: providerAccountModelHealth.unhealthyCountUpdatedAt,
+              providerAccountId: accountModelHealth.providerAccountId,
+              model: accountModelHealth.model,
+              status: accountModelHealth.status,
+              statusChangedAt: accountModelHealth.statusChangedAt,
+              consecutiveErrors: accountModelHealth.consecutiveErrors,
+              lastErrorAt: accountModelHealth.lastErrorAt,
+              lastErrorCode: accountModelHealth.lastErrorCode,
+              lastSuccessAt: accountModelHealth.lastSuccessAt,
+              unhealthyCountUpdatedAt: accountModelHealth.unhealthyCountUpdatedAt,
             })
-            .from(providerAccountModelHealth)
-            .where(and(inArray(providerAccountModelHealth.providerAccountId, accountIds), inArray(providerAccountModelHealth.model, healthModelKeys))), "Failed to load account model health")
+            .from(accountModelHealth)
+            .where(and(inArray(accountModelHealth.providerAccountId, accountIds), inArray(accountModelHealth.model, healthModelKeys))), "Failed to load account model health")
         : Effect.succeed([]),
-      getPinnedProviderKeys(userId),
+      Pins.load(userId),
     ], { concurrency: "unbounded" });
 
-    const disabledModelsByAccountId = disabledModelRows.reduce<Record<string, string[]>>((acc, row) => {
+    const disabledModels = disabledModelRows.reduce<Record<string, string[]>>((acc, row) => {
       acc[row.providerAccountId] = [...(acc[row.providerAccountId] ?? []), row.model];
       return acc;
     }, {});
 
-    const cooldownRecoveryAccountIds = getCooldownRecoveryAccountIds(accounts, now);
-    const effectiveHealthRows = healthRows.map((row) => withEffectiveModelHealth(row, now, cooldownRecoveryAccountIds.has(row.providerAccountId)));
-    const healthByAccountId = effectiveHealthRows.reduce<Record<string, AccountHealthAggregate>>((acc, row) => {
+    const recoveryIds = AccountState.cooldownRecoveryIds(accounts, now);
+    const effectiveHealthRows = healthRows.map((row) => Health.withEffective(row, now, recoveryIds.has(row.providerAccountId)));
+    const healthById = effectiveHealthRows.reduce<Record<string, AccountHealthAggregate>>((acc, row) => {
       const current = acc[row.providerAccountId] ?? { unhealthyCount: 0, warningCount: 0, lastErrorAt: null, lastSuccessAt: null };
       current.unhealthyCount += row.consecutiveErrors;
-      if (hasActionableHealthWarning(row)) current.warningCount += row.consecutiveErrors;
-      if ((toTimeMs(row.lastErrorAt) ?? 0) > (toTimeMs(current.lastErrorAt) ?? 0)) current.lastErrorAt = row.lastErrorAt;
-      if ((toTimeMs(row.lastSuccessAt) ?? 0) > (toTimeMs(current.lastSuccessAt) ?? 0)) current.lastSuccessAt = row.lastSuccessAt;
+      if (Health.actionable(row)) current.warningCount += row.consecutiveErrors;
+      if ((Clock.ms(row.lastErrorAt) ?? 0) > (Clock.ms(current.lastErrorAt) ?? 0)) current.lastErrorAt = row.lastErrorAt;
+      if ((Clock.ms(row.lastSuccessAt) ?? 0) > (Clock.ms(current.lastSuccessAt) ?? 0)) current.lastSuccessAt = row.lastSuccessAt;
       acc[row.providerAccountId] = current;
       return acc;
     }, {});
-    const modelHealthByAccountId = effectiveHealthRows.reduce<Record<string, Record<string, { status: string; consecutiveErrors: number; lastErrorAt: Date | string | null; lastSuccessAt: Date | string | null }>>>((acc, row) => {
-      const model = resolveModelAlias(row.model);
+    const modelHealth = effectiveHealthRows.reduce<Record<string, Record<string, { status: string; consecutiveErrors: number; lastErrorAt: Date | string | null; lastSuccessAt: Date | string | null }>>>((acc, row) => {
+      const model = aliasOf(row.model);
       const accountHealth = acc[row.providerAccountId] ?? {};
       const current = accountHealth[model];
       if (!current || row.consecutiveErrors > current.consecutiveErrors) {
@@ -343,18 +333,18 @@ const buildAccountDetail = Effect.fnUntraced(function* (
     }, {});
 
     const detailedAccounts = accounts.map((account) => {
-      const health = healthByAccountId[account.id];
+      const health = healthById[account.id];
       const unhealthyCount = health?.unhealthyCount ?? account.consecutiveErrors;
-      const status = accountHasActiveCooldown(account, now) || unhealthyCount >= UNHEALTHY_THRESHOLD ? "failed" : "active";
+      const status = AccountState.hasCooldown(account, now) || unhealthyCount >= UNHEALTHY_THRESHOLD ? "failed" : "active";
 
       return {
-        ...withEffectiveActive(account, now),
+        ...AccountState.withActive(account, now),
         status,
         consecutiveErrors: unhealthyCount,
         unhealthyCount,
         lastErrorAt: health?.lastErrorAt ?? account.lastErrorAt,
         lastSuccessAt: health?.lastSuccessAt ?? account.lastSuccessAt,
-        stats: buildEmptyProviderStats(),
+        stats: emptyStats(),
       };
     });
 
@@ -362,9 +352,9 @@ const buildAccountDetail = Effect.fnUntraced(function* (
       accounts: detailedAccounts,
       supportedModels,
       freeSupportedModels,
-      supportedModelsByAccountId,
-      disabledModelsByAccountId,
-      modelHealthByAccountId,
+      supportedByAccount,
+      disabledModelsByAccountId: disabledModels,
+      modelHealthByAccountId: modelHealth,
       pinnedProviders,
     };
   }
@@ -445,12 +435,12 @@ const updateAccountInner = Effect.fnUntraced(function* (
       () => db.update(providerAccount).set(updates).where(eq(providerAccount.id, input.id)),
       "Failed to update account"
     );
-    if (manuallyReenabled) yield* clearRefreshFailCount(input.id);
+    if (manuallyReenabled) yield* clearFails(input.id);
     if (manuallyReenabled && account.status === "failed") {
-      yield* accelerateAccountCooldownForManualEnable(input.id, now);
+      yield* accelerateCooldown(input.id, now);
     }
     if (updates.isActive !== undefined || updates.disabledUntil !== undefined) {
-      yield* invalidateDisabledModelsCache(userId);
+      yield* invalidateDisabled(userId);
     }
   }
 
@@ -466,37 +456,37 @@ const updateAccountInner = Effect.fnUntraced(function* (
   const updated = updatedRows[0];
   if (!updated) return yield* Effect.fail(internal("Account not found"));
 
-  publishAccountsChanged(userId);
-  return { ...withEffectiveActive(updated, now), unhealthyCount: updated.consecutiveErrors };
+  publishAccounts(userId);
+  return { ...AccountState.withActive(updated, now), unhealthyCount: updated.consecutiveErrors };
 });
 
-const accelerateAccountCooldownForManualEnable = Effect.fn("accounts.accelerateCooldown")(function* (
+const accelerateCooldown = Effect.fn("accounts.accelerateCooldown")(function* (
   accountId: string,
   now = new Date()
 ) {
   yield* fromPromise(
     () =>
       db.transaction(async (tx) => {
-        const rows: AccountModelHealthRecoveryRow[] = await tx
+        const rows: HealthRecoveryRow[] = await tx
           .select({
-            id: providerAccountModelHealth.id,
-            providerAccountId: providerAccountModelHealth.providerAccountId,
-            status: providerAccountModelHealth.status,
-            statusChangedAt: providerAccountModelHealth.statusChangedAt,
-            consecutiveErrors: providerAccountModelHealth.consecutiveErrors,
-            lastErrorAt: providerAccountModelHealth.lastErrorAt,
-            lastErrorCode: providerAccountModelHealth.lastErrorCode,
-            lastSuccessAt: providerAccountModelHealth.lastSuccessAt,
-            unhealthyCountUpdatedAt: providerAccountModelHealth.unhealthyCountUpdatedAt,
-            updatedAt: providerAccountModelHealth.updatedAt,
-            createdAt: providerAccountModelHealth.createdAt,
+            id: accountModelHealth.id,
+            providerAccountId: accountModelHealth.providerAccountId,
+            status: accountModelHealth.status,
+            statusChangedAt: accountModelHealth.statusChangedAt,
+            consecutiveErrors: accountModelHealth.consecutiveErrors,
+            lastErrorAt: accountModelHealth.lastErrorAt,
+            lastErrorCode: accountModelHealth.lastErrorCode,
+            lastSuccessAt: accountModelHealth.lastSuccessAt,
+            unhealthyCountUpdatedAt: accountModelHealth.unhealthyCountUpdatedAt,
+            updatedAt: accountModelHealth.updatedAt,
+            createdAt: accountModelHealth.createdAt,
           })
-          .from(providerAccountModelHealth)
-          .where(eq(providerAccountModelHealth.providerAccountId, accountId));
+          .from(accountModelHealth)
+          .where(eq(accountModelHealth.providerAccountId, accountId));
 
         let total = 0;
         for (const row of rows) {
-          const recovered = withEffectiveModelHealth(row, now, true);
+          const recovered = Health.withEffective(row, now, true);
           total += recovered.consecutiveErrors;
           const patch: { consecutiveErrors: number; unhealthyCountUpdatedAt: Date; status?: string; statusChangedAt?: Date } = {
             consecutiveErrors: recovered.consecutiveErrors,
@@ -506,7 +496,7 @@ const accelerateAccountCooldownForManualEnable = Effect.fn("accounts.accelerateC
             patch.status = recovered.status;
             patch.statusChangedAt = now;
           }
-          await tx.update(providerAccountModelHealth).set(patch).where(eq(providerAccountModelHealth.id, row.id));
+          await tx.update(accountModelHealth).set(patch).where(eq(accountModelHealth.id, row.id));
         }
 
         const stillCoolingDown = total >= UNHEALTHY_THRESHOLD;
@@ -555,27 +545,27 @@ const deleteAccountInner = Effect.fnUntraced(function* (
     () => db.delete(providerAccount).where(eq(providerAccount.id, input.id)),
     "Failed to delete account"
   );
-  yield* invalidateDisabledModelsCache(userId);
-  yield* clearRefreshFailCount(input.id);
-  publishAccountsChanged(userId);
+  yield* invalidateDisabled(userId);
+  yield* clearFails(input.id);
+  publishAccounts(userId);
   return undefined;
 });
 
 export const togglePinnedProvider = Effect.fn("accounts.togglePinned")(function* (
   userId: string,
-  input: TogglePinnedProviderInput
+  input: PinToggleInput
 ) {
   if (!PROVIDER_KEY_PATTERN.test(input.providerKey)) return failWith("Invalid provider");
 
-  return yield* togglePinnedProviderInner(userId, input).pipe(
+  return yield* togglePinInner(userId, input).pipe(
     Effect.map((data) => ({ success: true as const, data })),
     Effect.catch((failure: { message: string }) => failWith(failure.message))
   );
 });
 
-const togglePinnedProviderInner = Effect.fnUntraced(function* (
+const togglePinInner = Effect.fnUntraced(function* (
   userId: string,
-  input: TogglePinnedProviderInput
+  input: PinToggleInput
 ) {
   const existing = yield* fromPromise(
     () =>
@@ -592,7 +582,7 @@ const togglePinnedProviderInner = Effect.fnUntraced(function* (
       () => db.delete(pinnedProvider).where(eq(pinnedProvider.id, existing[0]!.id)),
       "Failed to update pinned provider"
     );
-    publishAccountsChanged(userId);
+    publishAccounts(userId);
     return { providerKey: input.providerKey, pinned: false };
   }
 
@@ -604,23 +594,23 @@ const togglePinnedProviderInner = Effect.fnUntraced(function* (
         .onConflictDoNothing({ target: [pinnedProvider.userId, pinnedProvider.providerKey] }),
     "Failed to update pinned provider"
   );
-  publishAccountsChanged(userId);
+  publishAccounts(userId);
   return { providerKey: input.providerKey, pinned: true };
 });
 
-export const setAccountModelEnabled = Effect.fn("accounts.setModelEnabled")(function* (
+export const enableModel = Effect.fn("accounts.enableModel")(function* (
   userId: string,
-  input: SetAccountModelEnabledInput
+  input: ModelToggleInput
 ) {
-  return yield* setAccountModelEnabledInner(userId, input).pipe(
+  return yield* enableInner(userId, input).pipe(
     Effect.map((data) => ({ success: true as const, data })),
     Effect.catch((failure: { message: string }) => failWith(failure.message))
   );
 });
 
-const setAccountModelEnabledInner = Effect.fnUntraced(function* (
+const enableInner = Effect.fnUntraced(function* (
   userId: string,
-  input: SetAccountModelEnabledInput
+  input: ModelToggleInput
 ) {
   const accountRows = yield* fromPromise(
     () =>
@@ -634,27 +624,27 @@ const setAccountModelEnabledInner = Effect.fnUntraced(function* (
   const account = accountRows[0];
   if (!account) return yield* Effect.fail(internal("Account not found"));
 
-  const normalizedModel = resolveModelAlias(input.modelId.trim());
-  if (!normalizedModel || !getProviderModelSet(account.provider).has(normalizedModel)) {
+  const normalizedModel = aliasOf(input.modelId.trim());
+  if (!normalizedModel || !providerSet(account.provider).has(normalizedModel)) {
     return yield* Effect.fail(
       internal(`Model "${normalizedModel || input.modelId}" is not supported by provider "${account.provider}"`)
     );
   }
-  if (!accountTierCanAccessModel(account.tier, normalizedModel, account.provider)) {
+  if (!Tier.canAccess(account.tier, normalizedModel, account.provider)) {
     return yield* Effect.fail(
       internal(`Model "${normalizedModel}" is not available for this account tier`)
     );
   }
 
-  const lookupKeys = getModelLookupKeys(normalizedModel);
+  const lookupKeys = keysOf(normalizedModel);
   yield* fromPromise(
     () =>
       db
-        .delete(providerAccountDisabledModel)
+        .delete(accountDisabledModel)
         .where(
           and(
-            eq(providerAccountDisabledModel.providerAccountId, account.id),
-            inArray(providerAccountDisabledModel.model, lookupKeys)
+            eq(accountDisabledModel.providerAccountId, account.id),
+            inArray(accountDisabledModel.model, lookupKeys)
           )
         ),
     "Failed to update model status"
@@ -663,21 +653,21 @@ const setAccountModelEnabledInner = Effect.fnUntraced(function* (
     yield* fromPromise(
       () =>
         db
-          .insert(providerAccountDisabledModel)
+          .insert(accountDisabledModel)
           .values({ providerAccountId: account.id, model: normalizedModel })
           .onConflictDoNothing({
-            target: [providerAccountDisabledModel.providerAccountId, providerAccountDisabledModel.model],
+            target: [accountDisabledModel.providerAccountId, accountDisabledModel.model],
           }),
       "Failed to update model status"
     );
   }
 
-  yield* invalidateDisabledModelsCache(userId);
-  publishAccountsChanged(userId);
+  yield* invalidateDisabled(userId);
+  publishAccounts(userId);
   return { model: normalizedModel, enabled: input.enabled };
 });
 
-export const getAccountErrorHistory = Effect.fn("accounts.errorHistory")(function* (
+export const errorHistory = Effect.fn("accounts.errorHistory")(function* (
   userId: string,
   input: ErrorHistoryInput
 ) {
@@ -692,17 +682,17 @@ export const getAccountErrorHistory = Effect.fn("accounts.errorHistory")(functio
   ).pipe(Effect.catch(() => Effect.succeed([])));
   if (!accountRows[0]) return { success: true as const, data: { entries: [] } };
 
-  const entries = yield* readRedisErrorHistory(
+  const entries = yield* ErrorHistory.read(
     input.accountId,
-    Math.min(input.limit ?? DEFAULT_ERROR_HISTORY_ROWS, MAX_ERROR_HISTORY_ROWS)
+    Math.min(input.limit ?? DEFAULT_HISTORY_ROWS, MAX_HISTORY_ROWS)
   ).pipe(Effect.catch(() => Effect.succeed([])));
 
   return { success: true as const, data: { entries } };
 });
 
-export const getAccountErrorHistories = Effect.fn("accounts.errorHistories")(function* (
+export const errorHistories = Effect.fn("accounts.errorHistories")(function* (
   userId: string,
-  input: ErrorHistoryBatchInput
+  input: HistoryBatchInput
 ) {
   const accountIds = Array.from(new Set(input.accountIds));
   if (accountIds.length === 0) return { success: true as const, data: {} };
@@ -716,13 +706,13 @@ export const getAccountErrorHistories = Effect.fn("accounts.errorHistories")(fun
     "Failed to load accounts"
   ).pipe(Effect.catch(() => Effect.succeed([])));
   const ownedAccountIds = ownedAccounts.map((account) => account.id);
-  const entriesByAccountId = yield* readRedisErrorHistories(
+  const entriesByAccount = yield* ErrorHistory.readMany(
     ownedAccountIds,
-    Math.min(input.limit ?? DEFAULT_ERROR_HISTORY_ROWS, MAX_ERROR_HISTORY_ROWS)
+    Math.min(input.limit ?? DEFAULT_HISTORY_ROWS, MAX_HISTORY_ROWS)
   ).pipe(Effect.catch(() => Effect.succeed({} as Record<string, never[]>)));
   const results = Object.fromEntries(
     accountIds.map((accountId) => {
-      const entries = entriesByAccountId[accountId];
+      const entries = entriesByAccount[accountId];
       if (!entries) return [accountId, { success: false, error: "Account not found" }];
       return [accountId, { success: true, data: { entries } }];
     })
@@ -757,13 +747,13 @@ export const resolveAccountErrors = Effect.fn("accounts.resolveErrors")(function
   userId: string,
   input: ResolveErrorsInput
 ) {
-  return yield* resolveAccountErrorsInner(userId, input).pipe(
+  return yield* resolveInner(userId, input).pipe(
     Effect.map(() => ({ success: true as const, data: undefined })),
     Effect.catch((failure: { message: string }) => failWith(failure.message))
   );
 });
 
-const resolveAccountErrorsInner = Effect.fnUntraced(function* (
+const resolveInner = Effect.fnUntraced(function* (
   userId: string,
   input: ResolveErrorsInput
 ) {
@@ -788,21 +778,21 @@ const resolveAccountErrorsInner = Effect.fnUntraced(function* (
           consecutiveErrors: 0,
           lastErrorAt: null,
           lastErrorCode: null,
-          lastRecoveredByRotationAt: null,
+          lastRecoveredAt: null,
           ...(account.status === "failed" ? { status: "active", statusChangedAt: new Date(), disabledUntil: null } : {}),
         })
         .where(eq(providerAccount.id, input.accountId)),
     "Failed to resolve account errors"
   );
-  yield* deleteRedisErrorHistory(input.accountId);
+  yield* ErrorHistory.remove(input.accountId);
   yield* fromPromise(
     () =>
       db
-        .delete(providerAccountModelHealth)
-        .where(eq(providerAccountModelHealth.providerAccountId, input.accountId)),
+        .delete(accountModelHealth)
+        .where(eq(accountModelHealth.providerAccountId, input.accountId)),
     "Failed to resolve account errors"
   );
-  yield* clearRefreshFailCount(input.accountId);
-  publishAccountsChanged(userId);
+  yield* clearFails(input.accountId);
+  publishAccounts(userId);
   return undefined;
 });

@@ -3,13 +3,13 @@ import type { AccountQuotaInfo, ProviderDetailData, QuotaProviderKey } from "../
 
 type Account = ProviderDetailData["accounts"][number];
 
-type LoadAccountQuotaOptions = {
+type LoadOptions = {
   refreshExisting?: boolean;
   forceRefresh?: boolean;
   runId?: number;
 };
 
-type RunQuotaRefreshOptions = {
+type RefreshOptions = {
   refreshExisting?: boolean;
   forceRefresh?: boolean;
 };
@@ -21,82 +21,82 @@ export function useQuotaMonitor(options: {
   shouldQueueAccount?: (account: Account) => boolean;
 }) {
   const api = useApi();
-  const quotaByAccountId = useState<Record<string, AccountQuotaInfo>>(stateKeys.quotaByAccountId, () => ({}));
-  const quotaErrorByAccountId = useState<Record<string, string>>(stateKeys.quotaErrorByAccountId, () => ({}));
-  const quotaLoadingByAccountId = useState<Record<string, boolean>>(stateKeys.quotaLoadingByAccountId, () => ({}));
-  let quotaQueueRunId = 0;
-  let quotaRunInFlight: Promise<void> | null = null;
-  const quotaLoadingRunByAccountId = new Map<string, number>();
+  const quotaById = useState<Record<string, AccountQuotaInfo>>(stateKeys.quotaById, () => ({}));
+  const errorById = useState<Record<string, string>>(stateKeys.errorById, () => ({}));
+  const loadingById = useState<Record<string, boolean>>(stateKeys.loadingById, () => ({}));
+  let queueRunId = 0;
+  let runInFlight: Promise<void> | null = null;
+  const loadingRun = new Map<string, number>();
 
   function cancelQuotaQueue() {
-    quotaQueueRunId += 1;
+    queueRunId += 1;
   }
 
   function setQuotaLoading(accountId: string, loading: boolean) {
-    quotaLoadingByAccountId.value = loading
-      ? { ...quotaLoadingByAccountId.value, [accountId]: true }
-      : Object.fromEntries(Object.entries(quotaLoadingByAccountId.value).filter(([key]) => key !== accountId));
+    loadingById.value = loading
+      ? { ...loadingById.value, [accountId]: true }
+      : Object.fromEntries(Object.entries(loadingById.value).filter(([key]) => key !== accountId));
   }
 
   function pruneQuotaState() {
     const accountIds = new Set(options.accounts.value.map((account) => account.id));
-    quotaErrorByAccountId.value = Object.fromEntries(Object.entries(quotaErrorByAccountId.value).filter(([accountId]) => accountIds.has(accountId)));
-    quotaLoadingByAccountId.value = Object.fromEntries(Object.entries(quotaLoadingByAccountId.value).filter(([accountId]) => accountIds.has(accountId)));
-    for (const accountId of quotaLoadingRunByAccountId.keys()) {
-      if (!accountIds.has(accountId)) quotaLoadingRunByAccountId.delete(accountId);
+    errorById.value = Object.fromEntries(Object.entries(errorById.value).filter(([accountId]) => accountIds.has(accountId)));
+    loadingById.value = Object.fromEntries(Object.entries(loadingById.value).filter(([accountId]) => accountIds.has(accountId)));
+    for (const accountId of loadingRun.keys()) {
+      if (!accountIds.has(accountId)) loadingRun.delete(accountId);
     }
   }
 
-  async function loadAccountQuota(account: Account, loadOptions: LoadAccountQuotaOptions = {}) {
+  async function loadAccountQuota(account: Account, loadOptions: LoadOptions = {}) {
     const { refreshExisting = false, forceRefresh = false, runId } = loadOptions;
     const provider = options.toQuotaProvider(account.provider);
-    if (!provider || (quotaLoadingByAccountId.value[account.id] && !forceRefresh)) return;
-    if (quotaByAccountId.value[account.id] && !refreshExisting) return;
+    if (!provider || (loadingById.value[account.id] && !forceRefresh)) return;
+    if (quotaById.value[account.id] && !refreshExisting) return;
 
-    const hadQuota = Boolean(quotaByAccountId.value[account.id]);
+    const hadQuota = Boolean(quotaById.value[account.id]);
     setQuotaLoading(account.id, true);
-    quotaErrorByAccountId.value = { ...quotaErrorByAccountId.value, [account.id]: "" };
+    errorById.value = { ...errorById.value, [account.id]: "" };
 
     try {
       const result = await api.accounts.quota({ provider, accountId: account.id, forceRefresh });
-      if (runId !== undefined && runId !== quotaQueueRunId) return;
+      if (runId !== undefined && runId !== queueRunId) return;
       if (!result.success) throw new Error(result.error);
 
-      quotaByAccountId.value = { ...quotaByAccountId.value, [account.id]: result.data };
-      quotaErrorByAccountId.value = Object.fromEntries(Object.entries(quotaErrorByAccountId.value).filter(([accountId]) => accountId !== account.id));
+      quotaById.value = { ...quotaById.value, [account.id]: result.data };
+      errorById.value = Object.fromEntries(Object.entries(errorById.value).filter(([accountId]) => accountId !== account.id));
     } catch (error) {
-      if (runId !== undefined && runId !== quotaQueueRunId) return;
+      if (runId !== undefined && runId !== queueRunId) return;
 
       const message = error instanceof Error ? error.message : "Failed to fetch quota data";
-      if (refreshExisting || !hadQuota) quotaErrorByAccountId.value = { ...quotaErrorByAccountId.value, [account.id]: message };
+      if (refreshExisting || !hadQuota) errorById.value = { ...errorById.value, [account.id]: message };
     } finally {
       setQuotaLoading(account.id, false);
     }
   }
 
-  async function runQuotaQueue(accounts = options.quotaCapableAccounts.value, refreshOptions: RunQuotaRefreshOptions | boolean = {}) {
+  async function runQuotaQueue(accounts = options.quotaCapableAccounts.value, refreshOptions: RefreshOptions | boolean = {}) {
     const normalizedOptions = typeof refreshOptions === "boolean" ? { refreshExisting: refreshOptions } : refreshOptions;
     const { refreshExisting = false, forceRefresh = false } = normalizedOptions;
-    const runId = ++quotaQueueRunId;
+    const runId = ++queueRunId;
     let loadingAccountIds: string[] = [];
 
     const run = async () => {
       const queueableAccounts = accounts.filter((account) => options.shouldQueueAccount?.(account) ?? true);
       const accountsToFetch = queueableAccounts.filter((account) => {
-        if (quotaLoadingByAccountId.value[account.id]) return false;
-        if (quotaByAccountId.value[account.id] && !refreshExisting) return false;
+        if (loadingById.value[account.id]) return false;
+        if (quotaById.value[account.id] && !refreshExisting) return false;
         return Boolean(options.toQuotaProvider(account.provider));
       });
 
       if (accountsToFetch.length === 0) return;
 
-      const hadQuotaByAccountId = Object.fromEntries(accountsToFetch.map((account) => [account.id, Boolean(quotaByAccountId.value[account.id])]));
+      const hadQuota = Object.fromEntries(accountsToFetch.map((account) => [account.id, Boolean(quotaById.value[account.id])]));
       loadingAccountIds = accountsToFetch.map((account) => account.id);
       accountsToFetch.forEach((account) => {
-        quotaLoadingRunByAccountId.set(account.id, runId);
+        loadingRun.set(account.id, runId);
         setQuotaLoading(account.id, true);
       });
-      quotaErrorByAccountId.value = { ...quotaErrorByAccountId.value, ...Object.fromEntries(accountsToFetch.map((account) => [account.id, ""])) };
+      errorById.value = { ...errorById.value, ...Object.fromEntries(accountsToFetch.map((account) => [account.id, ""])) };
 
       const accountsByProvider = new Map<QuotaProviderKey, Account[]>();
       for (const account of accountsToFetch) {
@@ -115,15 +115,15 @@ export function useQuotaMonitor(options: {
         }
       }));
 
-      if (runId !== quotaQueueRunId) return;
+      if (runId !== queueRunId) return;
 
-      const nextQuotaByAccountId = { ...quotaByAccountId.value };
-      const nextErrorByAccountId = { ...quotaErrorByAccountId.value };
+      const nextQuota = { ...quotaById.value };
+      const nextError = { ...errorById.value };
 
       for (const providerResult of providerResults) {
         if (!providerResult.ok) {
           const message = providerResult.error instanceof Error ? providerResult.error.message : "Failed to fetch quota data";
-          for (const account of providerResult.providerAccounts.filter((account) => refreshExisting || !hadQuotaByAccountId[account.id])) nextErrorByAccountId[account.id] = message;
+          for (const account of providerResult.providerAccounts.filter((account) => refreshExisting || !hadQuota[account.id])) nextError[account.id] = message;
           continue;
         }
 
@@ -132,41 +132,41 @@ export function useQuotaMonitor(options: {
           if (!accountResult) continue;
 
           if (accountResult.success) {
-            nextQuotaByAccountId[account.id] = accountResult.data;
-          } else if (refreshExisting || !hadQuotaByAccountId[account.id]) {
-            nextErrorByAccountId[account.id] = accountResult.error;
+            nextQuota[account.id] = accountResult.data;
+          } else if (refreshExisting || !hadQuota[account.id]) {
+            nextError[account.id] = accountResult.error;
           }
         }
       }
 
-      quotaByAccountId.value = nextQuotaByAccountId;
-      quotaErrorByAccountId.value = Object.fromEntries(Object.entries(nextErrorByAccountId).filter(([accountId]) => !nextQuotaByAccountId[accountId]));
+      quotaById.value = nextQuota;
+      errorById.value = Object.fromEntries(Object.entries(nextError).filter(([accountId]) => !nextQuota[accountId]));
     };
 
     const runPromise = run().finally(() => {
       loadingAccountIds.forEach((accountId) => {
-        if (quotaLoadingRunByAccountId.get(accountId) !== runId) return;
-        quotaLoadingRunByAccountId.delete(accountId);
+        if (loadingRun.get(accountId) !== runId) return;
+        loadingRun.delete(accountId);
         setQuotaLoading(accountId, false);
       });
-      if (quotaRunInFlight === runPromise) quotaRunInFlight = null;
+      if (runInFlight === runPromise) runInFlight = null;
     });
-    quotaRunInFlight = runPromise;
-    await quotaRunInFlight;
+    runInFlight = runPromise;
+    await runInFlight;
   }
 
-  async function waitForQuotaQueue() {
-    await quotaRunInFlight;
+  async function waitForQueue() {
+    await runInFlight;
   }
 
   return {
-    quotaByAccountId,
-    quotaErrorByAccountId,
-    quotaLoadingByAccountId,
+    quotaById,
+    errorById,
+    loadingById,
     cancelQuotaQueue,
     loadAccountQuota,
     pruneQuotaState,
     runQuotaQueue,
-    waitForQuotaQueue,
+    waitForQueue,
   };
 }

@@ -20,8 +20,8 @@ const emit = defineEmits<{
 const { auditRefreshVersion, auditUser, isAuditMode } = useAudit();
 const statHitEffects = ref<Record<string, StatHit>>({});
 const previousStatValues = ref<Record<string, number> | null>(null);
-const previousStatAnimationContextKey = ref<string | null>(null);
-const pendingStatBaselineContextKey = ref<string | null>(null);
+const previousAnimationKey = ref<string | null>(null);
+const baselineContextKey = ref<string | null>(null);
 
 function indicatorBadge(indicator: string) {
   if (indicator === "error") return { label: "Issue", class: "border-destructive/60 text-destructive" };
@@ -42,23 +42,23 @@ function compactNumber(n: number): string {
   return n.toLocaleString();
 }
 
-function formatSignedInteger(delta: number): string {
+function signedInteger(delta: number): string {
   const sign = delta > 0 ? "+" : "-";
   return `${sign} ${compactNumber(Math.abs(Math.round(delta)))}`;
 }
 
-function formatSignedDuration(delta: number): string {
+function signedDuration(delta: number): string {
   const sign = delta > 0 ? "+" : "-";
   return `${sign} ${formatDuration(Math.abs(Math.round(delta)))}`;
 }
 
-function formatSignedPercent(delta: number): string {
+function signedPercent(delta: number): string {
   const sign = delta > 0 ? "+" : "-";
   const value = Math.round(Math.abs(delta) * 10) / 10;
   return `${sign} ${value}%`;
 }
 
-function collectStatValues(items: StatMetric[]): Record<string, number> {
+function statValues(items: StatMetric[]): Record<string, number> {
   const values: Record<string, number> = {};
 
   for (const item of items) {
@@ -68,7 +68,7 @@ function collectStatValues(items: StatMetric[]): Record<string, number> {
   return values;
 }
 
-function buildHourKeys(hours: number): string[] {
+function hourKeys(hours: number): string[] {
   const now = new Date();
   const currentHourUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), now.getUTCHours()));
 
@@ -79,7 +79,7 @@ function buildHourKeys(hours: number): string[] {
   });
 }
 
-function buildDayKeys(days: number): string[] {
+function dayKeys(days: number): string[] {
   const now = new Date();
   const todayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 
@@ -90,21 +90,21 @@ function buildDayKeys(days: number): string[] {
   });
 }
 
-function expandDailyPoints(points: Array<{ date: string; count: number }>) {
+function dailyPoints(points: Array<{ date: string; count: number }>) {
   const valuesByDate = new Map(points.map((point) => [point.date, point.count]));
-  return buildDayKeys(30).map((date) => ({ date, count: valuesByDate.get(date) ?? 0 }));
+  return dayKeys(30).map((date) => ({ date, count: valuesByDate.get(date) ?? 0 }));
 }
 
-function expandDurationPoints(points: Array<{ time: string; avgDuration: number }>) {
+function durationPoints(points: Array<{ time: string; avgDuration: number }>) {
   const valuesByTime = new Map(points.map((point) => [point.time, point.avgDuration]));
-  return buildHourKeys(24).map((time) => ({ time, avgDuration: valuesByTime.get(time) ?? null }));
+  return hourKeys(24).map((time) => ({ time, avgDuration: valuesByTime.get(time) ?? null }));
 }
 
-function formatHourLabel(time: string): string {
+function hourLabel(time: string): string {
   return time.slice(11, 16);
 }
 
-function isPreviousDayLabel(time: string): boolean {
+function prevDay(time: string): boolean {
   const date = new Date(time);
   if (Number.isNaN(date.getTime())) return false;
 
@@ -113,12 +113,12 @@ function isPreviousDayLabel(time: string): boolean {
   return date < today;
 }
 
-const dailyPoints = computed(() => expandDailyPoints(props.summary.stats.dailyRequests));
-const dailyValues = computed(() => dailyPoints.value.map((point) => point.count));
-const durationPoints = computed(() => expandDurationPoints(props.summary.stats.durationLast24Hours));
-const durationValues = computed(() => durationPoints.value.map((point) => point.avgDuration ?? 0));
+const daily = computed(() => dailyPoints(props.summary.stats.dailyRequests));
+const dailyValues = computed(() => daily.value.map((point) => point.count));
+const duration = computed(() => durationPoints(props.summary.stats.durationLast24Hours));
+const durationValues = computed(() => duration.value.map((point) => point.avgDuration ?? 0));
 const durationLabelPoints = computed(() => {
-  const points = durationPoints.value;
+  const points = duration.value;
   const tickCount = Math.min(5, points.length);
   const indexes = Array.from(new Set(Array.from({ length: tickCount }, (_, index) => Math.round((index / (tickCount - 1 || 1)) * (points.length - 1)))));
   return indexes.map((index) => points[index]).filter(Boolean) as Array<{ time: string; avgDuration: number | null }>;
@@ -126,36 +126,36 @@ const durationLabelPoints = computed(() => {
 const badge = computed(() => props.summary.active > 0 ? indicatorBadge(props.summary.indicator) : null);
 const connected = computed(() => props.summary.connected > 0);
 const usageChartColor = computed(() => connected.value ? "var(--chart-1)" : "var(--muted-foreground)");
-const usageChartColorAlt = computed(() => connected.value ? "var(--chart-2)" : "var(--muted-foreground)");
+const chartColorAlt = computed(() => connected.value ? "var(--chart-2)" : "var(--muted-foreground)");
 const statMetrics = computed<StatMetric[]>(() => [
-  { key: "totalRequests", label: "Requests", value: props.summary.stats.totalRequests.toLocaleString(), numericValue: props.summary.stats.totalRequests, formatDelta: formatSignedInteger },
-  { key: "totalTokens", label: "Token", value: compactNumber(props.summary.stats.totalTokens), numericValue: props.summary.stats.totalTokens, formatDelta: formatSignedInteger },
-  { key: "successRate", label: "Success", value: props.summary.stats.successRate === null ? "-" : `${props.summary.stats.successRate}%`, numericValue: props.summary.stats.successRate ?? Number.NaN, formatDelta: formatSignedPercent },
-  { key: "avgDuration", label: "Latency", value: formatDuration(props.summary.stats.avgDurationLastDay), numericValue: props.summary.stats.avgDurationLastDay ?? Number.NaN, formatDelta: formatSignedDuration, getTone: (delta) => delta > 0 ? "negative" : "positive" },
+  { key: "totalRequests", label: "Requests", value: props.summary.stats.totalRequests.toLocaleString(), numericValue: props.summary.stats.totalRequests, formatDelta: signedInteger },
+  { key: "totalTokens", label: "Token", value: compactNumber(props.summary.stats.totalTokens), numericValue: props.summary.stats.totalTokens, formatDelta: signedInteger },
+  { key: "successRate", label: "Success", value: props.summary.stats.successRate === null ? "-" : `${props.summary.stats.successRate}%`, numericValue: props.summary.stats.successRate ?? Number.NaN, formatDelta: signedPercent },
+  { key: "avgDuration", label: "Latency", value: formatDuration(props.summary.stats.avgDurationLastDay), numericValue: props.summary.stats.avgDurationLastDay ?? Number.NaN, formatDelta: signedDuration, getTone: (delta) => delta > 0 ? "negative" : "positive" },
 ]);
-const statAnimationContextKey = computed(() => {
+const animationKey = computed(() => {
   const userKey = isAuditMode.value ? `audit:${auditUser.value?.id ?? ""}` : "self";
   return `${props.provider.key}:${userKey}:${auditRefreshVersion.value}`;
 });
 const stats = computed(() => statMetrics.value.map((stat) => ({ ...stat, hit: statHitEffects.value[stat.key] })));
 
-watch([statMetrics, statAnimationContextKey], ([items, contextKey]) => {
-  const nextValues = collectStatValues(items);
+watch([statMetrics, animationKey], ([items, contextKey]) => {
+  const nextValues = statValues(items);
   const previousValues = previousStatValues.value;
-  const previousContextKey = previousStatAnimationContextKey.value;
+  const previousContextKey = previousAnimationKey.value;
   const contextChanged = previousContextKey !== contextKey;
 
   if (contextChanged) {
     previousStatValues.value = nextValues;
-    previousStatAnimationContextKey.value = contextKey;
-    pendingStatBaselineContextKey.value = previousContextKey === null ? null : contextKey;
+    previousAnimationKey.value = contextKey;
+    baselineContextKey.value = previousContextKey === null ? null : contextKey;
     statHitEffects.value = {};
     return;
   }
 
-  if (!previousValues || pendingStatBaselineContextKey.value === contextKey) {
+  if (!previousValues || baselineContextKey.value === contextKey) {
     previousStatValues.value = nextValues;
-    pendingStatBaselineContextKey.value = null;
+    baselineContextKey.value = null;
     return;
   }
 
@@ -178,11 +178,11 @@ watch([statMetrics, statAnimationContextKey], ([items, contextKey]) => {
   }
 
   previousStatValues.value = nextValues;
-  previousStatAnimationContextKey.value = contextKey;
+  previousAnimationKey.value = contextKey;
   statHitEffects.value = nextHitEffects;
 }, { immediate: true });
 
-function handlePinnedToggled(providerKey: string, pinned: boolean) {
+function pinnedToggled(providerKey: string, pinned: boolean) {
   emit("toggled", providerKey, pinned);
 }
 </script>
@@ -193,7 +193,7 @@ function handlePinnedToggled(providerKey: string, pinned: boolean) {
 
     <div class="pointer-events-none relative z-20 flex items-start justify-between gap-2">
       <div class="flex items-center gap-1">
-        <ProviderPinButton class="pointer-events-auto" :provider-key="provider.key" :pinned="pinned" :readonly="readonly" @toggled="handlePinnedToggled" />
+        <ProviderPinButton class="pointer-events-auto" :provider-key="provider.key" :pinned="pinned" :readonly="readonly" @toggled="pinnedToggled" />
         <UiCardTitle class="text-base">{{ provider.label }}</UiCardTitle>
         <UiBadge v-if="summary.connected > 0" variant="outline" class="text-xs">{{ summary.active }}/{{ summary.connected }}</UiBadge>
       </div>
@@ -214,9 +214,9 @@ function handlePinnedToggled(providerKey: string, pinned: boolean) {
           />
         </div>
         <div>
-          <UsageSparkline :values="durationValues" :color="usageChartColorAlt" :aria-label="`Average duration trend for ${provider.label} over last 24 hours`" class="h-6" :height="24" />
+          <UsageSparkline :values="durationValues" :color="chartColorAlt" :aria-label="`Average duration trend for ${provider.label} over last 24 hours`" class="h-6" :height="24" />
           <div class="mt-0.5 grid grid-cols-5 text-[9px]">
-            <span v-for="point in durationLabelPoints" :key="point.time" :class="['truncate text-center', isPreviousDayLabel(point.time) ? 'text-muted-foreground' : 'text-foreground/80']">{{ formatHourLabel(point.time) }}</span>
+            <span v-for="point in durationLabelPoints" :key="point.time" :class="['truncate text-center', prevDay(point.time) ? 'text-muted-foreground' : 'text-foreground/80']">{{ hourLabel(point.time) }}</span>
           </div>
         </div>
         <UsageSparkline :values="dailyValues" :color="usageChartColor" :aria-label="`Requests trend for ${provider.label}`" />

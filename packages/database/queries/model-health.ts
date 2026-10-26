@@ -2,9 +2,9 @@ import { and, eq, inArray, isNotNull, lte, sql } from "drizzle-orm";
 import { Effect } from "effect";
 import { db, type DbExecutor } from "../client.js";
 import { tryDb } from "../errors.js";
-import { providerAccount, providerAccountModelHealth } from "../schema/accounts.js";
+import { providerAccount, accountModelHealth } from "../schema/accounts.js";
 
-export const bumpAccountRequestCount = Effect.fn("db.bumpAccountRequestCount")(function* (
+export const bumpRequests = Effect.fn("db.bumpRequests")(function* (
   params: { id: string; at: Date },
   database: DbExecutor = db
 ) {
@@ -14,7 +14,7 @@ export const bumpAccountRequestCount = Effect.fn("db.bumpAccountRequestCount")(f
     .where(eq(providerAccount.id, params.id)));
 });
 
-export const getAccountHealthState = Effect.fn("db.getAccountHealthState")(function* (id: string, database: DbExecutor = db) {
+export const healthState = Effect.fn("db.healthState")(function* (id: string, database: DbExecutor = db) {
   const rows = yield* tryDb("query", () => database
     .select({
       id: providerAccount.id,
@@ -28,7 +28,7 @@ export const getAccountHealthState = Effect.fn("db.getAccountHealthState")(funct
   return rows[0] ?? null;
 });
 
-export const setAccountHealthFailed = Effect.fn("db.setAccountHealthFailed")(function* (
+export const markFailed = Effect.fn("db.markFailed")(function* (
   params: { id: string; consecutiveErrors: number; status: string; at: Date },
   database: DbExecutor = db
 ) {
@@ -78,7 +78,7 @@ export const setAccountActive = Effect.fn("db.setAccountActive")(function* (
     .where(eq(providerAccount.id, params.id)));
 });
 
-export const setAccountUsageLimited = Effect.fn("db.setAccountUsageLimited")(function* (
+export const markLimited = Effect.fn("db.markLimited")(function* (
   params: { id: string; disabledUntil: Date; status: string; at: Date },
   database: DbExecutor = db
 ) {
@@ -112,34 +112,34 @@ export const markAccountSuccess = Effect.fn("db.markAccountSuccess")(function* (
     .where(eq(providerAccount.id, params.id)));
 });
 
-export const markAccountRecoveredByRotation = Effect.fn("db.markAccountRecoveredByRotation")(function* (
+export const markRecovered = Effect.fn("db.markRecovered")(function* (
   params: { id: string; at: Date; beforeOrAt: Date },
   database: DbExecutor = db
 ) {
   yield* tryDb("query", () => database
     .update(providerAccount)
-    .set({ lastRecoveredByRotationAt: params.at })
+    .set({ lastRecoveredAt: params.at })
     .where(and(eq(providerAccount.id, params.id), lte(providerAccount.lastErrorAt, params.beforeOrAt))));
 });
 
 export const modelHealthColumns = {
-  id: providerAccountModelHealth.id,
-  providerAccountId: providerAccountModelHealth.providerAccountId,
-  model: providerAccountModelHealth.model,
-  consecutiveErrors: providerAccountModelHealth.consecutiveErrors,
-  status: providerAccountModelHealth.status,
-  statusChangedAt: providerAccountModelHealth.statusChangedAt,
-  lastErrorAt: providerAccountModelHealth.lastErrorAt,
-  lastErrorCode: providerAccountModelHealth.lastErrorCode,
-  lastSuccessAt: providerAccountModelHealth.lastSuccessAt,
-  unhealthyCountUpdatedAt: providerAccountModelHealth.unhealthyCountUpdatedAt,
-  createdAt: providerAccountModelHealth.createdAt,
-  updatedAt: providerAccountModelHealth.updatedAt,
-  quotaLockedUntil: providerAccountModelHealth.quotaLockedUntil,
-  quotaLockReason: providerAccountModelHealth.quotaLockReason,
+  id: accountModelHealth.id,
+  providerAccountId: accountModelHealth.providerAccountId,
+  model: accountModelHealth.model,
+  consecutiveErrors: accountModelHealth.consecutiveErrors,
+  status: accountModelHealth.status,
+  statusChangedAt: accountModelHealth.statusChangedAt,
+  lastErrorAt: accountModelHealth.lastErrorAt,
+  lastErrorCode: accountModelHealth.lastErrorCode,
+  lastSuccessAt: accountModelHealth.lastSuccessAt,
+  unhealthyCountUpdatedAt: accountModelHealth.unhealthyCountUpdatedAt,
+  createdAt: accountModelHealth.createdAt,
+  updatedAt: accountModelHealth.updatedAt,
+  quotaLockedUntil: accountModelHealth.quotaLockedUntil,
+  quotaLockReason: accountModelHealth.quotaLockReason,
 } as const;
 
-export const listModelHealthByAccounts = Effect.fn("db.listModelHealthByAccounts")(function* (
+export const healthByAccounts = Effect.fn("db.healthByAccounts")(function* (
   params: { accountIds: string[]; models: string[] },
   database: DbExecutor = db
 ) {
@@ -147,25 +147,25 @@ export const listModelHealthByAccounts = Effect.fn("db.listModelHealthByAccounts
   return yield* tryDb("query", () =>
     database
       .select(modelHealthColumns)
-      .from(providerAccountModelHealth)
+      .from(accountModelHealth)
       .where(
         and(
-          inArray(providerAccountModelHealth.providerAccountId, params.accountIds),
-          inArray(providerAccountModelHealth.model, params.models)
+          inArray(accountModelHealth.providerAccountId, params.accountIds),
+          inArray(accountModelHealth.model, params.models)
         )
       )
   );
 });
 
-export const listModelHealthByAccount = Effect.fn("db.listModelHealthByAccount")(function* (
+export const healthByAccount = Effect.fn("db.healthByAccount")(function* (
   accountId: string,
   database: DbExecutor = db
 ) {
   return yield* tryDb("query", () =>
     database
       .select(modelHealthColumns)
-      .from(providerAccountModelHealth)
-      .where(eq(providerAccountModelHealth.providerAccountId, accountId))
+      .from(accountModelHealth)
+      .where(eq(accountModelHealth.providerAccountId, accountId))
   );
 });
 
@@ -176,31 +176,31 @@ export const getModelHealth = Effect.fn("db.getModelHealth")(function* (
 ) {
   const rows = yield* tryDb("query", () => database
     .select(modelHealthColumns)
-    .from(providerAccountModelHealth)
+    .from(accountModelHealth)
     .where(
       and(
-        eq(providerAccountModelHealth.providerAccountId, accountId),
-        eq(providerAccountModelHealth.model, model)
+        eq(accountModelHealth.providerAccountId, accountId),
+        eq(accountModelHealth.model, model)
       )
     )
     .limit(1));
   return rows[0] ?? null;
 });
 
-export const updateModelHealthCounters = Effect.fn("db.updateModelHealthCounters")(function* (
+export const bumpCounters = Effect.fn("db.bumpCounters")(function* (
   params: { id: string; consecutiveErrors: number; unhealthyCountUpdatedAt: Date },
   database: DbExecutor = db
 ) {
   yield* tryDb("query", () => database
-    .update(providerAccountModelHealth)
+    .update(accountModelHealth)
     .set({
       consecutiveErrors: params.consecutiveErrors,
       unhealthyCountUpdatedAt: params.unhealthyCountUpdatedAt,
     })
-    .where(eq(providerAccountModelHealth.id, params.id)));
+    .where(eq(accountModelHealth.id, params.id)));
 });
 
-export const updateModelHealthStatus = Effect.fn("db.updateModelHealthStatus")(function* (
+export const setStatus = Effect.fn("db.setStatus")(function* (
   params: {
     id: string;
     consecutiveErrors: number;
@@ -211,14 +211,14 @@ export const updateModelHealthStatus = Effect.fn("db.updateModelHealthStatus")(f
   database: DbExecutor = db
 ) {
   yield* tryDb("query", () => database
-    .update(providerAccountModelHealth)
+    .update(accountModelHealth)
     .set({
       consecutiveErrors: params.consecutiveErrors,
       unhealthyCountUpdatedAt: params.unhealthyCountUpdatedAt,
       status: params.status,
       statusChangedAt: params.statusChangedAt,
     })
-    .where(eq(providerAccountModelHealth.id, params.id)));
+    .where(eq(accountModelHealth.id, params.id)));
 });
 
 export const insertModelHealth = Effect.fn("db.insertModelHealth")(function* (
@@ -236,15 +236,15 @@ export const insertModelHealth = Effect.fn("db.insertModelHealth")(function* (
   },
   database: DbExecutor = db
 ) {
-  yield* tryDb("query", () => database.insert(providerAccountModelHealth).values(params));
+  yield* tryDb("query", () => database.insert(accountModelHealth).values(params));
 });
 
-export const markUsageLimitedHealth = Effect.fn("db.markUsageLimitedHealth")(function* (
+export const markUsageLimited = Effect.fn("db.markUsageLimited")(function* (
   params: { providerAccountId: string; model: string; status: string; at: Date; consecutiveErrors: number },
   database: DbExecutor = db
 ) {
   yield* tryDb("query", () => database
-    .update(providerAccountModelHealth)
+    .update(accountModelHealth)
     .set({
       status: params.status,
       statusChangedAt: params.at,
@@ -254,13 +254,13 @@ export const markUsageLimitedHealth = Effect.fn("db.markUsageLimitedHealth")(fun
     })
     .where(
       and(
-        eq(providerAccountModelHealth.providerAccountId, params.providerAccountId),
-        eq(providerAccountModelHealth.model, params.model)
+        eq(accountModelHealth.providerAccountId, params.providerAccountId),
+        eq(accountModelHealth.model, params.model)
       )
     ));
 });
 
-export const updateModelHealthSuccess = Effect.fn("db.updateModelHealthSuccess")(function* (
+export const markSuccess = Effect.fn("db.markSuccess")(function* (
   params: {
     id: string;
     consecutiveErrors: number;
@@ -270,16 +270,16 @@ export const updateModelHealthSuccess = Effect.fn("db.updateModelHealthSuccess")
   database: DbExecutor = db
 ) {
   yield* tryDb("query", () => database
-    .update(providerAccountModelHealth)
+    .update(accountModelHealth)
     .set({
       consecutiveErrors: params.consecutiveErrors,
       lastSuccessAt: params.lastSuccessAt,
       unhealthyCountUpdatedAt: params.unhealthyCountUpdatedAt,
     })
-    .where(eq(providerAccountModelHealth.id, params.id)));
+    .where(eq(accountModelHealth.id, params.id)));
 });
 
-export const updateModelHealthSuccessWithStatus = Effect.fn("db.updateModelHealthSuccessWithStatus")(function* (
+export const successStatus = Effect.fn("db.successStatus")(function* (
   params: {
     id: string;
     consecutiveErrors: number;
@@ -291,7 +291,7 @@ export const updateModelHealthSuccessWithStatus = Effect.fn("db.updateModelHealt
   database: DbExecutor = db
 ) {
   yield* tryDb("query", () => database
-    .update(providerAccountModelHealth)
+    .update(accountModelHealth)
     .set({
       consecutiveErrors: params.consecutiveErrors,
       lastSuccessAt: params.lastSuccessAt,
@@ -299,10 +299,10 @@ export const updateModelHealthSuccessWithStatus = Effect.fn("db.updateModelHealt
       status: params.status,
       statusChangedAt: params.statusChangedAt,
     })
-    .where(eq(providerAccountModelHealth.id, params.id)));
+    .where(eq(accountModelHealth.id, params.id)));
 });
 
-export const updateModelHealthFailure = Effect.fn("db.updateModelHealthFailure")(function* (
+export const recordFailure = Effect.fn("db.recordFailure")(function* (
   params: {
     id: string;
     consecutiveErrors: number;
@@ -313,17 +313,17 @@ export const updateModelHealthFailure = Effect.fn("db.updateModelHealthFailure")
   database: DbExecutor = db
 ) {
   yield* tryDb("query", () => database
-    .update(providerAccountModelHealth)
+    .update(accountModelHealth)
     .set({
       consecutiveErrors: params.consecutiveErrors,
       lastErrorAt: params.lastErrorAt,
       lastErrorCode: params.lastErrorCode,
       unhealthyCountUpdatedAt: params.unhealthyCountUpdatedAt,
     })
-    .where(eq(providerAccountModelHealth.id, params.id)));
+    .where(eq(accountModelHealth.id, params.id)));
 });
 
-export const updateModelHealthFailureWithStatus = Effect.fn("db.updateModelHealthFailureWithStatus")(function* (
+export const failStatus = Effect.fn("db.failStatus")(function* (
   params: {
     id: string;
     consecutiveErrors: number;
@@ -336,7 +336,7 @@ export const updateModelHealthFailureWithStatus = Effect.fn("db.updateModelHealt
   database: DbExecutor = db
 ) {
   yield* tryDb("query", () => database
-    .update(providerAccountModelHealth)
+    .update(accountModelHealth)
     .set({
       consecutiveErrors: params.consecutiveErrors,
       lastErrorAt: params.lastErrorAt,
@@ -345,7 +345,7 @@ export const updateModelHealthFailureWithStatus = Effect.fn("db.updateModelHealt
       status: params.status,
       statusChangedAt: params.statusChangedAt,
     })
-    .where(eq(providerAccountModelHealth.id, params.id)));
+    .where(eq(accountModelHealth.id, params.id)));
 });
 
 export const lockModelQuota = Effect.fn("db.lockModelQuota")(function* (
@@ -360,7 +360,7 @@ export const lockModelQuota = Effect.fn("db.lockModelQuota")(function* (
   database: DbExecutor = db
 ) {
   yield* tryDb("query", () => database
-    .insert(providerAccountModelHealth)
+    .insert(accountModelHealth)
     .values({
       id: params.id,
       providerAccountId: params.providerAccountId,
@@ -373,7 +373,7 @@ export const lockModelQuota = Effect.fn("db.lockModelQuota")(function* (
       updatedAt: params.at,
     })
     .onConflictDoUpdate({
-      target: [providerAccountModelHealth.providerAccountId, providerAccountModelHealth.model],
+      target: [accountModelHealth.providerAccountId, accountModelHealth.model],
       set: {
         quotaLockedUntil: params.quotaLockedUntil,
         quotaLockReason: params.quotaLockReason,
@@ -382,18 +382,18 @@ export const lockModelQuota = Effect.fn("db.lockModelQuota")(function* (
     }));
 });
 
-export const clearModelQuotaLock = Effect.fn("db.clearModelQuotaLock")(function* (
+export const clearQuotaLock = Effect.fn("db.clearQuotaLock")(function* (
   params: { providerAccountId: string; model: string },
   database: DbExecutor = db
 ) {
   yield* tryDb("query", () => database
-    .update(providerAccountModelHealth)
+    .update(accountModelHealth)
     .set({ quotaLockedUntil: null, quotaLockReason: null })
     .where(
       and(
-        eq(providerAccountModelHealth.providerAccountId, params.providerAccountId),
-        eq(providerAccountModelHealth.model, params.model),
-        isNotNull(providerAccountModelHealth.quotaLockedUntil)
+        eq(accountModelHealth.providerAccountId, params.providerAccountId),
+        eq(accountModelHealth.model, params.model),
+        isNotNull(accountModelHealth.quotaLockedUntil)
       )
     ));
 });

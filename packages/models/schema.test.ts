@@ -5,16 +5,16 @@ import { ModelParseFailure } from "./errors.ts";
 import {
   ModelDataSchema,
   ProviderConfigSchema,
-  decodeModelData,
-  decodeModelDataSync,
-  validateModelData,
-  validateProviderConfig,
+  decodeModel,
+  decodeSync,
+  validateModel,
+  validateConfig,
   validateRegistry,
 } from "./schema.ts";
 
 describe("model data schema", () => {
   test("keeps unknown keys while validating known ones", () => {
-    const decoded = decodeModelDataSync(
+    const decoded = decodeSync(
       JSON.stringify({
         id: "gpt-5",
         providers: ["openai"],
@@ -31,7 +31,7 @@ describe("model data schema", () => {
   });
 
   test("accepts the null shapes the generated files use", () => {
-    const decoded = decodeModelDataSync(
+    const decoded = decodeSync(
       JSON.stringify({ reasoning: null, modalities: null, limit: null, cost: null, scores: null }),
       "nulls.json"
     );
@@ -40,15 +40,15 @@ describe("model data schema", () => {
   });
 
   test("rejects a known key with the wrong type", () => {
-    expect(() => decodeModelDataSync('{"id":5}', "bad.json")).toThrow(ModelParseFailure);
-    expect(() => decodeModelDataSync('{"providers":"openai"}', "bad.json")).toThrow(ModelParseFailure);
+    expect(() => decodeSync('{"id":5}', "bad.json")).toThrow(ModelParseFailure);
+    expect(() => decodeSync('{"providers":"openai"}', "bad.json")).toThrow(ModelParseFailure);
     expect(() =>
-      decodeModelDataSync('{"providerConfig":{"openai":{"contextWindow":"big"}}}', "bad.json")
+      decodeSync('{"providerConfig":{"openai":{"contextWindow":"big"}}}', "bad.json")
     ).toThrow(ModelParseFailure);
   });
 
   test("reports invalid JSON as a parse failure on the effect channel", async () => {
-    const exit = await Effect.runPromise(Effect.exit(decodeModelData("{ oops", "bad.json")));
+    const exit = await Effect.runPromise(Effect.exit(decodeModel("{ oops", "bad.json")));
     expect(Exit.isFailure(exit)).toBe(true);
     if (Exit.isFailure(exit)) {
       const option = Exit.findErrorOption(exit);
@@ -61,18 +61,18 @@ describe("model data schema", () => {
   });
 
   test("validates an already parsed value before writing", async () => {
-    const ok = await Effect.runPromise(validateModelData({ providers: ["openai"] }, "inline"));
+    const ok = await Effect.runPromise(validateModel({ providers: ["openai"] }, "inline"));
     expect(ok.providers).toEqual(["openai"]);
 
     const bad = await Effect.runPromise(
-      Effect.exit(validateModelData({ providers: [1] } as never, "inline"))
+      Effect.exit(validateModel({ providers: [1] } as never, "inline"))
     );
     expect(Exit.isFailure(bad)).toBe(true);
   });
 
   test("validates provider configs and full registries", async () => {
-    expect(validateProviderConfig({ upstream: "x" })?.["upstream"]).toBe("x");
-    expect(validateProviderConfig({ contextWindow: "wide" })).toBe(null);
+    expect(validateConfig({ upstream: "x" })?.["upstream"]).toBe("x");
+    expect(validateConfig({ contextWindow: "wide" })).toBe(null);
 
     const registry = await Effect.runPromise(validateRegistry([{ id: "a" }, { id: "b" }]));
     expect(registry.map((entry) => entry.id)).toEqual(["a", "b"]);

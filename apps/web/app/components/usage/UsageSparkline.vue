@@ -20,7 +20,7 @@ const containerRef = ref<HTMLDivElement | null>(null);
 const chartWidth = ref(120);
 let observer: ResizeObserver | null = null;
 
-function buildSparklinePath(values: number[], width: number, height: number): string {
+function sparkPath(values: number[], width: number, height: number): string {
   if (values.length === 0) {
     return `M0,${height} L${width},${height}`;
   }
@@ -48,7 +48,7 @@ function buildSparklinePath(values: number[], width: number, height: number): st
     .join(" ");
 }
 
-const sparklinePath = computed(() => buildSparklinePath(props.values, chartWidth.value, props.height));
+const sparklinePath = computed(() => sparkPath(props.values, chartWidth.value, props.height));
 const areaPath = computed(() => {
   if (!sparklinePath.value) {
     return "";

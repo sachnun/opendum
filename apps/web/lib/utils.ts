@@ -5,7 +5,7 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function requestErrorMessage(error: unknown, fallback = "Request failed. Please try again."): string {
+export function messageOf(error: unknown, fallback = "Request failed. Please try again."): string {
   if (error && typeof error === "object") {
     const candidate = error as {
       data?: { statusMessage?: string; message?: string };

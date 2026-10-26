@@ -4,12 +4,12 @@ import { DatabaseFailure, databaseFailure } from "../errors.js";
 import {
   creditPointBalance,
   debitPointBalance,
-  debitPointBalanceAllowNegative,
-  insertPointBalanceOnConflictDoNothing,
-  listOrphanedRoamingDebits,
+  debitAllowNegative,
+  insertBalance,
+  listOrphaned,
   insertPointTransaction,
-  insertPointTransactionOnConflictDoNothing,
-  updatePointTransactionBalance,
+  insertTransaction,
+  updateTransactionBalance,
 } from "../queries/index.js";
 
 export class Points {
@@ -30,27 +30,27 @@ export class Points {
     return debitPointBalance(params, this.database);
   }
 
-  debitPointBalanceAllowNegative(params: Parameters<typeof debitPointBalanceAllowNegative>[0]) {
-    return debitPointBalanceAllowNegative(params, this.database);
+  debitAllowNegative(params: Parameters<typeof debitAllowNegative>[0]) {
+    return debitAllowNegative(params, this.database);
   }
 
-  insertPointBalanceOnConflictDoNothing(params: Parameters<typeof insertPointBalanceOnConflictDoNothing>[0]) {
-    return insertPointBalanceOnConflictDoNothing(params, this.database);
+  insertBalance(params: Parameters<typeof insertBalance>[0]) {
+    return insertBalance(params, this.database);
   }
 
   insertPointTransaction(params: Parameters<typeof insertPointTransaction>[0]) {
     return insertPointTransaction(params, this.database);
   }
 
-  insertPointTransactionOnConflictDoNothing(params: Parameters<typeof insertPointTransactionOnConflictDoNothing>[0]) {
-    return insertPointTransactionOnConflictDoNothing(params, this.database);
+  insertTransaction(params: Parameters<typeof insertTransaction>[0]) {
+    return insertTransaction(params, this.database);
   }
 
-  updatePointTransactionBalance(params: Parameters<typeof updatePointTransactionBalance>[0]) {
-    return updatePointTransactionBalance(params, this.database);
+  updateTransactionBalance(params: Parameters<typeof updateTransactionBalance>[0]) {
+    return updateTransactionBalance(params, this.database);
   }
 
-  listOrphanedRoamingDebits(params: Parameters<typeof listOrphanedRoamingDebits>[0]) {
-    return listOrphanedRoamingDebits(params, this.database);
+  listOrphaned(params: Parameters<typeof listOrphaned>[0]) {
+    return listOrphaned(params, this.database);
   }
 }

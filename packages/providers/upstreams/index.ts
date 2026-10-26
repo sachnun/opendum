@@ -3,7 +3,7 @@ export * from "./opencode.js";
 export * from "./cline.js";
 export * from "./codex.js";
 export * from "./custom.js";
-export * from "./perch.js";
+export * from "./perch/index.js";
 export * from "./workbuddy.js";
 export * from "./workers-ai.js";
 export * from "./kiro/index.js";

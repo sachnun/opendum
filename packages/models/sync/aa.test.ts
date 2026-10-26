@@ -3,13 +3,13 @@ import { expect, test } from "bun:test";
 import { gzip, sha256Bytes } from "../fs.ts";
 
 import {
-  buildAaIndex,
-  decodeLeaderboardManifest,
-  normalizeAaSlug,
+  aaIndex,
+  decodeManifest,
+  normalizeSlug,
   parseLeaderboard,
-  parseLeaderboardManifest,
-  resolveAaScore,
-  stripEffortSuffix,
+  parseManifest,
+  aaScore,
+  stripEffort,
 } from "./aa.ts";
 
 function leaderboardHtml(models: unknown[], key = "models"): string {
@@ -40,7 +40,7 @@ async function encodeManifest(models: unknown[], keyHex: string): Promise<Uint8A
   return new Uint8Array(sealed);
 }
 
-function randomKeyHex(): string {
+function randomHex(): string {
   return crypto.getRandomValues(new Uint8Array(32)).toHex();
 }
 
@@ -54,18 +54,18 @@ const SAMPLE = [
   { slug: "unscored-model", name: "No score" },
 ];
 
-test("normalizeAaSlug folds separators and drops variant suffixes", () => {
-  expect(normalizeAaSlug("claude-opus-4.5:free")).toBe("claude-opus-4-5");
-  expect(normalizeAaSlug("MiniMax_M3")).toBe("minimax-m3");
-  expect(normalizeAaSlug("anthropic/claude-opus-4-5")).toBe("claude-opus-4-5");
-  expect(normalizeAaSlug(null)).toBe("");
+test("normalizeSlug folds separators and drops variant suffixes", () => {
+  expect(normalizeSlug("claude-opus-4.5:free")).toBe("claude-opus-4-5");
+  expect(normalizeSlug("MiniMax_M3")).toBe("minimax-m3");
+  expect(normalizeSlug("anthropic/claude-opus-4-5")).toBe("claude-opus-4-5");
+  expect(normalizeSlug(null)).toBe("");
 });
 
-test("stripEffortSuffix removes only effort tokens", () => {
-  expect(stripEffortSuffix("claude-opus-5-5-high")).toBe("claude-opus-5-5");
-  expect(stripEffortSuffix("gpt-5-4-mini-medium")).toBe("gpt-5-4-mini");
-  expect(stripEffortSuffix("qwen3-max")).toBe("qwen3-max");
-  expect(stripEffortSuffix("kimi-k2-thinking")).toBe("kimi-k2-thinking");
+test("stripEffort removes only effort tokens", () => {
+  expect(stripEffort("claude-opus-5-5-high")).toBe("claude-opus-5-5");
+  expect(stripEffort("gpt-5-4-mini-medium")).toBe("gpt-5-4-mini");
+  expect(stripEffort("qwen3-max")).toBe("qwen3-max");
+  expect(stripEffort("kimi-k2-thinking")).toBe("kimi-k2-thinking");
 });
 
 test("parseLeaderboard extracts scored models", () => {
@@ -85,18 +85,18 @@ test("parseLeaderboard accepts renamed model list keys", () => {
   expect(parseLeaderboard(leaderboardHtml(SAMPLE, "scoredModels"))).toHaveLength(6);
 });
 
-test("parseLeaderboardManifest reads the encrypted payload pointer", () => {
-  const key = randomKeyHex();
-  expect(parseLeaderboardManifest(manifestHtml("/data/abc.txt", key))).toEqual({
+test("parseManifest reads the encrypted payload pointer", () => {
+  const key = randomHex();
+  expect(parseManifest(manifestHtml("/data/abc.txt", key))).toEqual({
     path: "/data/abc.txt",
     key,
   });
-  expect(parseLeaderboardManifest(leaderboardHtml(SAMPLE))).toBe(null);
+  expect(parseManifest(leaderboardHtml(SAMPLE))).toBe(null);
 });
 
-test("decodeLeaderboardManifest decrypts the full scored list", async () => {
-  const key = randomKeyHex();
-  const entries = await decodeLeaderboardManifest(await encodeManifest(SAMPLE, key), key);
+test("decodeManifest decrypts the full scored list", async () => {
+  const key = randomHex();
+  const entries = await decodeManifest(await encodeManifest(SAMPLE, key), key);
   expect(entries.map((entry) => entry.slug)).toEqual([
     "claude-opus-5-5",
     "claude-opus-5-5-xhigh",
@@ -108,11 +108,11 @@ test("decodeLeaderboardManifest decrypts the full scored list", async () => {
   expect(entries[4]?.estimated).toBe(true);
 });
 
-test("decodeLeaderboardManifest fails closed on a wrong key", async () => {
-  const key = randomKeyHex();
-  const other = randomKeyHex();
-  await expect(decodeLeaderboardManifest(await encodeManifest(SAMPLE, key), other)).rejects.toThrow();
-  expect(await decodeLeaderboardManifest(new Uint8Array(), key)).toEqual([]);
+test("decodeManifest fails closed on a wrong key", async () => {
+  const key = randomHex();
+  const other = randomHex();
+  await expect(decodeManifest(await encodeManifest(SAMPLE, key), other)).rejects.toThrow();
+  expect(await decodeManifest(new Uint8Array(), key)).toEqual([]);
 });
 
 test("parseLeaderboard tolerates malformed input", () => {
@@ -120,39 +120,39 @@ test("parseLeaderboard tolerates malformed input", () => {
   expect(parseLeaderboard(leaderboardHtml([{ slug: "", intelligenceIndex: 5 }]))).toEqual([]);
 });
 
-test("buildAaIndex keeps the highest score per slug", () => {
-  const index = buildAaIndex([
+test("aaIndex keeps the highest score per slug", () => {
+  const index = aaIndex([
     { slug: "model", name: "Model", index: 10, estimated: false },
     { slug: "model", name: "Model (max)", index: 30, estimated: false },
   ]);
   expect(index.bySlug.get("model")?.index).toBe(30);
 });
 
-test("resolveAaScore prefers an exact slug over an effort-stripped one", () => {
-  const index = buildAaIndex(parseLeaderboard(leaderboardHtml(SAMPLE)));
-  expect(resolveAaScore(["gpt-5-4-nano"], index)?.index).toBe(21);
-  expect(resolveAaScore(["gpt-5.4-nano"], index)?.slug).toBe("gpt-5-4-nano");
+test("aaScore prefers an exact slug over an effort-stripped one", () => {
+  const index = aaIndex(parseLeaderboard(leaderboardHtml(SAMPLE)));
+  expect(aaScore(["gpt-5-4-nano"], index)?.index).toBe(21);
+  expect(aaScore(["gpt-5.4-nano"], index)?.slug).toBe("gpt-5-4-nano");
 });
 
-test("resolveAaScore falls back to an effort-stripped slug", () => {
-  const index = buildAaIndex(parseLeaderboard(leaderboardHtml(SAMPLE)));
-  expect(resolveAaScore(["claude-opus-5-5-medium"], index)?.slug).toBe("claude-opus-5-5");
-  expect(resolveAaScore(["MiniMax-M3"], index)?.index).toBe(29);
+test("aaScore falls back to an effort-stripped slug", () => {
+  const index = aaIndex(parseLeaderboard(leaderboardHtml(SAMPLE)));
+  expect(aaScore(["claude-opus-5-5-medium"], index)?.slug).toBe("claude-opus-5-5");
+  expect(aaScore(["MiniMax-M3"], index)?.index).toBe(29);
 });
 
-test("resolveAaScore matches a size-qualified slug by shape", () => {
-  const index = buildAaIndex(
+test("aaScore matches a size-qualified slug by shape", () => {
+  const index = aaIndex(
     parseLeaderboard(
       leaderboardHtml([
         { slug: "nvidia-nemotron-3-ultra-550b-a55b", name: "Nemotron 3 Ultra", intelligenceIndex: 23 },
       ]),
     ),
   );
-  expect(resolveAaScore(["nemotron-3-ultra"], index)?.index).toBe(23);
+  expect(aaScore(["nemotron-3-ultra"], index)?.index).toBe(23);
 });
 
-test("resolveAaScore fails closed when shapes are ambiguous across sizes", () => {
-  const index = buildAaIndex(
+test("aaScore fails closed when shapes are ambiguous across sizes", () => {
+  const index = aaIndex(
     parseLeaderboard(
       leaderboardHtml([
         { slug: "gemma-3-27b-it", name: "Gemma 3 27B", intelligenceIndex: 12 },
@@ -160,12 +160,12 @@ test("resolveAaScore fails closed when shapes are ambiguous across sizes", () =>
       ]),
     ),
   );
-  expect(resolveAaScore(["gemma-3"], index)).toBe(null);
-  expect(resolveAaScore(["gemma-3-27b-it"], index)?.index).toBe(12);
+  expect(aaScore(["gemma-3"], index)).toBe(null);
+  expect(aaScore(["gemma-3-27b-it"], index)?.index).toBe(12);
 });
 
-test("resolveAaScore never strips a tier token that doubles as an effort level", () => {
-  const index = buildAaIndex(
+test("aaScore never strips a tier token that doubles as an effort level", () => {
+  const index = aaIndex(
     parseLeaderboard(
       leaderboardHtml([
         { slug: "mistral-medium", name: "Mistral Medium", intelligenceIndex: 5 },
@@ -173,28 +173,28 @@ test("resolveAaScore never strips a tier token that doubles as an effort level",
       ]),
     ),
   );
-  expect(resolveAaScore(["mistral"], index)).toBe(null);
-  expect(resolveAaScore(["mistral-medium"], index)?.index).toBe(5);
+  expect(aaScore(["mistral"], index)).toBe(null);
+  expect(aaScore(["mistral-medium"], index)?.index).toBe(5);
 });
 
-test("resolveAaScore rejects a shape match whose size differs", () => {
-  const index = buildAaIndex(
+test("aaScore rejects a shape match whose size differs", () => {
+  const index = aaIndex(
     parseLeaderboard(leaderboardHtml([{ slug: "qwen2-72b-instruct", name: "Qwen2 72B", intelligenceIndex: 6 }])),
   );
-  expect(resolveAaScore(["qwen2-7b-instruct"], index)).toBe(null);
-  expect(resolveAaScore(["qwen2-72b-instruct"], index)?.index).toBe(6);
+  expect(aaScore(["qwen2-7b-instruct"], index)).toBe(null);
+  expect(aaScore(["qwen2-72b-instruct"], index)?.index).toBe(6);
 });
 
-test("resolveAaScore matches reordered tokens of the same shape", () => {
-  const index = buildAaIndex(
+test("aaScore matches reordered tokens of the same shape", () => {
+  const index = aaIndex(
     parseLeaderboard(leaderboardHtml([{ slug: "claude-4-5-haiku", name: "Claude 4.5 Haiku", intelligenceIndex: 17 }])),
   );
-  expect(resolveAaScore(["claude-haiku-4-5"], index)?.index).toBe(17);
+  expect(aaScore(["claude-haiku-4-5"], index)?.index).toBe(17);
 });
 
-test("resolveAaScore scans every probe before giving up", () => {
-  const index = buildAaIndex(parseLeaderboard(leaderboardHtml(SAMPLE)));
-  expect(resolveAaScore(["unrelated", "", "glm-4.5v"], index)?.slug).toBe("glm-4-5v");
-  expect(resolveAaScore(["unrelated"], index)).toBe(null);
-  expect(resolveAaScore([], index)).toBe(null);
+test("aaScore scans every probe before giving up", () => {
+  const index = aaIndex(parseLeaderboard(leaderboardHtml(SAMPLE)));
+  expect(aaScore(["unrelated", "", "glm-4.5v"], index)?.slug).toBe("glm-4-5v");
+  expect(aaScore(["unrelated"], index)).toBe(null);
+  expect(aaScore([], index)).toBe(null);
 });

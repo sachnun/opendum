@@ -2,21 +2,21 @@ import { and, eq, inArray, isNull, lte, ne, or } from "drizzle-orm";
 import { Effect } from "effect";
 import { db, type DbExecutor } from "../client.js";
 import { tryDb } from "../errors.js";
-import { providerAccount, providerAccountDisabledModel } from "../schema/accounts.js";
+import { providerAccount, accountDisabledModel } from "../schema/accounts.js";
 import { disabledModel } from "../schema/keys.js";
 import { userSharingSetting } from "../schema/usage.js";
 
-export const listDisabledModelsByUser = Effect.fn("db.listDisabledModelsByUser")(function* (
+export const disabledByUser = Effect.fn("db.disabledByUser")(function* (
   userId: string,
   database: DbExecutor = db
 ) {
-  const rows = yield* tryDb("listDisabledModelsByUser", () =>
+  const rows = yield* tryDb("disabledByUser", () =>
     database.select({ model: disabledModel.model }).from(disabledModel).where(eq(disabledModel.userId, userId))
   );
   return rows.map((row) => row.model);
 });
 
-export const listActiveAccountTiers = Effect.fn("db.listActiveAccountTiers")(function* (
+export const activeTiers = Effect.fn("db.activeTiers")(function* (
   userId: string,
   now: Date,
   includeInactive = false,
@@ -27,7 +27,7 @@ export const listActiveAccountTiers = Effect.fn("db.listActiveAccountTiers")(fun
     conditions.push(eq(providerAccount.isActive, true));
     conditions.push(or(isNull(providerAccount.disabledUntil), lte(providerAccount.disabledUntil, now))!);
   }
-  return yield* tryDb("listActiveAccountTiers", () =>
+  return yield* tryDb("activeTiers", () =>
     database
       .select({
         id: providerAccount.id,
@@ -39,19 +39,19 @@ export const listActiveAccountTiers = Effect.fn("db.listActiveAccountTiers")(fun
   );
 });
 
-export const listDisabledModelsByAccounts = Effect.fn("db.listDisabledModelsByAccounts")(function* (
+export const disabledByAccounts = Effect.fn("db.disabledByAccounts")(function* (
   accountIds: string[],
   database: DbExecutor = db
 ) {
   if (accountIds.length === 0) return [];
-  return yield* tryDb("listDisabledModelsByAccounts", () =>
+  return yield* tryDb("disabledByAccounts", () =>
     database
       .select({
-        providerAccountId: providerAccountDisabledModel.providerAccountId,
-        model: providerAccountDisabledModel.model,
+        providerAccountId: accountDisabledModel.providerAccountId,
+        model: accountDisabledModel.model,
       })
-      .from(providerAccountDisabledModel)
-      .where(inArray(providerAccountDisabledModel.providerAccountId, accountIds))
+      .from(accountDisabledModel)
+      .where(inArray(accountDisabledModel.providerAccountId, accountIds))
   );
 });
 

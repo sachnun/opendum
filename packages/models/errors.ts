@@ -64,17 +64,17 @@ export type ModelFailure =
   | ModelTimeoutFailure
   | ModelDecodeFailure;
 
-export function modelFailureMessage(cause: unknown): string {
+export function failureMessage(cause: unknown): string {
   if (cause instanceof Error) return cause.message;
   if (typeof cause === "string") return cause;
   return String(cause);
 }
 
 export function asError(cause: unknown): Error {
-  return cause instanceof Error ? cause : new Error(modelFailureMessage(cause));
+  return cause instanceof Error ? cause : new Error(failureMessage(cause));
 }
 
-export function isRetryableStatus(status: number | undefined): boolean {
+export function isRetryable(status: number | undefined): boolean {
   if (status === undefined) return true;
   return status === 408 || status === 425 || status === 429 || status >= 500;
 }

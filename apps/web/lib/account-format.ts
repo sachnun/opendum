@@ -1,7 +1,7 @@
 import { formatDistanceToNowStrict } from "date-fns";
 
 import type { ProviderDetailData } from "./api-types";
-import { getErrorStatusTag, stripStatusFromErrorMessage, type ErrorStatusTag } from "./account-errors";
+import { statusTag, stripStatus, type ErrorStatusTag } from "./account-errors";
 
 export type StatDeltaTone = "positive" | "negative" | "neutral";
 
@@ -32,23 +32,23 @@ export function compactNumber(n: number): string {
   return n.toLocaleString();
 }
 
-export function formatSignedInteger(delta: number): string {
+export function signedInteger(delta: number): string {
   const sign = delta > 0 ? "+" : "-";
   return `${sign} ${compactNumber(Math.abs(Math.round(delta)))}`;
 }
 
-export function formatSignedDuration(delta: number): string {
+export function signedDuration(delta: number): string {
   const sign = delta > 0 ? "+" : "-";
   return `${sign} ${formatDuration(Math.abs(Math.round(delta)))}`;
 }
 
-export function formatSignedPercent(delta: number): string {
+export function signedPercent(delta: number): string {
   const sign = delta > 0 ? "+" : "-";
   const value = Math.round(Math.abs(delta) * 10) / 10;
   return `${sign} ${value}%`;
 }
 
-export function collectStatValues(items: StatMetric[]): Record<string, number> {
+export function statValues(items: StatMetric[]): Record<string, number> {
   const values: Record<string, number> = {};
 
   for (const item of items) {
@@ -58,7 +58,7 @@ export function collectStatValues(items: StatMetric[]): Record<string, number> {
   return values;
 }
 
-export function buildHourKeys(hours: number): string[] {
+export function hourKeys(hours: number): string[] {
   const now = new Date();
   const currentHourUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), now.getUTCHours()));
 
@@ -69,7 +69,7 @@ export function buildHourKeys(hours: number): string[] {
   });
 }
 
-export function buildDayKeys(days: number): string[] {
+export function dayKeys(days: number): string[] {
   const now = new Date();
   const todayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 
@@ -80,17 +80,17 @@ export function buildDayKeys(days: number): string[] {
   });
 }
 
-export function expandDailyPoints(points: Array<{ date: string; count: number }>) {
+export function dailyPoints(points: Array<{ date: string; count: number }>) {
   const valuesByDate = new Map(points.map((point) => [point.date, point.count]));
-  return buildDayKeys(30).map((date) => ({ date, count: valuesByDate.get(date) ?? 0 }));
+  return dayKeys(30).map((date) => ({ date, count: valuesByDate.get(date) ?? 0 }));
 }
 
-export function expandDurationPoints(points: Array<{ time: string; avgDuration: number }>): DurationPoint[] {
+export function durationPoints(points: Array<{ time: string; avgDuration: number }>): DurationPoint[] {
   const valuesByTime = new Map(points.map((point) => [point.time, point.avgDuration]));
-  return buildHourKeys(24).map((time) => ({ time, avgDuration: valuesByTime.get(time) ?? null }));
+  return hourKeys(24).map((time) => ({ time, avgDuration: valuesByTime.get(time) ?? null }));
 }
 
-export function formatRelativeTime(value: string | Date | number): string {
+export function relativeTime(value: string | Date | number): string {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
 
@@ -98,19 +98,19 @@ export function formatRelativeTime(value: string | Date | number): string {
   return relative === "0 seconds ago" ? "just now" : relative;
 }
 
-export function toTimeMs(value: string | Date | null | undefined): number | null {
+export function timeOf(value: string | Date | null | undefined): number | null {
   if (!value) return null;
 
   const timeMs = new Date(value).getTime();
   return Number.isNaN(timeMs) ? null : timeMs;
 }
 
-export function formatHourLabel(time: string): string {
+export function hourLabel(time: string): string {
   const date = new Date(time);
   return Number.isNaN(date.getTime()) ? time.slice(11, 16) : date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
-export function isPreviousDayLabel(time: string): boolean {
+export function prevDay(time: string): boolean {
   const date = new Date(time);
   if (Number.isNaN(date.getTime())) return false;
 
@@ -119,28 +119,28 @@ export function isPreviousDayLabel(time: string): boolean {
   return date < today;
 }
 
-export function isPaidTierValue(tier: string, provider?: string): boolean {
+export function paidTier(tier: string, provider?: string): boolean {
   const value = tier.trim().toLowerCase();
   if (provider === "antigravity") return ["paid", "standard-tier"].includes(value) || value.startsWith("g1-");
   if (provider === "kiro") return ["pro", "pro-plus", "pro+", "power"].includes(value);
   return ["paid", "standard-tier", "plus", "pro", "pro-plus", "pro+", "prolite", "power", "team", "go", "self_serve_business_usage_based", "business", "enterprise_cbp_usage_based", "enterprise", "student", "edu", "education", "hc"].includes(value);
 }
 
-export function isFreeTierValue(tier: string): boolean {
+export function freeTier(tier: string): boolean {
   return ["free", "free-tier", "legacy-tier"].includes(tier.trim().toLowerCase());
 }
 
-export function formatTierBadgeLabel(tier: string, provider?: string): "Paid" | "Free" | "" {
-  if (isPaidTierValue(tier, provider)) return "Paid";
-  if (isFreeTierValue(tier)) return "Free";
+export function tierLabel(tier: string, provider?: string): "Paid" | "Free" | "" {
+  if (paidTier(tier, provider)) return "Paid";
+  if (freeTier(tier)) return "Free";
   return "";
 }
 
-export function maskSensitiveText(value: string): string {
+export function maskText(value: string): string {
   return value.replace(/\S/g, "•");
 }
 
-export function getAccountHeader(account: Account): { title: string; subtitle: string | null } {
+export function accountHeader(account: Account): { title: string; subtitle: string | null } {
   const rawName = account.name.trim();
   const rawEmail = account.email?.trim() ?? "";
 
@@ -158,21 +158,21 @@ export function getAccountHeader(account: Account): { title: string; subtitle: s
   return { title, subtitle: rawEmail };
 }
 
-export function formatDateTime(value: Date): string {
+export function dateTime(value: Date): string {
   return value.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-export function getErrorEntryRelativeTime(entry: ErrorPreviewEntry): string {
+export function errorTime(entry: ErrorPreviewEntry): string {
   if (!entry.createdAt) return "Unknown time";
   const createdAt = new Date(entry.createdAt);
-  return Number.isNaN(createdAt.getTime()) ? "Unknown time" : formatRelativeTime(createdAt);
+  return Number.isNaN(createdAt.getTime()) ? "Unknown time" : relativeTime(createdAt);
 }
 
-export function getErrorEntryPreview(entry: ErrorPreviewEntry, maxLength = 150): string {
-  const message = stripStatusFromErrorMessage(entry.errorMessage, entry.errorCode);
+export function errorPreview(entry: ErrorPreviewEntry, maxLength = 150): string {
+  const message = stripStatus(entry.errorMessage, entry.errorCode);
   return message.length > maxLength ? `${message.slice(0, maxLength)}...` : message;
 }
 
-export function getErrorEntryStatusTag(entry: ErrorPreviewEntry): ErrorStatusTag | null {
-  return getErrorStatusTag(entry.errorCode);
+export function errorStatus(entry: ErrorPreviewEntry): ErrorStatusTag | null {
+  return statusTag(entry.errorCode);
 }

@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { db, userSharingSetting } from "@opendum/database";
 import { fromPromise } from "#web/lib/task.js";
 
-export const getUserSharingEnabled = Effect.fn("getUserSharingEnabled")(function* (userId: string) {
+export const sharingEnabled = Effect.fn("sharingEnabled")(function* (userId: string) {
   const rows = yield* fromPromise(
     () =>
       db
@@ -18,7 +18,7 @@ export const getUserSharingEnabled = Effect.fn("getUserSharingEnabled")(function
   return rows[0]?.enabled ?? false;
 });
 
-export const setUserSharingEnabled = Effect.fn("setUserSharingEnabled")(function* (
+export const setSharing = Effect.fn("setSharing")(function* (
   userId: string,
   enabled: boolean
 ) {

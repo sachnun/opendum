@@ -6,9 +6,9 @@ import {
   ModelReadFailure,
   ModelsDirectoryFailure,
   asError,
-  modelFailureMessage,
+  failureMessage,
 } from "./errors.ts";
-import { tryLoadModelEntries } from "./registry.ts";
+import { tryLoad } from "./registry.ts";
 import { tryRead } from "./model-store.ts";
 
 function failureOf<E>(exit: Exit.Exit<unknown, E>): E {
@@ -19,7 +19,7 @@ function failureOf<E>(exit: Exit.Exit<unknown, E>): E {
 
 describe("models typed errors", () => {
   it("reports a missing models directory as a typed failure", async () => {
-    const exit = await Effect.runPromiseExit(tryLoadModelEntries("/definitely/not/here"));
+    const exit = await Effect.runPromiseExit(tryLoad("/definitely/not/here"));
     expect(Exit.isFailure(exit)).toBe(true);
     const error = failureOf(exit);
     expect(error).toBeInstanceOf(ModelsDirectoryFailure);
@@ -40,8 +40,8 @@ describe("models typed errors", () => {
   });
 
   it("maps unknown causes to an Error", () => {
-    expect(modelFailureMessage(new Error("boom"))).toBe("boom");
-    expect(modelFailureMessage("plain")).toBe("plain");
+    expect(failureMessage(new Error("boom"))).toBe("boom");
+    expect(failureMessage("plain")).toBe("plain");
     expect(asError("plain").message).toBe("plain");
     expect(asError(new ModelReadFailure({ message: "x", path: "p" }))).toBeInstanceOf(Error);
   });

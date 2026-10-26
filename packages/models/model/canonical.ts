@@ -53,7 +53,7 @@ function asString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
 }
 
-export function normalizeCanonicalKey(value: unknown): string {
+export function canonicalKey(value: unknown): string {
   return String(value ?? "")
     .toLowerCase()
     .replace(/^library\//, "")
@@ -76,7 +76,7 @@ function canonicalLab(id: string): string {
 
 function modelKey(value: string): string {
   const bare = canonicalBare(value);
-  const key = normalizeCanonicalKey(bare).replace(/\//g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+  const key = canonicalKey(bare).replace(/\//g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
   return key;
 }
 
@@ -95,7 +95,7 @@ function tokenList(value: string): string[] {
   return modelKey(value).split("-").filter(Boolean);
 }
 
-function isPrefixRelation(left: string[], right: string[]): boolean {
+function isPrefix(left: string[], right: string[]): boolean {
   const shorter = left.length <= right.length ? left : right;
   const longer = left.length <= right.length ? right : left;
   if (shorter.length === 0) return false;
@@ -116,7 +116,7 @@ function offeringKeys(providerId: string, offeringId: string): string[] {
   return [...keys];
 }
 
-export function buildCanonicalIndex(sources: CanonicalSources): CanonicalIndex {
+export function canonicalIndex(sources: CanonicalSources): CanonicalIndex {
   const models = new Map<string, CanonicalModel>();
 
   const rawModels = asRecord(sources.models);
@@ -189,7 +189,7 @@ function fuzzyMatches(probe: string, index: CanonicalIndex): CanonicalModel[] {
     const candidateTokens = tokenList(model.bare);
     if (candidateTokens.length === 0) continue;
     if (candidateTokens[0] !== probeTokens[0]) continue;
-    if (!isPrefixRelation(probeTokens, candidateTokens)) continue;
+    if (!isPrefix(probeTokens, candidateTokens)) continue;
     matches.push(model);
   }
   return matches;
@@ -240,7 +240,7 @@ export function resolveCanonical(
     ?? fuzzyResolution(value, index);
 }
 
-export function resolveCanonicalFrom(
+export function resolveFrom(
   probes: Iterable<string | null | undefined>,
   index: CanonicalIndex,
   options: ResolveCanonicalOptions = {},
@@ -269,7 +269,7 @@ export function resolveCanonicalFrom(
   return null;
 }
 
-export function canonicalModelId(
+export function canonicalId(
   probe: string | null | undefined,
   index: CanonicalIndex,
   options: ResolveCanonicalOptions = {},

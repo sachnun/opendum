@@ -3,7 +3,7 @@ import { and, eq, inArray, isNull, lte, or } from "drizzle-orm";
 
 import { db, customProvider, customProviderModel, providerAccount } from "@opendum/database";
 import { fromPromise } from "../task.js";
-import { isModelSupported, resolveModelAlias } from "./models.js";
+import { supportsModel, aliasOf } from "./models.js";
 
 export interface CustomProviderModels {
   slug: string;
@@ -13,7 +13,7 @@ export interface CustomProviderModels {
   accountIds: string[];
 }
 
-export const listCustomProviderModels = Effect.fn("listCustomProviderModels")(function* (
+export const customModels = Effect.fn("customModels")(function* (
   userId: string,
   options: { includeInactiveAccounts?: boolean } = {}
 ) {
@@ -64,17 +64,17 @@ export const listCustomProviderModels = Effect.fn("listCustomProviderModels")(fu
     { concurrency: "unbounded" }
   );
 
-  const accountIdsBySlug = new Map<string, string[]>();
+  const idsBySlug = new Map<string, string[]>();
   for (const account of accounts) {
-    accountIdsBySlug.set(account.provider, [...(accountIdsBySlug.get(account.provider) ?? []), account.id]);
+    idsBySlug.set(account.provider, [...(idsBySlug.get(account.provider) ?? []), account.id]);
   }
 
-  const aliasedByProviderId = new Map<string, string[]>();
-  const standaloneByProviderId = new Map<string, string[]>();
+  const aliasedByProvider = new Map<string, string[]>();
+  const standaloneByProvider = new Map<string, string[]>();
   for (const model of models) {
-    const canonical = resolveModelAlias(model.modelId);
-    const aliased = model.aliased && isModelSupported(canonical);
-    const target = aliased ? aliasedByProviderId : standaloneByProviderId;
+    const canonical = aliasOf(model.modelId);
+    const aliased = model.aliased && supportsModel(canonical);
+    const target = aliased ? aliasedByProvider : standaloneByProvider;
     const value = aliased ? canonical : model.modelId;
     const current = target.get(model.providerId) ?? [];
     if (!current.includes(value)) current.push(value);
@@ -82,9 +82,9 @@ export const listCustomProviderModels = Effect.fn("listCustomProviderModels")(fu
   }
 
   return providers.flatMap((provider) => {
-    const accountIds = accountIdsBySlug.get(provider.slug) ?? [];
-    const aliasedModels = aliasedByProviderId.get(provider.id) ?? [];
-    const standaloneModels = standaloneByProviderId.get(provider.id) ?? [];
+    const accountIds = idsBySlug.get(provider.slug) ?? [];
+    const aliasedModels = aliasedByProvider.get(provider.id) ?? [];
+    const standaloneModels = standaloneByProvider.get(provider.id) ?? [];
     if (accountIds.length === 0 || (aliasedModels.length === 0 && standaloneModels.length === 0)) return [];
     return [
       {

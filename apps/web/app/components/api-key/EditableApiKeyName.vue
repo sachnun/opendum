@@ -23,29 +23,29 @@ const emit = defineEmits<{
 
 const api = useApi();
 const { data: me } = useNuxtData<MeData>(dataKeys.me);
-const API_KEY_MIN_LENGTH = 3;
-const API_KEY_MAX_LENGTH = 100;
-const API_KEY_UPDATE_POINT_COST = 20;
-const API_KEY_ALLOWED_PATTERN = /^[A-Za-z0-9_-]+$/;
+const MIN_LENGTH = 3;
+const MAX_LENGTH = 100;
+const UPDATE_COST = 20;
+const ALLOWED_PATTERN = /^[A-Za-z0-9_-]+$/;
 const editDialogOpen = ref(false);
 const newName = ref(props.name ?? "");
 const apiKeyValue = ref("");
 const revealedApiKey = ref<string | null>(null);
-const isApiKeyDirty = ref(false);
+const isDirty = ref(false);
 const isUpdating = ref(false);
-const isRevealingApiKey = ref(false);
+const isRevealing = ref(false);
 const errorMessage = ref("");
 const maskedApiKey = computed(() => props.keyPreview || "********");
-const normalizedApiKeyValue = computed(() => apiKeyValue.value.trim());
-const saveCostsPoints = computed(() => isApiKeyDirty.value && normalizedApiKeyValue.value !== revealedApiKey.value);
+const normalizedValue = computed(() => apiKeyValue.value.trim());
+const saveCostsPoints = computed(() => isDirty.value && normalizedValue.value !== revealedApiKey.value);
 const pointBalance = computed(() => me.value?.points?.balance ?? 0);
-const formattedApiKeyUpdatePointCost = computed(() => API_KEY_UPDATE_POINT_COST.toLocaleString("en-US"));
-const hasInsufficientPoints = computed(() => saveCostsPoints.value && pointBalance.value < API_KEY_UPDATE_POINT_COST);
-const apiKeyValidationError = computed(() => {
+const costLabel = computed(() => UPDATE_COST.toLocaleString("en-US"));
+const hasInsufficientPoints = computed(() => saveCostsPoints.value && pointBalance.value < UPDATE_COST);
+const validationError = computed(() => {
   if (!saveCostsPoints.value) return "";
-  if (normalizedApiKeyValue.value.length < API_KEY_MIN_LENGTH) return `API key must be at least ${API_KEY_MIN_LENGTH} characters`;
-  if (normalizedApiKeyValue.value.length > API_KEY_MAX_LENGTH) return `API key must be at most ${API_KEY_MAX_LENGTH} characters`;
-  if (!API_KEY_ALLOWED_PATTERN.test(normalizedApiKeyValue.value)) return "API key can only contain letters, numbers, hyphen, and underscore";
+  if (normalizedValue.value.length < MIN_LENGTH) return `API key must be at least ${MIN_LENGTH} characters`;
+  if (normalizedValue.value.length > MAX_LENGTH) return `API key must be at most ${MAX_LENGTH} characters`;
+  if (!ALLOWED_PATTERN.test(normalizedValue.value)) return "API key can only contain letters, numbers, hyphen, and underscore";
   return "";
 });
 
@@ -54,41 +54,41 @@ watch(editDialogOpen, (open) => {
     newName.value = props.name ?? "";
     apiKeyValue.value = maskedApiKey.value;
     revealedApiKey.value = null;
-    isApiKeyDirty.value = false;
+    isDirty.value = false;
     errorMessage.value = "";
   }
 });
 
-async function revealApiKeyForEdit() {
-  if (props.readonly || revealedApiKey.value || isRevealingApiKey.value) return;
-  isRevealingApiKey.value = true;
+async function reveal() {
+  if (props.readonly || revealedApiKey.value || isRevealing.value) return;
+  isRevealing.value = true;
   errorMessage.value = "";
   try {
     const result = await api.apiKeys.reveal({ id: props.id });
     if (!result.success) throw new Error(result.error);
     revealedApiKey.value = result.data.key;
     apiKeyValue.value = result.data.key;
-    isApiKeyDirty.value = false;
+    isDirty.value = false;
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : "Failed to reveal API key";
   } finally {
-    isRevealingApiKey.value = false;
+    isRevealing.value = false;
   }
 }
 
-function markApiKeyDirty() {
+function markDirty() {
   if (!revealedApiKey.value) return;
-  isApiKeyDirty.value = true;
+  isDirty.value = true;
 }
 
 async function updateName() {
   if (props.readonly) return;
-  if (apiKeyValidationError.value) return;
+  if (validationError.value) return;
   if (hasInsufficientPoints.value) return;
   isUpdating.value = true;
   errorMessage.value = "";
   try {
-    const result = await api.apiKeys.updateName({ id: props.id, name: newName.value, ...(saveCostsPoints.value ? { key: normalizedApiKeyValue.value } : {}) });
+    const result = await api.apiKeys.updateName({ id: props.id, name: newName.value, ...(saveCostsPoints.value ? { key: normalizedValue.value } : {}) });
     if (!result.success) throw new Error(result.error);
     editDialogOpen.value = false;
     if (saveCostsPoints.value) void refreshNuxtData(dataKeys.me);
@@ -124,26 +124,26 @@ async function updateName() {
             v-model="apiKeyValue"
             :class="[
               'h-9 w-full rounded-md border bg-background px-3 pr-9 font-mono text-sm outline-none focus-visible:ring-[3px]',
-              apiKeyValidationError ? 'border-destructive focus-visible:border-destructive focus-visible:ring-destructive/20' : 'border-input focus-visible:border-ring focus-visible:ring-ring/50',
+              validationError ? 'border-destructive focus-visible:border-destructive focus-visible:ring-destructive/20' : 'border-input focus-visible:border-ring focus-visible:ring-ring/50',
             ]"
-            :readonly="!revealedApiKey || isRevealingApiKey"
-            @focus="revealApiKeyForEdit"
-            @click="revealApiKeyForEdit"
-            @input="markApiKeyDirty"
+            :readonly="!revealedApiKey || isRevealing"
+            @focus="reveal"
+            @click="reveal"
+            @input="markDirty"
             @keydown.enter.prevent="updateName"
           >
-          <UiIcon v-if="isRevealingApiKey" name="i-lucide-loader-2" class="absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+          <UiIcon v-if="isRevealing" name="i-lucide-loader-2" class="absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground" />
         </div>
-        <span v-if="apiKeyValidationError" class="text-xs font-normal text-destructive">{{ apiKeyValidationError }}</span>
+        <span v-if="validationError" class="text-xs font-normal text-destructive">{{ validationError }}</span>
         <span v-else-if="hasInsufficientPoints" class="text-xs font-normal text-destructive">Not enough points.</span>
       </label>
       <div class="flex justify-end gap-2">
         <UiButton variant="outline" @click="editDialogOpen = false">Cancel</UiButton>
-        <UiButton class="w-24 transition-colors" :disabled="isUpdating || isRevealingApiKey || Boolean(apiKeyValidationError) || hasInsufficientPoints" @click="updateName">
+        <UiButton class="w-24 transition-colors" :disabled="isUpdating || isRevealing || Boolean(validationError) || hasInsufficientPoints" @click="updateName">
           <template v-if="isUpdating">Saving...</template>
           <template v-else-if="saveCostsPoints">
             <PointCoinIcon reverse class="size-5 shrink-0 text-foreground/85 drop-shadow-[0_0_0.35rem_rgba(255,255,255,0.18)]" />
-            {{ formattedApiKeyUpdatePointCost }}
+            {{ costLabel }}
           </template>
           <template v-else>Save</template>
         </UiButton>

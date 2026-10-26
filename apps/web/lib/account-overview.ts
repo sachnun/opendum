@@ -5,7 +5,7 @@ import type {
   ProviderAccountIndicators,
 } from "./navigation";
 import type { AccountOverviewData, AccountPingData } from "./api-types";
-import { MODEL_FAMILY_NAV_ITEMS, categorizeModelFamily } from "@opendum/models/ranking";
+import { NAV_ITEMS, categorize } from "@opendum/models/ranking";
 import { PROVIDER_ACCOUNT_DEFINITIONS } from "@opendum/providers/provider-accounts";
 
 export interface ShellAccountSummary {
@@ -24,7 +24,7 @@ export const emptyAccountIndicators = Object.fromEntries(
   PROVIDER_ACCOUNT_DEFINITIONS.map((definition) => [definition.key, "normal"])
 ) as unknown as ProviderAccountIndicators;
 
-export const emptyShellAccountSummary: ShellAccountSummary = {
+export const emptySummary: ShellAccountSummary = {
   accountCounts: { ...emptyAccountCounts },
   activeAccountCounts: { ...emptyAccountCounts },
   accountIndicators: { ...emptyAccountIndicators },
@@ -32,11 +32,11 @@ export const emptyShellAccountSummary: ShellAccountSummary = {
   hasConnectedAccounts: false,
 };
 
-export const emptyModelFamilyCounts = Object.fromEntries(MODEL_FAMILY_NAV_ITEMS.map((family) => [family.anchorId, 0])) as ModelFamilyCounts;
+export const emptyCounts = Object.fromEntries(NAV_ITEMS.map((family) => [family.anchorId, 0])) as ModelFamilyCounts;
 
-export function toShellAccountSummary(summary: AccountOverviewData | AccountPingData): ShellAccountSummary {
+export function toSummary(summary: AccountOverviewData | AccountPingData): ShellAccountSummary {
   const nextAccountCounts: ProviderAccountCounts = { ...emptyAccountCounts };
-  const nextActiveAccountCounts: ProviderAccountCounts = { ...emptyAccountCounts };
+  const nextCounts: ProviderAccountCounts = { ...emptyAccountCounts };
   const nextAccountIndicators: ProviderAccountIndicators = { ...emptyAccountIndicators };
   let hasConnectedAccounts = "hasConnectedAccounts" in summary ? summary.hasConnectedAccounts : false;
 
@@ -47,25 +47,25 @@ export function toShellAccountSummary(summary: AccountOverviewData | AccountPing
     if (connected > 0) hasConnectedAccounts = true;
 
     nextAccountCounts[key] = connected;
-    nextActiveAccountCounts[key] = providerSummary.active;
+    nextCounts[key] = providerSummary.active;
     nextAccountIndicators[key] = providerSummary.indicator;
   }
 
   return {
     accountCounts: nextAccountCounts,
-    activeAccountCounts: nextActiveAccountCounts,
+    activeAccountCounts: nextCounts,
     accountIndicators: nextAccountIndicators,
     pinnedProviders: summary.pinnedProviders,
     hasConnectedAccounts,
   };
 }
 
-export function normalizeModelFamilyCounts(counts: Record<string, number>) {
-  const nextCounts = { ...emptyModelFamilyCounts };
-  const anchorByFamily = new Map(MODEL_FAMILY_NAV_ITEMS.map((family) => [family.name, family.anchorId]));
+export function familyCounts(counts: Record<string, number>) {
+  const nextCounts = { ...emptyCounts };
+  const anchorByFamily = new Map(NAV_ITEMS.map((family) => [family.name, family.anchorId]));
 
   for (const [rawFamily, count] of Object.entries(counts)) {
-    const family = categorizeModelFamily(rawFamily);
+    const family = categorize(rawFamily);
     const anchorId = anchorByFamily.get(family);
     if (anchorId) {
       nextCounts[anchorId] = (nextCounts[anchorId] ?? 0) + count;

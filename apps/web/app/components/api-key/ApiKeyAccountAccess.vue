@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { getProviderLabel } from "@opendum/providers/provider-accounts";
+import { labelOf } from "@opendum/providers/provider-accounts";
 
 type AccessMode = "all" | "whitelist" | "blacklist";
 
@@ -40,12 +40,12 @@ function sameList(left: string[], right: string[]): boolean {
   return left.length === right.length && left.every((item, index) => item === right[index]);
 }
 
-function getAccountLabel(account: ProviderAccountOption): string {
+function accountLabel(account: ProviderAccountOption): string {
   return account.email ? `${account.name} (${account.email})` : account.name;
 }
 
-function getProviderDisplayName(provider: string): string {
-  return getProviderLabel(provider);
+function providerName(provider: string): string {
+  return labelOf(provider);
 }
 
 function toggleAccount(accountId: string) {
@@ -55,7 +55,7 @@ function toggleAccount(accountId: string) {
     : normalizeAccounts([...draftAccounts.value, accountId]);
 }
 
-function resetDraftState() {
+function resetDraft() {
   draftMode.value = savedMode.value;
   draftAccounts.value = [...savedAccounts.value];
   accountPickerOpen.value = false;
@@ -129,7 +129,7 @@ const filteredAccounts = computed(() => {
                 <UiIcon name="i-lucide-check" :class="['size-3.5', normalizedDraftAccounts.includes(account.id) ? 'opacity-100' : 'opacity-0']" />
                 <div class="flex min-w-0 flex-col">
                   <span class="truncate text-xs font-medium">{{ account.name }}</span>
-                  <span class="truncate text-[11px] text-muted-foreground">{{ getProviderDisplayName(account.provider) }}{{ account.email ? ` - ${account.email}` : '' }}</span>
+                  <span class="truncate text-[11px] text-muted-foreground">{{ providerName(account.provider) }}{{ account.email ? ` - ${account.email}` : '' }}</span>
                 </div>
               </button>
               <p v-if="filteredAccounts.length === 0" class="px-2 py-6 text-center text-xs text-muted-foreground">No account found.</p>
@@ -141,9 +141,9 @@ const filteredAccounts = computed(() => {
           <p v-if="normalizedDraftAccounts.length === 0" class="px-1 text-[11px] text-muted-foreground">No accounts selected</p>
           <div v-else class="flex flex-wrap gap-1.5">
             <UiBadge v-for="accountId in normalizedDraftAccounts" :key="accountId" variant="secondary" class="max-w-full gap-1 pr-1 text-[10px] font-normal">
-              <span class="min-w-0 truncate">{{ accountMap.get(accountId) ? getAccountLabel(accountMap.get(accountId)!) : accountId }}</span>
+              <span class="min-w-0 truncate">{{ accountMap.get(accountId) ? accountLabel(accountMap.get(accountId)!) : accountId }}</span>
               <UiTooltip text="Remove" :disabled="readonly">
-                <button type="button" :disabled="readonly" :aria-label="`Remove account ${accountMap.get(accountId) ? getAccountLabel(accountMap.get(accountId)!) : accountId}`" class="inline-flex size-4 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground disabled:cursor-default disabled:pointer-events-none disabled:opacity-60" @click="toggleAccount(accountId)">
+                <button type="button" :disabled="readonly" :aria-label="`Remove account ${accountMap.get(accountId) ? accountLabel(accountMap.get(accountId)!) : accountId}`" class="inline-flex size-4 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground disabled:cursor-default disabled:pointer-events-none disabled:opacity-60" @click="toggleAccount(accountId)">
                   <UiIcon name="i-lucide-x" class="size-2.5" />
                 </button>
               </UiTooltip>
@@ -155,7 +155,7 @@ const filteredAccounts = computed(() => {
     </div>
 
     <div class="flex items-center justify-end gap-2 border-t border-border/60 pt-3 lg:mt-4">
-      <UiButton variant="outline" size="sm" :disabled="isSaving || !hasChanges || readonly" @click="resetDraftState">Cancel</UiButton>
+      <UiButton variant="outline" size="sm" :disabled="isSaving || !hasChanges || readonly" @click="resetDraft">Cancel</UiButton>
       <UiButton size="sm" :disabled="isSaving || !hasChanges || readonly" @click="save">{{ isSaving ? 'Saving...' : 'Save' }}</UiButton>
     </div>
   </section>

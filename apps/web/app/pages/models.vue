@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { MODEL_FAMILY_SORT_ORDER, getModelFamilyAnchorId } from "@opendum/models/ranking";
-import { compareModelEntries } from "@opendum/models/sort";
-import { buildDayKeys, buildEmptyModelStats, buildHourKeys, MODEL_DURATION_LOOKBACK_HOURS, MODEL_STATS_DAYS, type ModelStats } from "@opendum/models/stats";
-import { costEntries, formatCostPoints, type ModelCost } from "../../lib/model-cost";
+import { SORT_ORDER, anchorId } from "@opendum/models/ranking";
+import { compareEntries } from "@opendum/models/sort";
+import { dayKeys, emptyStats, hourKeys, LOOKBACK_HOURS, MODEL_STATS_DAYS, type ModelStats } from "@opendum/models/stats";
+import { costEntries, costPoints, type ModelCost } from "../../lib/model-cost";
 import type { UsageData } from "@opendum/providers/contract";
-import { getProviderLabel } from "@opendum/providers/provider-accounts";
+import { labelOf } from "@opendum/providers/provider-accounts";
 
 definePageMeta({ middleware: "auth", layout: "web" });
 
@@ -14,8 +14,8 @@ const { isAuditMode } = useAudit();
 const invalidation = useInvalidate();
 
 type ModelListItem = Awaited<ReturnType<typeof api.models.list>>[number];
-const MODEL_STATS_BATCH_SIZE = 24;
-const MODEL_STATS_ROOT_MARGIN = "600px 0px";
+const STATS_BATCH_SIZE = 24;
+const STATS_ROOT_MARGIN = "600px 0px";
 const HIGHLIGHT_DURATION_MS = 2500;
 
 const { data, error } = useAsyncData(dataKeys.models, () => api.models.list({ includeStats: false }));
@@ -25,12 +25,12 @@ function isLinked(model: ModelListItem) {
   return model.available !== false;
 }
 
-function isActiveModel(model: ModelListItem) {
+function isActive(model: ModelListItem) {
   return isLinked(model) && model.isEnabled;
 }
 const customModelIds = computed(() => new Set(models.value.filter((model) => model.custom).map((model) => model.id)));
-const emptyModelStats = buildEmptyModelStats(buildDayKeys(MODEL_STATS_DAYS), buildHourKeys(MODEL_DURATION_LOOKBACK_HOURS));
-const modelStatsById = shallowReactive<Record<string, ModelStats>>({});
+const emptyModelStats = emptyStats(dayKeys(MODEL_STATS_DAYS), hourKeys(LOOKBACK_HOURS));
+const statsById = shallowReactive<Record<string, ModelStats>>({});
 const pendingModelId = ref<string | null>(null);
 const copiedModelId = ref<string | null>(null);
 const modelsRoot = ref<HTMLElement | null>(null);
@@ -38,10 +38,10 @@ const visibleModelIds = reactive(new Set<string>());
 const intersectingModelIds = new Set<string>();
 const highlightedModelId = ref<string | null>(null);
 let highlightTimer: ReturnType<typeof setTimeout> | null = null;
-const queuedModelStatsIds = new Set<string>();
-const forceQueuedModelStatsIds = new Set<string>();
-const loadingModelStatsIds = new Set<string>();
-let modelStatsQueueTimer: ReturnType<typeof setTimeout> | null = null;
+const queuedStatsIds = new Set<string>();
+const forceStatsIds = new Set<string>();
+const loadingStatsIds = new Set<string>();
+let statsTimer: ReturnType<typeof setTimeout> | null = null;
 let statsObserver: IntersectionObserver | null = null;
 
 const enabledModelCount = computed(() => models.value.filter((model) => model.available !== false && model.isEnabled).length);
@@ -56,16 +56,16 @@ const modelSections = computed(() => {
   }
 
   for (const familyModels of groupedModels.values()) {
-    familyModels.sort(compareModelEntries);
+    familyModels.sort(compareEntries);
   }
 
-  const rankedFamilies = MODEL_FAMILY_SORT_ORDER.filter((family) => family !== "Others");
+  const rankedFamilies = SORT_ORDER.filter((family) => family !== "Others");
   const rankedSet = new Set<string>(rankedFamilies);
 
   const sections = rankedFamilies
     .map((family) => ({
       name: family,
-      anchorId: getModelFamilyAnchorId(family),
+      anchorId: anchorId(family),
       models: groupedModels.get(family) ?? [],
     }))
     .filter((section) => section.models.length > 0);
@@ -75,7 +75,7 @@ const modelSections = computed(() => {
     .sort((a, b) => a.localeCompare(b))
     .map((family) => ({
       name: family,
-      anchorId: getModelFamilyAnchorId(family),
+      anchorId: anchorId(family),
       models: groupedModels.get(family) ?? [],
     }));
 
@@ -113,77 +113,77 @@ onMounted(() => {
       visibleIds.push(modelId);
     }
 
-    if (visibleIds.length > 0) queueModelStatsLoad(visibleIds);
-  }, { rootMargin: MODEL_STATS_ROOT_MARGIN });
+    if (visibleIds.length > 0) queueStats(visibleIds);
+  }, { rootMargin: STATS_ROOT_MARGIN });
 
-  observeModelCards();
+  observeCards();
 });
 
 onBeforeUnmount(() => {
   statsObserver?.disconnect();
   statsObserver = null;
-  if (modelStatsQueueTimer) clearTimeout(modelStatsQueueTimer);
+  if (statsTimer) clearTimeout(statsTimer);
   if (highlightTimer) {
     clearTimeout(highlightTimer);
     highlightTimer = null;
   }
 });
 
-function queueModelStatsLoad(modelIds: Iterable<string>, options: { force?: boolean } = {}) {
+function queueStats(modelIds: Iterable<string>, options: { force?: boolean } = {}) {
   if (!import.meta.client) return;
 
   for (const modelId of modelIds) {
-    if (!options.force && modelStatsById[modelId]) continue;
-    if (loadingModelStatsIds.has(modelId)) continue;
-    queuedModelStatsIds.add(modelId);
-    if (options.force) forceQueuedModelStatsIds.add(modelId);
+    if (!options.force && statsById[modelId]) continue;
+    if (loadingStatsIds.has(modelId)) continue;
+    queuedStatsIds.add(modelId);
+    if (options.force) forceStatsIds.add(modelId);
   }
 
-  if (queuedModelStatsIds.size === 0 || modelStatsQueueTimer) return;
-  modelStatsQueueTimer = setTimeout(() => {
-    modelStatsQueueTimer = null;
-    void flushQueuedModelStats();
+  if (queuedStatsIds.size === 0 || statsTimer) return;
+  statsTimer = setTimeout(() => {
+    statsTimer = null;
+    void flushStats();
   }, 80);
 }
 
-async function flushQueuedModelStats() {
-  const modelIds = Array.from(queuedModelStatsIds).slice(0, MODEL_STATS_BATCH_SIZE);
-  for (const modelId of modelIds) queuedModelStatsIds.delete(modelId);
-  const force = modelIds.some((modelId) => forceQueuedModelStatsIds.has(modelId));
-  for (const modelId of modelIds) forceQueuedModelStatsIds.delete(modelId);
+async function flushStats() {
+  const modelIds = Array.from(queuedStatsIds).slice(0, STATS_BATCH_SIZE);
+  for (const modelId of modelIds) queuedStatsIds.delete(modelId);
+  const force = modelIds.some((modelId) => forceStatsIds.has(modelId));
+  for (const modelId of modelIds) forceStatsIds.delete(modelId);
 
-  await loadModelStats(modelIds, { force });
+  await loadStats(modelIds, { force });
 
-  if (queuedModelStatsIds.size > 0) {
-    modelStatsQueueTimer = setTimeout(() => {
-      modelStatsQueueTimer = null;
-      void flushQueuedModelStats();
+  if (queuedStatsIds.size > 0) {
+    statsTimer = setTimeout(() => {
+      statsTimer = null;
+      void flushStats();
     }, 80);
   }
 }
 
-async function loadModelStats(modelIds: string[], options: { force?: boolean } = {}) {
+async function loadStats(modelIds: string[], options: { force?: boolean } = {}) {
   const availableModelIds = new Set(models.value.filter((model) => model.available !== false).map((model) => model.id));
   const requestedModelIds = Array.from(new Set(modelIds))
     .filter((modelId) => availableModelIds.has(modelId) && !customModelIds.value.has(modelId))
-    .filter((modelId) => !loadingModelStatsIds.has(modelId))
-    .filter((modelId) => options.force || !modelStatsById[modelId]);
+    .filter((modelId) => !loadingStatsIds.has(modelId))
+    .filter((modelId) => options.force || !statsById[modelId]);
 
   if (requestedModelIds.length === 0) return;
 
-  for (const modelId of requestedModelIds) loadingModelStatsIds.add(modelId);
+  for (const modelId of requestedModelIds) loadingStatsIds.add(modelId);
 
   try {
     const response = await api.models.stats({ models: requestedModelIds });
-    for (const [modelId, stats] of Object.entries(response)) modelStatsById[modelId] = stats;
+    for (const [modelId, stats] of Object.entries(response)) statsById[modelId] = stats;
   } catch (error) {
     console.error("Failed to load model stats:", error);
   } finally {
-    for (const modelId of requestedModelIds) loadingModelStatsIds.delete(modelId);
+    for (const modelId of requestedModelIds) loadingStatsIds.delete(modelId);
   }
 }
 
-function observeModelCards() {
+function observeCards() {
   if (!import.meta.client || !statsObserver) return;
   const root = modelsRoot.value;
   if (!root) return;
@@ -196,21 +196,21 @@ function observeModelCards() {
   }
 }
 
-function applyUsageSnapshot(data: UsageData) {
-  for (const [modelId, stats] of Object.entries(data.modelStats)) modelStatsById[modelId] = stats;
+function applyUsage(data: UsageData) {
+  for (const [modelId, stats] of Object.entries(data.modelStats)) statsById[modelId] = stats;
 }
 
-useLiveEvent("usage", applyUsageSnapshot);
+useLiveEvent("usage", applyUsage);
 
-function pruneModelStats() {
+function pruneStats() {
   const availableModelIds = new Set(models.value.filter((model) => model.available !== false).map((model) => model.id));
 
-  for (const modelId of Object.keys(modelStatsById)) {
-    if (!availableModelIds.has(modelId)) Reflect.deleteProperty(modelStatsById, modelId);
+  for (const modelId of Object.keys(statsById)) {
+    if (!availableModelIds.has(modelId)) Reflect.deleteProperty(statsById, modelId);
   }
 
-  for (const modelId of forceQueuedModelStatsIds) {
-    if (!availableModelIds.has(modelId)) forceQueuedModelStatsIds.delete(modelId);
+  for (const modelId of forceStatsIds) {
+    if (!availableModelIds.has(modelId)) forceStatsIds.delete(modelId);
   }
 
   for (const modelId of visibleModelIds) {
@@ -223,17 +223,17 @@ function pruneModelStats() {
 }
 
 watch(models, async () => {
-  pruneModelStats();
+  pruneStats();
   await nextTick();
-  observeModelCards();
+  observeCards();
 }, { immediate: true });
 
 watch(modelSections, async () => {
   await nextTick();
-  observeModelCards();
+  observeCards();
 }, { immediate: true });
 
-async function copyModelId(modelId: string) {
+async function copyId(modelId: string) {
   await navigator.clipboard.writeText(modelId);
   copiedModelId.value = modelId;
   window.setTimeout(() => {
@@ -241,20 +241,20 @@ async function copyModelId(modelId: string) {
   }, 2000);
 }
 
-function updateModelEnabled(modelId: string, enabled: boolean) {
+function applyEnabled(modelId: string, enabled: boolean) {
   if (!data.value) return;
   data.value = data.value.map((model) => (model.id === modelId ? { ...model, isEnabled: enabled } : model));
 }
 
-function modelCostSummary(cost: ModelCost) {
-  return `${formatCostPoints(cost.input ?? 0)}/${formatCostPoints(cost.output ?? 0)}`;
+function costSummary(cost: ModelCost) {
+  return `${costPoints(cost.input ?? 0)}/${costPoints(cost.output ?? 0)}`;
 }
 
-async function setModelEnabled(model: ModelListItem, enabled: boolean) {
+async function enableModel(model: ModelListItem, enabled: boolean) {
   if (isAuditMode.value || model.available === false) return;
   pendingModelId.value = model.id;
   const previousValue = model.isEnabled;
-  updateModelEnabled(model.id, enabled);
+  applyEnabled(model.id, enabled);
 
   try {
     const result = await api.models.setEnabled({ modelId: model.id, enabled });
@@ -262,14 +262,14 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
     invalidation.patchModelEnabled(result.data.model, result.data.enabled);
     void invalidation.invalidateModelAvailability();
   } catch (error) {
-    updateModelEnabled(model.id, previousValue);
+    applyEnabled(model.id, previousValue);
     console.error(error);
   } finally {
     pendingModelId.value = null;
   }
 }
 
-function decodeModelHash(hash: string): string | null {
+function hashModel(hash: string): string | null {
   const raw = hash.startsWith("#") ? hash.slice(1) : hash;
   const id = raw.startsWith("model-") ? raw.slice("model-".length) : raw;
   if (!id) return null;
@@ -287,7 +287,7 @@ watch(
     if (!import.meta.client) return;
     const hashRaw = raw.startsWith("#") ? raw.slice(1) : raw;
     if (!hashRaw.startsWith("model-")) return;
-    const id = decodeModelHash(raw);
+    const id = hashModel(raw);
     if (!id) return;
     if (highlightedModelId.value === id) return;
 
@@ -328,7 +328,7 @@ watch(
             :id="`model-${model.id}`"
             :key="model.id"
             :data-model-id="model.id"
-            :class="`flex h-full flex-col scroll-mt-20 bg-transparent [contain-intrinsic-size:auto_12rem] [content-visibility:auto] transition-[border-color,box-shadow] duration-[1800ms] ease-out${isLinked(model) ? (isActiveModel(model) ? '' : ' opacity-65') : ' grayscale opacity-40'}${highlightedModelId === model.id ? ' border-primary shadow-[0_0_0_3px_var(--primary)]' : ' border-border shadow-none'}`"
+            :class="`flex h-full flex-col scroll-mt-20 bg-transparent [contain-intrinsic-size:auto_12rem] [content-visibility:auto] transition-[border-color,box-shadow] duration-[1800ms] ease-out${isLinked(model) ? (isActive(model) ? '' : ' opacity-65') : ' grayscale opacity-40'}${highlightedModelId === model.id ? ' border-primary shadow-[0_0_0_3px_var(--primary)]' : ' border-border shadow-none'}`"
           >
             <UiCardHeader class="pb-1">
               <div class="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
@@ -337,7 +337,7 @@ watch(
                   :class="['-m-1 flex min-w-0 flex-1 items-center gap-1.5 rounded-md p-1 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2', isLinked(model) ? 'cursor-pointer' : 'cursor-default']"
                   :disabled="!isLinked(model)"
                   :aria-label="`Copy model ID ${model.id}`"
-                  @click="copyModelId(model.id)"
+                  @click="copyId(model.id)"
                 >
                   <span class="flex size-3 shrink-0 items-center justify-center">
                     <UiIcon :name="copiedModelId === model.id ? 'i-lucide-check' : 'i-lucide-copy'" class="size-3" />
@@ -354,13 +354,13 @@ watch(
                     </NuxtLink>
                   </UiTooltip>
                   <span class="w-5 text-right text-[11px] leading-none text-muted-foreground">
-                    {{ isActiveModel(model) ? 'On' : 'Off' }}
+                    {{ isActive(model) ? 'On' : 'Off' }}
                   </span>
                   <UiSwitch
-                    :model-value="isActiveModel(model)"
+                    :model-value="isActive(model)"
                     :disabled="!isLinked(model) || pendingModelId === model.id || isAuditMode"
                     :title="isLinked(model) ? (model.isEnabled ? 'Disable' : 'Enable') : undefined"
-                    @update:model-value="setModelEnabled(model, $event)"
+                    @update:model-value="enableModel(model, $event)"
                   />
                 </div>
               </div>
@@ -373,19 +373,19 @@ watch(
                     variant="outline"
                     :class="isLinked(model) ? 'text-[10px] font-normal' : 'text-[10px] font-normal border-border/60 text-muted-foreground opacity-70'"
                   >
-                    {{ getProviderLabel(provider) }}
+                    {{ labelOf(provider) }}
                   </UiBadge>
                 </div>
                 <UiTooltip v-if="model.cost" side="left">
                   <span class="inline-flex shrink-0 items-center gap-1 rounded-full bg-muted/50 px-1.5 py-0.5 font-mono text-[10px] font-normal leading-none text-muted-foreground tabular-nums">
                     <UiIcon name="i-lucide-coins" class="size-3" />
-                    {{ modelCostSummary(model.cost) }}
+                    {{ costSummary(model.cost) }}
                   </span>
                   <template #content>
                     <div class="space-y-0.5">
                       <p class="font-medium">Cost in points per 1M tokens</p>
                       <p v-for="entry in costEntries(model.cost)" :key="entry.label">
-                        {{ entry.label }}: {{ formatCostPoints(entry.value) }}
+                        {{ entry.label }}: {{ costPoints(entry.value) }}
                       </p>
                     </div>
                   </template>
@@ -399,10 +399,10 @@ watch(
                 <ModelStatsPanel
                   v-if="visibleModelIds.has(model.id)"
                   :stats="model.stats ?? emptyModelStats"
-                  :stats-map="modelStatsById"
+                  :stats-map="statsById"
                   :model-id="model.id"
                   :label="model.id"
-                  :disabled="!isActiveModel(model)"
+                  :disabled="!isActive(model)"
                   compact
                   :animate-deltas="false"
                 />

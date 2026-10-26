@@ -17,7 +17,7 @@ function add(probes: Set<string>, value: unknown): void {
   if (trimmed) probes.add(trimmed);
 }
 
-export function modelProbeSets(source: ProbeSource): ProbeSets {
+export function probeSets(source: ProbeSource): ProbeSets {
   const core = new Set<string>();
   const aliases = new Set<string>();
 
@@ -36,6 +36,6 @@ export function modelProbeSets(source: ProbeSource): ProbeSets {
 }
 
 export function modelProbes(source: ProbeSource): Set<string> {
-  const { core, aliases } = modelProbeSets(source);
+  const { core, aliases } = probeSets(source);
   return new Set([...core, ...aliases]);
 }

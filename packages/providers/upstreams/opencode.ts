@@ -1,22 +1,21 @@
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
 import {
-  chatSseToChatCompletion,
-  buildResponsesApiPayload,
-  responsesSseToChatStream,
-  responsesSseToResponsesJson,
+  sseCompletion,
+  buildPayload,
+  sseJson,
 } from "../transform/responses.js";
 import {
-  anthropicMessagesSseToChatStream,
-  buildAnthropicMessagesPayload,
+  messagesStream,
+  payloadFor,
 } from "../transform/anthropic.js";
-import { defaultStringValue, hex, jsonResponse, sseResponse, stringValue } from "../core/helpers.js";
-import { providerConfigBool } from "../core/model-config.js";
+import { Value, Ids, Responses } from "../core/helpers.js";
+import { ModelConfig } from "../core/model-config.js";
 import {
-  postExecuteWithFallback,
-  postJSONWithHeaders,
-  postWithEgressFallback,
-  transportFailure,
+  EgressPoster,
+  FallbackPoster,
+  JSONPoster,
+  RequestFailure,
   type FetchLike,
   type Logger,
   type ProviderTransportFailure,
@@ -69,7 +68,7 @@ function opencodeId(prefix: string, descending: boolean): string {
     timeBytes[index] = Number((value >> BigInt(40 - 8 * index)) & 0xffn);
   }
   const random = crypto.getRandomValues(new Uint8Array(14));
-  let out = `${prefix}_${hex(timeBytes)}`;
+  let out = `${prefix}_${Ids.hex(timeBytes)}`;
   for (const byte of random) out += ID_ALPHABET[byte % ID_ALPHABET.length];
   return out;
 }
@@ -78,7 +77,7 @@ const SESSION_PATTERN = /^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$/;
 const REQUEST_PATTERN = /^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$/;
 const SESSION_COUNTER_HEX = "ffe";
 
-function isCanonicalSession(seed: string): boolean {
+function isCanonical(seed: string): boolean {
   if (!SESSION_PATTERN.test(seed)) return false;
   const counter = Number.parseInt(seed.slice(13, 16), 16);
   return counter >= 0xfc0;
@@ -86,14 +85,14 @@ function isCanonicalSession(seed: string): boolean {
 
 function canonicalId(prefix: string, seed: string): string {
   const hash = new Bun.CryptoHasher("sha256").update(`${prefix}\u0000${seed}`).digest();
-  const time = `${hex(hash.subarray(0, 6)).slice(0, 9)}${SESSION_COUNTER_HEX}`;
+  const time = `${Ids.hex(hash.subarray(0, 6)).slice(0, 9)}${SESSION_COUNTER_HEX}`;
   let out = `${prefix}_${time}`;
   for (const byte of hash.subarray(6, 20)) out += ID_ALPHABET[byte % ID_ALPHABET.length];
   return out;
 }
 
 function sessionId(seed: string): string {
-  if (isCanonicalSession(seed)) return seed;
+  if (isCanonical(seed)) return seed;
   return canonicalId("ses", seed || "opencode-session");
 }
 
@@ -104,9 +103,9 @@ function requestId(seed: string): string {
 }
 
 function opencodeHeaders(body: Json): Record<string, string> {
-  const session = sessionId(stringValue(body._sessionId));
-  const request = requestId(stringValue(body._requestId));
-  let project = stringValue(body._projectId);
+  const session = sessionId(Value.string(body._sessionId));
+  const request = requestId(Value.string(body._requestId));
+  let project = Value.string(body._projectId);
   if (!project) project = "global";
   return {
     "User-Agent": USER_AGENT,
@@ -129,27 +128,27 @@ function fingerprintTool(name: string): Json {
   };
 }
 
-function isToolObject(raw: unknown): raw is Json {
+function isTool(raw: unknown): raw is Json {
   return raw !== null && typeof raw === "object" && !Array.isArray(raw);
 }
 
 function toolName(raw: unknown): string {
-  if (!isToolObject(raw)) return "";
-  const fn = isToolObject(raw.function) ? raw.function : {};
-  return stringValue(fn.name) || stringValue(raw.name);
+  if (!isTool(raw)) return "";
+  const fn = isTool(raw.function) ? raw.function : {};
+  return Value.string(fn.name) || Value.string(raw.name);
 }
 
 function toolDescription(raw: unknown): string {
-  if (!isToolObject(raw)) return "";
-  const fn = isToolObject(raw.function) ? raw.function : {};
-  return stringValue(fn.description) || stringValue(raw.description);
+  if (!isTool(raw)) return "";
+  const fn = isTool(raw.function) ? raw.function : {};
+  return Value.string(fn.description) || Value.string(raw.description);
 }
 
 function toolSchema(raw: unknown): Json | null {
-  if (!isToolObject(raw)) return null;
-  const fn = isToolObject(raw.function) ? raw.function : {};
+  if (!isTool(raw)) return null;
+  const fn = isTool(raw.function) ? raw.function : {};
   for (const candidate of [fn.parameters, raw.parameters, raw.input_schema, raw.inputSchema]) {
-    if (isToolObject(candidate)) return candidate;
+    if (isTool(candidate)) return candidate;
   }
   return null;
 }
@@ -157,7 +156,7 @@ function toolSchema(raw: unknown): Json | null {
 function toolParameters(raw: unknown): Json {
   const schema = toolSchema(raw);
   if (!schema) return FINGERPRINT_PARAMETERS;
-  if (!isToolObject(schema.properties) || Object.keys(schema.properties).length === 0) {
+  if (!isTool(schema.properties) || Object.keys(schema.properties).length === 0) {
     return FINGERPRINT_PARAMETERS;
   }
   return schema;
@@ -183,7 +182,7 @@ function sanitizeTools(raw: unknown): Json[] {
   return out;
 }
 
-function ensureFingerprintTools(body: Json): void {
+function fingerprintTools(body: Json): void {
   const tools = sanitizeTools(body.tools);
   if (!tools.some((tool) => toolName(tool) === REQUIRED_TOOL_NAME)) {
     tools.unshift(fingerprintTool(REQUIRED_TOOL_NAME));
@@ -191,7 +190,7 @@ function ensureFingerprintTools(body: Json): void {
   body.tools = tools;
 }
 
-function ensureResponsesFingerprintTools(body: Json): void {
+function responsesTools(body: Json): void {
   const tools = sanitizeTools(body.tools).map((tool) => {
     const flat: Json = { type: "function", name: toolName(tool), parameters: (tool.function as Json).parameters };
     const description = toolDescription(tool);
@@ -236,20 +235,20 @@ export class OpencodeProvider implements Provider {
 
   makeRequest(request: ProviderRequest): Effect.Effect<Response, ProviderFailure> {
     const body = request.body;
-    let model = stringValue(body.model);
+    let model = Value.string(body.model);
     if (model.startsWith("opencode/")) model = model.slice("opencode/".length);
     const modelName = this.registry.upstream(model, "opencode");
     const headers = opencodeHeaders(body);
     body.stream = true;
-    if (this.requiresResponsesAPI(model)) ensureResponsesFingerprintTools(body);
-    else ensureFingerprintTools(body);
+    if (this.requiresResponsesAPI(model)) responsesTools(body);
+    else fingerprintTools(body);
     const direct = this.transport.direct;
 
     if (this.requiresResponsesAPI(model)) {
       return Effect.gen({ self: this }, function* () {
         const payload = yield* Effect.tryPromise({
-          try: () => buildResponsesApiPayload(body, modelName, true, direct),
-          catch: (cause) => transportFailure("opencode", cause),
+          try: () => buildPayload(body, modelName, true, direct),
+          catch: (cause) => RequestFailure.transport("opencode", cause),
         });
         const resp = yield* this.post(
           RESPONSES_ENDPOINT,
@@ -257,29 +256,29 @@ export class OpencodeProvider implements Provider {
           payload,
           true,
           headers,
-          request.onUpstreamResponseStart
+          request.onResponseStart
         );
         if (resp.status < 200 || resp.status >= 300) return resp;
         if (Array.isArray(body._responsesInput)) {
           if (request.stream) return resp;
           if (!resp.body) return resp;
-          const data = yield* Effect.promise(() => responsesSseToResponsesJson(resp.body as ReadableStream<Uint8Array>));
-          return jsonResponse(200, data);
+          const data = yield* Effect.promise(() => sseJson(resp.body as ReadableStream<Uint8Array>));
+          return Responses.json(200, data);
         }
         if (!resp.body) return resp;
-        if (request.stream) return sseResponse(responsesSseToChatStream(resp.body, modelName));
+        if (request.stream) return Responses.sse(messagesStream(resp.body, modelName));
         const data = yield* Effect.promise(() =>
-          chatSseToChatCompletion(responsesSseToChatStream(resp.body as ReadableStream<Uint8Array>, modelName), modelName)
+          sseCompletion(messagesStream(resp.body as ReadableStream<Uint8Array>, modelName), modelName)
         );
-        return jsonResponse(200, data);
+        return Responses.json(200, data);
       });
     }
 
     if (this.requiresMessagesAPI(model)) {
       return Effect.gen({ self: this }, function* () {
         const payload = yield* Effect.tryPromise({
-          try: () => buildAnthropicMessagesPayload(body, modelName, true, direct),
-          catch: (cause) => transportFailure("opencode", cause),
+          try: () => payloadFor(body, modelName, true, direct),
+          catch: (cause) => RequestFailure.transport("opencode", cause),
         });
         const resp = yield* this.post(
           MESSAGES_ENDPOINT,
@@ -287,18 +286,18 @@ export class OpencodeProvider implements Provider {
           payload,
           true,
           headers,
-          request.onUpstreamResponseStart
+          request.onResponseStart
         );
         if (resp.status < 200 || resp.status >= 300) return resp;
         if (!resp.body) return resp;
-        if (request.stream) return sseResponse(anthropicMessagesSseToChatStream(resp.body, modelName));
+        if (request.stream) return Responses.sse(messagesStream(resp.body, modelName));
         const data = yield* Effect.promise(() =>
-          chatSseToChatCompletion(
-            anthropicMessagesSseToChatStream(resp.body as ReadableStream<Uint8Array>, modelName),
+          sseCompletion(
+            messagesStream(resp.body as ReadableStream<Uint8Array>, modelName),
             modelName
           )
         );
-        return jsonResponse(200, data);
+        return Responses.json(200, data);
       });
     }
 
@@ -315,13 +314,13 @@ export class OpencodeProvider implements Provider {
         payload,
         true,
         headers,
-        request.onUpstreamResponseStart
+        request.onResponseStart
       );
       if (resp.status < 200 || resp.status >= 300) return resp;
       if (request.stream) return resp;
       if (!resp.body) return resp;
-      const data = yield* Effect.promise(() => chatSseToChatCompletion(resp.body as ReadableStream<Uint8Array>, modelName));
-      return jsonResponse(200, data);
+      const data = yield* Effect.promise(() => sseCompletion(resp.body as ReadableStream<Uint8Array>, modelName));
+      return Responses.json(200, data);
     });
   }
 
@@ -330,11 +329,11 @@ export class OpencodeProvider implements Provider {
   }
 
   private requiresResponsesAPI(model: string): boolean {
-    return providerConfigBool(this.registry, model, "opencode", "responses_api");
+    return new ModelConfig(this.registry, model, "opencode").bool("responses_api");
   }
 
   private requiresMessagesAPI(model: string): boolean {
-    return providerConfigBool(this.registry, model, "opencode", "messages_api");
+    return new ModelConfig(this.registry, model, "opencode").bool("messages_api");
   }
 
   private post(
@@ -346,9 +345,18 @@ export class OpencodeProvider implements Provider {
     onStart?: () => void
   ): Effect.Effect<Response, ProviderFailure> {
     const execute = (fetchFn: FetchLike, target: string): Effect.Effect<Response, ProviderTransportFailure> =>
-      postJSONWithHeaders("opencode", fetchFn, target, PUBLIC_API_KEY, payload, stream, headers, onStart);
+      JSONPoster.withAuth({
+        provider: "opencode",
+        fetchFn,
+        url: target,
+        bearer: PUBLIC_API_KEY,
+        payload,
+        stream,
+        headers,
+        onStart,
+      });
     if (this.transport.egressReady()) {
-      return postWithEgressFallback({
+      return new EgressPoster({
         transport: this.transport,
         state: this.fallback,
         provider: "opencode",
@@ -356,16 +364,23 @@ export class OpencodeProvider implements Provider {
         execute,
         logger: this.logger,
         retry: { limited: 5 },
-      });
+      }).send();
     }
-    return postExecuteWithFallback(this.transport.direct, this.fallback, "opencode", primary, fallback, execute);
+    return new FallbackPoster(this.fallback).send({
+      provider: "opencode",
+      fetchFn: this.transport.direct,
+      state: this.fallback,
+      primary,
+      fallback,
+      execute,
+    });
   }
 }
 
-export function opencodeFallbackUrls(): { chat: string; responses: string } {
+export function fallbackUrls(): { chat: string; responses: string } {
   return { chat: FALLBACK_CHAT_ENDPOINT, responses: FALLBACK_RESPONSES_ENDPOINT };
 }
 
-export function defaultOpencodeValue(value: unknown, fallback: string): string {
-  return defaultStringValue(value, fallback);
+export function defaultValue(value: unknown, fallback: string): string {
+  return Value.stringOr(value, fallback);
 }

@@ -20,14 +20,14 @@ const ensurePointBalance = Effect.fn("points.ensureBalance")(function* (
   userId: string,
   now: Date
 ) {
-  const affected = yield* points.insertPointBalanceOnConflictDoNothing({
+  const affected = yield* points.insertBalance({
     userId,
     balance: INITIAL_POINT_BALANCE,
     createdAt: now,
     updatedAt: now,
   });
   if (affected > 0) {
-    yield* points.insertPointTransactionOnConflictDoNothing({
+    yield* points.insertTransaction({
       id: crypto.randomUUID(),
       userId,
       amount: INITIAL_POINT_BALANCE,
@@ -110,7 +110,7 @@ export const refundRoamingPoint = Effect.fn("points.refundRoaming")(function* (
     Effect.gen(function* () {
       yield* ensurePointBalance(tx, reservation.userId, now);
       const transactionId = crypto.randomUUID();
-      const affected = yield* tx.insertPointTransactionOnConflictDoNothing({
+      const affected = yield* tx.insertTransaction({
         id: transactionId,
         userId: reservation.userId,
         amount: reservation.amount,
@@ -126,7 +126,7 @@ export const refundRoamingPoint = Effect.fn("points.refundRoaming")(function* (
         amount: reservation.amount,
         at: now,
       });
-      yield* tx.updatePointTransactionBalance({ id: transactionId, balanceAfter: balanceAfter ?? 0 });
+      yield* tx.updateTransactionBalance({ id: transactionId, balanceAfter: balanceAfter ?? 0 });
     })
   );
 });
@@ -144,7 +144,7 @@ export const adjustRoamingPoints = Effect.fn("points.adjustRoaming")(function* (
     Effect.gen(function* () {
       yield* ensurePointBalance(tx, reservation.userId, now);
       const transactionId = crypto.randomUUID();
-      const affected = yield* tx.insertPointTransactionOnConflictDoNothing({
+      const affected = yield* tx.insertTransaction({
         id: transactionId,
         userId: reservation.userId,
         amount: -delta,
@@ -158,13 +158,13 @@ export const adjustRoamingPoints = Effect.fn("points.adjustRoaming")(function* (
       if (delta === 0) return;
       const balanceAfter =
         delta > 0
-          ? yield* tx.debitPointBalanceAllowNegative({
+          ? yield* tx.debitAllowNegative({
               userId: reservation.userId,
               amount: delta,
               at: now,
             })
           : yield* tx.creditPointBalance({ userId: reservation.userId, amount: -delta, at: now });
-      yield* tx.updatePointTransactionBalance({ id: transactionId, balanceAfter: balanceAfter ?? 0 });
+      yield* tx.updateTransactionBalance({ id: transactionId, balanceAfter: balanceAfter ?? 0 });
     })
   );
 });
@@ -196,7 +196,7 @@ export const creditSharingPoint = Effect.fn("points.creditSharing")(function* (
     Effect.gen(function* () {
       yield* ensurePointBalance(tx, ownerUserId, now);
       const transactionId = crypto.randomUUID();
-      const affected = yield* tx.insertPointTransactionOnConflictDoNothing({
+      const affected = yield* tx.insertTransaction({
         id: transactionId,
         userId: ownerUserId,
         amount,
@@ -212,12 +212,12 @@ export const creditSharingPoint = Effect.fn("points.creditSharing")(function* (
         amount,
         at: now,
       });
-      yield* tx.updatePointTransactionBalance({ id: transactionId, balanceAfter: balanceAfter ?? 0 });
+      yield* tx.updateTransactionBalance({ id: transactionId, balanceAfter: balanceAfter ?? 0 });
     })
   );
 });
 
-export const ensureUserPointBalance = Effect.fn("points.ensureUserBalance")(function* (
+export const ensureBalance = Effect.fn("points.ensureUserBalance")(function* (
   points: PointPort,
   userId: string
 ) {

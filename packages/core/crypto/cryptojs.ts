@@ -13,7 +13,7 @@ export function generateSalt(): Buffer {
   return randomBytes(SALT_LENGTH);
 }
 
-export function evpBytesToKey(
+export function evpKey(
   password: Buffer,
   salt: Buffer,
   keyLen: number,
@@ -68,7 +68,7 @@ export function decrypt(passphrase: string, ciphertext: string): string {
 
   const salt = raw.subarray(OPENSSL_SALT_HEADER.length, OPENSSL_SALT_HEADER.length + SALT_LENGTH);
   const payload = raw.subarray(OPENSSL_SALT_HEADER.length + SALT_LENGTH);
-  const { key, iv } = evpBytesToKey(Buffer.from(passphrase, "utf8"), salt, KEY_LENGTH, BLOCK_SIZE);
+  const { key, iv } = evpKey(Buffer.from(passphrase, "utf8"), salt, KEY_LENGTH, BLOCK_SIZE);
 
   if (payload.length === 0 || payload.length % BLOCK_SIZE !== 0) {
     throw new Error("invalid AES-CBC ciphertext length");
@@ -82,7 +82,7 @@ export function decrypt(passphrase: string, ciphertext: string): string {
 
 export function encrypt(passphrase: string, plaintext: string): string {
   const salt = generateSalt();
-  const { key, iv } = evpBytesToKey(Buffer.from(passphrase, "utf8"), salt, KEY_LENGTH, BLOCK_SIZE);
+  const { key, iv } = evpKey(Buffer.from(passphrase, "utf8"), salt, KEY_LENGTH, BLOCK_SIZE);
   const padded = pkcs7Pad(Buffer.from(plaintext, "utf8"), BLOCK_SIZE);
   const cipher = createCipheriv("aes-256-cbc", key, iv);
   cipher.setAutoPadding(false);

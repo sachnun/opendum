@@ -1,12 +1,12 @@
 import { expect, test } from "bun:test";
 
 import {
-  buildCanonicalIndex,
+  canonicalIndex,
   canonicalBare,
-  canonicalModelId,
-  normalizeCanonicalKey,
+  canonicalId,
+  canonicalKey,
   resolveCanonical,
-  resolveCanonicalFrom,
+  resolveFrom,
   type CanonicalSources,
 } from "./canonical.ts";
 
@@ -48,12 +48,12 @@ function sources(): CanonicalSources {
   };
 }
 
-test("normalizeCanonicalKey folds spelling and drops variant suffixes", () => {
-  expect(normalizeCanonicalKey("anthropic/claude-opus-4.5")).toBe("anthropic/claude-opus-4-5");
-  expect(normalizeCanonicalKey("nvidia/Nemotron_3")).toBe("nvidia/nemotron-3");
-  expect(normalizeCanonicalKey("poolside/laguna-s-2.1:free")).toBe("poolside/laguna-s-2-1");
-  expect(normalizeCanonicalKey("  vendor/model  ")).toBe("vendor/model");
-  expect(normalizeCanonicalKey(null)).toBe("");
+test("canonicalKey folds spelling and drops variant suffixes", () => {
+  expect(canonicalKey("anthropic/claude-opus-4.5")).toBe("anthropic/claude-opus-4-5");
+  expect(canonicalKey("nvidia/Nemotron_3")).toBe("nvidia/nemotron-3");
+  expect(canonicalKey("poolside/laguna-s-2.1:free")).toBe("poolside/laguna-s-2-1");
+  expect(canonicalKey("  vendor/model  ")).toBe("vendor/model");
+  expect(canonicalKey(null)).toBe("");
 });
 
 test("canonicalBare keeps the model segment only", () => {
@@ -61,15 +61,15 @@ test("canonicalBare keeps the model segment only", () => {
   expect(canonicalBare("mimo-v2.5")).toBe("mimo-v2.5");
 });
 
-test("buildCanonicalIndex prefers the shorter id on normalization collisions", () => {
-  const index = buildCanonicalIndex(sources());
+test("canonicalIndex prefers the shorter id on normalization collisions", () => {
+  const index = canonicalIndex(sources());
   const model = index.models.get("claude-opus-4-5");
   expect(model?.bare).toBe("claude-opus-4-5");
   expect(model?.lab).toBe("anthropic");
 });
 
 test("resolveCanonical matches an exact canonical id at tier exact", () => {
-  const index = buildCanonicalIndex(sources());
+  const index = canonicalIndex(sources());
   const hit = resolveCanonical("anthropic/claude-opus-4-5", index);
   expect(hit?.id).toBe("claude-opus-4-5");
   expect(hit?.lab).toBe("anthropic");
@@ -78,106 +78,106 @@ test("resolveCanonical matches an exact canonical id at tier exact", () => {
 });
 
 test("resolveCanonical folds dots onto the dash canonical id", () => {
-  const index = buildCanonicalIndex(sources());
-  expect(canonicalModelId("zhipuai/glm-5.3-flash", index)).toBe("glm-5.3-flash");
-  expect(canonicalModelId("MiniMax-M3", index)).toBe("MiniMax-M3");
+  const index = canonicalIndex(sources());
+  expect(canonicalId("zhipuai/glm-5.3-flash", index)).toBe("glm-5.3-flash");
+  expect(canonicalId("MiniMax-M3", index)).toBe("MiniMax-M3");
 });
 
 test("resolveCanonical follows a provider offering link at tier linked", () => {
-  const index = buildCanonicalIndex(sources());
+  const index = canonicalIndex(sources());
   const hit = resolveCanonical("deepseek-v4-flash", index, { provider: "deepseek" });
   expect(hit?.id).toBe("deepseek-v4.1-flash");
   expect(hit?.tier).toBe("linked");
 });
 
 test("resolveCanonical follows provider-scoped links only for that provider", () => {
-  const index = buildCanonicalIndex(sources());
-  expect(canonicalModelId("z-ai/glm-5.3-flash", index, { provider: "kilo_code" })).toBe("glm-5.3-flash");
-  expect(canonicalModelId("nvidia/nemotron-3-ultra-550b-a55b:free", index, { provider: "kilo_code" })).toBe("nemotron-3-ultra-550b-a55b");
+  const index = canonicalIndex(sources());
+  expect(canonicalId("z-ai/glm-5.3-flash", index, { provider: "kilo_code" })).toBe("glm-5.3-flash");
+  expect(canonicalId("nvidia/nemotron-3-ultra-550b-a55b:free", index, { provider: "kilo_code" })).toBe("nemotron-3-ultra-550b-a55b");
 });
 
 test("resolveCanonical reads OpenRouter canonical_slug links", () => {
-  const index = buildCanonicalIndex(sources());
+  const index = canonicalIndex(sources());
   const hit = resolveCanonical("deepseek/deepseek-v4-flash", index, { provider: "openrouter" });
   expect(hit?.id).toBe("deepseek-v4.1-flash");
   expect(hit?.tier).toBe("linked");
 });
 
 test("resolveCanonical prefers exact over a conflicting provider link", () => {
-  const index = buildCanonicalIndex(sources());
+  const index = canonicalIndex(sources());
   const hit = resolveCanonical("deepseek/deepseek-v4.1-flash", index, { provider: "deepseek" });
   expect(hit?.tier).toBe("exact");
   expect(hit?.id).toBe("deepseek-v4.1-flash");
 });
 
 test("resolveCanonical resolves a size-stripped probe via unique fuzzy match", () => {
-  const index = buildCanonicalIndex(sources());
+  const index = canonicalIndex(sources());
   const hit = resolveCanonical("nemotron-3-ultra", index);
   expect(hit?.tier).toBe("fuzzy");
   expect(hit?.id).toBe("nemotron-3-ultra-550b-a55b");
 });
 
-test("resolveCanonicalFrom ignores an exact alias when core probes resolve later", () => {
-  const index = buildCanonicalIndex({
+test("resolveFrom ignores an exact alias when core probes resolve later", () => {
+  const index = canonicalIndex({
     models: {
       "meta/llama-3.1-8b-instruct": { name: "Llama 3.1 8B" },
       "meta/llama-3.1-70b-instruct": { name: "Llama 3.1 70B" },
     },
   });
-  const hit = resolveCanonicalFrom(["llama-3.1", "meta/llama-3.1-8b-instruct"], index, {
+  const hit = resolveFrom(["llama-3.1", "meta/llama-3.1-8b-instruct"], index, {
     fallbackProbes: ["llama-3.1-70b-instruct", "llama-3.1-8b-instruct"],
   });
   expect(hit?.id).toBe("llama-3.1-8b-instruct");
 });
 
-test("resolveCanonicalFrom falls back to aliases when core probes find nothing", () => {
-  const index = buildCanonicalIndex({
+test("resolveFrom falls back to aliases when core probes find nothing", () => {
+  const index = canonicalIndex({
     models: { "meta/llama-3.1-70b-instruct": { name: "Llama 3.1 70B" } },
   });
-  const hit = resolveCanonicalFrom(["llama-3.1", "unserved-name"], index, {
+  const hit = resolveFrom(["llama-3.1", "unserved-name"], index, {
     fallbackProbes: ["llama-3.1-70b-instruct"],
   });
   expect(hit?.id).toBe("llama-3.1-70b-instruct");
 });
 
 test("resolveCanonical fails closed when a fuzzy probe is ambiguous", () => {
-  const index = buildCanonicalIndex({
+  const index = canonicalIndex({
     models: {
       "google/gemma-4-31b-it": { name: "Gemma 4 31B" },
       "google/gemma-4-12b-it": { name: "Gemma 4 12B" },
     },
   });
   expect(resolveCanonical("gemma-4", index)).toBe(null);
-  expect(canonicalModelId("gemma-4-31b", index)).toBe("gemma-4-31b-it");
+  expect(canonicalId("gemma-4-31b", index)).toBe("gemma-4-31b-it");
 });
 
 test("resolveCanonical rejects a fuzzy match that changes the family prefix", () => {
-  const index = buildCanonicalIndex(sources());
+  const index = canonicalIndex(sources());
   expect(resolveCanonical("ox", index)).toBe(null);
   expect(resolveCanonical("ling-2.6-flash", index)).toBe(null);
 });
 
-test("resolveCanonicalFrom tries every probe per tier before falling back", () => {
-  const index = buildCanonicalIndex(sources());
-  const hit = resolveCanonicalFrom(["totally-unrelated", "deepseek-v4-flash"], index, { provider: "deepseek" });
+test("resolveFrom tries every probe per tier before falling back", () => {
+  const index = canonicalIndex(sources());
+  const hit = resolveFrom(["totally-unrelated", "deepseek-v4-flash"], index, { provider: "deepseek" });
   expect(hit?.id).toBe("deepseek-v4.1-flash");
   expect(hit?.tier).toBe("linked");
 });
 
-test("resolveCanonicalFrom prefers an exact probe over a linked one", () => {
-  const index = buildCanonicalIndex(sources());
-  const hit = resolveCanonicalFrom(["deepseek-v4-flash", "MiniMax-M3"], index, { provider: "deepseek" });
+test("resolveFrom prefers an exact probe over a linked one", () => {
+  const index = canonicalIndex(sources());
+  const hit = resolveFrom(["deepseek-v4-flash", "MiniMax-M3"], index, { provider: "deepseek" });
   expect(hit?.id).toBe("MiniMax-M3");
   expect(hit?.tier).toBe("exact");
 });
 
-test("resolveCanonicalFrom returns null when every probe misses", () => {
-  const index = buildCanonicalIndex(sources());
-  expect(resolveCanonicalFrom(["nope", ""], index)).toBe(null);
+test("resolveFrom returns null when every probe misses", () => {
+  const index = canonicalIndex(sources());
+  expect(resolveFrom(["nope", ""], index)).toBe(null);
 });
 
 test("resolveCanonical returns null for unrelated or empty probes", () => {
-  const index = buildCanonicalIndex(sources());
+  const index = canonicalIndex(sources());
   expect(resolveCanonical("totally-unrelated-model", index)).toBe(null);
   expect(resolveCanonical("", index)).toBe(null);
   expect(resolveCanonical(null, index)).toBe(null);
@@ -185,16 +185,16 @@ test("resolveCanonical returns null for unrelated or empty probes", () => {
 });
 
 test("resolveCanonical rejects cross-version fuzzy matches", () => {
-  const index = buildCanonicalIndex(sources());
+  const index = canonicalIndex(sources());
   expect(resolveCanonical("glm-4.6-flash", index)).toBe(null);
 });
-test("buildCanonicalIndex tolerates empty and malformed sources", () => {
-  const index = buildCanonicalIndex({});
+test("canonicalIndex tolerates empty and malformed sources", () => {
+  const index = canonicalIndex({});
   expect(index.models.size).toBe(0);
   expect(index.offerings.size).toBe(0);
   expect(resolveCanonical("anything", index)).toBe(null);
 
-  const malformed = buildCanonicalIndex({
+  const malformed = canonicalIndex({
     models: { "lab/model": null, "": {} },
     providers: { lab: { models: { x: {} } } },
     openrouter: { data: [{ id: "" }] },

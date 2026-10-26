@@ -5,7 +5,7 @@ import { Chat, Messages } from "../core/endpoints.js";
 import { handleInference } from "../handlers/inference.js";
 import { handleModels } from "../handlers/models.js";
 
-function context(overrides: Partial<ProxyContext> = {}): ProxyContext {
+function fakeContext(overrides: Partial<ProxyContext> = {}): ProxyContext {
   return {
     service: {
       handle: async () => new Response("{}", { status: 200 }),
@@ -26,14 +26,14 @@ function postEvent(path: string, body: string): ReturnType<typeof mockEvent> {
 
 describe("handleInference", () => {
   it("rejects invalid JSON with an openai envelope", async () => {
-    const response = await handleInference(postEvent("/v1/chat/completions", "not json"), context(), new Chat());
+    const response = await handleInference(postEvent("/v1/chat/completions", "not json"), fakeContext(), new Chat());
     expect(response.status).toBe(400);
     const body = (await response.json()) as { error: { type: string } };
     expect(body.error.type).toBe("invalid_request_error");
   });
 
   it("rejects invalid JSON with an anthropic envelope", async () => {
-    const response = await handleInference(postEvent("/v1/messages", "not json"), context(), new Messages());
+    const response = await handleInference(postEvent("/v1/messages", "not json"), fakeContext(), new Messages());
     expect(response.status).toBe(400);
     const body = (await response.json()) as { type: string; error: { type: string } };
     expect(body.type).toBe("error");
@@ -41,7 +41,7 @@ describe("handleInference", () => {
   });
 
   it("returns a structured 500 when the service throws", async () => {
-    const failing = context({
+    const failing = fakeContext({
       service: {
         handle: async () => {
           throw new Error("service exploded");
@@ -58,7 +58,7 @@ describe("handleInference", () => {
 
 describe("handleModels", () => {
   it("returns a structured 500 when model listing throws", async () => {
-    const failing = context({
+    const failing = fakeContext({
       auth: {
         validateKey: () => {
           throw new Error("auth exploded");

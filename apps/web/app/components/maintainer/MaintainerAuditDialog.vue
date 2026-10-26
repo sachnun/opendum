@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { MaintainerAuditSearchUser, MaintainerAuditUser } from "~~/lib/api-types";
+import type { AuditSearchUser, MaintainerAuditUser } from "~~/lib/api-types";
 import { avatarUrl } from "~~/lib/utils";
 
 const open = defineModel<boolean>("open", { default: false });
@@ -13,7 +13,7 @@ const PAGE_SIZE = 12;
 const SCROLL_LOAD_THRESHOLD = 48;
 
 const query = ref("");
-const users = ref<MaintainerAuditSearchUser[]>([]);
+const users = ref<AuditSearchUser[]>([]);
 const isSearching = ref(false);
 const isLoadingMore = ref(false);
 const hasMore = ref(false);
@@ -23,16 +23,16 @@ const errorMessage = ref("");
 let searchRequestId = 0;
 let searchTimer: ReturnType<typeof setTimeout> | null = null;
 
-function userInitial(user: MaintainerAuditSearchUser) {
+function userInitial(user: AuditSearchUser) {
   return (user.name?.[0] || user.email?.[0] || "U").toUpperCase();
 }
 
 
-function canLoadQuery(value: string) {
+function canLoad(value: string) {
   return value.length === 0 || value.length >= 2;
 }
 
-function clearSearchTimer() {
+function clearTimer() {
   if (!searchTimer) return;
   clearTimeout(searchTimer);
   searchTimer = null;
@@ -46,7 +46,7 @@ function resetUsers() {
 
 async function loadUsers(requestId: number, append = false) {
   const normalizedQuery = query.value.trim();
-  if (!canLoadQuery(normalizedQuery)) {
+  if (!canLoad(normalizedQuery)) {
     resetUsers();
     isSearching.value = false;
     isLoadingMore.value = false;
@@ -86,7 +86,7 @@ async function loadUsers(requestId: number, append = false) {
   }
 }
 
-function handleUsersScroll(event: Event) {
+function usersScroll(event: Event) {
   const target = event.currentTarget as HTMLElement;
   const distanceFromBottom = target.scrollHeight - target.scrollTop - target.clientHeight;
   if (distanceFromBottom > SCROLL_LOAD_THRESHOLD) return;
@@ -94,7 +94,7 @@ function handleUsersScroll(event: Event) {
 }
 
 watch(open, (value) => {
-  clearSearchTimer();
+  clearTimer();
 
   if (value) {
     const requestId = ++searchRequestId;
@@ -117,10 +117,10 @@ watch(query, (value) => {
 
   const normalizedQuery = value.trim();
   const requestId = ++searchRequestId;
-  clearSearchTimer();
+  clearTimer();
 
   errorMessage.value = "";
-  if (!canLoadQuery(normalizedQuery)) {
+  if (!canLoad(normalizedQuery)) {
     resetUsers();
     isSearching.value = false;
     isLoadingMore.value = false;
@@ -137,10 +137,10 @@ watch(query, (value) => {
 });
 
 onBeforeUnmount(() => {
-  clearSearchTimer();
+  clearTimer();
 });
 
-async function selectUser(user: MaintainerAuditSearchUser) {
+async function selectUser(user: AuditSearchUser) {
   selectingUserId.value = user.id;
   errorMessage.value = "";
 
@@ -181,7 +181,7 @@ async function selectUser(user: MaintainerAuditSearchUser) {
 
       <p v-if="errorMessage" class="text-sm text-destructive">{{ errorMessage }}</p>
 
-      <div class="h-72 overflow-y-auto rounded-md border border-border bg-muted/10 p-1" @scroll="handleUsersScroll">
+      <div class="h-72 overflow-y-auto rounded-md border border-border bg-muted/10 p-1" @scroll="usersScroll">
         <p v-if="query.trim().length > 0 && query.trim().length < 2" class="px-3 py-6 text-center text-sm text-muted-foreground">Type at least 2 characters.</p>
         <p v-else-if="isSearching && users.length === 0" class="px-3 py-6 text-center text-sm text-muted-foreground">Loading users...</p>
         <p v-else-if="users.length === 0" class="px-3 py-6 text-center text-sm text-muted-foreground">No users found.</p>

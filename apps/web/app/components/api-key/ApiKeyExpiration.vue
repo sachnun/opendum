@@ -18,22 +18,22 @@ const api = useApi();
 const open = ref(false);
 const isSaving = ref(false);
 const expiresAt = ref<Date | null>(props.initialExpiresAt ? new Date(props.initialExpiresAt) : null);
-const draftDate = ref<DateValue | undefined>(toCalendarDate(expiresAt.value));
-const draftTime = ref<Time>(toTimeValue(expiresAt.value));
+const draftDate = ref<DateValue | undefined>(calendarDate(expiresAt.value));
+const draftTime = ref<Time>(timeValue(expiresAt.value));
 const errorMessage = ref("");
 
 watch(open, (value) => {
   if (value) {
-    draftDate.value = toCalendarDate(expiresAt.value) as DateValue | undefined;
-    draftTime.value = toTimeValue(expiresAt.value) as Time;
+    draftDate.value = calendarDate(expiresAt.value) as DateValue | undefined;
+    draftTime.value = timeValue(expiresAt.value) as Time;
     errorMessage.value = "";
   }
 });
 
 const isExpired = computed(() => expiresAt.value != null && expiresAt.value < new Date());
 const displayText = computed(() => (expiresAt.value ? format(expiresAt.value, "MMM d, yyyy HH:mm") : "No expiry"));
-const draftExpiresAt = computed(() => toLocalDateTime(draftDate.value as DateValue | undefined, draftTime.value as Time));
-const isDraftInPast = computed(() => {
+const draftExpiresAt = computed(() => stamp(draftDate.value as DateValue | undefined, draftTime.value as Time));
+const draftInPast = computed(() => {
   if (!draftExpiresAt.value) return false;
   return draftExpiresAt.value <= new Date();
 });
@@ -43,43 +43,43 @@ watch(
   (value) => {
     expiresAt.value = value ? new Date(value) : null;
     if (!open.value) {
-      draftDate.value = toCalendarDate(expiresAt.value) as DateValue | undefined;
-      draftTime.value = toTimeValue(expiresAt.value) as Time;
+      draftDate.value = calendarDate(expiresAt.value) as DateValue | undefined;
+      draftTime.value = timeValue(expiresAt.value) as Time;
     }
   }
 );
 
-function toCalendarDate(value: Date | null): DateValue | undefined {
+function calendarDate(value: Date | null): DateValue | undefined {
   if (!value) return undefined;
   return new CalendarDate(value.getFullYear(), value.getMonth() + 1, value.getDate());
 }
 
-function toDateOnlyString(value: DateValue): string {
+function dateOnly(value: DateValue): string {
   return value.toString().slice(0, 10);
 }
 
-function toLocalDate(value: DateValue | undefined): Date | null {
+function localDate(value: DateValue | undefined): Date | null {
   if (!value) return null;
-  const [year, month, day] = toDateOnlyString(value).split("-").map(Number);
+  const [year, month, day] = dateOnly(value).split("-").map(Number);
   return new Date(year ?? 1970, (month ?? 1) - 1, day ?? 1);
 }
 
-function toTimeValue(value: Date | null): Time {
+function timeValue(value: Date | null): Time {
   return value ? new Time(value.getHours(), value.getMinutes()) : new Time(23, 59);
 }
 
-function toLocalDateTime(dateValue: DateValue | undefined, timeValue: Time): Date | null {
-  const date = toLocalDate(dateValue);
+function stamp(dateValue: DateValue | undefined, timeValue: Time): Date | null {
+  const date = localDate(dateValue);
   if (!date) return null;
   date.setHours(timeValue.hour, timeValue.minute, 0, 0);
   return date;
 }
 
-function isPastDate(value: DateValue): boolean {
-  return toDateOnlyString(value) < format(new Date(), "yyyy-MM-dd");
+function pastDate(value: DateValue): boolean {
+  return dateOnly(value) < format(new Date(), "yyyy-MM-dd");
 }
 
-function saveDraftExpiration() {
+function saveDraft() {
   const value = draftExpiresAt.value;
   if (!value) return;
 
@@ -126,7 +126,7 @@ async function saveExpiration(value: Date | null) {
       <div class="space-y-3 p-3">
         <div class="space-y-1.5">
           <p class="text-xs font-medium text-muted-foreground">Expiration date</p>
-          <UiCalendar :is-date-disabled="isPastDate" class="border-0 p-0" :model-value="draftDate as never" @update:model-value="draftDate = $event as never" />
+          <UiCalendar :is-date-disabled="pastDate" class="border-0 p-0" :model-value="draftDate as never" @update:model-value="draftDate = $event as never" />
         </div>
         <div class="space-y-1.5">
           <p class="text-xs font-medium text-muted-foreground">Expiration time</p>
@@ -162,7 +162,7 @@ async function saveExpiration(value: Date | null) {
             <UiIcon name="i-lucide-x" class="size-3" />
             Remove expiration
           </UiButton>
-          <UiButton size="sm" class="h-7 text-xs" :disabled="isSaving || !draftDate || isDraftInPast" @click="saveDraftExpiration">
+          <UiButton size="sm" class="h-7 text-xs" :disabled="isSaving || !draftDate || draftInPast" @click="saveDraft">
             Save
           </UiButton>
         </div>

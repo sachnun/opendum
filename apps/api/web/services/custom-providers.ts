@@ -2,20 +2,20 @@ import { Effect } from "effect";
 import { and, count, eq, inArray } from "drizzle-orm";
 
 import { db, customProvider, customProviderModel, providerAccount } from "@opendum/database";
-import { stripParamInfoKey } from "@opendum/models/clean-key";
+import { stripParams } from "@opendum/models/clean-key";
 import { idMap } from "@opendum/models/model-store";
 import { decrypt, encrypt, hashString } from "#web/lib/encryption.js";
 import { fetchExternalEffect } from "#web/lib/external.js";
 import { fromPromise } from "#web/lib/task.js";
 import { internal } from "#web/errors.js";
-import type { CreateCustomProviderInput, CustomModelInput, PreviewCustomModelsInput, UpdateCustomProviderInput } from "@opendum/providers/contract";
+import type { CustomCreateInput, CustomModelInput, ModelsPreviewInput, CustomUpdateInput } from "@opendum/providers/contract";
 import { PROVIDER_ACCOUNT_KEYS } from "./account-providers.js";
 
-const API_KEY_ACCOUNT_EXPIRY = new Date("2100-01-01T00:00:00.000Z");
-const INTERNAL_RELAY_ERROR_HEADER = "X-Opendum-Internal-Relay-Error";
+const KEY_ACCOUNT_EXPIRY = new Date("2100-01-01T00:00:00.000Z");
+const RELAY_ERROR_HEADER = "X-Opendum-Internal-Relay-Error";
 const VALIDATION_TIMEOUT_MS = 15000;
 
-function isProbablyPrivateTarget(raw: string): boolean {
+function privateTarget(raw: string): boolean {
   let parsed: URL;
   try {
     parsed = new URL(raw);
@@ -37,10 +37,10 @@ function isProbablyPrivateTarget(raw: string): boolean {
   return false;
 }
 
-function normalizeBaseUrl(raw: string): string | null {
+function normalizeUrl(raw: string): string | null {
   const trimmed = raw.trim().replace(/\/+$/, "");
   if (!trimmed) return null;
-  if (isProbablyPrivateTarget(trimmed)) return null;
+  if (privateTarget(trimmed)) return null;
   return trimmed;
 }
 
@@ -139,9 +139,9 @@ const failWith = (message: string) => ({ success: false as const, error: message
 
 export const createCustomProvider = Effect.fn("customProviders.create")(function* (
   userId: string,
-  input: CreateCustomProviderInput
+  input: CustomCreateInput
 ) {
-  const baseUrl = normalizeBaseUrl(input.baseUrl);
+  const baseUrl = normalizeUrl(input.baseUrl);
   if (!baseUrl) return failWith("baseUrl is invalid or targets a private network address.");
   if (PROVIDER_ACCOUNT_KEYS.includes(input.slug as (typeof PROVIDER_ACCOUNT_KEYS)[number])) {
     return failWith(`Slug "${input.slug}" is reserved for a built-in provider.`);
@@ -170,11 +170,11 @@ export const createCustomProvider = Effect.fn("customProviders.create")(function
 
 export const updateCustomProvider = Effect.fn("customProviders.update")(function* (
   userId: string,
-  input: UpdateCustomProviderInput
+  input: CustomUpdateInput
 ) {
   const provider = yield* ownedProvider(userId, input.slug);
   if (!provider) return failWith(`Custom provider "${input.slug}" not found.`);
-  const baseUrl = input.baseUrl == null ? undefined : normalizeBaseUrl(input.baseUrl);
+  const baseUrl = input.baseUrl == null ? undefined : normalizeUrl(input.baseUrl);
   if (input.baseUrl != null && !baseUrl) {
     return failWith("baseUrl is invalid or targets a private network address.");
   }
@@ -298,7 +298,7 @@ const syncFromUpstream = Effect.fn("customProviders.syncFromUpstream")(function*
     )
   );
   if (!response) return failWith("Provider /models request timed out.");
-  if (response.headers.get(INTERNAL_RELAY_ERROR_HEADER) === "1") {
+  if (response.headers.get(RELAY_ERROR_HEADER) === "1") {
     return failWith("Unable to reach the provider through the proxy.");
   }
   if (!response.ok) {
@@ -326,7 +326,7 @@ export const syncCustomModels = Effect.fn("customProviders.sync")(function* (
   const effectiveToken = token?.trim() || (yield* storedAccountKey(userId, slug)) || undefined;
   const fetched = yield* syncFromUpstream(provider.baseUrl, effectiveToken, provider.extraHeaders ?? undefined);
   if (!fetched.success) return fetched;
-  const upserted = yield* upsertCustomModels(userId, slug, cleanCustomModels(fetched.data.ids));
+  const upserted = yield* upsertCustomModels(userId, slug, cleanModels(fetched.data.ids));
   if (!upserted.success) return upserted;
   return {
     success: true as const,
@@ -335,16 +335,16 @@ export const syncCustomModels = Effect.fn("customProviders.sync")(function* (
 });
 
 export const previewCustomModels = Effect.fn("customProviders.preview")(function* (
-  input: PreviewCustomModelsInput
+  input: ModelsPreviewInput
 ) {
-  const baseUrl = normalizeBaseUrl(input.baseUrl);
+  const baseUrl = normalizeUrl(input.baseUrl);
   if (!baseUrl) return failWith("baseUrl is invalid or targets a private network address.");
   const fetched = yield* syncFromUpstream(baseUrl, input.token, input.extraHeaders);
   if (!fetched.success) return fetched;
-  return { success: true as const, data: { models: cleanCustomModels(fetched.data.ids) } };
+  return { success: true as const, data: { models: cleanModels(fetched.data.ids) } };
 });
 
-function toModelKey(upstream: string): string {
+function modelKey(upstream: string): string {
   const slashIndex = upstream.indexOf("/");
   const basename = slashIndex === -1 ? upstream : upstream.slice(slashIndex + 1);
   const slug = basename
@@ -352,15 +352,15 @@ function toModelKey(upstream: string): string {
     .replace(/[^a-zA-Z0-9._-]/g, "-")
     .replace(/-{2,}/g, "-")
     .toLowerCase();
-  const cleaned = stripParamInfoKey(slug);
+  const cleaned = stripParams(slug);
   return cleaned.endsWith("-free") ? cleaned.slice(0, -"-free".length) : cleaned;
 }
 
-function cleanCustomModels(upstreamIds: string[]): Array<{ modelId: string; upstream: string }> {
-  return [...idMap(upstreamIds, toModelKey)].map(([modelId, upstream]) => ({ modelId, upstream }));
+function cleanModels(upstreamIds: string[]): Array<{ modelId: string; upstream: string }> {
+  return [...idMap(upstreamIds, modelKey)].map(([modelId, upstream]) => ({ modelId, upstream }));
 }
 
-export const connectCustomProviderAccount = Effect.fn("customProviders.connectAccount")(function* (
+export const connectCustom = Effect.fn("customProviders.connectAccount")(function* (
   userId: string,
   slug: string,
   apiKey: string,
@@ -381,7 +381,7 @@ export const connectCustomProviderAccount = Effect.fn("customProviders.connectAc
     )
   );
   if (response.status === 599) return failWith("Unable to validate the API key. Please check your network and try again.");
-  if (response.headers.get(INTERNAL_RELAY_ERROR_HEADER) === "1") {
+  if (response.headers.get(RELAY_ERROR_HEADER) === "1") {
     return failWith("Unable to validate the API key through the proxy.");
   }
   if (!response.ok) {
@@ -440,7 +440,7 @@ export const connectCustomProviderAccount = Effect.fn("customProviders.connectAc
           .set({
             accessToken: encrypt(normalizedKey),
             refreshToken: encrypt(normalizedKey),
-            expiresAt: API_KEY_ACCOUNT_EXPIRY,
+            expiresAt: KEY_ACCOUNT_EXPIRY,
             isActive: true,
             disabledUntil: null,
             ...(normalizedName ? { name: normalizedName } : {}),
@@ -458,7 +458,7 @@ export const connectCustomProviderAccount = Effect.fn("customProviders.connectAc
         name: displayName,
         accessToken: encrypt(normalizedKey),
         refreshToken: encrypt(normalizedKey),
-        expiresAt: API_KEY_ACCOUNT_EXPIRY,
+        expiresAt: KEY_ACCOUNT_EXPIRY,
         email: identifier,
         isActive: true,
       }),

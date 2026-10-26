@@ -3,8 +3,8 @@ import type { QuotaAccount, QuotaContext } from "./types.js";
 import { QuotaFetchFailure } from "../core/errors.js";
 
 const RAW_CACHE_PREFIX = "opendum:quota:raw";
-const RAW_CACHE_MIN_TTL_SECONDS = 60;
-const RAW_CACHE_MAX_TTL_SECONDS = 300;
+const MIN_TTL = 60;
+const MAX_TTL = 300;
 
 const CACHE_HEADER_ALLOWLIST = [
   "x-codex-primary-used-percent",
@@ -26,12 +26,12 @@ export type QuotaJsonResult = {
   fromCache: boolean;
 };
 
-function rawCacheTtlSeconds(): number {
-  const spread = RAW_CACHE_MAX_TTL_SECONDS - RAW_CACHE_MIN_TTL_SECONDS;
-  return RAW_CACHE_MIN_TTL_SECONDS + Math.floor(Math.random() * (spread + 1));
+function ttlSeconds(): number {
+  const spread = MAX_TTL - MIN_TTL;
+  return MIN_TTL + Math.floor(Math.random() * (spread + 1));
 }
 
-function rawCacheKey(account: QuotaAccount, cacheName: string, method: string, target: string, encodedBody: string): string {
+function cacheKey(account: QuotaAccount, cacheName: string, method: string, target: string, encodedBody: string): string {
   const hash = new Bun.CryptoHasher("sha256")
     .update([account.provider, account.id, cacheName, method.toUpperCase(), target, encodedBody].join("\n"))
     .digest("hex");
@@ -47,7 +47,7 @@ function cacheHeaders(headers: Headers): Record<string, string[]> {
   return out;
 }
 
-function decodeCachedEntry(raw: string, cacheKey: string): QuotaJsonResult | null {
+function decodeEntry(raw: string, cacheKey: string): QuotaJsonResult | null {
   const entry = JSON.parse(raw) as { statusCode: number; header?: Record<string, string[]>; body: string };
   if (entry.statusCode <= 0) return null;
   const header = new Headers();
@@ -63,7 +63,7 @@ function decodeCachedEntry(raw: string, cacheKey: string): QuotaJsonResult | nul
   };
 }
 
-function quotaFetchFailure(provider: string, target: string, cause: unknown): QuotaFetchFailure {
+function fetchFailure(provider: string, target: string, cause: unknown): QuotaFetchFailure {
   return new QuotaFetchFailure({
     message: cause instanceof Error ? cause.message : String(cause),
     provider,
@@ -72,7 +72,7 @@ function quotaFetchFailure(provider: string, target: string, cause: unknown): Qu
   });
 }
 
-export function getQuotaJson(
+export function quotaJson(
   ctx: QuotaContext,
   account: QuotaAccount,
   forceRefresh: boolean,
@@ -83,16 +83,16 @@ export function getQuotaJson(
   body: unknown
 ): Effect.Effect<QuotaJsonResult, QuotaFetchFailure> {
   const encodedBody = body === null || body === undefined ? "" : JSON.stringify(body);
-  const cacheKey = rawCacheKey(account, cacheName, method, target, encodedBody);
+  const key = cacheKey(account, cacheName, method, target, encodedBody);
 
   const fromCache = Effect.gen(function* () {
     if (forceRefresh || !ctx.journal) return null;
     const raw = yield* Effect.tryPromise({
-      try: () => ctx.journal!.get(cacheKey),
+      try: () => ctx.journal!.get(key),
       catch: (cause) => cause,
     }).pipe(Effect.orElseSucceed(() => null));
     if (!raw) return null;
-    return yield* Effect.try(() => decodeCachedEntry(raw, cacheKey)).pipe(
+    return yield* Effect.try(() => decodeEntry(raw, key)).pipe(
       Effect.orElseSucceed(() => null)
     );
   });
@@ -106,9 +106,9 @@ export function getQuotaJson(
       if (encodedBody) init.body = encodedBody;
       const response = await ctx.fetch(target, init);
       const raw = await response.text();
-      return { statusCode: response.status, header: response.headers, raw, cacheKey, fromCache: false };
+      return { statusCode: response.status, header: response.headers, raw, cacheKey: key, fromCache: false };
     },
-    catch: (cause) => quotaFetchFailure(account.provider, target, cause),
+    catch: (cause) => fetchFailure(account.provider, target, cause),
   });
 
   return Effect.gen(function* () {
@@ -118,7 +118,7 @@ export function getQuotaJson(
   });
 }
 
-export function putQuotaCache(
+export function putQuota(
   ctx: QuotaContext,
   result: QuotaJsonResult
 ): Effect.Effect<void> {
@@ -130,7 +130,7 @@ export function putQuotaCache(
     body: Buffer.from(result.raw, "utf8").toString("base64"),
   };
   return Effect.tryPromise({
-    try: () => ctx.journal!.set(result.cacheKey, JSON.stringify(entry), rawCacheTtlSeconds()),
+    try: () => ctx.journal!.set(result.cacheKey, JSON.stringify(entry), ttlSeconds()),
     catch: (cause) => cause,
   }).pipe(Effect.ignore);
 }

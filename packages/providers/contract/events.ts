@@ -1,7 +1,7 @@
 import { eventIterator, oc } from "@orpc/contract";
 import { z } from "zod";
 
-import { modelListItemSchema, modelStatsSchema } from "./models.js";
+import { modelItem, modelStatsSchema } from "./models.js";
 
 const dateSchema = z.union([z.string(), z.date()]);
 const nullableDateSchema = dateSchema.nullable();
@@ -27,7 +27,7 @@ export const accountOverviewSchema = z.object({
   pinnedProviders: z.array(z.string()),
 });
 
-export const accountModelHealthSchema = z.object({
+export const healthSchema = z.object({
   status: z.string(),
   consecutiveErrors: z.number(),
   lastErrorAt: nullableDateSchema,
@@ -51,7 +51,7 @@ export const providerAccountSchema = z.object({
   consecutiveErrors: z.number(),
   lastErrorAt: nullableDateSchema,
   lastSuccessAt: nullableDateSchema,
-  lastRecoveredByRotationAt: nullableDateSchema,
+  lastRecoveredAt: nullableDateSchema,
   lastErrorCode: z.number().nullable(),
   unhealthyCount: z.number(),
   successCount: z.number(),
@@ -63,9 +63,9 @@ export const providerDetailSchema = z.object({
   accounts: z.array(providerAccountSchema),
   supportedModels: z.array(z.string()),
   freeSupportedModels: z.array(z.string()),
-  supportedModelsByAccountId: z.record(z.string(), z.array(z.string())),
+  supportedByAccount: z.record(z.string(), z.array(z.string())),
   disabledModelsByAccountId: z.record(z.string(), z.array(z.string())),
-  modelHealthByAccountId: z.record(z.string(), z.record(z.string(), accountModelHealthSchema)),
+  modelHealthByAccountId: z.record(z.string(), z.record(z.string(), healthSchema)),
   pinnedProviders: z.array(z.string()),
 });
 
@@ -78,11 +78,11 @@ export const usageDataSchema = z.object({
   overview: accountOverviewSchema,
   accountStats: z.record(z.string(), providerStatsSchema),
   modelStats: z.record(z.string(), modelStatsSchema),
-  roamingPointsByApiKeyId: z.record(z.string(), z.number()),
+  roamingByKey: z.record(z.string(), z.number()),
 });
 
 export const modelsDataSchema = z.object({
-  list: z.array(modelListItemSchema),
+  list: z.array(modelItem),
   familyCounts: z.record(z.string(), z.number()),
 });
 

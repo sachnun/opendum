@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
-import { ANTIGRAVITY_GOOGLE_OAUTH_TOKEN_ENDPOINT } from "../../endpoints.js";
+import { ANTIGRAVITY_TOKEN_ENDPOINT } from "../../endpoints.js";
 import type { UpstreamTransport } from "../../core/http.js";
 import type { ProviderAccount } from "../../types.js";
 import { AntigravityProvider } from "./index.js";
@@ -36,7 +36,7 @@ describe("AntigravityProvider.refreshCredentials", () => {
   it("refreshes the token and composes the account info", async () => {
     const captured: Captured[] = [];
     const fake = provider((url) => {
-      if (url === ANTIGRAVITY_GOOGLE_OAUTH_TOKEN_ENDPOINT) {
+      if (url === ANTIGRAVITY_TOKEN_ENDPOINT) {
         return { body: JSON.stringify({ access_token: "at-1", refresh_token: "rt-2", expires_in: 1800 }) };
       }
       if (url.endsWith("/v1internal:loadCodeAssist")) {
@@ -57,7 +57,7 @@ describe("AntigravityProvider.refreshCredentials", () => {
       expect(result.credentials.email).toBe("user@test");
       expect(result.credentials.expiresAt.getTime()).toBeGreaterThanOrEqual(before + 1800 * 1000);
     }
-    expect(captured[0]?.url).toBe(ANTIGRAVITY_GOOGLE_OAUTH_TOKEN_ENDPOINT);
+    expect(captured[0]?.url).toBe(ANTIGRAVITY_TOKEN_ENDPOINT);
     const form = new URLSearchParams(String(captured[0]?.init?.body));
     expect(form.get("grant_type")).toBe("refresh_token");
     expect(form.get("refresh_token")).toBe("rt-1");
@@ -69,7 +69,7 @@ describe("AntigravityProvider.refreshCredentials", () => {
     const before = Date.now();
     const result = await refresh(
       provider((url) =>
-        url === ANTIGRAVITY_GOOGLE_OAUTH_TOKEN_ENDPOINT ? { body: JSON.stringify({ access_token: "at-1" }) } : null
+        url === ANTIGRAVITY_TOKEN_ENDPOINT ? { body: JSON.stringify({ access_token: "at-1" }) } : null
       )
     );
     expect(result.ok).toBe(true);
@@ -83,7 +83,7 @@ describe("AntigravityProvider.refreshCredentials", () => {
   });
 
   it("fails with the provider label on non-2xx responses", async () => {
-    const result = await refresh(provider((url) => (url === ANTIGRAVITY_GOOGLE_OAUTH_TOKEN_ENDPOINT ? { status: 400, body: "bad" } : null)));
+    const result = await refresh(provider((url) => (url === ANTIGRAVITY_TOKEN_ENDPOINT ? { status: 400, body: "bad" } : null)));
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.provider).toBe("antigravity");
@@ -92,7 +92,7 @@ describe("AntigravityProvider.refreshCredentials", () => {
   });
 
   it("rejects empty access tokens", async () => {
-    const result = await refresh(provider((url) => (url === ANTIGRAVITY_GOOGLE_OAUTH_TOKEN_ENDPOINT ? { body: "{}" } : null)));
+    const result = await refresh(provider((url) => (url === ANTIGRAVITY_TOKEN_ENDPOINT ? { body: "{}" } : null)));
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.message).toBe("antigravity token refresh returned empty access token");
   });

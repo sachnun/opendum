@@ -1,7 +1,7 @@
 import { Effect } from "effect";
-import { assertPublicHost, PrivateHostError } from "@opendum/core/egress";
-import { getProxyContext } from "../../context.js";
-import { ServiceFailure, asServiceFailure, badRequest, unavailable } from "../errors.js";
+import { assertPublic, PrivateHostError } from "@opendum/core/egress";
+import { proxyContext } from "../../context.js";
+import { ServiceFailure, asFailure, badRequest, unavailable } from "../errors.js";
 
 const TIMEOUT_MS = 20 * 1000;
 
@@ -30,13 +30,13 @@ function resolveTarget(url: string, method: string): Effect.Effect<Target, Servi
 
   return Effect.try({
     try: () => {
-      assertPublicHost(target.hostname);
+      assertPublic(target.hostname);
       return { method, target: target.toString() };
     },
     catch: (cause) =>
       cause instanceof PrivateHostError
         ? badRequest("url must not target a private network address")
-        : asServiceFailure(cause),
+        : asFailure(cause),
   });
 }
 
@@ -62,7 +62,7 @@ export const fetchExternalEffect = Effect.fn("fetchExternal")(function* (
   const method = (init.method ?? "GET").toUpperCase();
   const resolved = yield* resolveTarget(url, method);
   const context = yield* Effect.tryPromise({
-    try: () => getProxyContext(),
+    try: () => proxyContext(),
     catch: (cause) => unavailable("Failed to start the proxy runtime", cause),
   });
 
@@ -75,7 +75,7 @@ export const fetchExternalEffect = Effect.fn("fetchExternal")(function* (
         cache: init.cache,
         signal: abortSignal(init.signal),
       }),
-    catch: (cause) => asServiceFailure(cause, "External request failed"),
+    catch: (cause) => asFailure(cause, "External request failed"),
   });
 });
 

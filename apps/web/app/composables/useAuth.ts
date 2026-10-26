@@ -1,16 +1,16 @@
 import {
-  clearAuthTokens,
-  getActiveSessionToken,
-  getImpersonationToken,
-  getSessionToken,
-  readAccessClaims,
-  setAccessToken,
-  setAuthTokens,
-  setImpersonationToken,
+  clearTokens,
+  activeToken,
+  impersonationToken,
+  sessionToken,
+  readClaims,
+  setAccess,
+  setTokens,
+  setImpersonation,
   type AccessTokenClaims,
   type AuthUser,
 } from "../../lib/auth-token";
-import { resolveApiUrl } from "../../lib/api-url";
+import { apiUrl } from "../../lib/api-url";
 
 function sanitizeRedirect(value: string | undefined): string | null {
   if (!value || !value.startsWith("/") || value.startsWith("//")) return null;
@@ -35,31 +35,31 @@ function errorMessage(error: unknown, fallback: string): string {
 
 export function useAuth() {
   const config = useRuntimeConfig();
-  const apiUrl = resolveApiUrl(config.public.apiUrl);
+  const baseUrl = apiUrl(config.public.apiUrl);
 
-  const claims = useState<AccessTokenClaims | null>(stateKeys.authClaims, () => readAccessClaims());
-  const hasSession = useState(stateKeys.authSession, () => Boolean(getSessionToken()));
+  const claims = useState<AccessTokenClaims | null>(stateKeys.authClaims, () => readClaims());
+  const hasSession = useState(stateKeys.authSession, () => Boolean(sessionToken()));
 
   const user = computed<AuthUser | null>(() => claims.value?.user ?? null);
   const isAuthenticated = computed(() => hasSession.value);
 
   function syncFromStorage() {
-    claims.value = readAccessClaims();
-    hasSession.value = Boolean(getSessionToken());
+    claims.value = readClaims();
+    hasSession.value = Boolean(sessionToken());
   }
 
   function applyHandoff(tokens: { access: string; session: string }) {
-    setAuthTokens(tokens);
+    setTokens(tokens);
     syncFromStorage();
   }
 
   function applyAccessToken(token: string) {
-    setAccessToken(token);
-    claims.value = readAccessClaims(token);
+    setAccess(token);
+    claims.value = readClaims(token);
   }
 
   function expireSession() {
-    clearAuthTokens();
+    clearTokens();
     clearNuxtData();
     claims.value = null;
     hasSession.value = false;
@@ -69,7 +69,7 @@ export function useAuth() {
     if (!sessionToken) return null;
 
     try {
-      const result = await $fetch<{ token?: string }>(`${apiUrl}/api/auth/token`, {
+      const result = await $fetch<{ token?: string }>(`${baseUrl}/api/auth/token`, {
         headers: { authorization: `Bearer ${sessionToken}` },
       });
 
@@ -80,7 +80,7 @@ export function useAuth() {
   }
 
   async function refreshAccessToken(): Promise<boolean> {
-    const activeSessionToken = getActiveSessionToken();
+    const activeSessionToken = activeToken();
     if (!activeSessionToken) return false;
 
     const token = await requestAccessToken(activeSessionToken);
@@ -90,10 +90,10 @@ export function useAuth() {
       return true;
     }
 
-    if (!getImpersonationToken()) return false;
+    if (!impersonationToken()) return false;
 
-    setImpersonationToken(null);
-    const fallback = await requestAccessToken(getSessionToken() ?? "");
+    setImpersonation(null);
+    const fallback = await requestAccessToken(sessionToken() ?? "");
     if (!fallback) return false;
 
     applyAccessToken(fallback);
@@ -102,14 +102,14 @@ export function useAuth() {
   }
 
   async function startAudit(userId: string): Promise<AuthUser> {
-    const sessionToken = getSessionToken();
-    if (!sessionToken) throw new Error("Not signed in");
+    const token = sessionToken();
+    if (!token) throw new Error("Not signed in");
 
     let result: { session?: { token?: string }; user?: AuthUser };
     try {
-      result = await $fetch<{ session?: { token?: string }; user?: AuthUser }>(`${apiUrl}/api/auth/admin/impersonate-user`, {
+      result = await $fetch<{ session?: { token?: string }; user?: AuthUser }>(`${baseUrl}/api/auth/admin/impersonate-user`, {
         method: "POST",
-        headers: { authorization: `Bearer ${sessionToken}` },
+        headers: { authorization: `Bearer ${token}` },
         body: { userId },
       });
     } catch (error) {
@@ -119,9 +119,9 @@ export function useAuth() {
     const impersonationToken = result?.session?.token;
     if (!impersonationToken) throw new Error("Failed to start audit mode");
 
-    setImpersonationToken(impersonationToken);
+    setImpersonation(impersonationToken);
     if (!(await refreshAccessToken())) {
-      setImpersonationToken(null);
+      setImpersonation(null);
       throw new Error("Failed to start audit mode");
     }
 
@@ -129,13 +129,13 @@ export function useAuth() {
   }
 
   async function stopAudit(): Promise<boolean> {
-    const impersonationToken = getImpersonationToken();
-    setImpersonationToken(null);
+    const auditToken = impersonationToken();
+    setImpersonation(null);
 
-    if (impersonationToken) {
-      await $fetch(`${apiUrl}/api/auth/sign-out`, {
+    if (auditToken) {
+      await $fetch(`${baseUrl}/api/auth/sign-out`, {
         method: "POST",
-        headers: { authorization: `Bearer ${impersonationToken}` },
+        headers: { authorization: `Bearer ${auditToken}` },
         body: {},
       }).catch(() => undefined);
     }
@@ -143,24 +143,24 @@ export function useAuth() {
     return await refreshAccessToken();
   }
 
-  function signInUrl(provider: string, redirectPath?: string): string {
+  function loginUrl(provider: string, redirectPath?: string): string {
     const params = new URLSearchParams({ provider, to: window.location.origin });
     const redirect = sanitizeRedirect(redirectPath);
     if (redirect) params.set("redirect", redirect);
 
-    return `${apiUrl}/api/auth/start?${params.toString()}`;
+    return `${baseUrl}/api/auth/start?${params.toString()}`;
   }
 
   function startSignIn(provider: string, redirectPath?: string) {
-    window.location.assign(signInUrl(provider, redirectPath));
+    window.location.assign(loginUrl(provider, redirectPath));
   }
 
   async function signOut() {
-    const sessionTokens = [getImpersonationToken(), getSessionToken()].filter((token): token is string => Boolean(token));
+    const sessionTokens = [impersonationToken(), sessionToken()].filter((token): token is string => Boolean(token));
     expireSession();
 
     for (const sessionToken of sessionTokens) {
-      await $fetch(`${apiUrl}/api/auth/sign-out`, {
+      await $fetch(`${baseUrl}/api/auth/sign-out`, {
         method: "POST",
         headers: { authorization: `Bearer ${sessionToken}` },
         body: {},
@@ -179,7 +179,7 @@ export function useAuth() {
     refreshAccessToken,
     startAudit,
     stopAudit,
-    signInUrl,
+    loginUrl,
     startSignIn,
     signOut,
   };

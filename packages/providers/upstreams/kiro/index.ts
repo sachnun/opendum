@@ -1,23 +1,19 @@
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
-import { jsonResponse, randomId, stringValue } from "../../core/helpers.js";
-import { normalizeProviderFailure, transportFailure, type UpstreamTransport } from "../../core/http.js";
+import { Value, Ids, Responses } from "../../core/helpers.js";
+import { RequestFailure, type UpstreamTransport } from "../../core/http.js";
 import { ProviderCredentialFailure } from "../../core/errors.js";
 import { OAuth } from "../../core/oauth.js";
 import { KIRO_REFRESH_ENDPOINT } from "../../endpoints.js";
 import {
+  BracketCalls,
+  KiroAccount,
+  KiroCompletion,
+  KiroModel,
+  KiroRequest,
+  KiroTier,
+  KiroUsage,
   Parser,
-  buildKiroRequest,
-  convertKiroEventsToCompletion,
-  kiroApiUrlForAccount,
-  kiroErrorMessage,
-  kiroNumberAsFloat,
-  kiroReasoningContent,
-  kiroUsage,
-  kiroUsageFromContext,
-  lastModelSegment,
-  normalizeKiroTier,
-  parseKiroBracketToolCalls,
   type Json,
 } from "./transform.js";
 import type {
@@ -94,7 +90,7 @@ export class KiroProvider implements Provider, CredentialRefresher, RefreshBuffe
       const record = ((payload.data ?? payload) as Json) ?? {};
       const sub = record.subscriptionInfo;
       if (sub === null || typeof sub !== "object" || Array.isArray(sub)) return "";
-      return normalizeKiroTier(stringValue((sub as Json).type), stringValue((sub as Json).subscriptionTitle));
+      return KiroTier.normalize(Value.string((sub as Json).type), Value.string((sub as Json).subscriptionTitle));
     } catch {
       return "";
     }
@@ -102,14 +98,14 @@ export class KiroProvider implements Provider, CredentialRefresher, RefreshBuffe
 
   makeRequest(request: ProviderRequest): Effect.Effect<Response, ProviderFailure> {
     const body = request.body;
-    const modelName = lastModelSegment(stringValue(body.model));
-    const payload = buildKiroRequest(this.registry, body);
+    const modelName = KiroModel.segment(Value.string(body.model));
+    const payload = KiroRequest.build(this.registry, body);
     const accountId = request.account.accountId?.trim();
     if (accountId) payload.profileArn = accountId;
     const transport = this.transport;
-    const url = kiroApiUrlForAccount(request.account);
+    const url = KiroAccount.apiUrl(request.account);
 
-    return normalizeProviderFailure(
+    return RequestFailure.normalize(
       "kiro",
       Effect.gen(function* () {
         const resp = yield* Effect.tryPromise({
@@ -125,22 +121,22 @@ export class KiroProvider implements Provider, CredentialRefresher, RefreshBuffe
                 "x-amz-user-agent": "aws-sdk-js/3.738.0 KiroIDE",
                 "x-amzn-codewhisperer-optout": "true",
                 "x-amzn-kiro-agent-mode": "vibe",
-                "amz-sdk-invocation-id": randomId("kiro"),
+                "amz-sdk-invocation-id": Ids.random("kiro"),
                 "amz-sdk-request": "attempt=1; max=1",
                 Connection: "close",
               },
               body: JSON.stringify(payload),
             }),
-          catch: (cause) => transportFailure("kiro", cause, url),
+          catch: (cause) => RequestFailure.transport("kiro", cause, url),
         });
         if (resp.status < 200 || resp.status >= 300) return resp;
-        request.onUpstreamResponseStart?.();
+        request.onResponseStart?.();
         if (!resp.body) {
-          return jsonResponse(502, { error: { message: "Kiro response stream is empty", type: "api_error" } });
+          return Responses.json(502, { error: { message: "Kiro response stream is empty", type: "api_error" } });
         }
 
         if (request.stream) {
-          return new Response(kiroSseStream(resp.body, modelName), {
+          return new Response(sseStream(resp.body, modelName), {
             status: 200,
             headers: {
               "Content-Type": "text/event-stream",
@@ -151,15 +147,15 @@ export class KiroProvider implements Provider, CredentialRefresher, RefreshBuffe
         }
         const rawText = yield* Effect.promise(() => resp.text());
         const events = new Parser().feed(rawText);
-        return jsonResponse(200, convertKiroEventsToCompletion(events, modelName));
+        return Responses.json(200, KiroCompletion.fromEvents(events, modelName));
       })
     );
   }
 }
 
-async function* transformKiroSse(source: ReadableStream<Uint8Array>, model: string): AsyncGenerator<string> {
+async function* transformSse(source: ReadableStream<Uint8Array>, model: string): AsyncGenerator<string> {
   const parser = new Parser();
-  const completionId = randomId("chatcmpl");
+  const completionId = Ids.random("chatcmpl");
   let sentRole = false;
   let toolCallCount = 0;
   let activeToolId = "";
@@ -202,16 +198,16 @@ async function* transformKiroSse(source: ReadableStream<Uint8Array>, model: stri
 
   const processEvent = (event: Json): void => {
     if (event.contextUsagePercentage !== undefined) {
-      contextUsagePercentage = kiroNumberAsFloat(event.contextUsagePercentage);
+      contextUsagePercentage = KiroUsage.float(event.contextUsagePercentage);
       return;
     }
-    const usage = kiroUsage(event);
+    const usage = KiroUsage.fromEvent(event);
     if (usage) {
       explicitUsage = usage;
       return;
     }
-    if (kiroErrorMessage(event)) return;
-    const reasoning = kiroReasoningContent(event);
+    if (KiroUsage.errorMessage(event)) return;
+    const reasoning = KiroUsage.reasoningText(event);
     if (reasoning) {
       hasNativeReasoning = true;
       emitContent("", reasoning);
@@ -224,10 +220,10 @@ async function* transformKiroSse(source: ReadableStream<Uint8Array>, model: stri
       emitContent(contentDelta, reasoningDelta);
       void contentDelta;
     }
-    const name = stringValue(event.name);
-    if (name && stringValue(event.toolUseId)) {
+    const name = Value.string(event.name);
+    if (name && Value.string(event.toolUseId)) {
       ensureRole();
-      const id = stringValue(event.toolUseId);
+      const id = Value.string(event.toolUseId);
       let idx = toolIndex.get(id);
       if (idx === undefined) {
         idx = toolCallCount;
@@ -240,13 +236,13 @@ async function* transformKiroSse(source: ReadableStream<Uint8Array>, model: stri
         null,
         null
       );
-      const input = stringValue(event.input);
+      const input = Value.string(event.input);
       if (input) {
         writeChunk({ tool_calls: [{ index: idx, function: { arguments: input } }] }, null, null);
       }
     }
-    const input = stringValue(event.input);
-    if (input && !stringValue(event.name) && activeToolId) {
+    const input = Value.string(event.input);
+    if (input && !Value.string(event.name) && activeToolId) {
       const idx = toolIndex.get(activeToolId);
       if (idx !== undefined) {
         ensureRole();
@@ -278,7 +274,7 @@ async function* transformKiroSse(source: ReadableStream<Uint8Array>, model: stri
   let [flushContent, flushReasoning] = parser.flushContent();
   if (hasNativeReasoning) flushReasoning = "";
   emitContent(flushContent, flushReasoning);
-  for (const call of parseKiroBracketToolCalls(totalContent)) {
+  for (const call of BracketCalls.parse(totalContent)) {
     const idx = toolCallCount;
     toolCallCount += 1;
     writeChunk(
@@ -293,7 +289,7 @@ async function* transformKiroSse(source: ReadableStream<Uint8Array>, model: stri
     );
   }
   const finish = toolCallCount > 0 ? "tool_calls" : "stop";
-  const usage = explicitUsage ?? kiroUsageFromContext(model, contextUsagePercentage, outputText);
+  const usage = explicitUsage ?? KiroUsage.fromContext(model, contextUsagePercentage, outputText);
   writeChunk({}, finish, usage);
   pending.push("data: [DONE]\n\n");
   for (const chunk of pending.splice(0)) yield chunk;
@@ -301,9 +297,9 @@ async function* transformKiroSse(source: ReadableStream<Uint8Array>, model: stri
   void flushReasoning;
 }
 
-function kiroSseStream(source: ReadableStream<Uint8Array>, model: string): ReadableStream<Uint8Array> {
+function sseStream(source: ReadableStream<Uint8Array>, model: string): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
-  const iterator = transformKiroSse(source, model)[Symbol.asyncIterator]();
+  const iterator = transformSse(source, model)[Symbol.asyncIterator]();
   return new ReadableStream<Uint8Array>({
     async pull(controller) {
       const { done, value } = await iterator.next();
@@ -319,4 +315,4 @@ function kiroSseStream(source: ReadableStream<Uint8Array>, model: string): Reada
   });
 }
 
-export { Parser, normalizeKiroTier, convertKiroEventsToCompletion };
+export { Parser, KiroTier, KiroCompletion };

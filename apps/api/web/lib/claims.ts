@@ -14,7 +14,7 @@ function text(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
-export function toAuthUser(value: { id: string; name?: string | null; email?: string | null; image?: string | null }): AuthUser {
+export function authUser(value: { id: string; name?: string | null; email?: string | null; image?: string | null }): AuthUser {
   return {
     id: value.id,
     name: value.name ?? null,
@@ -23,7 +23,7 @@ export function toAuthUser(value: { id: string; name?: string | null; email?: st
   };
 }
 
-export function claimsFromPayload(payload: unknown): AccessTokenClaims | null {
+export function claimsOf(payload: unknown): AccessTokenClaims | null {
   if (!payload || typeof payload !== "object") return null;
 
   const record = payload as Record<string, unknown>;

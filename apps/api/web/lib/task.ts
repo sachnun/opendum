@@ -1,7 +1,7 @@
 import { Effect } from "effect";
 
 import type { ActionResult } from "#web/utils/api.js";
-import { ServiceFailure, asServiceFailure } from "../errors.js";
+import { ServiceFailure, asFailure } from "../errors.js";
 
 export function fromPromise<A>(
   run: () => Promise<A>,
@@ -9,7 +9,7 @@ export function fromPromise<A>(
 ): Effect.Effect<A, ServiceFailure> {
   return Effect.tryPromise({
     try: run,
-    catch: (cause) => asServiceFailure(cause, message),
+    catch: (cause) => asFailure(cause, message),
   });
 }
 
@@ -17,7 +17,7 @@ export function fromEffect<A, E>(
   effect: Effect.Effect<A, E>,
   message = "Request failed"
 ): Effect.Effect<A, ServiceFailure> {
-  return Effect.mapError(effect, (cause) => asServiceFailure(cause, message));
+  return Effect.mapError(effect, (cause) => asFailure(cause, message));
 }
 
 export function fromSync<A>(
@@ -26,7 +26,7 @@ export function fromSync<A>(
 ): Effect.Effect<A, ServiceFailure> {
   return Effect.try({
     try: run,
-    catch: (cause) => asServiceFailure(cause, message),
+    catch: (cause) => asFailure(cause, message),
   });
 }
 
@@ -39,7 +39,7 @@ export function withContext<A>(
   );
 }
 
-export function toActionResult<A>(
+export function toResult<A>(
   effect: Effect.Effect<A, ServiceFailure>
 ): Effect.Effect<ActionResult<A>> {
   return effect.pipe(
@@ -50,7 +50,7 @@ export function toActionResult<A>(
   );
 }
 
-export function toVoidActionResult(
+export function toVoid(
   effect: Effect.Effect<unknown, ServiceFailure>
 ): Effect.Effect<ActionResult> {
   return effect.pipe(

@@ -3,8 +3,8 @@ import type { DatabaseFailure } from "@opendum/database";
 import { ignore } from "@opendum/core/best-effort";
 import type { Registry } from "@opendum/models/runtime";
 import {
-  analyticsVersionBumpKey,
-  analyticsVersionKey,
+  versionBump,
+  versionKey,
   type OpendumRedis,
 } from "@opendum/core/redis";
 import { Policy } from "./policy.js";
@@ -19,7 +19,7 @@ import {
   modelList,
   parseModel,
 } from "./normalize.js";
-import { type CustomProviderReader, createCustomStore } from "./store/custom.js";
+import { type CustomProviderReader, customStore } from "./store/custom.js";
 import {
   type AccountModelAvailability,
   type AuthResult,
@@ -42,7 +42,7 @@ export class AuthService {
   constructor(
     registry: Registry,
     redis: OpendumRedis,
-    customProviders: CustomProviderReader = createCustomStore()
+    customProviders: CustomProviderReader = customStore()
   ) {
     this.registry = registry;
     this.redis = redis;
@@ -167,17 +167,17 @@ export class AuthService {
   bumpVersion(userId: string): Effect.Effect<void> {
     if (!userId) return Effect.void;
     return ignore(async () => {
-      const updated = await this.redis.set(analyticsVersionBumpKey(userId), "1", {
+      const updated = await this.redis.set(versionBump(userId), "1", {
         NX: true,
         EX: BUMP_TTL,
       });
       if (!updated) return;
-      const version = await this.redis.incr(analyticsVersionKey(userId));
+      const version = await this.redis.incr(versionKey(userId));
       if (version === 1) {
-        await this.redis.expire(analyticsVersionKey(userId), VERSION_TTL);
+        await this.redis.expire(versionKey(userId), VERSION_TTL);
       }
     });
   }
 }
 
-export { isAuthless, isAuthlessId } from "./authless.js";
+export { isAuthless, authlessAccount } from "./authless.js";

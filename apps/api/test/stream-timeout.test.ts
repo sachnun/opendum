@@ -87,7 +87,7 @@ function harness(options: {
     resolveAlias: (model: string) => model,
     lookupKeys: (model: string) => [model],
     isVisionModel: () => true,
-    isSupportedByProvider: () => true,
+    supportsProvider: () => true,
     isAuthless: () => false,
     rule: () => null,
     modelCost: () => null,

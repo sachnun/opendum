@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 
-import { setAuthTokens } from "~~/lib/auth-token";
+import { setTokens } from "~~/lib/auth-token";
 
 const refreshAccessToken = mock(async () => false);
 const expireSession = mock(() => {});
@@ -18,10 +18,10 @@ globalThis.fetch = (async (input: RequestInfo | URL) => {
   return responder();
 }) as typeof fetch;
 
-const { createApiClient } = await import("~~/lib/orpc");
+const { apiClient } = await import("~~/lib/orpc");
 
 function createClient() {
-  return createApiClient({
+  return apiClient({
     baseUrl: "https://api.example.com",
     refresh: async () => {
       if (await refreshAccessToken()) return true;
@@ -48,7 +48,7 @@ describe("api client access tokens", () => {
   });
 
   it("sends the stored access token", async () => {
-    setAuthTokens({ access: "access-token", session: "session-token" });
+    setTokens({ access: "access-token", session: "session-token" });
 
     await callMe(createClient());
 
@@ -56,9 +56,9 @@ describe("api client access tokens", () => {
   });
 
   it("refreshes once on 401 and retries with the fresh token", async () => {
-    setAuthTokens({ access: "stale-token", session: "session-token" });
+    setTokens({ access: "stale-token", session: "session-token" });
     refreshAccessToken.mockImplementation(async () => {
-      setAuthTokens({ access: "fresh-token", session: "session-token" });
+      setTokens({ access: "fresh-token", session: "session-token" });
       return true;
     });
     let calls = 0;
@@ -72,7 +72,7 @@ describe("api client access tokens", () => {
   });
 
   it("expires the session when the refresh fails", async () => {
-    setAuthTokens({ access: "stale-token", session: "session-token" });
+    setTokens({ access: "stale-token", session: "session-token" });
     responder = () => jsonResponse({}, 401);
 
     await callMe(createClient());
@@ -83,7 +83,7 @@ describe("api client access tokens", () => {
   });
 
   it("leaves other failures alone", async () => {
-    setAuthTokens({ access: "access-token", session: "session-token" });
+    setTokens({ access: "access-token", session: "session-token" });
     responder = () => jsonResponse({}, 500);
 
     await callMe(createClient());

@@ -3,21 +3,21 @@ import { getQuery, HTTPError } from "h3";
 import { z } from "zod";
 
 import { createAuth } from "#web/auth.js";
-import { handoffUrl, resolveWebOrigin, sanitizeRedirectPath } from "#web/lib/handoff.js";
+import { handoffUrl, webOrigin, safePath } from "#web/lib/handoff.js";
 import { requestOrigin } from "#web/lib/request-origin.js";
 
-const signInProviderSchema = z.enum(["github", "google"]);
+const providerSchema = z.enum(["github", "google"]);
 
 export default defineHandler(async (event) => {
   const query = getQuery(event);
-  const webOrigin = resolveWebOrigin(query.to);
-  if (!webOrigin) throw new HTTPError({ status: 400, statusText: "Invalid web origin" });
+  const target = webOrigin(query.to);
+  if (!target) throw new HTTPError({ status: 400, statusText: "Invalid web origin" });
 
-  const provider = signInProviderSchema.safeParse(typeof query.provider === "string" ? query.provider.trim() : undefined);
+  const provider = providerSchema.safeParse(typeof query.provider === "string" ? query.provider.trim() : undefined);
   if (!provider.success) throw new HTTPError({ status: 400, statusText: "Unsupported sign in provider" });
 
   const baseUrl = process.env.BETTER_AUTH_URL?.trim().replace(/\/+$/, "") || requestOrigin(event);
-  const callbackURL = handoffUrl(baseUrl, { to: webOrigin, redirect: sanitizeRedirectPath(query.redirect) });
+  const callbackURL = handoffUrl(baseUrl, { to: target, redirect: safePath(query.redirect) });
 
   const { headers, response } = await createAuth(undefined, { baseURL: baseUrl }).api.signInSocial({
     body: { provider: provider.data, callbackURL },

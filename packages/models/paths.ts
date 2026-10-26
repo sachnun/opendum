@@ -87,10 +87,10 @@ export function relative(from: string, to: string): string {
   return combined.length === 0 ? "" : combined;
 }
 
-export function fromFileUrl(url: string | URL): string {
+export function fileUrl(url: string | URL): string {
   return Bun.fileURLToPath(url);
 }
 
 export function moduleDir(url: string | URL): string {
-  return dirname(fromFileUrl(url));
+  return dirname(fileUrl(url));
 }

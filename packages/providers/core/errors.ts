@@ -69,12 +69,12 @@ export type ProviderFailure =
 
 export type QuotaFailure = QuotaFetchFailure | QuotaJournalFailure;
 
-export function providerFailureMessage(cause: unknown): string {
+export function failureMessage(cause: unknown): string {
   if (cause instanceof Error) return cause.message;
   if (typeof cause === "string") return cause;
   return String(cause);
 }
 
 export function asError(cause: unknown): Error {
-  return cause instanceof Error ? cause : new Error(providerFailureMessage(cause));
+  return cause instanceof Error ? cause : new Error(failureMessage(cause));
 }

@@ -1,5 +1,5 @@
-import { MODEL_FAMILY_NAV_ITEMS } from "@opendum/models/ranking";
-import { getProviderAccountPath, PROVIDER_ACCOUNT_DEFINITIONS } from "@opendum/providers/provider-accounts";
+import { NAV_ITEMS } from "@opendum/models/ranking";
+import { accountPath, PROVIDER_ACCOUNT_DEFINITIONS } from "@opendum/providers/provider-accounts";
 
 export interface NavItem {
   name: string;
@@ -30,7 +30,7 @@ export interface ModelFamilyCounts {
 
 const ACCOUNT_NAV_CHILDREN: NavSubItem[] = [...PROVIDER_ACCOUNT_DEFINITIONS]
   .sort((a, b) => (a.navOrder ?? Number.MAX_SAFE_INTEGER) - (b.navOrder ?? Number.MAX_SAFE_INTEGER))
-  .map((definition) => ({ name: definition.label, href: getProviderAccountPath(definition.key) }));
+  .map((definition) => ({ name: definition.label, href: accountPath(definition.key) }));
 
 export const primaryNavigation: NavItem[] = [
   {
@@ -51,7 +51,7 @@ export const primaryNavigation: NavItem[] = [
     name: "Models",
     href: "/models",
     icon: "i-lucide-cpu",
-    children: MODEL_FAMILY_NAV_ITEMS.map((family) => ({
+    children: NAV_ITEMS.map((family) => ({
       name: family.name,
       href: "/models",
       anchorId: family.anchorId,
@@ -59,7 +59,7 @@ export const primaryNavigation: NavItem[] = [
   },
 ];
 
-export function subItemHref(subItem: NavSubItem): string {
+export function hrefOf(subItem: NavSubItem): string {
   if (subItem.anchorId) {
     return `${subItem.href}#${subItem.anchorId}`;
   }
@@ -67,6 +67,6 @@ export function subItemHref(subItem: NavSubItem): string {
   return subItem.href;
 }
 
-export function isSwitchSubItem(subItem: NavSubItem): boolean {
+export function isSwitch(subItem: NavSubItem): boolean {
   return subItem.control === "switch";
 }

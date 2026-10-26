@@ -1,14 +1,14 @@
 import type { Provider, ProviderAccount } from "@opendum/providers";
+import { Coerce } from "./helpers.js";
 import { tierFor } from "./tiers.js";
-import { stringValue } from "./helpers.js";
 import type { ProviderRoutingOptions, ProviderScore } from "./provider-performance.js";
 
 export const AUTHLESS_ACCOUNT_PREFIX = "authless:";
-export const UNHEALTHY_IDLE_DECAY_MS = 10 * 60 * 1000;
+export const IDLE_DECAY_MS = 10 * 60 * 1000;
 export const MODEL_DEGRADED_THRESHOLD = 2;
 export const COOLDOWN_RECOVERY_RATIO = 0.3;
 
-export function isSyntheticProviderAccountId(accountId: string): boolean {
+export function isSynthetic(accountId: string): boolean {
   return accountId === "opencode" || accountId.startsWith(AUTHLESS_ACCOUNT_PREFIX);
 }
 
@@ -17,16 +17,16 @@ export function accessMode(mode: string): string {
   return mode === "whitelist" || mode === "blacklist" ? mode : "all";
 }
 
-export function normalizeAccountIds(values: string[]): string[] {
+export function normalizeIds(values: string[]): string[] {
   return [...new Set(values.map((v) => v.trim()).filter((v) => v.length > 0))].sort((a, b) => a.localeCompare(b));
 }
 
-export function accountAccessDenial(
+export function accessDenial(
   accountId: string,
   access: { mode: string; accounts: string[] }
 ): { message: string; code: string } | null {
   const mode = accessMode(access.mode);
-  const set = new Set(normalizeAccountIds(access.accounts));
+  const set = new Set(normalizeIds(access.accounts));
   if (mode === "whitelist" && !set.has(accountId)) {
     return { message: "Selected provider account is not allowed for this API key.", code: "provider_account_not_whitelisted" };
   }
@@ -36,7 +36,7 @@ export function accountAccessDenial(
   return null;
 }
 
-export function refreshBufferFor(provider: Provider): number {
+export function bufferFor(provider: Provider): number {
   const candidate = provider as unknown as { refreshBuffer?: () => number };
   if (typeof candidate.refreshBuffer === "function") {
     return candidate.refreshBuffer();
@@ -44,12 +44,12 @@ export function refreshBufferFor(provider: Provider): number {
   return 3 * 60 * 60 * 1000;
 }
 
-export function accountNeedsCredentialRefresh(account: ProviderAccount, provider: Provider): boolean {
+export function needsRefresh(account: ProviderAccount, provider: Provider): boolean {
   if (!account.expiresAt) return false;
-  return Date.now() > account.expiresAt.getTime() - refreshBufferFor(provider);
+  return Date.now() > account.expiresAt.getTime() - bufferFor(provider);
 }
 
-export function parseRefreshErrorStatusCode(error: Error): number {
+export function refreshStatus(error: Error): number {
   const message = error.message;
   for (let i = 0; i + 3 <= message.length; i += 1) {
     const ch = message[i];
@@ -76,7 +76,7 @@ export type HealthRow = {
   lastErrorCode: number | null;
 };
 
-export function latestHealthRequestAt(row: HealthRow): Date | null {
+export function healthAt(row: HealthRow): Date | null {
   let latest: Date | null = row.unhealthyCountUpdatedAt;
   if (row.lastErrorAt && (!latest || row.lastErrorAt.getTime() > latest.getTime())) latest = row.lastErrorAt;
   if (row.lastSuccessAt && (!latest || row.lastSuccessAt.getTime() > latest.getTime())) latest = row.lastSuccessAt;
@@ -85,40 +85,40 @@ export function latestHealthRequestAt(row: HealthRow): Date | null {
   return latest;
 }
 
-export function effectiveUnhealthyCount(row: HealthRow, now: Date): number {
+export function unhealthyCount(row: HealthRow, now: Date): number {
   const count = row.consecutiveErrors;
   if (count <= 0) return 0;
-  const lastRequestAt = latestHealthRequestAt(row);
+  const lastRequestAt = healthAt(row);
   if (!lastRequestAt || lastRequestAt.getTime() > now.getTime()) return count;
-  const decay = Math.trunc((now.getTime() - lastRequestAt.getTime()) / UNHEALTHY_IDLE_DECAY_MS);
+  const decay = Math.trunc((now.getTime() - lastRequestAt.getTime()) / IDLE_DECAY_MS);
   if (decay <= 0) return count;
   if (decay >= count) return 0;
   return count - decay;
 }
 
-export function modelHealthStatus(unhealthyCount: number): string {
+export function healthStatus(unhealthyCount: number): string {
   return unhealthyCount >= MODEL_DEGRADED_THRESHOLD ? "degraded" : "active";
 }
 
-export function cooldownRecoveryCount(unhealthyCount: number): number {
+export function recoveryCount(unhealthyCount: number): number {
   if (unhealthyCount <= 0) return 0;
   const reduction = Math.round(unhealthyCount * COOLDOWN_RECOVERY_RATIO);
   if (reduction > unhealthyCount) return 0;
   return unhealthyCount - reduction;
 }
 
-export function isImmediatelyRecoverableStatusCode(code: number): boolean {
+export function isRecoverable(code: number): boolean {
   return code === 408 || code === 429 || code >= 500;
 }
 
-export function successRecoveryCount(row: HealthRow, now: Date): number {
-  let count = effectiveUnhealthyCount(row, now);
-  if (row.lastErrorCode !== null && !isImmediatelyRecoverableStatusCode(row.lastErrorCode)) return count;
+export function successRecovery(row: HealthRow, now: Date): number {
+  let count = unhealthyCount(row, now);
+  if (row.lastErrorCode !== null && !isRecoverable(row.lastErrorCode)) return count;
   if (count > 0) count -= 1;
   return count;
 }
 
-export function sortAccountsByProviderPriority(accounts: ProviderAccount[], priority: string[]): void {
+export function byPriority(accounts: ProviderAccount[], priority: string[]): void {
   const order = new Map<string, number>();
   priority.forEach((provider, index) => order.set(provider, index));
   accounts.sort((a, b) => {
@@ -126,30 +126,30 @@ export function sortAccountsByProviderPriority(accounts: ProviderAccount[], prio
     const aj = order.get(b.provider) ?? 1 << 30;
     if (ai !== aj) return ai - aj;
     if ((a.status ?? "") !== (b.status ?? "")) return (a.status ?? "") < (b.status ?? "") ? -1 : 1;
-    return nullableTimeBefore(a.lastUsedAt, b.lastUsedAt) ? -1 : 0;
+    return beforeTime(a.lastUsedAt, b.lastUsedAt) ? -1 : 0;
   });
 }
 
 export function prioritizeAccounts(
   accounts: ProviderAccount[],
-  groupByProvider: boolean,
+  byProvider: boolean,
   priority: string[],
   routing?: ProviderRoutingOptions
 ): ProviderAccount[] {
-  if (!groupByProvider) return paidFirst(accounts);
-  const byProvider = new Map<string, ProviderAccount[]>();
+  if (!byProvider) return paidFirst(accounts);
+  const grouped = new Map<string, ProviderAccount[]>();
   for (const account of accounts) {
-    const list = byProvider.get(account.provider) ?? [];
+    const list = grouped.get(account.provider) ?? [];
     list.push(account);
-    byProvider.set(account.provider, list);
+    grouped.set(account.provider, list);
   }
-  const ordered = orderProvidersByPerformance([...byProvider.keys()], priority, routing);
+  const ordered = byPerformance([...grouped.keys()], priority, routing);
   const result: ProviderAccount[] = [];
-  for (const provider of ordered) result.push(...paidFirst(byProvider.get(provider) ?? []));
+  for (const provider of ordered) result.push(...paidFirst(grouped.get(provider) ?? []));
   return result;
 }
 
-export function orderProvidersByPerformance(
+export function byPerformance(
   present: string[],
   priority: string[],
   routing?: ProviderRoutingOptions,
@@ -207,25 +207,25 @@ export function paidFirst(accounts: ProviderAccount[]): ProviderAccount[] {
   const paid: ProviderAccount[] = [];
   const free: ProviderAccount[] = [];
   for (const account of accounts) {
-    if (isSyntheticProviderAccountId(account.id)) free.push(account);
-    else if (isPaidAccountTier(account.provider, account.tier ?? null)) paid.push(account);
+    if (isSynthetic(account.id)) free.push(account);
+    else if (paidTier(account.provider, account.tier ?? null)) paid.push(account);
     else free.push(account);
   }
   return [...paid, ...free];
 }
 
-export function isPaidAccountTier(provider: string, tier: string | null): boolean {
+export function paidTier(provider: string, tier: string | null): boolean {
   return tierFor(provider).isPaid(tier);
 }
 
-export function nullableTimeBefore(a: Date | null | undefined, b: Date | null | undefined): boolean {
+export function beforeTime(a: Date | null | undefined, b: Date | null | undefined): boolean {
   if (!a && !b) return false;
   if (!a) return true;
   if (!b) return false;
   return a.getTime() < b.getTime();
 }
 
-export function normalizeAccountTierAlias(tier: string): string {
+export function normalizeTier(tier: string): string {
   const normalized = tier.trim().toLowerCase().replace(/_/g, "-");
   if (normalized === "pro-plus" || normalized === "proplus") return "pro+";
   if (normalized === "free-tier") return "free";
@@ -233,28 +233,28 @@ export function normalizeAccountTierAlias(tier: string): string {
   return normalized;
 }
 
-export function proxyTierSatisfiesRule(tier: string, minTier: string | undefined, allowedTiers: string[] | undefined): boolean {
-  const normalized = normalizeAccountTierAlias(tier);
+export function tierSatisfies(tier: string, minTier: string | undefined, allowedTiers: string[] | undefined): boolean {
+  const normalized = normalizeTier(tier);
   if (allowedTiers && allowedTiers.length > 0) {
-    return allowedTiers.some((value) => normalizeAccountTierAlias(value) === normalized);
+    return allowedTiers.some((value) => normalizeTier(value) === normalized);
   }
   const required = (minTier ?? "").trim().toLowerCase();
   if (!required || required === "free") return true;
-  return normalized === normalizeAccountTierAlias(required);
+  return normalized === normalizeTier(required);
 }
 
-export function proxyAccessRuleRestrictsTier(minTier: string | undefined, allowedTiers: string[] | undefined): boolean {
+export function ruleRestricts(minTier: string | undefined, allowedTiers: string[] | undefined): boolean {
   if (allowedTiers && allowedTiers.length > 0) return true;
-  const required = normalizeAccountTierAlias(minTier ?? "");
+  const required = normalizeTier(minTier ?? "");
   return required !== "" && required !== "free";
 }
 
-export function quotaFallbackTierLocal(account: ProviderAccount): string {
+export function fallbackTier(account: ProviderAccount): string {
   const tier = account.tier?.trim();
   return tier ? tier : "free";
 }
 
-export function extractSessionId(request: Request, body: Record<string, unknown>): string {
+export function sessionKey(request: Request, body: Record<string, unknown>): string {
   for (const header of [
     "x-claude-code-session-id",
     "session_id",
@@ -278,7 +278,7 @@ export function extractSessionId(request: Request, body: Record<string, unknown>
       return userId.trim();
     }
   }
-  const text = firstUserText(body);
+  const text = userText(body);
   if (text && text.trim().length > 20) {
     const trimmed = text.trim().slice(0, 100);
     return `prompt:${new Bun.CryptoHasher("sha256").update(trimmed).digest("hex").slice(0, 16)}`;
@@ -286,13 +286,13 @@ export function extractSessionId(request: Request, body: Record<string, unknown>
   return "";
 }
 
-export function firstUserText(body: Record<string, unknown>): string {
+export function userText(body: Record<string, unknown>): string {
   const messages = body.messages;
   if (Array.isArray(messages)) {
     for (const raw of messages) {
       const msg = (raw ?? {}) as Record<string, unknown>;
       if (msg.role !== "user") continue;
-      const text = sessionTextContent(msg.content);
+      const text = sessionText(msg.content);
       if (text) return text;
     }
   }
@@ -301,20 +301,20 @@ export function firstUserText(body: Record<string, unknown>): string {
     for (const raw of input) {
       const item = (raw ?? {}) as Record<string, unknown>;
       if (item.role !== "user") continue;
-      const text = sessionTextContent(item.content);
+      const text = sessionText(item.content);
       if (text) return text;
     }
   }
   return "";
 }
 
-export function sessionTextContent(content: unknown): string {
+export function sessionText(content: unknown): string {
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return "";
   const texts: string[] = [];
   for (const raw of content) {
     const part = (raw ?? {}) as Record<string, unknown>;
-    const text = stringValue(part.text).trim();
+    const text = Coerce.string(part.text).trim();
     if (text) texts.push(text);
   }
   return texts.join("\n");

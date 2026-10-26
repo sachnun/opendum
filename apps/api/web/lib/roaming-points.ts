@@ -3,7 +3,7 @@ import { and, eq, inArray, ne, sql } from "drizzle-orm";
 import { Effect } from "effect";
 import { db, providerAccount, usageLog } from "@opendum/database";
 import { fromPromise } from "./task.js";
-import { MODEL_REGISTRY, resolveModelAlias } from "./proxy/models.js";
+import { MODEL_REGISTRY, aliasOf } from "./proxy/models.js";
 
 export const ROAMING_MINIMUM_POINTS = 1;
 
@@ -16,8 +16,8 @@ interface RoamingTokenUsage {
   cacheWriteTokens: number;
 }
 
-export function roamingPointsForUsage(model: string, usage: RoamingTokenUsage): number {
-  const cost = MODEL_REGISTRY[resolveModelAlias(model)]?.cost;
+export function roamingPoints(model: string, usage: RoamingTokenUsage): number {
+  const cost = MODEL_REGISTRY[aliasOf(model)]?.cost;
   let points = 0;
 
   if (cost) {
@@ -33,7 +33,7 @@ export function roamingPointsForUsage(model: string, usage: RoamingTokenUsage): 
   return Math.max(ROAMING_MINIMUM_POINTS, Math.ceil(points));
 }
 
-export const roamingUsagePointsByApiKey = Effect.fn("roamingUsagePointsByApiKey")(function* (
+export const roamingByKey = Effect.fn("roamingByKey")(function* (
   userId: string,
   apiKeyIds: string[]
 ) {
@@ -62,7 +62,7 @@ export const roamingUsagePointsByApiKey = Effect.fn("roamingUsagePointsByApiKey"
 
   for (const row of rows) {
     if (!row.apiKeyId) continue;
-    const points = roamingPointsForUsage(row.model, {
+    const points = roamingPoints(row.model, {
       inputTokens: Number(row.inputTokens ?? 0),
       outputTokens: Number(row.outputTokens ?? 0),
       cachedTokens: Number(row.cachedTokens ?? 0),

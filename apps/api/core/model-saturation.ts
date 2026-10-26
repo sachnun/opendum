@@ -1,26 +1,26 @@
 import { Effect, Result } from "effect";
 import type { OpendumRedis } from "@opendum/core/redis";
-import { modelSaturationKey } from "@opendum/core/redis/keys";
+import { saturationKey } from "@opendum/core/redis/keys";
 import { tryAsync } from "@opendum/core/best-effort";
-import { parseJson, stringValue } from "./helpers.js";
+import { Coerce, Safe } from "./helpers.js";
 
 const SATURATION_CODE = 14003;
 const SATURATION_MARKERS = ["model busy", "saturated", "模型繁忙", "請求量已飽和", "请求量已饱和"];
 const COUNTER_TTL_SECONDS = 300;
 
-export const SATURATION_BASE_DELAY_MS = 1200;
-export const SATURATION_MAX_DELAY_MS = 30_000;
-export const SATURATION_MAX_WAIT_MS = 5000;
+export const BASE_DELAY_MS = 1200;
+export const MAX_DELAY_MS = 30_000;
+export const MAX_WAIT_MS = 5000;
 export const SATURATION_MAX_RETRIES = 2;
 
-export function isModelSaturated(status: number, body: string): boolean {
-  const parsed = parseJson(body.trim());
+export function isSaturated(status: number, body: string): boolean {
+  const parsed = Safe.json(body.trim());
   if (Result.isSuccess(parsed)) {
     const payload = parsed.success;
     if (payload !== null && typeof payload === "object" && !Array.isArray(payload)) {
       const record = payload as Record<string, unknown>;
       if (record.code === SATURATION_CODE) return true;
-      const text = `${stringValue(record.msg)} ${stringValue(record.message)} ${displayText(record.displayMsg)}`.toLowerCase();
+      const text = `${Coerce.string(record.msg)} ${Coerce.string(record.message)} ${displayText(record.displayMsg)}`.toLowerCase();
       if (SATURATION_MARKERS.some((marker) => text.includes(marker))) return true;
     }
   }
@@ -51,20 +51,20 @@ export class ModelSaturation {
 
   constructor(redis: OpendumRedis, options: ModelSaturationOptions = {}) {
     this.redis = redis;
-    this.baseDelayMs = Math.max(1, options.baseDelayMs ?? SATURATION_BASE_DELAY_MS);
-    this.maxDelayMs = Math.max(this.baseDelayMs, options.maxDelayMs ?? SATURATION_MAX_DELAY_MS);
+    this.baseDelayMs = Math.max(1, options.baseDelayMs ?? BASE_DELAY_MS);
+    this.maxDelayMs = Math.max(this.baseDelayMs, options.maxDelayMs ?? MAX_DELAY_MS);
     this.random = options.random ?? Math.random;
   }
 
   remaining(provider: string, model: string): Effect.Effect<number> {
-    return tryAsync(() => this.redis.pTTL(modelSaturationKey(provider, model)), -1).pipe(
+    return tryAsync(() => this.redis.pTTL(saturationKey(provider, model)), -1).pipe(
       Effect.map((ttl) => (typeof ttl === "number" && ttl > 0 ? ttl : 0))
     );
   }
 
   hold(provider: string, model: string): Effect.Effect<number> {
     return Effect.gen({ self: this }, function* () {
-      const key = modelSaturationKey(provider, model);
+      const key = saturationKey(provider, model);
       const count = yield* tryAsync(async () => {
         const next = await this.redis.incr(`${key}:strikes`);
         await this.redis.expire(`${key}:strikes`, COUNTER_TTL_SECONDS);
@@ -79,7 +79,7 @@ export class ModelSaturation {
   }
 
   clear(provider: string, model: string): Effect.Effect<void> {
-    const key = modelSaturationKey(provider, model);
+    const key = saturationKey(provider, model);
     return tryAsync(() => this.redis.del([key, `${key}:strikes`]), 0).pipe(Effect.asVoid);
   }
 }

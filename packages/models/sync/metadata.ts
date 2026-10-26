@@ -1,10 +1,10 @@
 import { Cause, Effect, Exit } from "effect";
 
-import { runFetchJsonEffect } from "./http.ts";
+import { fetchJson } from "./http.ts";
 import { buildIndex, resolveCandidates, type IndexedModel } from "../model/similarity.ts";
 import {
   MODELSDEV_CANONICAL_URL,
-  buildCanonicalIndex,
+  canonicalIndex,
   type CanonicalIndex,
 } from "../model/canonical.ts";
 
@@ -222,7 +222,7 @@ function pointsFrom(source: RegistryName, entry: unknown): ModelCost | null {
   return null;
 }
 
-function hasProviderLimits(limits: ProviderLimits): boolean {
+function providerLimits(limits: ProviderLimits): boolean {
   return limits.contextWindow !== undefined || limits.maxOutputTokens !== undefined;
 }
 
@@ -404,7 +404,7 @@ const SOURCES: SourceExtractor[] = [
   },
 ];
 
-function groupByProvider(
+function byProvider(
   entries: ReadonlyArray<{ id: string; name?: string; provider?: string; entry: unknown }>,
   source: string,
 ): Record<string, Map<string, IndexedModel<unknown>>> {
@@ -426,7 +426,7 @@ function describeFailure(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause);
 }
 
-export async function fetchExternalRegistries(
+export async function externalRegistries(
   options: { logger?: (message: string) => void } = {},
 ): Promise<ExternalCatalogs> {
   const logger = options.logger ?? (() => {});
@@ -435,7 +435,7 @@ export async function fetchExternalRegistries(
     Effect.forEach(
       SOURCES,
       (source) =>
-        runFetchJsonEffect(source.url, { label: `external registry ${source.name}` }).pipe(
+        fetchJson(source.url, { label: `external registry ${source.name}` }).pipe(
           Effect.map((payload) => ({ source, payload })),
           Effect.exit,
         ),
@@ -457,7 +457,7 @@ export async function fetchExternalRegistries(
     registries[source.name] = {
       entries,
       index: buildIndex(entries, source.name),
-      byProvider: groupByProvider(entries, source.name),
+      byProvider: byProvider(entries, source.name),
     };
     if (source.name === "modelsdev") canonicalModels = payload;
     logger(`[metadata] ${source.name}: ${entries.length} entries`);
@@ -466,7 +466,7 @@ export async function fetchExternalRegistries(
   let canonicalModelsJson: unknown;
   const canonicalExit = await Effect.runPromise(
     Effect.exit(
-      runFetchJsonEffect(MODELSDEV_CANONICAL_URL, { label: "models.dev canonical models" }),
+      fetchJson(MODELSDEV_CANONICAL_URL, { label: "models.dev canonical models" }),
     ),
   );
   if (Exit.isSuccess(canonicalExit)) {
@@ -477,7 +477,7 @@ export async function fetchExternalRegistries(
     logger(`[metadata] canonical models unavailable: ${describeFailure(Cause.squash(canonicalExit.cause))}`);
   }
 
-  const canonical = buildCanonicalIndex({
+  const canonical = canonicalIndex({
     models: canonicalModelsJson,
     providers: canonicalModels,
     openrouter: registries.openrouter?.entries.map(
@@ -494,7 +494,7 @@ function pickHit<TEntry>(
   return result.exact ?? result.match;
 }
 
-export function resolveModelMetadata(
+export function modelMetadata(
   model: ModelMetadataInput,
   registries: Registries,
 ): ResolvedMetadata {
@@ -532,7 +532,7 @@ export function resolveModelMetadata(
   return { perProvider, global };
 }
 
-export function buildModelPatch(
+export function modelPatch(
   model: ModelMetadataInput,
   resolved: ResolvedMetadata,
 ): ModelMetadataPatch {
@@ -547,18 +547,18 @@ export function buildModelPatch(
     if (hit) candidates.push({ ...hit, scope: "global" });
   }
 
-  const providerLimits: Record<string, ProviderLimits> = {};
+  const limitsByProvider: Record<string, ProviderLimits> = {};
   for (const [provider, hit] of Object.entries(resolved.perProvider)) {
     const limits = limitsFrom(hit.source, hit.entry);
-    if (hasProviderLimits(limits)) providerLimits[provider] = limits;
+    if (providerLimits(limits)) limitsByProvider[provider] = limits;
   }
 
   const globalFallback = candidates.find((item) => item.scope === "global" && item.source === "modelsdev")
     ?? candidates.find((item) => item.scope === "global");
   for (const provider of providerOrder) {
-    if (providerLimits[provider] || !globalFallback) continue;
+    if (limitsByProvider[provider] || !globalFallback) continue;
     const limits = limitsFrom(globalFallback.source, globalFallback.entry);
-    if (hasProviderLimits(limits)) providerLimits[provider] = limits;
+    if (providerLimits(limits)) limitsByProvider[provider] = limits;
   }
 
   const modalities = firstDefined(candidates.map((item) => modalitiesFrom(item.source, item.entry)));
@@ -583,7 +583,7 @@ export function buildModelPatch(
   return {
     reasoning,
     reasoningEffort,
-    providerLimits,
+    providerLimits: limitsByProvider,
     modalities,
     limits,
     cost,

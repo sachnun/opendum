@@ -25,13 +25,13 @@ export type Fakes = {
 function accounts(): Stub<AccountPort> {
   return {
     listEligibleAccounts: mock<AccountPort["listEligibleAccounts"]>(() => Effect.succeed([])),
-    listSharedEligibleAccounts: mock<AccountPort["listSharedEligibleAccounts"]>(() => Effect.succeed([])),
-    listDisabledAccountIDs: mock<AccountPort["listDisabledAccountIDs"]>(() => Effect.succeed([])),
-    listExpiringRefreshableAccounts: mock<AccountPort["listExpiringRefreshableAccounts"]>(() => Effect.succeed([])),
+    sharedAccounts: mock<AccountPort["sharedAccounts"]>(() => Effect.succeed([])),
+    disabledIds: mock<AccountPort["disabledIds"]>(() => Effect.succeed([])),
+    expiringAccounts: mock<AccountPort["expiringAccounts"]>(() => Effect.succeed([])),
     getForcedAccount: mock<AccountPort["getForcedAccount"]>(absent),
     getQuotaAccount: mock<AccountPort["getQuotaAccount"]>(absent),
-    getAccountCredentialsByID: mock<AccountPort["getAccountCredentialsByID"]>(absent),
-    getAccountOwnerUserID: mock<AccountPort["getAccountOwnerUserID"]>(absent),
+    credentialsById: mock<AccountPort["credentialsById"]>(absent),
+    ownerId: mock<AccountPort["ownerId"]>(absent),
     updateRefreshedCredentials: mock<AccountPort["updateRefreshedCredentials"]>(() => Effect.succeed(undefined)),
     recordAccountError: mock<AccountPort["recordAccountError"]>(() => Effect.succeed(undefined)),
     disableFailedAccount: mock<AccountPort["disableFailedAccount"]>(() => Effect.succeed(0)),
@@ -40,25 +40,25 @@ function accounts(): Stub<AccountPort> {
 
 function health(): Stub<HealthPort> {
   return {
-    bumpAccountRequestCount: mock<HealthPort["bumpAccountRequestCount"]>(() => Effect.succeed(undefined)),
-    getAccountHealthState: mock<HealthPort["getAccountHealthState"]>(absent),
-    setAccountHealthFailed: mock<HealthPort["setAccountHealthFailed"]>(() => Effect.succeed(undefined)),
+    bumpRequests: mock<HealthPort["bumpRequests"]>(() => Effect.succeed(undefined)),
+    healthState: mock<HealthPort["healthState"]>(absent),
+    markFailed: mock<HealthPort["markFailed"]>(() => Effect.succeed(undefined)),
     setAccountCooldown: mock<HealthPort["setAccountCooldown"]>(() => Effect.succeed(undefined)),
     setAccountActive: mock<HealthPort["setAccountActive"]>(() => Effect.succeed(undefined)),
-    setAccountUsageLimited: mock<HealthPort["setAccountUsageLimited"]>(() => Effect.succeed(undefined)),
+    markLimited: mock<HealthPort["markLimited"]>(() => Effect.succeed(undefined)),
     recordRequestError: mock<HealthPort["recordRequestError"]>(() => Effect.succeed(undefined)),
     markAccountSuccess: mock<HealthPort["markAccountSuccess"]>(() => Effect.succeed(undefined)),
-    markAccountRecoveredByRotation: mock<HealthPort["markAccountRecoveredByRotation"]>(() => Effect.succeed(undefined)),
-    listModelHealthByAccount: mock<HealthPort["listModelHealthByAccount"]>(() => Effect.succeed([])),
+    markRecovered: mock<HealthPort["markRecovered"]>(() => Effect.succeed(undefined)),
+    healthByAccount: mock<HealthPort["healthByAccount"]>(() => Effect.succeed([])),
     getModelHealth: mock<HealthPort["getModelHealth"]>(absent),
-    updateModelHealthCounters: mock<HealthPort["updateModelHealthCounters"]>(() => Effect.succeed(undefined)),
-    updateModelHealthStatus: mock<HealthPort["updateModelHealthStatus"]>(() => Effect.succeed(undefined)),
+    bumpCounters: mock<HealthPort["bumpCounters"]>(() => Effect.succeed(undefined)),
+    setStatus: mock<HealthPort["setStatus"]>(() => Effect.succeed(undefined)),
     insertModelHealth: mock<HealthPort["insertModelHealth"]>(() => Effect.succeed(undefined)),
-    markUsageLimitedHealth: mock<HealthPort["markUsageLimitedHealth"]>(() => Effect.succeed(undefined)),
-    updateModelHealthSuccess: mock<HealthPort["updateModelHealthSuccess"]>(() => Effect.succeed(undefined)),
-    updateModelHealthSuccessWithStatus: mock<HealthPort["updateModelHealthSuccessWithStatus"]>(() => Effect.succeed(undefined)),
-    updateModelHealthFailure: mock<HealthPort["updateModelHealthFailure"]>(() => Effect.succeed(undefined)),
-    updateModelHealthFailureWithStatus: mock<HealthPort["updateModelHealthFailureWithStatus"]>(() => Effect.succeed(undefined)),
+    markUsageLimited: mock<HealthPort["markUsageLimited"]>(() => Effect.succeed(undefined)),
+    markSuccess: mock<HealthPort["markSuccess"]>(() => Effect.succeed(undefined)),
+    successStatus: mock<HealthPort["successStatus"]>(() => Effect.succeed(undefined)),
+    recordFailure: mock<HealthPort["recordFailure"]>(() => Effect.succeed(undefined)),
+    failStatus: mock<HealthPort["failStatus"]>(() => Effect.succeed(undefined)),
   };
 }
 
@@ -66,7 +66,7 @@ function customProviders(): Stub<CustomPort> {
   return {
     listCustomProviders: mock<CustomPort["listCustomProviders"]>(() => Effect.succeed([])),
     getCustomProvider: mock<CustomPort["getCustomProvider"]>(absent),
-    listCustomProviderModels: mock<CustomPort["listCustomProviderModels"]>(() => Effect.succeed([])),
+    customModels: mock<CustomPort["customModels"]>(() => Effect.succeed([])),
   };
 }
 
@@ -80,12 +80,12 @@ function points(): Fakes["points"] {
   const points: Fakes["points"] = {
     creditPointBalance: mock<PointPort["creditPointBalance"]>(() => Effect.succeed(10)),
     debitPointBalance: mock<PointPort["debitPointBalance"]>(() => Effect.succeed(10)),
-    debitPointBalanceAllowNegative: mock<PointPort["debitPointBalanceAllowNegative"]>(() => Effect.succeed(10)),
-    insertPointBalanceOnConflictDoNothing: mock<PointPort["insertPointBalanceOnConflictDoNothing"]>(() => Effect.succeed(0)),
+    debitAllowNegative: mock<PointPort["debitAllowNegative"]>(() => Effect.succeed(10)),
+    insertBalance: mock<PointPort["insertBalance"]>(() => Effect.succeed(0)),
     insertPointTransaction: mock<PointPort["insertPointTransaction"]>(() => Effect.succeed(undefined)),
-    insertPointTransactionOnConflictDoNothing: mock<PointPort["insertPointTransactionOnConflictDoNothing"]>(() => Effect.succeed(0)),
-    updatePointTransactionBalance: mock<PointPort["updatePointTransactionBalance"]>(() => Effect.succeed(undefined)),
-    listOrphanedRoamingDebits: mock<PointPort["listOrphanedRoamingDebits"]>(() => Effect.succeed([])),
+    insertTransaction: mock<PointPort["insertTransaction"]>(() => Effect.succeed(0)),
+    updateTransactionBalance: mock<PointPort["updateTransactionBalance"]>(() => Effect.succeed(undefined)),
+    listOrphaned: mock<PointPort["listOrphaned"]>(() => Effect.succeed([])),
     transaction: (run) => run(points),
   };
   return points;

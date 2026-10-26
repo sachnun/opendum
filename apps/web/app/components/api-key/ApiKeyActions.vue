@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { cn } from "~~/lib/utils";
-import type { ApiKeyListItem } from "~~/lib/api-types";
+import type { KeyListItem } from "~~/lib/api-types";
 
-type ApiKey = ApiKeyListItem;
+type ApiKey = KeyListItem;
 
 const props = defineProps<{
   apiKey: ApiKey;

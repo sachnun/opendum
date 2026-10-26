@@ -1,14 +1,14 @@
 import { Effect } from "effect";
 import {
-  baseQuotaInfo,
-  errorQuotaInfo,
-  expiredQuotaInfo,
-  parseQuotaNumber,
+  baseInfo,
+  errorInfo,
+  expiredInfo,
+  parseNumber,
 } from "../helpers.js";
 import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay } from "../types.js";
-import { fetchJsonData, type Json } from "./shared.js";
+import { jsonData, type Json } from "./shared.js";
 
-export function fetchHyperQuota(
+export function hyperQuota(
   ctx: QuotaContext,
   account: QuotaAccount,
   forceRefresh: boolean
@@ -18,10 +18,10 @@ export function fetchHyperQuota(
     apiKey = ctx.decrypt(account.accessToken ?? "");
   } catch {
     return Effect.succeed(
-      expiredQuotaInfo("API key is missing or invalid. Please reconnect this account.")
+      expiredInfo("API key is missing or invalid. Please reconnect this account.")
     );
   }
-  return fetchJsonData(
+  return jsonData(
     ctx,
     account,
     forceRefresh,
@@ -32,14 +32,14 @@ export function fetchHyperQuota(
     null
   ).pipe(
     Effect.map(({ data, error }) => {
-      if (error || !data) return errorQuotaInfo(error ?? "Charm credits request failed");
-      return baseQuotaInfo("success", hyperGroups(data));
+      if (error || !data) return errorInfo(error ?? "Charm credits request failed");
+      return baseInfo("success", hyperGroups(data));
     })
   );
 }
 
 function hyperGroups(payload: Json): QuotaGroupDisplay[] {
-  const balance = parseQuotaNumber(payload.balance);
+  const balance = parseNumber(payload.balance);
   if (balance === null) {
     return [{
       name: "account-balance", displayName: "Balance", remainingFraction: 1, remainingRequests: 1,

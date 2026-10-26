@@ -1,14 +1,15 @@
 import { describe, expect, it } from "bun:test";
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
-import { PERCH_APP_URL, PERCH_AUTH_CONFIG_PATH } from "../endpoints.js";
+import { PERCH_APP_URL, PERCH_CONFIG_PATH } from "../endpoints.js";
 import type { UpstreamTransport } from "../core/http.js";
 import type { ProviderAccount } from "../types.js";
-import { PerchProvider, perchSseToChatCompletion } from "./perch.js";
+import { PerchProvider } from "./perch/index.js";
+import { PerchCompletion } from "./perch/stream.js";
 
 const account = { id: "acc-1" } as unknown as ProviderAccount;
 const SUPABASE_URL = "https://perch-supabase.test";
-const CONFIG_ENDPOINT = `${PERCH_APP_URL}${PERCH_AUTH_CONFIG_PATH}`;
+const CONFIG_ENDPOINT = `${PERCH_APP_URL}${PERCH_CONFIG_PATH}`;
 const TOKEN_ENDPOINT = `${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`;
 
 type Captured = { url: string; init?: RequestInit };
@@ -107,7 +108,7 @@ function choiceOf(completion: Record<string, unknown>): { message: Record<string
 
 describe("perchSseToChatCompletion", () => {
   it("aggregates answer, reasoning and tool call events", async () => {
-    const completion = await perchSseToChatCompletion(
+    const completion = await PerchCompletion.fromResponse(
       sse(
         { type: "reasoning_delta", text: " think" },
         { type: "answer_delta", text: "he" },
@@ -141,7 +142,7 @@ describe("perchSseToChatCompletion", () => {
   });
 
   it("drops reasoning, nulls empty content and defaults blank arguments", async () => {
-    const completion = await perchSseToChatCompletion(
+    const completion = await PerchCompletion.fromResponse(
       sse(
         { type: "reasoning_delta", text: "hmm" },
         { type: "tool_call_delta", toolCalls: [{ id: "call_2", name: "f", rawArgumentsText: "  " }] },
@@ -165,7 +166,7 @@ describe("perchSseToChatCompletion", () => {
 
   it("fails on rejected done events", async () => {
     await expect(
-      perchSseToChatCompletion(sse({ type: "done", ok: false, error: "quota exceeded" }), "m", false)
+      PerchCompletion.fromResponse(sse({ type: "done", ok: false, error: "quota exceeded" }), "m", false)
     ).rejects.toThrow("quota exceeded");
   });
 });

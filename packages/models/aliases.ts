@@ -1,4 +1,4 @@
-import { uniqueSorted, uniqueSortedStable } from "./collections.ts";
+import { uniqueSorted } from "./collections.ts";
 import type { ModelInfo } from "./registry.ts";
 
 export function nvidiaAlias(upstream: string): string {
@@ -14,7 +14,7 @@ export type AliasSource = {
 
 export class Aliases {
   private readonly aliasToCanonical = new Map<string, string>();
-  private readonly foldedAliasToCanonical = new Map<string, string>();
+  private readonly foldedAliases = new Map<string, string>();
   private readonly canonicalToAliases = new Map<string, string[]>();
 
   private constructor() {}
@@ -71,14 +71,14 @@ export class Aliases {
     if (!trimmed) return trimmed;
     const direct = this.aliasToCanonical.get(trimmed);
     if (direct !== undefined) return direct;
-    const folded = this.foldedAliasToCanonical.get(trimmed.toLowerCase());
+    const folded = this.foldedAliases.get(trimmed.toLowerCase());
     if (folded !== undefined) return folded;
     return trimmed;
   }
 
   keys(model: string): string[] {
     const canonical = this.resolve(model);
-    return uniqueSortedStable([canonical, ...(this.canonicalToAliases.get(canonical) ?? [])]);
+    return uniqueSorted([canonical, ...(this.canonicalToAliases.get(canonical) ?? [])]);
   }
 
   private assign(alias: string, canonical: string, source: AliasSource): void {
@@ -93,13 +93,13 @@ export class Aliases {
     const canonicals = [...source.canonicalIds()].sort((a, b) => a.localeCompare(b));
     for (const canonical of canonicals) {
       const key = canonical.toLowerCase();
-      if (!this.foldedAliasToCanonical.has(key)) this.foldedAliasToCanonical.set(key, canonical);
+      if (!this.foldedAliases.has(key)) this.foldedAliases.set(key, canonical);
     }
     const aliases = [...this.aliasToCanonical.keys()].sort((a, b) => a.localeCompare(b));
     for (const alias of aliases) {
       const key = alias.toLowerCase();
-      if (!this.foldedAliasToCanonical.has(key)) {
-        this.foldedAliasToCanonical.set(key, this.aliasToCanonical.get(alias) as string);
+      if (!this.foldedAliases.has(key)) {
+        this.foldedAliases.set(key, this.aliasToCanonical.get(alias) as string);
       }
     }
   }

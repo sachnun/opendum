@@ -1,26 +1,26 @@
 import { idMap, sync } from "#models/model-store.ts";
-import { fetchDecoded, runOrThrow } from "#models/sync/http.ts";
-import { stripParamInfoKey } from "#models/model/clean-key.ts";
-import { arrayAt, asRecord, asTrimmedString, stringAt } from "#models/json.ts";
+import { fetchDecoded, orThrow } from "#models/sync/http.ts";
+import { stripParams } from "#models/model/clean-key.ts";
+import { arrayAt, asRecord, trimmed, stringAt } from "#models/json.ts";
 import { packageModelsDir, runScript } from "./shared.ts";
 
 const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
 
-function toModelKey(modelId: string): string {
+function modelKey(modelId: string): string {
   const normalizedModelId = modelId.replace(/^library\//, "");
-  const providerStrippedModelId =
+  const strippedId =
     normalizedModelId === "openrouter/free"
       ? normalizedModelId
       : normalizedModelId.includes("/")
         ? normalizedModelId.slice(normalizedModelId.indexOf("/") + 1)
         : normalizedModelId;
 
-  const modelKey = providerStrippedModelId
+  const modelKey = strippedId
     .replace(/[:/]/g, "-")
     .replace(/[^a-zA-Z0-9._-]/g, "-")
     .replace(/-{2,}/g, "-");
 
-  const cleaned = stripParamInfoKey(modelKey);
+  const cleaned = stripParams(modelKey);
   if (modelKey !== "openrouter-free" && cleaned.endsWith("-free")) {
     return cleaned.slice(0, -"-free".length);
   }
@@ -28,12 +28,12 @@ function toModelKey(modelId: string): string {
   return cleaned;
 }
 
-function isFreeChatModel(model: unknown): boolean {
-  const id = asTrimmedString(stringAt(model, "id"));
+function isFree(model: unknown): boolean {
+  const id = trimmed(stringAt(model, "id"));
   if (!id) return false;
 
-  const isFreeModelId = id === "openrouter/free" || id.endsWith(":free");
-  if (!isFreeModelId) return false;
+  const isFreeModel = id === "openrouter/free" || id.endsWith(":free");
+  if (!isFreeModel) return false;
 
   const architecture = asRecord(asRecord(model)?.["architecture"]);
   const inputModalities = arrayAt(architecture, "input_modalities");
@@ -51,7 +51,7 @@ function isFreeChatModel(model: unknown): boolean {
   );
 }
 
-function freeModelIds(payload: unknown): string[] {
+function freeModels(payload: unknown): string[] {
   const data = arrayAt(payload, "data");
   if (data.length === 0) {
     throw new Error("Unexpected OpenRouter /v1/models payload format");
@@ -59,19 +59,19 @@ function freeModelIds(payload: unknown): string[] {
 
   const ids: string[] = [];
   for (const model of data) {
-    if (!isFreeChatModel(model)) continue;
-    const id = asTrimmedString(stringAt(model, "id"));
+    if (!isFree(model)) continue;
+    const id = trimmed(stringAt(model, "id"));
     if (id) ids.push(id);
   }
   return [...new Set(ids)].sort((a, b) => a.localeCompare(b));
 }
 
-async function fetchOpenRouterFreeModelIds(): Promise<string[]> {
-  return runOrThrow(
+async function docsFree(): Promise<string[]> {
+  return orThrow(
     fetchDecoded(
       OPENROUTER_MODELS_URL,
       { label: "OpenRouter free models", headers: { Accept: "application/json" } },
-      async (response) => freeModelIds(await response.json())
+      async (response) => freeModels(await response.json())
     )
   );
 }
@@ -79,8 +79,8 @@ async function fetchOpenRouterFreeModelIds(): Promise<string[]> {
 async function main(): Promise<void> {
   const modelsDir = packageModelsDir();
 
-  const modelIds = await fetchOpenRouterFreeModelIds();
-  const modelMap = idMap(modelIds, toModelKey);
+  const modelIds = await docsFree();
+  const modelMap = idMap(modelIds, modelKey);
 
   const result = await sync(modelsDir, "openrouter", modelMap);
 

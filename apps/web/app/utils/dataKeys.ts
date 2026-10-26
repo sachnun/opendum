@@ -18,7 +18,7 @@ export const stateKeys = {
   authClaims: "web-auth-claims",
   authSession: "web-auth-session",
   auditRefreshVersion: "web-audit-refresh-version",
-  quotaByAccountId: "account-quota-by-account-id",
-  quotaErrorByAccountId: "account-quota-error-by-account-id",
-  quotaLoadingByAccountId: "account-quota-loading-by-account-id",
+  quotaById: "account-quota-by-account-id",
+  errorById: "account-quota-error-by-account-id",
+  loadingById: "account-quota-loading-by-account-id",
 } as const;

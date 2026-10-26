@@ -1,35 +1,19 @@
-import { MODEL_FAMILY_SORT_ORDER, categorizeModelFamily } from "@opendum/models/ranking";
-import { compareModelEntries } from "@opendum/models/sort";
-import { BY_KEY, getProviderAccountPath, getProviderLabel, type ProviderAccountKey } from "@opendum/providers/provider-accounts";
+import { SORT_ORDER, categorize } from "@opendum/models/ranking";
+import { compareEntries } from "@opendum/models/sort";
+import { BY_KEY, accountPath, labelOf, type ProviderAccountKey } from "@opendum/providers/provider-accounts";
 import type { PlaygroundOptions } from "../../lib/api-types";
 import {
-  generateId,
-  normalizeQueryParam,
-  normalizeQueryEndpoint,
-  normalizeQueryNumber,
-  normalizeQueryBoolean,
-  normalizeQueryReasoningEffort,
-  normalizeQueryAdditionalParameters,
-  parseAdditionalParameters,
-  clampNumber,
-  extractMessageText,
-  extractImageUrls,
-  formatDurationMs,
-  mergeUsageData,
-  buildResponseMetrics,
-  extractErrorMessage,
-  extractChatCompletionData,
-  extractAnthropicCompletionData,
-  extractResponsesCompletionData,
-  createSseChunkProcessor,
-  isSuccessfulStatus,
-  getErrorMessageFromText,
-  buildPlaygroundErrorMessage,
-  getEndpointPath,
-  buildRequestBody,
-  applyRouteSelectorToRequestBody,
-  adaptRequestOverridesForEndpoint,
-  formatToolArguments,
+  Body,
+  Completion,
+  Content,
+  Duration,
+  ErrorText,
+  Ids,
+  Params,
+  Query,
+  Sse,
+  Tokens,
+  ToolCalls,
 } from "../../lib/playground-protocol";
 import type {
   ReasoningEffort,
@@ -55,7 +39,7 @@ export function usePlayground() {
 type ResponseData = { content: string; reasoning: string; toolCalls: ToolCallData[]; isLoading: boolean; error?: string; errorDetails?: string; metrics: ResponseMetrics; usedAccountId?: string | null; startedAt?: number | null };
 type FetchModelResult = "success" | "error" | "aborted";
 type StreamHeaderInfo = { status: number; statusText: string; getHeader: (name: string) => string | null };
-type StreamProxyRequestInput = { url: string; headers: Record<string, string>; body: string; signal: AbortSignal; endpoint: PlaygroundEndpoint; onHeaders: (info: StreamHeaderInfo) => void; onChunk: (chunk: ParsedCompletionData) => void };
+type StreamRequest = { url: string; headers: Record<string, string>; body: string; signal: AbortSignal; endpoint: PlaygroundEndpoint; onHeaders: (info: StreamHeaderInfo) => void; onChunk: (chunk: ParsedCompletionData) => void };
 
 
 
@@ -191,14 +175,14 @@ watch(data, (value) => {
 const options = computed<PlaygroundOptions | null>(() => data.value ?? null);
 const models = computed<ModelOption[]>(() => options.value?.models ?? []);
 const providerAccounts = computed<ProviderAccountOption[]>(() => options.value?.providerAccounts ?? []);
-const hasAnyProviderAccount = computed(() => Boolean(options.value?.hasAnyProviderAccount));
+const hasAccount = computed(() => Boolean(options.value?.hasAnyProviderAccount));
 const isProxyConfigured = computed(() => Boolean(options.value?.proxyBaseUrl));
-const canUsePlayground = computed(() => hasAnyProviderAccount.value && isProxyConfigured.value && providerAccounts.value.length > 0 && models.value.length > 0);
+const canUsePlayground = computed(() => hasAccount.value && isProxyConfigured.value && providerAccounts.value.length > 0 && models.value.length > 0);
 
 const selectedScenario = ref<Scenario>(SCENARIOS[0]!);
 const settings = reactive<PlaygroundSettings>({ ...DEFAULT_SETTINGS });
 const settingsOpen = ref(false);
-const panels = ref<PanelState[]>([{ id: generateId(), modelId: null, provider: null, accountId: null }]);
+const panels = ref<PanelState[]>([{ id: Ids.short(), modelId: null, provider: null, accountId: null }]);
 const responses = ref<Record<string, ResponseData>>({});
 const loopDialogOpen = ref(false);
 const loopCountInput = ref("2");
@@ -209,38 +193,38 @@ const activeFamilyPresets = ref<string[]>([]);
 const activeProviderPresets = ref<string[]>([]);
 const familyPresetExpanded = ref(false);
 const providerPresetExpanded = ref(false);
-const selectionOpenByPanel = reactive<Record<string, boolean>>({});
-const selectionStepByPanel = reactive<Record<string, "model" | "routing">>({});
-const pendingModelByPanel = reactive<Record<string, string | null>>({});
-const modelSearchByPanel = reactive<Record<string, string>>({});
-const routeSearchByPanel = reactive<Record<string, string>>({});
-const chatMessagesByPanel = reactive<Record<string, ScenarioMessage[]>>({});
-const autoScrollByPanel = reactive<Record<string, boolean>>({});
-const copiedErrorByPanel = reactive<Record<string, boolean>>({});
+const pickerOpen = reactive<Record<string, boolean>>({});
+const pickerStep = reactive<Record<string, "model" | "routing">>({});
+const pendingModel = reactive<Record<string, string | null>>({});
+const modelSearch = reactive<Record<string, string>>({});
+const routeSearch = reactive<Record<string, string>>({});
+const chatMessages = reactive<Record<string, ScenarioMessage[]>>({});
+const autoScroll = reactive<Record<string, boolean>>({});
+const copiedError = reactive<Record<string, boolean>>({});
 const copyErrorTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
 const initializedFromRoute = ref(false);
 const liveNow = ref(Date.now());
 
 const controllers = new Map<string, AbortController>();
 const requestIds = new Map<string, string>();
-const stoppedBatchPanelIds = new Set<string>();
+const stoppedPanels = new Set<string>();
 const panelScrollElements = new Map<string, HTMLElement>();
-const isBatchRunActive = ref(false);
+const batchActive = ref(false);
 let liveTimer: ReturnType<typeof setInterval> | null = null;
-let startLongPressTimer: ReturnType<typeof setTimeout> | null = null;
-let accountOverviewInvalidationTimer: ReturnType<typeof setTimeout> | null = null;
-let startLongPressTriggered = false;
-const START_LONG_PRESS_DELAY_MS = 600;
-const ACCOUNT_OVERVIEW_INVALIDATION_DELAY_MS = 500;
-const AUTO_SCROLL_DISABLE_THRESHOLD = 0.05;
+let longPressTimer: ReturnType<typeof setTimeout> | null = null;
+let overviewTimer: ReturnType<typeof setTimeout> | null = null;
+let longPressFired = false;
+const LONG_PRESS_MS = 600;
+const OVERVIEW_DELAY_MS = 500;
+const SCROLL_THRESHOLD = 0.05;
 
 const filteredModels = computed(() => models.value);
 const filteredModelIds = computed(() => new Set(filteredModels.value.map((model) => model.id)));
 const modelsById = computed(() => new Map(models.value.map((model) => [model.id, model])));
-const providerAccountsById = computed(() => new Map(providerAccounts.value.map((account) => [account.id, account])));
-const familyPresets = computed(() => buildFamilyPresets(filteredModels.value, providerAccounts.value));
-const providerPresets = computed(() => buildProviderPresets(filteredModels.value, providerAccounts.value));
-const activePresetModelIds = computed(() => {
+const accountsById = computed(() => new Map(providerAccounts.value.map((account) => [account.id, account])));
+const familyPresets = computed(() => families(filteredModels.value, providerAccounts.value));
+const providerPresets = computed(() => providers(filteredModels.value, providerAccounts.value));
+const presetModelIds = computed(() => {
   if (activeFamilyPresets.value.length > 0) {
     const ids = new Set<string>();
     for (const preset of familyPresets.value) {
@@ -262,30 +246,30 @@ const maxPanels = computed(() => Math.max(filteredModels.value.length, providerP
 const canAddPanel = computed(() => panels.value.length < maxPanels.value);
 const hasSelectedModel = computed(() => panels.value.some((panel) => panel.modelId));
 const isAnyLoading = computed(() => Object.values(responses.value).some((response) => response.isLoading));
-const isTopPDeprecated = computed(() =>
+const topPDeprecated = computed(() =>
   panels.value.some((panel) => {
     if (!panel.modelId) return false;
     const model = modelsById.value.get(panel.modelId);
-    if (!model?.topPDeprecatedProviders) return false;
+    if (!model?.deprecatedProviders) return false;
     const provider = panel.accountId
-      ? providerAccountsById.value.get(panel.accountId)?.provider
+      ? accountsById.value.get(panel.accountId)?.provider
       : panel.provider;
-    return Boolean(provider && model.topPDeprecatedProviders.includes(provider));
+    return Boolean(provider && model.deprecatedProviders.includes(provider));
   }),
 );
-const additionalParametersError = computed(() => parseAdditionalParameters(additionalParametersInput.value).error);
+const additionalParametersError = computed(() => Params.parse(additionalParametersInput.value).error);
 const canRunPlayground = computed(() => Boolean(selectedScenario.value && hasSelectedModel.value && canUsePlayground.value && !additionalParametersError.value));
 const playgroundSetupMessage = computed(() => {
-  if (!hasAnyProviderAccount.value) return "Connect a provider account before running Playground.";
+  if (!hasAccount.value) return "Connect a provider account before running Playground.";
   if (!isProxyConfigured.value) return "Set NUXT_PUBLIC_API_URL to your API URL before running Playground.";
   if (providerAccounts.value.length === 0) return "Enable at least one provider account before running Playground.";
   if (models.value.length === 0) return "";
   return "";
 });
 const parsedLoopCount = computed(() => Number(loopCountInput.value));
-const isLoopCountValid = computed(() => Number.isInteger(parsedLoopCount.value) && parsedLoopCount.value >= 1);
-const activeLoopBadgeLabel = computed(() => activeLoopProgress.value && activeLoopProgress.value.total > 1 ? `${activeLoopProgress.value.current}/${activeLoopProgress.value.total}` : null);
-const scenarioMessages = computed(() => getScenarioMessages(selectedScenario.value));
+const loopCountValid = computed(() => Number.isInteger(parsedLoopCount.value) && parsedLoopCount.value >= 1);
+const loopBadge = computed(() => activeLoopProgress.value && activeLoopProgress.value.total > 1 ? `${activeLoopProgress.value.current}/${activeLoopProgress.value.total}` : null);
+const scenarioMessages = computed(() => messagesOf(selectedScenario.value));
 const isChatScenario = computed(() => selectedScenario.value.id === "chat");
 const isVisionScenario = computed(() => selectedScenario.value.id === "vision");
 
@@ -296,33 +280,33 @@ watch(options, (value) => {
 watch(options, (value) => {
   if (!value || initializedFromRoute.value) return;
 
-  applyQuerySettings(route.query);
-  const modelId = normalizeQueryParam(route.query.model);
-  const accountId = normalizeQueryParam(route.query.accountId);
-  const compareAuto = isAutoCompareQuery(route.query.compare);
+  applyQuery(route.query);
+  const modelId = Query.string(route.query.model);
+  const accountId = Query.string(route.query.accountId);
+  const compareAuto = autoCompare(route.query.compare);
 
   if (modelId) {
     const model = modelsById.value.get(modelId);
     if (compareAuto && model) {
-      panels.value = buildAutoComparePanelsForModel(model);
+      panels.value = autoPanels(model);
       initializedFromRoute.value = true;
       return;
     }
 
     if (model) {
-      panels.value = [{ id: generateId(), modelId, provider: null, accountId: getValidRouteAccountId(accountId, modelId) }];
+      panels.value = [{ id: Ids.short(), modelId, provider: null, accountId: queryAccount(accountId, modelId) }];
       initializedFromRoute.value = true;
       return;
     }
   }
 
   if (accountId) {
-    const account = providerAccountsById.value.get(accountId);
+    const account = accountsById.value.get(accountId);
     if (account) {
-      const compatibleModels = models.value.filter((model) => accountSupportsModel(account, model));
+      const compatibleModels = models.value.filter((model) => accountSupports(account, model));
       panels.value = compatibleModels.length > 0
-        ? compatibleModels.map((model) => ({ id: generateId(), modelId: model.id, provider: null, accountId }))
-        : [{ id: generateId(), modelId: null, provider: null, accountId }];
+        ? compatibleModels.map((model) => ({ id: Ids.short(), modelId: model.id, provider: null, accountId }))
+        : [{ id: Ids.short(), modelId: null, provider: null, accountId }];
       initializedFromRoute.value = true;
       return;
     }
@@ -335,33 +319,33 @@ watch(() => route.query, (query) => {
   if (!initializedFromRoute.value) return;
   if (!options.value) return;
 
-  applyQuerySettings(query);
-  const modelId = normalizeQueryParam(query.model);
-  const accountId = normalizeQueryParam(query.accountId);
-  const compareAuto = isAutoCompareQuery(query.compare);
+  applyQuery(query);
+  const modelId = Query.string(query.model);
+  const accountId = Query.string(query.accountId);
+  const compareAuto = autoCompare(query.compare);
 
   if (modelId) {
     const model = modelsById.value.get(modelId);
     if (compareAuto && model) {
-      panels.value = buildAutoComparePanelsForModel(model);
+      panels.value = autoPanels(model);
       responses.value = {};
       return;
     }
 
     if (model) {
-      panels.value = [{ id: generateId(), modelId, provider: null, accountId: getValidRouteAccountId(accountId, modelId) }];
+      panels.value = [{ id: Ids.short(), modelId, provider: null, accountId: queryAccount(accountId, modelId) }];
       responses.value = {};
       return;
     }
   }
 
   if (accountId) {
-    const account = providerAccountsById.value.get(accountId);
+    const account = accountsById.value.get(accountId);
     if (account) {
-      const compatibleModels = models.value.filter((m) => accountSupportsModel(account, m));
+      const compatibleModels = models.value.filter((m) => accountSupports(account, m));
       panels.value = compatibleModels.length > 0
-        ? compatibleModels.map((m) => ({ id: generateId(), modelId: m.id, provider: null, accountId }))
-        : [{ id: generateId(), modelId: null, provider: null, accountId }];
+        ? compatibleModels.map((m) => ({ id: Ids.short(), modelId: m.id, provider: null, accountId }))
+        : [{ id: Ids.short(), modelId: null, provider: null, accountId }];
       responses.value = {};
       return;
     }
@@ -397,10 +381,10 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
-  stopAllRequests();
+  stopAll();
   if (liveTimer) clearInterval(liveTimer);
-  if (startLongPressTimer) clearTimeout(startLongPressTimer);
-  if (accountOverviewInvalidationTimer) clearTimeout(accountOverviewInvalidationTimer);
+  if (longPressTimer) clearTimeout(longPressTimer);
+  if (overviewTimer) clearTimeout(overviewTimer);
   for (const timeout of copyErrorTimeouts.values()) clearTimeout(timeout);
   copyErrorTimeouts.clear();
 });
@@ -423,29 +407,29 @@ onBeforeUnmount(() => {
 
 
 
-function applyQuerySettings(query: typeof route.query) {
-  const endpoint = normalizeQueryEndpoint(query.endpoint);
-  const streamResponses = normalizeQueryBoolean(query.stream);
-  const temperature = normalizeQueryNumber(query.temperature);
-  const topP = normalizeQueryNumber(query.top_p);
-  const maxTokens = normalizeQueryNumber(query.max_tokens);
-  const presencePenalty = normalizeQueryNumber(query.presence_penalty);
-  const frequencyPenalty = normalizeQueryNumber(query.frequency_penalty);
-  const reasoningEffort = normalizeQueryReasoningEffort(query.reasoning_effort);
-  const additionalParameters = normalizeQueryAdditionalParameters(query.additional_parameters);
+function applyQuery(query: typeof route.query) {
+  const endpoint = Query.endpoint(query.endpoint);
+  const streamResponses = Query.boolean(query.stream);
+  const temperature = Query.number(query.temperature);
+  const topP = Query.number(query.top_p);
+  const maxTokens = Query.number(query.max_tokens);
+  const presencePenalty = Query.number(query.presence_penalty);
+  const frequencyPenalty = Query.number(query.frequency_penalty);
+  const reasoningEffort = Query.effort(query.reasoning_effort);
+  const additionalParameters = Query.additional(query.additional_parameters);
 
   if (endpoint) settings.endpoint = endpoint;
   if (streamResponses !== null) settings.streamResponses = streamResponses;
-  if (temperature !== null) settings.temperature = clampNumber(temperature, 0, 2);
-  if (topP !== null) settings.topP = clampNumber(topP, 0, 1);
-  if (maxTokens !== null) settings.maxTokens = Math.round(clampNumber(maxTokens, 1, 128000));
-  if (presencePenalty !== null) settings.presencePenalty = clampNumber(presencePenalty, -2, 2);
-  if (frequencyPenalty !== null) settings.frequencyPenalty = clampNumber(frequencyPenalty, -2, 2);
+  if (temperature !== null) settings.temperature = Params.clamp(temperature, 0, 2);
+  if (topP !== null) settings.topP = Params.clamp(topP, 0, 1);
+  if (maxTokens !== null) settings.maxTokens = Math.round(Params.clamp(maxTokens, 1, 128000));
+  if (presencePenalty !== null) settings.presencePenalty = Params.clamp(presencePenalty, -2, 2);
+  if (frequencyPenalty !== null) settings.frequencyPenalty = Params.clamp(frequencyPenalty, -2, 2);
   if (reasoningEffort) settings.reasoningEffort = reasoningEffort;
   if (additionalParameters !== null) additionalParametersInput.value = additionalParameters;
 }
 
-function accountSupportsModel(account: ProviderAccountOption, model: ModelOption | string): boolean {
+function accountSupports(account: ProviderAccountOption, model: ModelOption | string): boolean {
   const modelId = typeof model === "string" ? model : model.id;
   const modelOption = typeof model === "string" ? modelsById.value.get(model) : model;
   if (!modelOption?.providers.includes(account.provider)) return false;
@@ -453,38 +437,38 @@ function accountSupportsModel(account: ProviderAccountOption, model: ModelOption
   return !account.supportedModels || account.supportedModels.includes(modelId);
 }
 
-function providerSupportsModel(provider: string | null, model: ModelOption | string): boolean {
+function providerSupports(provider: string | null, model: ModelOption | string): boolean {
   if (!provider) return false;
   const modelOption = typeof model === "string" ? modelsById.value.get(model) : model;
   if (!modelOption?.providers.includes(provider)) return false;
-  return providerAccounts.value.some((account) => account.provider === provider && accountSupportsModel(account, modelOption));
+  return providerAccounts.value.some((account) => account.provider === provider && accountSupports(account, modelOption));
 }
 
-function getValidRouteAccountId(accountId: string | null, modelId: string): string | null {
-  const account = accountId ? providerAccountsById.value.get(accountId) : null;
-  return account && accountSupportsModel(account, modelId) ? account.id : null;
+function queryAccount(accountId: string | null, modelId: string): string | null {
+  const account = accountId ? accountsById.value.get(accountId) : null;
+  return account && accountSupports(account, modelId) ? account.id : null;
 }
 
-function getValidProviderForPanel(panel: PanelState): string | null {
+function panelProvider(panel: PanelState): string | null {
   if (!panel.provider || !panel.modelId || panel.accountId) return null;
-  return providerSupportsModel(panel.provider, panel.modelId) ? panel.provider : null;
+  return providerSupports(panel.provider, panel.modelId) ? panel.provider : null;
 }
 
-function buildFamilyPresets(modelOptions: ModelOption[], accounts: ProviderAccountOption[]) {
+function families(modelOptions: ModelOption[], accounts: ProviderAccountOption[]) {
   const availableProviders = new Set(accounts.map((account) => account.provider));
-  const grouped = new Map<ReturnType<typeof categorizeModelFamily>, ModelOption[]>();
+  const grouped = new Map<ReturnType<typeof categorize>, ModelOption[]>();
 
   for (const model of modelOptions) {
     if (!model.providers.some((provider) => availableProviders.has(provider))) continue;
-    const family = categorizeModelFamily(model.family);
+    const family = categorize(model.family);
     grouped.set(family, [...(grouped.get(family) ?? []), model]);
   }
 
   for (const familyModels of grouped.values()) {
-    familyModels.sort(compareModelEntries);
+    familyModels.sort(compareEntries);
   }
 
-  const familyOrder = new Map(MODEL_FAMILY_SORT_ORDER.map((family, index) => [family, index]));
+  const familyOrder = new Map(SORT_ORDER.map((family, index) => [family, index]));
   return Array.from(grouped.entries())
     .sort(([familyA], [familyB]) => {
       const orderA = familyOrder.get(familyA) ?? Number.MAX_SAFE_INTEGER;
@@ -494,33 +478,33 @@ function buildFamilyPresets(modelOptions: ModelOption[], accounts: ProviderAccou
     .map(([family, familyModels]) => ({ family, models: familyModels }));
 }
 
-function buildProviderPresets(modelOptions: ModelOption[], accounts: ProviderAccountOption[]) {
+function providers(modelOptions: ModelOption[], accounts: ProviderAccountOption[]) {
   const accountsByProvider = new Map<string, ProviderAccountOption[]>();
   for (const account of accounts) {
     accountsByProvider.set(account.provider, [...(accountsByProvider.get(account.provider) ?? []), account]);
   }
 
   return Array.from(accountsByProvider.entries()).flatMap(([provider, providerAccountsForProvider]) => {
-    const models = modelOptions.filter((model) => model.providers.includes(provider) && providerAccountsForProvider.some((account) => accountSupportsModel(account, model)));
+    const models = modelOptions.filter((model) => model.providers.includes(provider) && providerAccountsForProvider.some((account) => accountSupports(account, model)));
     const presetPanels = models.map((model) => ({ modelId: model.id, provider, accountId: null }));
 
     return presetPanels.length > 0 ? [{ provider, accounts: providerAccountsForProvider, models: models, panels: presetPanels }] : [];
   });
 }
 
-function buildAutoComparePanelsForModel(model: ModelOption): PanelState[] {
-  const supportedProviders = model.providers.filter((provider) => providerSupportsModel(provider, model));
+function autoPanels(model: ModelOption): PanelState[] {
+  const supportedProviders = model.providers.filter((provider) => providerSupports(provider, model));
   return [
-    { id: generateId(), modelId: model.id, provider: null, accountId: null },
-    ...supportedProviders.map((provider) => ({ id: generateId(), modelId: model.id, provider, accountId: null })),
+    { id: Ids.short(), modelId: model.id, provider: null, accountId: null },
+    ...supportedProviders.map((provider) => ({ id: Ids.short(), modelId: model.id, provider, accountId: null })),
   ];
 }
 
-function isAutoCompareQuery(value: unknown): boolean {
-  return normalizeQueryParam(value)?.trim().toLowerCase() === "auto";
+function autoCompare(value: unknown): boolean {
+  return Query.string(value)?.trim().toLowerCase() === "auto";
 }
 
-function getAccountLabel(account: ProviderAccountOption): string {
+function accountLabel(account: ProviderAccountOption): string {
   const name = account.name.trim();
   const email = account.email?.trim();
   if (!email) return name;
@@ -528,7 +512,7 @@ function getAccountLabel(account: ProviderAccountOption): string {
   return `${name} (${email})`;
 }
 
-function getAccountPlaygroundStatus(account: ProviderAccountOption): string | null {
+function accountStatus(account: ProviderAccountOption): string | null {
   if (!account.isActive) return "Off";
   if (!account.disabledUntil) return null;
 
@@ -537,72 +521,72 @@ function getAccountPlaygroundStatus(account: ProviderAccountOption): string | nu
   return "Disabled";
 }
 
-function isAuthlessAccount(account: ProviderAccountOption): boolean {
+function isAuthless(account: ProviderAccountOption): boolean {
   return account.id === account.provider || account.id.startsWith("authless:");
 }
 
-function getProviderPresetAccountLabel(accounts: ProviderAccountOption[]): string | null {
-  if (accounts.every(isAuthlessAccount)) return null;
+function presetLabel(accounts: ProviderAccountOption[]): string | null {
+  if (accounts.every(isAuthless)) return null;
   return `${accounts.length} ${accounts.length === 1 ? "account" : "accounts"}`;
 }
 
-function getProviderScopedRouteLabel(provider: string): string {
-  return `Auto (${getProviderLabel(provider)})`;
+function scopedLabel(provider: string): string {
+  return `Auto (${labelOf(provider)})`;
 }
 
-function getPendingModelProviders(panel: PanelState): string[] {
-  const pendingModelId = pendingModelByPanel[panel.id];
-  const pendingModel = pendingModelId ? modelsById.value.get(pendingModelId) : null;
-  if (!pendingModel) return [];
+function pendingProviders(panel: PanelState): string[] {
+  const pendingId = pendingModel[panel.id];
+  const candidate = pendingId ? modelsById.value.get(pendingId) : null;
+  if (!candidate) return [];
 
-  const routeSearch = routeSearchByPanel[panel.id]?.trim().toLowerCase();
-  return pendingModel.providers
-    .filter((provider) => providerSupportsModel(provider, pendingModel))
-    .filter((provider) => !routeSearch || `${provider} ${getProviderLabel(provider)}`.toLowerCase().includes(routeSearch));
+  const search = routeSearch[panel.id]?.trim().toLowerCase();
+  return candidate.providers
+    .filter((provider) => providerSupports(provider, candidate))
+    .filter((provider) => !search || `${provider} ${labelOf(provider)}`.toLowerCase().includes(search));
 }
 
-function getValidAccountIdForPanel(panel: PanelState): string | null {
+function routeAccount(panel: PanelState): string | null {
   if (!panel.accountId || !panel.modelId) return null;
   const model = modelsById.value.get(panel.modelId);
-  const account = providerAccountsById.value.get(panel.accountId);
-  if (!model || !account || !accountSupportsModel(account, model)) return null;
+  const account = accountsById.value.get(panel.accountId);
+  if (!model || !account || !accountSupports(account, model)) return null;
   return account.id;
 }
 
-function getSelectedRouteLabel(panel: PanelState): string {
-  const selectedAccountId = getValidAccountIdForPanel(panel);
-  const selectedAccount = selectedAccountId ? providerAccountsById.value.get(selectedAccountId) : null;
-  const selectedProvider = getValidProviderForPanel(panel);
+function routeLabel(panel: PanelState): string {
+  const selectedAccountId = routeAccount(panel);
+  const selectedAccount = selectedAccountId ? accountsById.value.get(selectedAccountId) : null;
+  const selectedProvider = panelProvider(panel);
   const response = responses.value[panel.id];
-  const usedAccount = response?.usedAccountId ? providerAccountsById.value.get(response.usedAccountId) : null;
+  const usedAccount = response?.usedAccountId ? accountsById.value.get(response.usedAccountId) : null;
 
-  if (selectedAccount) return `${getAccountLabel(selectedAccount)} (${getProviderLabel(selectedAccount.provider)})`;
-  if (selectedProvider) return usedAccount ? `Auto (${getAccountLabel(usedAccount)} - ${getProviderLabel(usedAccount.provider)})` : getProviderScopedRouteLabel(selectedProvider);
-  if (panel.modelId) return usedAccount ? `Auto (${getAccountLabel(usedAccount)} - ${getProviderLabel(usedAccount.provider)})` : "Auto (load balancer)";
+  if (selectedAccount) return `${accountLabel(selectedAccount)} (${labelOf(selectedAccount.provider)})`;
+  if (selectedProvider) return usedAccount ? `Auto (${accountLabel(usedAccount)} - ${labelOf(usedAccount.provider)})` : scopedLabel(selectedProvider);
+  if (panel.modelId) return usedAccount ? `Auto (${accountLabel(usedAccount)} - ${labelOf(usedAccount.provider)})` : "Auto (load balancer)";
   return "-";
 }
 
-function getPanelProviderAccount(panel: PanelState): ProviderAccountOption | null {
-  const selectedAccountId = getValidAccountIdForPanel(panel);
-  if (selectedAccountId) return providerAccountsById.value.get(selectedAccountId) ?? null;
+function panelAccount(panel: PanelState): ProviderAccountOption | null {
+  const selectedAccountId = routeAccount(panel);
+  if (selectedAccountId) return accountsById.value.get(selectedAccountId) ?? null;
 
   const usedAccountId = responses.value[panel.id]?.usedAccountId;
-  return usedAccountId ? providerAccountsById.value.get(usedAccountId) ?? null : null;
+  return usedAccountId ? accountsById.value.get(usedAccountId) ?? null : null;
 }
 
-function getProviderAccountHref(account: ProviderAccountOption): string | null {
+function accountHref(account: ProviderAccountOption): string | null {
   if (!(account.provider in BY_KEY)) return null;
-  return `${getProviderAccountPath(account.provider as ProviderAccountKey)}#${encodeURIComponent(account.id)}`;
+  return `${accountPath(account.provider as ProviderAccountKey)}#${encodeURIComponent(account.id)}`;
 }
 
-function getPanelProviderAccountHref(panel: PanelState): string | null {
-  const account = getPanelProviderAccount(panel);
-  return account ? getProviderAccountHref(account) : null;
+function accountLink(panel: PanelState): string | null {
+  const account = panelAccount(panel);
+  return account ? accountHref(account) : null;
 }
 
-function getPanelModels(panel: PanelState): ModelOption[] {
-  let nextModels = activePresetModelIds.value ? filteredModels.value.filter((model) => activePresetModelIds.value?.has(model.id)) : filteredModels.value;
-  const account = panel.accountId ? providerAccountsById.value.get(panel.accountId) : null;
+function panelModels(panel: PanelState): ModelOption[] {
+  let nextModels = presetModelIds.value ? filteredModels.value.filter((model) => presetModelIds.value?.has(model.id)) : filteredModels.value;
+  const account = panel.accountId ? accountsById.value.get(panel.accountId) : null;
   const provider = panel.accountId ? null : panel.provider;
 
   if (account?.disabledModels?.length) {
@@ -616,99 +600,99 @@ function getPanelModels(panel: PanelState): ModelOption[] {
   }
 
   if (provider) {
-    nextModels = nextModels.filter((model) => providerSupportsModel(provider, model));
+    nextModels = nextModels.filter((model) => providerSupports(provider, model));
   }
 
-  const search = modelSearchByPanel[panel.id]?.trim().toLowerCase();
+  const search = modelSearch[panel.id]?.trim().toLowerCase();
   if (!search) return nextModels;
   return nextModels.filter((model) => `${model.name} ${model.providers.join(" ")}`.toLowerCase().includes(search));
 }
 
-function hasVisionMetadata(model: ModelOption | undefined): boolean {
+function hasVision(model: ModelOption | undefined): boolean {
   if (!model?.modalities) return false;
   return model.modalities.input.includes("image");
 }
 
-function shouldShowVisionWarning(model: ModelOption | undefined): boolean {
-  return Boolean(isVisionScenario.value && model && !hasVisionMetadata(model));
+function visionWarning(model: ModelOption | undefined): boolean {
+  return Boolean(isVisionScenario.value && model && !hasVision(model));
 }
 
-function getGroupedPanelModels(panel: PanelState) {
-  const groups = new Map<ReturnType<typeof categorizeModelFamily>, ModelOption[]>();
-  for (const model of getPanelModels(panel)) {
-    const family = categorizeModelFamily(model.family);
+function groupedModels(panel: PanelState) {
+  const groups = new Map<ReturnType<typeof categorize>, ModelOption[]>();
+  for (const model of panelModels(panel)) {
+    const family = categorize(model.family);
     groups.set(family, [...(groups.get(family) ?? []), model]);
   }
 
-  const familyOrder = new Map(MODEL_FAMILY_SORT_ORDER.map((family, index) => [family, index]));
+  const familyOrder = new Map(SORT_ORDER.map((family, index) => [family, index]));
   return Array.from(groups.entries())
     .sort(([familyA], [familyB]) => {
       const orderA = familyOrder.get(familyA) ?? Number.MAX_SAFE_INTEGER;
       const orderB = familyOrder.get(familyB) ?? Number.MAX_SAFE_INTEGER;
       return orderA === orderB ? familyA.localeCompare(familyB) : orderA - orderB;
     })
-    .map(([family, familyModels]) => ({ family, models: familyModels.sort(compareModelEntries) }));
+    .map(([family, familyModels]) => ({ family, models: familyModels.sort(compareEntries) }));
 }
 
-function getPendingModelAccounts(panel: PanelState): ProviderAccountOption[] {
-  const pendingModelId = pendingModelByPanel[panel.id];
-  const pendingModel = pendingModelId ? modelsById.value.get(pendingModelId) : null;
-  if (!pendingModel) return [];
+function pendingAccounts(panel: PanelState): ProviderAccountOption[] {
+  const pendingId = pendingModel[panel.id];
+  const candidate = pendingId ? modelsById.value.get(pendingId) : null;
+  if (!candidate) return [];
 
-  const routeSearch = routeSearchByPanel[panel.id]?.trim().toLowerCase();
-  const providerOrder = new Map(pendingModel.providers.map((provider, index) => [provider, index]));
+  const search = routeSearch[panel.id]?.trim().toLowerCase();
+  const providerOrder = new Map(candidate.providers.map((provider, index) => [provider, index]));
   return providerAccounts.value
-    .filter((account) => accountSupportsModel(account, pendingModel))
-    .filter((account) => !routeSearch || `${account.provider} ${account.name} ${account.email ?? ""}`.toLowerCase().includes(routeSearch))
+    .filter((account) => accountSupports(account, candidate))
+    .filter((account) => !search || `${account.provider} ${account.name} ${account.email ?? ""}`.toLowerCase().includes(search))
     .sort((a, b) => {
       const orderA = providerOrder.get(a.provider) ?? Number.MAX_SAFE_INTEGER;
       const orderB = providerOrder.get(b.provider) ?? Number.MAX_SAFE_INTEGER;
-      return orderA === orderB ? getAccountLabel(a).localeCompare(getAccountLabel(b)) : orderA - orderB;
+      return orderA === orderB ? accountLabel(a).localeCompare(accountLabel(b)) : orderA - orderB;
     });
 }
 
-function openPanelPicker(panel: PanelState) {
-  selectionOpenByPanel[panel.id] = true;
-  selectionStepByPanel[panel.id] = panel.modelId ? "routing" : "model";
-  pendingModelByPanel[panel.id] = panel.modelId;
+function openPicker(panel: PanelState) {
+  pickerOpen[panel.id] = true;
+  pickerStep[panel.id] = panel.modelId ? "routing" : "model";
+  pendingModel[panel.id] = panel.modelId;
 }
 
-function setModelSearch(panelId: string, event: Event) {
-  modelSearchByPanel[panelId] = (event.target as HTMLInputElement).value;
+function searchModels(panelId: string, event: Event) {
+  modelSearch[panelId] = (event.target as HTMLInputElement).value;
 }
 
-function setRouteSearch(panelId: string, event: Event) {
-  routeSearchByPanel[panelId] = (event.target as HTMLInputElement).value;
+function searchRoutes(panelId: string, event: Event) {
+  routeSearch[panelId] = (event.target as HTMLInputElement).value;
 }
 
-function selectPendingModel(panel: PanelState, modelId: string) {
-  pendingModelByPanel[panel.id] = modelId;
-  selectionStepByPanel[panel.id] = "routing";
+function selectModel(panel: PanelState, modelId: string) {
+  pendingModel[panel.id] = modelId;
+  pickerStep[panel.id] = "routing";
 }
 
-function selectPanelRoute(panel: PanelState, route: { provider: string | null; accountId: string | null }) {
-  const modelId = pendingModelByPanel[panel.id];
+function selectRoute(panel: PanelState, route: { provider: string | null; accountId: string | null }) {
+  const modelId = pendingModel[panel.id];
   if (!modelId) return;
 
   panels.value = panels.value.map((item) => item.id === panel.id ? { ...item, modelId, provider: route.accountId ? null : route.provider, accountId: route.accountId } : item);
-  selectionOpenByPanel[panel.id] = false;
-  selectionStepByPanel[panel.id] = "model";
-  pendingModelByPanel[panel.id] = null;
-  modelSearchByPanel[panel.id] = "";
-  routeSearchByPanel[panel.id] = "";
+  pickerOpen[panel.id] = false;
+  pickerStep[panel.id] = "model";
+  pendingModel[panel.id] = null;
+  modelSearch[panel.id] = "";
+  routeSearch[panel.id] = "";
 }
 
 function addPanel() {
   if (!canAddPanel.value) return;
-  panels.value = [...panels.value, { id: generateId(), modelId: null, provider: null, accountId: null }];
+  panels.value = [...panels.value, { id: Ids.short(), modelId: null, provider: null, accountId: null }];
 }
 
 function removePanel(panelId: string) {
-  stopPanelRequest(panelId);
+  stopPanel(panelId);
   panelScrollElements.delete(panelId);
-  Reflect.deleteProperty(autoScrollByPanel, panelId);
-  Reflect.deleteProperty(chatMessagesByPanel, panelId);
-  Reflect.deleteProperty(copiedErrorByPanel, panelId);
+  Reflect.deleteProperty(autoScroll, panelId);
+  Reflect.deleteProperty(chatMessages, panelId);
+  Reflect.deleteProperty(copiedError, panelId);
   const timeout = copyErrorTimeouts.get(panelId);
   if (timeout) {
     clearTimeout(timeout);
@@ -720,10 +704,10 @@ function removePanel(panelId: string) {
   responses.value = nextResponses;
 }
 
-function applyFamilyPresets(families: string[]) {
+function applyFamilies(families: string[]) {
   const accountByModel = new Map<string, string>();
   for (const panel of panels.value) {
-    if (panel.modelId && panel.accountId && getValidAccountIdForPanel(panel)) {
+    if (panel.modelId && panel.accountId && routeAccount(panel)) {
       accountByModel.set(panel.modelId, panel.accountId);
     }
   }
@@ -731,21 +715,21 @@ function applyFamilyPresets(families: string[]) {
   const selected = familyPresets.value.filter((preset) => families.includes(preset.family));
   const nextModels = selected.flatMap((preset) => preset.models);
   panels.value = nextModels.length > 0
-    ? nextModels.map((model) => ({ id: generateId(), modelId: model.id, provider: null, accountId: accountByModel.get(model.id) ?? null }))
-    : [{ id: generateId(), modelId: null, provider: null, accountId: null }];
+    ? nextModels.map((model) => ({ id: Ids.short(), modelId: model.id, provider: null, accountId: accountByModel.get(model.id) ?? null }))
+    : [{ id: Ids.short(), modelId: null, provider: null, accountId: null }];
   responses.value = {};
 }
 
-function applyProviderPresets(providers: string[]) {
+function applyProviders(providers: string[]) {
   const selected = providerPresets.value.filter((preset) => providers.includes(preset.provider));
   const nextPanels = selected.flatMap((preset) => preset.panels);
   panels.value = nextPanels.length > 0
-    ? nextPanels.map((panel) => ({ id: generateId(), modelId: panel.modelId, provider: panel.provider, accountId: panel.accountId }))
-    : [{ id: generateId(), modelId: null, provider: null, accountId: null }];
+    ? nextPanels.map((panel) => ({ id: Ids.short(), modelId: panel.modelId, provider: panel.provider, accountId: panel.accountId }))
+    : [{ id: Ids.short(), modelId: null, provider: null, accountId: null }];
   responses.value = {};
 }
 
-function applyFamilyPreset(family: string) {
+function toggleFamily(family: string) {
   if (!familyPresets.value.some((item) => item.family === family)) return;
 
   const nextFamilies = activeFamilyPresets.value.includes(family)
@@ -754,10 +738,10 @@ function applyFamilyPreset(family: string) {
 
   activeFamilyPresets.value = nextFamilies;
   activeProviderPresets.value = [];
-  applyFamilyPresets(nextFamilies);
+  applyFamilies(nextFamilies);
 }
 
-function applyProviderPreset(provider: string) {
+function toggleProvider(provider: string) {
   if (!providerPresets.value.some((item) => item.provider === provider)) return;
 
   const nextProviders = activeProviderPresets.value.includes(provider)
@@ -766,13 +750,13 @@ function applyProviderPreset(provider: string) {
 
   activeProviderPresets.value = nextProviders;
   activeFamilyPresets.value = [];
-  applyProviderPresets(nextProviders);
+  applyProviders(nextProviders);
 }
 
 function selectScenario(scenario: Scenario) {
   selectedScenario.value = scenario;
   responses.value = {};
-  resetChatMessages();
+  clearChat();
   if (scenario.isReasoning && settings.reasoningEffort === "none") {
     settings.reasoningEffort = "medium";
   }
@@ -783,31 +767,31 @@ function resetSettings() {
   additionalParametersInput.value = "";
 }
 
-function resetChatMessages() {
-  for (const panelId of Object.keys(chatMessagesByPanel)) {
-    Reflect.deleteProperty(chatMessagesByPanel, panelId);
+function clearChat() {
+  for (const panelId of Object.keys(chatMessages)) {
+    Reflect.deleteProperty(chatMessages, panelId);
   }
 }
 
-function getScenarioMessages(scenario: Scenario): ScenarioMessage[] {
+function messagesOf(scenario: Scenario): ScenarioMessage[] {
   return scenario.messages?.length ? scenario.messages : [{ role: "user", content: scenario.prompt }];
 }
 
-function getPanelScenarioMessages(panelId: string, scenario: Scenario): ScenarioMessage[] {
-  return scenario.id === "chat" && chatMessagesByPanel[panelId]?.length ? chatMessagesByPanel[panelId] : getScenarioMessages(scenario);
+function panelMessages(panelId: string, scenario: Scenario): ScenarioMessage[] {
+  return scenario.id === "chat" && chatMessages[panelId]?.length ? chatMessages[panelId] : messagesOf(scenario);
 }
 
-function getScenarioConversationMessages(panelId: string): ScenarioMessage[] {
+function conversationMessages(panelId: string): ScenarioMessage[] {
   const scenario = selectedScenario.value;
-  return scenario?.id === "chat" && chatMessagesByPanel[panelId]?.length ? chatMessagesByPanel[panelId] : scenarioMessages.value;
+  return scenario?.id === "chat" && chatMessages[panelId]?.length ? chatMessages[panelId] : scenarioMessages.value;
 }
 
-function getPanelSystemPromptText(panelId: string): string {
-  return getScenarioConversationMessages(panelId).filter((message) => message.role === "system").map((message) => extractMessageText(message.content)).filter(Boolean).join("\n\n");
+function systemPrompt(panelId: string): string {
+  return conversationMessages(panelId).filter((message) => message.role === "system").map((message) => Content.message(message.content)).filter(Boolean).join("\n\n");
 }
 
-function getPanelUserScenarioMessages(panelId: string): ScenarioMessage[] {
-  return getScenarioConversationMessages(panelId).filter((message) => message.role !== "system");
+function userMessages(panelId: string): ScenarioMessage[] {
+  return conversationMessages(panelId).filter((message) => message.role !== "system");
 }
 
 
@@ -818,13 +802,13 @@ function getPanelUserScenarioMessages(panelId: string): ScenarioMessage[] {
 
 
 
-function getPanelWaitLabel(panelId: string): string {
+function waitLabel(panelId: string): string {
   const response = responses.value[panelId];
-  if (response?.isLoading && response.startedAt) return formatDurationMs(liveNow.value - response.startedAt);
-  return formatDurationMs(response?.metrics.waitMs);
+  if (response?.isLoading && response.startedAt) return Duration.format(liveNow.value - response.startedAt);
+  return Duration.format(response?.metrics.waitMs);
 }
 
-function setPanelScrollElement(panelId: string, element: unknown) {
+function bindScroll(panelId: string, element: unknown) {
   if (element instanceof HTMLElement) {
     panelScrollElements.set(panelId, element);
     return;
@@ -833,17 +817,17 @@ function setPanelScrollElement(panelId: string, element: unknown) {
   panelScrollElements.delete(panelId);
 }
 
-function scrollPanelToBottom(panelId: string) {
-  if (!autoScrollByPanel[panelId]) return;
+function scrollBottom(panelId: string) {
+  if (!autoScroll[panelId]) return;
   nextTick(() => {
     const element = panelScrollElements.get(panelId);
     const response = responses.value[panelId];
-    if (!element || !response?.isLoading || !autoScrollByPanel[panelId]) return;
+    if (!element || !response?.isLoading || !autoScroll[panelId]) return;
     element.scrollTop = element.scrollHeight;
   });
 }
 
-function handlePanelScroll(panelId: string, event: Event) {
+function onScroll(panelId: string, event: Event) {
   const element = event.currentTarget;
   if (!(element instanceof HTMLElement)) return;
 
@@ -854,7 +838,7 @@ function handlePanelScroll(panelId: string, event: Event) {
   if (scrollableDistance === 0) return;
 
   const distanceFromBottom = scrollableDistance - element.scrollTop;
-  autoScrollByPanel[panelId] = distanceFromBottom / scrollableDistance <= AUTO_SCROLL_DISABLE_THRESHOLD;
+  autoScroll[panelId] = distanceFromBottom / scrollableDistance <= SCROLL_THRESHOLD;
 }
 
 
@@ -910,7 +894,7 @@ function handlePanelScroll(panelId: string, event: Event) {
 
 
 
-function streamProxyRequest(input: StreamProxyRequestInput): Promise<void> {
+function streamRequest(input: StreamRequest): Promise<void> {
   return new Promise((resolve, reject) => {
     if (input.signal.aborted) {
       reject(new DOMException("Aborted", "AbortError"));
@@ -921,7 +905,7 @@ function streamProxyRequest(input: StreamProxyRequestInput): Promise<void> {
     let processedLength = 0;
     let headersHandled = false;
     let settled = false;
-    const processor = createSseChunkProcessor(input.endpoint, input.onChunk);
+    const processor = Sse.processor(input.endpoint, input.onChunk);
 
     const cleanup = () => {
       input.signal.removeEventListener("abort", abortRequest);
@@ -950,16 +934,16 @@ function streamProxyRequest(input: StreamProxyRequestInput): Promise<void> {
 
     xhr.onreadystatechange = () => {
       handleHeaders();
-      if (xhr.readyState === XMLHttpRequest.LOADING && isSuccessfulStatus(xhr.status)) processResponseText();
+      if (xhr.readyState === XMLHttpRequest.LOADING && Sse.ok(xhr.status)) processResponseText();
     };
     xhr.onprogress = () => {
       handleHeaders();
-      if (isSuccessfulStatus(xhr.status)) processResponseText();
+      if (Sse.ok(xhr.status)) processResponseText();
     };
     xhr.onload = () => {
       handleHeaders();
-      if (!isSuccessfulStatus(xhr.status)) {
-        settle(() => reject(new Error(getErrorMessageFromText(xhr.responseText || ""))));
+      if (!Sse.ok(xhr.status)) {
+        settle(() => reject(new Error(ErrorText.fromResponse(xhr.responseText || ""))));
         return;
       }
       processResponseText();
@@ -985,10 +969,10 @@ function streamProxyRequest(input: StreamProxyRequestInput): Promise<void> {
 
 
 
-function getProxyBaseUrl(): string {
-  const proxyBaseUrl = options.value?.proxyBaseUrl?.trim().replace(/\/+$/, "");
-  if (!proxyBaseUrl) throw new Error("Proxy URL is not configured");
-  return proxyBaseUrl;
+function proxyUrl(): string {
+  const proxyUrl = options.value?.proxyBaseUrl?.trim().replace(/\/+$/, "");
+  if (!proxyUrl) throw new Error("Proxy URL is not configured");
+  return proxyUrl;
 }
 
 
@@ -1007,33 +991,29 @@ function getProxyBaseUrl(): string {
 
 
 
-function setResponse(panelId: string, response: ResponseData) {
+function setResponse(panelId: string, response: ResponseData, requestId?: string) {
+  if (requestId !== undefined && requestIds.get(panelId) !== requestId) return;
   responses.value = { ...responses.value, [panelId]: response };
-  if (response.isLoading) scrollPanelToBottom(panelId);
+  if (response.isLoading) scrollBottom(panelId);
 }
 
-function setResponseIfCurrent(panelId: string, requestId: string, response: ResponseData) {
-  if (requestIds.get(panelId) !== requestId) return;
-  setResponse(panelId, response);
-}
-
-function refreshAccountOverview() {
-  if (accountOverviewInvalidationTimer) clearTimeout(accountOverviewInvalidationTimer);
-  accountOverviewInvalidationTimer = setTimeout(() => {
-    accountOverviewInvalidationTimer = null;
+function refreshOverview() {
+  if (overviewTimer) clearTimeout(overviewTimer);
+  overviewTimer = setTimeout(() => {
+    overviewTimer = null;
     void invalidation.invalidateAccountOverview();
-  }, ACCOUNT_OVERVIEW_INVALIDATION_DELAY_MS);
+  }, OVERVIEW_DELAY_MS);
 }
 
-async function runChatScenarioForPanel(panel: PanelState & { modelId: string }, scenario: Scenario, currentSettings: PlaygroundSettings): Promise<FetchModelResult> {
-  const messages = [...getScenarioMessages(scenario)];
-  chatMessagesByPanel[panel.id] = messages;
+async function runChat(panel: PanelState & { modelId: string }, scenario: Scenario, currentSettings: PlaygroundSettings): Promise<FetchModelResult> {
+  const messages = [...messagesOf(scenario)];
+  chatMessages[panel.id] = messages;
 
   const followUps = scenario.autoFollowUps ?? [];
   for (let step = 0; step <= followUps.length; step += 1) {
-    if (!isBatchRunActive.value || stoppedBatchPanelIds.has(panel.id)) return "aborted";
+    if (!batchActive.value || stoppedPanels.has(panel.id)) return "aborted";
 
-    const result = await fetchFromModel(panel.id, panel.modelId, scenario, currentSettings, getValidProviderForPanel(panel), getValidAccountIdForPanel(panel), messages);
+    const result = await fetchModel(panel.id, panel.modelId, scenario, currentSettings, panelProvider(panel), routeAccount(panel), messages);
     if (result !== "success") return result;
 
     const response = responses.value[panel.id];
@@ -1041,40 +1021,40 @@ async function runChatScenarioForPanel(panel: PanelState & { modelId: string }, 
     if (!assistantContent) return "success";
 
     messages.push({ role: "assistant", content: assistantContent });
-    chatMessagesByPanel[panel.id] = [...messages];
+    chatMessages[panel.id] = [...messages];
 
     const followUp = followUps[step];
     if (!followUp) return "success";
 
     messages.push({ role: "user", content: followUp });
-    chatMessagesByPanel[panel.id] = [...messages];
+    chatMessages[panel.id] = [...messages];
   }
 
   return "success";
 }
 
-async function fetchFromModel(panelId: string, modelId: string, scenario: Scenario, currentSettings: PlaygroundSettings, provider: string | null, accountId: string | null, messages = getPanelScenarioMessages(panelId, scenario)): Promise<FetchModelResult> {
+async function fetchModel(panelId: string, modelId: string, scenario: Scenario, currentSettings: PlaygroundSettings, provider: string | null, accountId: string | null, messages = panelMessages(panelId, scenario)): Promise<FetchModelResult> {
   const requestStartedAt = Date.now();
-  const requestId = generateId();
+  const requestId = Ids.short();
   let waitMs: number | null = null;
   let usedAccountId: string | null = null;
-  let shouldRefreshAccountOverview = false;
+  let shouldRefreshOverview = false;
   let errorContextParameters: Record<string, unknown> | null = null;
 
   controllers.get(panelId)?.abort();
   requestIds.set(panelId, requestId);
-  autoScrollByPanel[panelId] = true;
-  setResponse(panelId, { content: "", reasoning: "", toolCalls: [], isLoading: true, metrics: buildResponseMetrics(null, null, null), startedAt: requestStartedAt });
+  autoScroll[panelId] = true;
+  setResponse(panelId, { content: "", reasoning: "", toolCalls: [], isLoading: true, metrics: Tokens.metrics(null, null, null), startedAt: requestStartedAt });
 
   try {
-    const requestBody = buildRequestBody(modelId, messages, currentSettings);
+    const requestBody = Body.build(modelId, messages, currentSettings);
     errorContextParameters = requestBody;
-    const endpointOverrides = adaptRequestOverridesForEndpoint(scenario.requestOverrides, currentSettings.endpoint);
+    const endpointOverrides = Body.overrides(scenario.requestOverrides, currentSettings.endpoint);
     if (endpointOverrides) Object.assign(requestBody, endpointOverrides);
-    const additionalParameters = parseAdditionalParameters(additionalParametersInput.value);
+    const additionalParameters = Params.parse(additionalParametersInput.value);
     if (additionalParameters.error) throw new Error(`Invalid additional parameters: ${additionalParameters.error}`);
     if (additionalParameters.params) Object.assign(requestBody, additionalParameters.params);
-    applyRouteSelectorToRequestBody(requestBody, provider, accountId);
+    Body.route(requestBody, provider, accountId);
     if (!canUsePlayground.value) throw new Error(playgroundSetupMessage.value || "Playground is not ready.");
 
     const controller = new AbortController();
@@ -1082,7 +1062,7 @@ async function fetchFromModel(panelId: string, modelId: string, scenario: Scenar
     const auth = await api.playground.auth({ endpoint: currentSettings.endpoint });
     if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
 
-    const url = `${getProxyBaseUrl()}${getEndpointPath(currentSettings.endpoint)}`;
+    const url = `${proxyUrl()}${ErrorText.path(currentSettings.endpoint)}`;
     const headers = {
       "Content-Type": "application/json",
       Accept: "application/json, text/event-stream",
@@ -1097,7 +1077,7 @@ async function fetchFromModel(panelId: string, modelId: string, scenario: Scenar
       let firstResponseMs: number | null = null;
       let usage: ParsedUsageData | null = null;
 
-      await streamProxyRequest({
+      await streamRequest({
         url,
         headers,
         body,
@@ -1106,19 +1086,19 @@ async function fetchFromModel(panelId: string, modelId: string, scenario: Scenar
         onHeaders: (info) => {
           waitMs = Date.now() - requestStartedAt;
           usedAccountId = info.getHeader("x-provider-account-id");
-          shouldRefreshAccountOverview = true;
+          shouldRefreshOverview = true;
         },
         onChunk: (chunk) => {
           firstResponseMs ??= Date.now() - requestStartedAt;
           streamedContent += chunk.content;
           streamedReasoning += chunk.reasoning;
           streamedToolCalls = chunk.toolCalls.length > 0 ? [...streamedToolCalls, ...chunk.toolCalls] : streamedToolCalls;
-          usage = mergeUsageData(usage, chunk.usage);
-          setResponseIfCurrent(panelId, requestId, { content: streamedContent, reasoning: streamedReasoning, toolCalls: streamedToolCalls, isLoading: true, metrics: buildResponseMetrics(waitMs, firstResponseMs, usage), usedAccountId, startedAt: requestStartedAt });
+          usage = Tokens.merge(usage, chunk.usage);
+          setResponse(panelId, { content: streamedContent, reasoning: streamedReasoning, toolCalls: streamedToolCalls, isLoading: true, metrics: Tokens.metrics(waitMs, firstResponseMs, usage), usedAccountId, startedAt: requestStartedAt }, requestId);
         },
       });
 
-      setResponseIfCurrent(panelId, requestId, { content: streamedContent, reasoning: streamedReasoning, toolCalls: streamedToolCalls, isLoading: false, metrics: buildResponseMetrics(waitMs, firstResponseMs, usage), usedAccountId });
+      setResponse(panelId, { content: streamedContent, reasoning: streamedReasoning, toolCalls: streamedToolCalls, isLoading: false, metrics: Tokens.metrics(waitMs, firstResponseMs, usage), usedAccountId }, requestId);
       return "success";
     }
 
@@ -1131,14 +1111,14 @@ async function fetchFromModel(panelId: string, modelId: string, scenario: Scenar
 
     waitMs = Date.now() - requestStartedAt;
     usedAccountId = response.headers.get("x-provider-account-id");
-    shouldRefreshAccountOverview = true;
+    shouldRefreshOverview = true;
 
     if (!response.ok) {
       const clonedResponse = response.clone();
       let errorMessage = "Request failed";
       try {
         const errorData = await response.json();
-        errorMessage = extractErrorMessage(errorData) ?? errorMessage;
+        errorMessage = Completion.error(errorData) ?? errorMessage;
       } catch {
         const errorText = await clonedResponse.text();
         if (errorText.trim()) errorMessage = errorText;
@@ -1147,8 +1127,8 @@ async function fetchFromModel(panelId: string, modelId: string, scenario: Scenar
     }
 
     const payload = await response.json();
-    const parsed = currentSettings.endpoint === "messages" ? extractAnthropicCompletionData(payload) : currentSettings.endpoint === "responses" ? extractResponsesCompletionData(payload) : extractChatCompletionData(payload);
-    setResponseIfCurrent(panelId, requestId, { content: parsed.content, reasoning: parsed.reasoning, toolCalls: parsed.toolCalls, isLoading: false, metrics: buildResponseMetrics(waitMs, Date.now() - requestStartedAt, parsed.usage), usedAccountId });
+    const parsed = currentSettings.endpoint === "messages" ? Completion.anthropic(payload) : currentSettings.endpoint === "responses" ? Completion.responses(payload) : Completion.chat(payload);
+    setResponse(panelId, { content: parsed.content, reasoning: parsed.reasoning, toolCalls: parsed.toolCalls, isLoading: false, metrics: Tokens.metrics(waitMs, Date.now() - requestStartedAt, parsed.usage), usedAccountId }, requestId);
     return "success";
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
@@ -1158,25 +1138,25 @@ async function fetchFromModel(panelId: string, modelId: string, scenario: Scenar
     }
 
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    const providerByAccount = accountId ? providerAccountsById.value.get(accountId)?.provider ?? null : null;
-    const providerByUsedAccount = usedAccountId ? providerAccountsById.value.get(usedAccountId)?.provider ?? null : null;
-    const errorProvider = provider ?? providerByAccount ?? providerByUsedAccount ?? null;
-    const errorDetails = buildPlaygroundErrorMessage(errorMessage, { model: modelId, provider: errorProvider, endpoint: currentSettings.endpoint, parameters: errorContextParameters, messages });
-    setResponseIfCurrent(panelId, requestId, { content: "", reasoning: "", toolCalls: [], isLoading: false, error: errorMessage, errorDetails, metrics: buildResponseMetrics(waitMs, null, null), usedAccountId });
+    const providerByAccount = accountId ? accountsById.value.get(accountId)?.provider ?? null : null;
+    const usedAccountProvider = usedAccountId ? accountsById.value.get(usedAccountId)?.provider ?? null : null;
+    const errorProvider = provider ?? providerByAccount ?? usedAccountProvider ?? null;
+    const errorDetails = ErrorText.build(errorMessage, { model: modelId, provider: errorProvider, endpoint: currentSettings.endpoint, parameters: errorContextParameters, messages });
+    setResponse(panelId, { content: "", reasoning: "", toolCalls: [], isLoading: false, error: errorMessage, errorDetails, metrics: Tokens.metrics(waitMs, null, null), usedAccountId }, requestId);
     return "error";
   } finally {
     if (requestIds.get(panelId) === requestId) {
       controllers.delete(panelId);
       requestIds.delete(panelId);
     }
-    if (shouldRefreshAccountOverview) refreshAccountOverview();
+    if (shouldRefreshOverview) refreshOverview();
   }
 }
 
-async function runSelectedScenario(requestedLoopCount = 1) {
+async function runScenario(requestedLoopCount = 1) {
   if (!selectedScenario.value || !canRunPlayground.value) return;
   const scenario = selectedScenario.value;
-  resetChatMessages();
+  clearChat();
   let currentSettings = { ...settings };
   if (scenario.isReasoning && currentSettings.reasoningEffort === "none") {
     settings.reasoningEffort = "medium";
@@ -1188,116 +1168,116 @@ async function runSelectedScenario(requestedLoopCount = 1) {
 
   const totalLoops = Math.max(1, Math.floor(requestedLoopCount));
   activeLoopProgress.value = totalLoops > 1 ? { current: 1, total: totalLoops } : null;
-  stoppedBatchPanelIds.clear();
-  isBatchRunActive.value = true;
+  stoppedPanels.clear();
+  batchActive.value = true;
 
   try {
     await Promise.all(panelsWithModels.map(async (panel) => {
       for (let iteration = 0; iteration < totalLoops; iteration += 1) {
-        if (!isBatchRunActive.value || stoppedBatchPanelIds.has(panel.id)) break;
+        if (!batchActive.value || stoppedPanels.has(panel.id)) break;
         activeLoopProgress.value = totalLoops > 1 ? { current: iteration + 1, total: totalLoops } : null;
 
         const result = scenario.id === "chat"
-          ? await runChatScenarioForPanel(panel, scenario, currentSettings)
-          : await fetchFromModel(panel.id, panel.modelId, scenario, currentSettings, getValidProviderForPanel(panel), getValidAccountIdForPanel(panel));
+          ? await runChat(panel, scenario, currentSettings)
+          : await fetchModel(panel.id, panel.modelId, scenario, currentSettings, panelProvider(panel), routeAccount(panel));
         if (result !== "success") {
-          stoppedBatchPanelIds.add(panel.id);
+          stoppedPanels.add(panel.id);
           break;
         }
       }
     }));
   } finally {
     activeLoopProgress.value = null;
-    stoppedBatchPanelIds.clear();
-    isBatchRunActive.value = false;
+    stoppedPanels.clear();
+    batchActive.value = false;
   }
 }
 
-function stopPanelRequest(panelId: string) {
+function stopPanel(panelId: string) {
   controllers.get(panelId)?.abort();
   controllers.delete(panelId);
   requestIds.delete(panelId);
-  stoppedBatchPanelIds.add(panelId);
+  stoppedPanels.add(panelId);
 
   const response = responses.value[panelId];
   if (response?.isLoading) setResponse(panelId, { ...response, isLoading: false, error: undefined });
 }
 
-function stopAllRequests() {
+function stopAll() {
   for (const panelId of Array.from(controllers.keys())) {
-    stopPanelRequest(panelId);
+    stopPanel(panelId);
   }
-  isBatchRunActive.value = false;
+  batchActive.value = false;
   activeLoopProgress.value = null;
 }
 
 async function retryPanel(panelId: string) {
   const panel = panels.value.find((item) => item.id === panelId);
   if (!panel?.modelId || !selectedScenario.value || !canRunPlayground.value) return;
-  const wasBatchRunActive = isBatchRunActive.value;
-  if (wasBatchRunActive) stoppedBatchPanelIds.add(panelId);
+  const wasBatchActive = batchActive.value;
+  if (wasBatchActive) stoppedPanels.add(panelId);
   if (selectedScenario.value.id === "chat") {
-    isBatchRunActive.value = true;
-    stoppedBatchPanelIds.delete(panel.id);
+    batchActive.value = true;
+    stoppedPanels.delete(panel.id);
     try {
-      await runChatScenarioForPanel(panel as PanelState & { modelId: string }, selectedScenario.value, { ...settings });
+      await runChat(panel as PanelState & { modelId: string }, selectedScenario.value, { ...settings });
     } finally {
-      isBatchRunActive.value = wasBatchRunActive;
+      batchActive.value = wasBatchActive;
     }
     return;
   }
-  await fetchFromModel(panel.id, panel.modelId, selectedScenario.value, { ...settings }, getValidProviderForPanel(panel), getValidAccountIdForPanel(panel));
+  await fetchModel(panel.id, panel.modelId, selectedScenario.value, { ...settings }, panelProvider(panel), routeAccount(panel));
 }
 
-function handleStartPointerDown(event: PointerEvent) {
+function onPress(event: PointerEvent) {
   if (event.pointerType === "mouse" && event.button !== 0) return;
   document.getSelection()?.removeAllRanges();
-  if (startLongPressTimer) clearTimeout(startLongPressTimer);
-  startLongPressTriggered = false;
-  startLongPressTimer = setTimeout(() => {
-    startLongPressTriggered = true;
+  if (longPressTimer) clearTimeout(longPressTimer);
+  longPressFired = false;
+  longPressTimer = setTimeout(() => {
+    longPressFired = true;
     document.getSelection()?.removeAllRanges();
     loopCountInput.value = String(loopCount.value);
     loopDialogOpen.value = true;
-  }, START_LONG_PRESS_DELAY_MS);
+  }, LONG_PRESS_MS);
 }
 
-function handleStartPointerEnd() {
-  if (startLongPressTimer) {
-    clearTimeout(startLongPressTimer);
-    startLongPressTimer = null;
+function pressRelease() {
+  if (longPressTimer) {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
   }
 }
 
-function handleStartClick() {
-  if (startLongPressTriggered) {
-    startLongPressTriggered = false;
+function onTap() {
+  if (longPressFired) {
+    longPressFired = false;
     return;
   }
-  runSelectedScenario();
+  runScenario();
 }
 
 function runLoop() {
-  if (!isLoopCountValid.value) return;
+  if (!loopCountValid.value) return;
   loopCount.value = parsedLoopCount.value;
   loopDialogOpen.value = false;
-  runSelectedScenario(parsedLoopCount.value);
+  runScenario(parsedLoopCount.value);
 }
 
 
 
-async function copyPanelError(panelId: string) {
+async function copyError(panelId: string) {
   const response = responses.value[panelId];
   const error = response?.error;
   if (!error) return;
 
   try {
     await navigator.clipboard.writeText(response.errorDetails ?? error);
-    copiedErrorByPanel[panelId] = true;
+    copiedError[panelId] = true;
     const existingTimeout = copyErrorTimeouts.get(panelId);
     if (existingTimeout) clearTimeout(existingTimeout);
     copyErrorTimeouts.set(panelId, setTimeout(() => {
-      copiedErrorByPanel[panelId] = false;
+      copiedError[panelId] = false;
       copyErrorTimeouts.delete(panelId);
     }, 1800));
   } catch {
@@ -1322,65 +1302,65 @@ async function copyPanelError(panelId: string) {
     activeProviderPresets,
     familyPresetExpanded,
     providerPresetExpanded,
-    selectionOpenByPanel,
-    selectionStepByPanel,
-    pendingModelByPanel,
-    modelSearchByPanel,
-    routeSearchByPanel,
-    copiedErrorByPanel,
+    pickerOpen,
+    pickerStep,
+    pendingModel,
+    modelSearch,
+    routeSearch,
+    copiedError,
     modelsById,
-    providerAccountsById,
+    accountsById,
     familyPresets,
     providerPresets,
     canAddPanel,
     isAnyLoading,
-    isTopPDeprecated,
+    topPDeprecated,
     additionalParametersError,
     canRunPlayground,
-    isLoopCountValid,
-    activeLoopBadgeLabel,
+    loopCountValid,
+    loopBadge,
     isChatScenario,
-    getValidProviderForPanel,
-    getAccountLabel,
-    getAccountPlaygroundStatus,
-    getProviderPresetAccountLabel,
-    getProviderScopedRouteLabel,
-    getPendingModelProviders,
-    getValidAccountIdForPanel,
-    getSelectedRouteLabel,
-    getPanelProviderAccountHref,
-    shouldShowVisionWarning,
-    getGroupedPanelModels,
-    getPendingModelAccounts,
-    openPanelPicker,
-    setModelSearch,
-    setRouteSearch,
-    selectPendingModel,
-    selectPanelRoute,
+    panelProvider,
+    accountLabel,
+    accountStatus,
+    presetLabel,
+    scopedLabel,
+    pendingProviders,
+    routeAccount,
+    routeLabel,
+    accountLink,
+    visionWarning,
+    groupedModels,
+    pendingAccounts,
+    openPicker,
+    searchModels,
+    searchRoutes,
+    selectModel,
+    selectRoute,
     addPanel,
     removePanel,
-    applyFamilyPreset,
-    applyProviderPreset,
+    toggleFamily,
+    toggleProvider,
     selectScenario,
     resetSettings,
-    getScenarioConversationMessages,
-    getPanelSystemPromptText,
-    getPanelUserScenarioMessages,
-    getPanelWaitLabel,
-    setPanelScrollElement,
-    handlePanelScroll,
-    stopPanelRequest,
-    stopAllRequests,
+    conversationMessages,
+    systemPrompt,
+    userMessages,
+    waitLabel,
+    bindScroll,
+    onScroll,
+    stopPanel,
+    stopAll,
     retryPanel,
-    handleStartPointerDown,
-    handleStartPointerEnd,
-    handleStartClick,
+    onPress,
+    pressRelease,
+    onTap,
     runLoop,
-    copyPanelError,
+    copyError,
     error,
-    getProviderLabel,
-    extractMessageText,
-    extractImageUrls,
-    formatToolArguments,
+    labelOf,
+    extractMessageText: Content.message,
+    extractImageUrls: Content.images,
+    formatToolArguments: ToolCalls.format,
   };
 }

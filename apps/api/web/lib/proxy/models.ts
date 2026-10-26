@@ -1,32 +1,32 @@
 import { Registry } from "@opendum/models/runtime";
 import type { ModelInfo, ProviderAccessRule } from "@opendum/models/runtime";
-import { compareModelEntries } from "@opendum/models/sort";
-import { resolveModelsDirForService } from "../../../core/context.js";
+import { compareEntries } from "@opendum/models/sort";
+import { dirFor } from "../../../core/context.js";
 
-export const registry = Registry.load(resolveModelsDirForService(), { familyFromFolder: true });
+export const registry = Registry.load(dirFor(), { familyFromFolder: true });
 
 export const MODEL_REGISTRY: Record<string, ModelInfo> = registry.entries();
 export const IGNORED_MODELS = new Set(registry.ignoredModels());
 
 export type { ModelInfo, ProviderAccessRule };
 
-export function getProviderModelMap(provider: string): Record<string, string> {
+export function providerModels(provider: string): Record<string, string> {
   return Object.fromEntries(registry.modelMap(provider));
 }
 
-export function getProviderModelSet(provider: string): Set<string> {
+export function providerSet(provider: string): Set<string> {
   return registry.modelSet(provider);
 }
 
-export function getProviderAccessRule(model: string, provider: string): ProviderAccessRule | null {
+export function ruleOf(model: string, provider: string): ProviderAccessRule | null {
   return registry.rule(model, provider);
 }
 
-export function getAuthlessProviderModels(): Record<string, string[]> {
+export function authlessModels(): Record<string, string[]> {
   const result: Record<string, string[]> = {};
   for (const [provider, models] of registry.authlessModels()) {
     result[provider] = [...models].sort((a, b) =>
-      compareModelEntries(
+      compareEntries(
         { id: a, family: MODEL_REGISTRY[a]?.family },
         { id: b, family: MODEL_REGISTRY[b]?.family }
       )
@@ -35,30 +35,30 @@ export function getAuthlessProviderModels(): Record<string, string[]> {
   return result;
 }
 
-export function resolveModelAlias(model: string): string {
+export function aliasOf(model: string): string {
   return registry.resolveAlias(model);
 }
 
-export function getModelLookupKeys(model: string): string[] {
+export function keysOf(model: string): string[] {
   return registry.lookupKeys(model);
 }
 
-export function getProvidersForModel(model: string): string[] {
+export function providersFor(model: string): string[] {
   return registry.providers(model);
 }
 
-export function isModelSupported(model: string): boolean {
+export function supportsModel(model: string): boolean {
   return registry.isSupported(model);
 }
 
-export function getAllModels(): string[] {
+export function allModels(): string[] {
   return registry.allModels();
 }
 
-export function getModelFamily(model: string): string | undefined {
+export function familyOf(model: string): string | undefined {
   return registry.modelFamily(model) || undefined;
 }
 
-export function getAllFamilies(): string[] {
+export function allFamilies(): string[] {
   return registry.families();
 }

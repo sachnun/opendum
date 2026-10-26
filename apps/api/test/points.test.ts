@@ -15,7 +15,7 @@ describe("roaming points", () => {
   it("debits the minimum on reserve", async () => {
     const points = pointPort({
       debitPointBalance: mock(() => Effect.succeed(9)),
-      insertPointTransactionOnConflictDoNothing: mock(() => Effect.succeed(1)),
+      insertTransaction: mock(() => Effect.succeed(1)),
     });
 
     const reservation = await Effect.runPromise(reserveRoamingPoint(points, "user-1", "gpt-4o"));
@@ -37,7 +37,7 @@ describe("roaming points", () => {
   it("writes a settle marker even when the delta is zero", async () => {
     const inserted: Array<{ type: string; idempotencyKey: string | null }> = [];
     const points = pointPort({
-      insertPointTransactionOnConflictDoNothing: mock(
+      insertTransaction: mock(
         (params: { type: string; idempotencyKey: string | null }) => {
           inserted.push({ type: params.type, idempotencyKey: params.idempotencyKey });
           return Effect.succeed(1);
@@ -55,13 +55,13 @@ describe("roaming points", () => {
 
     expect(inserted).toEqual([{ type: "roaming_settle", idempotencyKey: "roaming_settle:debit-1" }]);
     expect(points.creditPointBalance).not.toHaveBeenCalled();
-    expect(points.debitPointBalanceAllowNegative).not.toHaveBeenCalled();
+    expect(points.debitAllowNegative).not.toHaveBeenCalled();
   });
 
   it("refunds with an idempotency key derived from the debit", async () => {
     const inserted: Array<{ type: string; idempotencyKey: string | null; amount: number }> = [];
     const points = pointPort({
-      insertPointTransactionOnConflictDoNothing: mock(
+      insertTransaction: mock(
         (params: { type: string; idempotencyKey: string | null; amount: number }) => {
           inserted.push({ type: params.type, idempotencyKey: params.idempotencyKey, amount: params.amount });
           return Effect.succeed(1);
@@ -79,7 +79,7 @@ describe("roaming points", () => {
 
   it("does not double refund when the marker already exists", async () => {
     const points = pointPort({
-      insertPointTransactionOnConflictDoNothing: mock(() => Effect.succeed(0)),
+      insertTransaction: mock(() => Effect.succeed(0)),
     });
 
     await Effect.runPromise(

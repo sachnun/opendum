@@ -33,7 +33,7 @@ export function errorEnvelope(
   };
 }
 
-export function internalErrorResponse(format: ErrorFormat, message = "Internal server error"): Response {
+export function internalResponse(format: ErrorFormat, message = "Internal server error"): Response {
   return jsonResponse(errorEnvelope(format, message, "api_error"), 500);
 }
 
@@ -47,10 +47,10 @@ export function notFound(): Response {
 
 const ANTHROPIC_PATHS = new Set(["/v1/messages"]);
 
-export function formatForPath(pathname: string): ErrorFormat {
+export function formatPath(pathname: string): ErrorFormat {
   return ANTHROPIC_PATHS.has(pathname) ? "anthropic" : "openai";
 }
 
-export function isInferencePath(pathname: string): boolean {
+export function inferencePath(pathname: string): boolean {
   return pathname === "/v1" || pathname.startsWith("/v1/");
 }

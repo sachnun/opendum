@@ -1,19 +1,19 @@
 import { expect, test } from "bun:test";
 
-import { avatarUrl, cn, requestErrorMessage } from "./utils";
+import { avatarUrl, cn, messageOf } from "./utils";
 
-test("requestErrorMessage prefers the most specific message", () => {
-  expect(requestErrorMessage(new Error("boom"))).toBe("boom");
-  expect(requestErrorMessage({ data: { statusMessage: "status-message" } })).toBe("status-message");
-  expect(requestErrorMessage({ data: { message: "data-message" } })).toBe("data-message");
-  expect(requestErrorMessage({ statusMessage: "top-status" })).toBe("top-status");
-  expect(requestErrorMessage({ message: "top-message" })).toBe("top-message");
+test("messageOf prefers the most specific message", () => {
+  expect(messageOf(new Error("boom"))).toBe("boom");
+  expect(messageOf({ data: { statusMessage: "status-message" } })).toBe("status-message");
+  expect(messageOf({ data: { message: "data-message" } })).toBe("data-message");
+  expect(messageOf({ statusMessage: "top-status" })).toBe("top-status");
+  expect(messageOf({ message: "top-message" })).toBe("top-message");
 });
 
-test("requestErrorMessage falls back for unknown errors", () => {
-  expect(requestErrorMessage(null)).toBe("Request failed. Please try again.");
-  expect(requestErrorMessage({}, "custom fallback")).toBe("custom fallback");
-  expect(requestErrorMessage("string error")).toBe("Request failed. Please try again.");
+test("messageOf falls back for unknown errors", () => {
+  expect(messageOf(null)).toBe("Request failed. Please try again.");
+  expect(messageOf({}, "custom fallback")).toBe("custom fallback");
+  expect(messageOf("string error")).toBe("Request failed. Please try again.");
 });
 
 test("avatarUrl resizes GitHub and Google avatars", () => {

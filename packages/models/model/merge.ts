@@ -29,7 +29,7 @@ function isEmpty(value: unknown): boolean {
   return false;
 }
 
-function mergeProviderConfig(
+function mergeConfig(
   generated: Record<string, ProviderModelConfig> | undefined,
   authored: Record<string, ProviderModelConfig> | undefined,
 ): Record<string, ProviderModelConfig> | undefined {
@@ -41,7 +41,7 @@ function mergeProviderConfig(
   return Object.keys(merged).length > 0 ? merged : undefined;
 }
 
-export function mergeModelData(
+export function mergeData(
   generated: ModelData | undefined,
   authored: ModelData | undefined,
 ): ModelData {
@@ -49,7 +49,7 @@ export function mergeModelData(
   const over = authored ?? {};
   const merged: ModelData = { ...base, ...over };
 
-  const providerConfig = mergeProviderConfig(base.providerConfig, over.providerConfig);
+  const providerConfig = mergeConfig(base.providerConfig, over.providerConfig);
   if (providerConfig) merged.providerConfig = providerConfig;
   else delete merged.providerConfig;
 
@@ -68,7 +68,7 @@ export interface SplitModelData {
   authored: ModelData;
 }
 
-export function splitModelData(data: ModelData): SplitModelData {
+export function splitData(data: ModelData): SplitModelData {
   const generated: ModelData = {};
   const authored: ModelData = {};
 

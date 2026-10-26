@@ -13,7 +13,7 @@ export interface EffectiveModelCapabilities {
   vision: boolean;
 }
 
-export function getEffectiveModelCapabilities(model?: ModelCapabilitiesInput): EffectiveModelCapabilities {
+export function capabilitiesOf(model?: ModelCapabilitiesInput): EffectiveModelCapabilities {
   return {
     reasoning: model?.reasoning === true,
     vision: (model?.modalities?.input ?? []).includes("image"),

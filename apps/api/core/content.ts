@@ -1,12 +1,12 @@
 type Json = Record<string, unknown>;
 
-export function stripImageContent(payload: Json): void {
+export function stripImages(payload: Json): void {
   const messages = payload.messages;
   if (Array.isArray(messages)) {
     for (const item of messages) {
       const message = item as Json;
       if (!Array.isArray(message.content)) continue;
-      const filtered = filterImageParts(message.content);
+      const filtered = filterImages(message.content);
       if (filtered.length === 1) {
         const textPart = filtered[0] as Json;
         if (textPart.type === "text" && typeof textPart.text === "string") {
@@ -23,11 +23,11 @@ export function stripImageContent(payload: Json): void {
   for (const raw of responsesInput) {
     const item = raw as Json;
     if (!Array.isArray(item.content)) continue;
-    item.content = filterImageParts(item.content);
+    item.content = filterImages(item.content);
   }
 }
 
-function filterImageParts(content: unknown[]): unknown[] {
+function filterImages(content: unknown[]): unknown[] {
   const filtered: unknown[] = [];
   for (const part of content) {
     if (part === null || typeof part !== "object" || Array.isArray(part)) {

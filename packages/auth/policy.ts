@@ -9,8 +9,8 @@ export class Policy {
   validateModel(modelParam: string): ModelValidationResult {
     const [provider, rawModel] = parseModel(modelParam);
     const model = this.registry.resolveAlias(rawModel);
-    if (provider === "codex" && !this.isCodexChatGPTModel(model)) {
-      const supported = this.codexChatGPTModels().join(", ");
+    if (provider === "codex" && !this.isChatGpt(model)) {
+      const supported = this.chatGptModels().join(", ");
       return invalid(
         provider,
         model,
@@ -22,7 +22,7 @@ export class Policy {
     if (!this.registry.isSupported(model)) {
       return this.invalidResult(provider, rawModel, modelParam, null);
     }
-    if (provider && !this.registry.isSupportedByProvider(model, provider)) {
+    if (provider && !this.registry.supportsProvider(model, provider)) {
       const supported = this.registry.providers(model).join(", ");
       return invalid(
         provider,
@@ -100,7 +100,7 @@ export class Policy {
     return invalid(provider, model, `Invalid model: ${modelParam}.${suggestionMessage}`, "model", "invalid_model");
   }
 
-  private isCodexChatGPTModel(model: string): boolean {
+  private isChatGpt(model: string): boolean {
     const normalized = model.trim().toLowerCase();
     for (const [canonical, upstream] of this.registry.modelMap("codex")) {
       if (canonical.toLowerCase() === normalized || upstream.toLowerCase() === normalized) return true;
@@ -108,7 +108,7 @@ export class Policy {
     return false;
   }
 
-  private codexChatGPTModels(): string[] {
+  private chatGptModels(): string[] {
     const values = new Set<string>();
     for (const [canonical, upstream] of this.registry.modelMap("codex")) {
       if (canonical) values.add(canonical);

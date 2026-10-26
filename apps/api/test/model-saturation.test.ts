@@ -6,7 +6,7 @@ import type { Registry } from "@opendum/models/runtime";
 import type { OpendumRedis } from "@opendum/core/redis";
 import { ProxyService } from "../core/service.js";
 import { Chat } from "../core/endpoints.js";
-import { ModelSaturation, isModelSaturated } from "../core/model-saturation.js";
+import { ModelSaturation, isSaturated } from "../core/model-saturation.js";
 import { fakes } from "./fakes.js";
 
 function memoryRedis(): OpendumRedis {
@@ -130,7 +130,7 @@ function harness(statuses: Reply[]): Harness {
     resolveAlias: (model: string) => model,
     lookupKeys: (model: string) => [model],
     isVisionModel: () => true,
-    isSupportedByProvider: () => true,
+    supportsProvider: () => true,
     isAuthless: () => false,
     rule: () => null,
     modelCost: () => null,
@@ -195,19 +195,19 @@ function harness(statuses: Reply[]): Harness {
   };
 }
 
-describe("isModelSaturated", () => {
+describe("isSaturated", () => {
   it("detects the workbuddy saturation code", () => {
-    expect(isModelSaturated(429, SATURATED_BODY)).toBe(true);
+    expect(isSaturated(429, SATURATED_BODY)).toBe(true);
   });
 
   it("detects the saturation message without a known status", () => {
-    expect(isModelSaturated(503, JSON.stringify({ msg: "模型繁忙" }))).toBe(true);
+    expect(isSaturated(503, JSON.stringify({ msg: "模型繁忙" }))).toBe(true);
   });
 
   it("ignores ordinary rate limits and request errors", () => {
-    expect(isModelSaturated(429, JSON.stringify({ code: 11148, msg: "rate limited" }))).toBe(false);
-    expect(isModelSaturated(400, "bad request")).toBe(false);
-    expect(isModelSaturated(500, "")).toBe(false);
+    expect(isSaturated(429, JSON.stringify({ code: 11148, msg: "rate limited" }))).toBe(false);
+    expect(isSaturated(400, "bad request")).toBe(false);
+    expect(isSaturated(500, "")).toBe(false);
   });
 });
 
@@ -219,8 +219,8 @@ describe("model saturation handling", () => {
     expect(response.status).toBe(200);
     expect(seen).toEqual(["acc-1", "acc-1"]);
     expect(repositories.health.recordRequestError.mock.calls.length).toBe(0);
-    expect(repositories.health.markUsageLimitedHealth.mock.calls.length).toBe(0);
-    expect(repositories.health.setAccountUsageLimited.mock.calls.length).toBe(0);
+    expect(repositories.health.markUsageLimited.mock.calls.length).toBe(0);
+    expect(repositories.health.markLimited.mock.calls.length).toBe(0);
   });
 
   it("clears the cooldown after a successful retry so the next turn does not wait", async () => {

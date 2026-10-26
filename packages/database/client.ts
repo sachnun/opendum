@@ -15,7 +15,7 @@ const globalForDb = globalThis as unknown as {
 
 const MAX_CONNECTIONS = 10;
 
-function getConnectionString(): string {
+function connectionString(): string {
   const connectionString = process.env.DATABASE_URL;
 
   if (!connectionString) {
@@ -28,7 +28,7 @@ function getConnectionString(): string {
 function createDb(): Database {
   return drizzle({
     connection: {
-      url: getConnectionString(),
+      url: connectionString(),
       max: MAX_CONNECTIONS,
       prepare: false,
     },

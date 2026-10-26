@@ -1,7 +1,7 @@
 import type { DbExecutor } from "../client.js";
 import {
   getCustomProvider,
-  listCustomProviderModels,
+  customModels,
   listCustomProviders,
 } from "../queries/index.js";
 
@@ -16,7 +16,7 @@ export class Customs {
     return getCustomProvider(userId, slug, this.database);
   }
 
-  listCustomProviderModels(providerId: string) {
-    return listCustomProviderModels(providerId, this.database);
+  customModels(providerId: string) {
+    return customModels(providerId, this.database);
   }
 }

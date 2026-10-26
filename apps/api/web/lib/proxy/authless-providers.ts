@@ -1,11 +1,11 @@
-import { getAuthlessProviderModels } from "./models.js";
+import { authlessModels } from "./models.js";
 
 export const AUTHLESS_PROVIDER_KEYS = ["opencode"] as const;
 
 const AUTHLESS_PROVIDER_SET = new Set<string>(AUTHLESS_PROVIDER_KEYS);
 
-export function getAuthlessProviderAccounts() {
-  const providerModelAuthlessAccounts = Object.entries(getAuthlessProviderModels()).map(([provider, models]) => ({
+export function authlessAccounts() {
+  const authlessByProvider = Object.entries(authlessModels()).map(([provider, models]) => ({
     id: `authless:${provider}`,
     provider,
     name: provider === "kilo_code" ? "Kilo Code" : provider,
@@ -30,10 +30,10 @@ export function getAuthlessProviderAccounts() {
         supportedModels: null as string[] | null,
       };
     }),
-    ...providerModelAuthlessAccounts,
+    ...authlessByProvider,
   ];
 }
 
-export function isSyntheticAuthlessAccount(accountId: string): boolean {
+export function isSynthetic(accountId: string): boolean {
   return AUTHLESS_PROVIDER_SET.has(accountId) || accountId.startsWith("authless:");
 }

@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { getProviderLabel } from "@opendum/providers/provider-accounts";
+import { labelOf } from "@opendum/providers/provider-accounts";
 import type { ModelSearchItem } from "~~/lib/api-types";
 
 type ModelListItem = ModelSearchItem;
 
 const api = useApi();
 
-async function loadModelSearch() {
+async function loadSearch() {
   return await api.models.search();
 }
 
@@ -26,7 +26,7 @@ let placeholderTimer: number | null = null;
 const suggestionListId = "model-search-suggestions";
 const MAX_SUGGESTIONS = 50;
 
-const { data, refresh, pending } = useAsyncData(dataKeys.modelSearch, loadModelSearch, {
+const { data, refresh, pending } = useAsyncData(dataKeys.modelSearch, loadSearch, {
   default: () => [] as ModelListItem[],
   lazy: true,
   immediate: false,
@@ -43,7 +43,7 @@ const matchedModels = computed(() => {
   if (!term) return models.value;
 
   return models.value.filter((model) => {
-    const providers = model.providers.map(getProviderLabel).join(" ");
+    const providers = model.providers.map(labelOf).join(" ");
     return `${model.id} ${providers}`.toLowerCase().includes(term);
   });
 });
@@ -84,7 +84,7 @@ onBeforeUnmount(() => {
   if (placeholderTimer) window.clearInterval(placeholderTimer);
 });
 
-function ensureModelsLoaded() {
+function ensureLoaded() {
   if (modelsRequested.value || models.value.length > 0) return;
 
   modelsRequested.value = true;
@@ -92,7 +92,7 @@ function ensureModelsLoaded() {
 }
 
 function openSuggestions() {
-  ensureModelsLoaded();
+  ensureLoaded();
   emit("focusChange", true);
   suggestionsOpen.value = true;
   if (filteredModels.value.length > 0 && activeSuggestionIndex.value === -1) {
@@ -105,14 +105,14 @@ function closeSuggestions() {
   activeSuggestionIndex.value = -1;
 }
 
-function handleFocusOut(event: FocusEvent) {
+function focusOut(event: FocusEvent) {
   const nextTarget = event.relatedTarget;
   if (nextTarget instanceof Node && root.value?.contains(nextTarget)) return;
   emit("focusChange", false);
   closeSuggestions();
 }
 
-function moveActiveSuggestion(delta: number) {
+function moveSuggestion(delta: number) {
   openSuggestions();
   const total = filteredModels.value.length;
   if (total === 0) return;
@@ -121,7 +121,7 @@ function moveActiveSuggestion(delta: number) {
   activeSuggestionIndex.value = (currentIndex + delta + total) % total;
 }
 
-function selectActiveSuggestion() {
+function selectSuggestion() {
   if (!suggestionsOpen.value) return;
   const model = activeSuggestionModel.value ?? filteredModels.value[0];
   if (model) selectModel(model);
@@ -143,7 +143,7 @@ async function selectModel(model: ModelListItem) {
 </script>
 
 <template>
-  <div ref="root" class="relative w-full max-w-xl" @focusout="handleFocusOut">
+  <div ref="root" class="relative w-full max-w-xl" @focusout="focusOut">
     <label for="model-search-input" class="sr-only">Search models</label>
     <div class="relative">
       <UiIcon name="i-lucide-search" class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -162,9 +162,9 @@ async function selectModel(model: ModelListItem) {
         autocomplete="off"
         @focus="openSuggestions"
         @input="openSuggestions"
-        @keydown.down.prevent="moveActiveSuggestion(1)"
-        @keydown.up.prevent="moveActiveSuggestion(-1)"
-        @keydown.enter.prevent="selectActiveSuggestion"
+        @keydown.down.prevent="moveSuggestion(1)"
+        @keydown.up.prevent="moveSuggestion(-1)"
+        @keydown.enter.prevent="selectSuggestion"
         @keydown.esc.stop="closeSuggestions"
       >
       <Transition
@@ -225,7 +225,7 @@ async function selectModel(model: ModelListItem) {
             <p class="truncate font-mono text-xs sm:text-sm">{{ model.id }}</p>
             <div class="mt-1 flex flex-wrap gap-1.5">
               <UiBadge v-for="provider in model.providers" :key="`${model.id}-${provider}`" variant="outline" class="text-[10px] font-normal">
-                {{ getProviderLabel(provider) }}
+                {{ labelOf(provider) }}
               </UiBadge>
             </div>
           </div>

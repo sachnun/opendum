@@ -1,19 +1,19 @@
 import { Effect } from "effect";
-import { putQuotaCache } from "../cache.js";
+import { putQuota } from "../cache.js";
 import {
-  baseQuotaInfo,
+  baseInfo,
   clampFraction,
   displayNumber,
-  errorQuotaInfo,
-  formatTimeUntilResetIso,
-  parseQuotaNumber,
-  parseQuotaRecord,
-  parseResetIso,
+  errorInfo,
+  resetIso,
+  parseNumber,
+  parseRecord,
+  isoOf,
 } from "../helpers.js";
 import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay } from "../types.js";
 import { quotaAttempt, type Json } from "./shared.js";
 
-export function fetchAntigravityQuota(
+export function antigravityQuota(
   ctx: QuotaContext,
   account: QuotaAccount,
   accessToken: string,
@@ -22,7 +22,7 @@ export function fetchAntigravityQuota(
   const projectId = account.projectId?.trim() ?? "";
   if (!projectId) {
     return Effect.succeed(
-      errorQuotaInfo("Antigravity account is missing projectId. Re-authenticate this account.")
+      errorInfo("Antigravity account is missing projectId. Re-authenticate this account.")
     );
   }
   const endpoints = [
@@ -59,7 +59,7 @@ export function fetchAntigravityQuota(
           }
         })();
         if (!parsed) return Effect.fail("response was not valid JSON");
-        return putQuotaCache(ctx, result).pipe(Effect.as(baseQuotaInfo("success", antigravityGroups(parsed))));
+        return putQuota(ctx, result).pipe(Effect.as(baseInfo("success", antigravityGroups(parsed))));
       })
     );
 
@@ -71,13 +71,13 @@ export function fetchAntigravityQuota(
 
   return combined.pipe(
     Effect.catch((message) =>
-      Effect.succeed(errorQuotaInfo(`Failed to fetch Antigravity quota data: ${message}`))
+      Effect.succeed(errorInfo(`Failed to fetch Antigravity quota data: ${message}`))
     )
   );
 }
 
 function antigravityGroups(payload: Json): QuotaGroupDisplay[] {
-  const models = parseQuotaRecord(payload.models) ?? {};
+  const models = parseRecord(payload.models) ?? {};
 
   const groups: Array<{ name: string; display: string; remainingFraction: number; resetIso: string | null }> = [
     { name: "claude", display: "Claude", remainingFraction: 1, resetIso: null },
@@ -86,18 +86,18 @@ function antigravityGroups(payload: Json): QuotaGroupDisplay[] {
 
   for (const [modelId, entry] of Object.entries(models)) {
     const group = modelId.startsWith("gemini") ? groups[1] : groups[0];
-    const modelRecord = parseQuotaRecord(entry);
+    const modelRecord = parseRecord(entry);
     if (!modelRecord) continue;
-    const quotaInfo = parseQuotaRecord(modelRecord.quotaInfo);
+    const quotaInfo = parseRecord(modelRecord.quotaInfo);
     if (!quotaInfo) continue;
 
     const value = quotaInfo.remainingFraction === undefined || quotaInfo.remainingFraction === null
       ? null
-      : parseQuotaNumber(quotaInfo.remainingFraction);
+      : parseNumber(quotaInfo.remainingFraction);
     const fraction = value === null ? 0 : clampFraction(value);
     if (fraction < group.remainingFraction) group.remainingFraction = fraction;
 
-    const iso = parseResetIso(quotaInfo.resetTime);
+    const iso = isoOf(quotaInfo.resetTime);
     if (iso && (!group.resetIso || iso < group.resetIso)) group.resetIso = iso;
   }
 
@@ -109,6 +109,6 @@ function antigravityGroups(payload: Json): QuotaGroupDisplay[] {
     maxRequests: 100,
     usedRequests: displayNumber(100 - group.remainingFraction * 100),
     resetTimeIso: group.resetIso,
-    resetInHuman: formatTimeUntilResetIso(group.resetIso),
+    resetInHuman: resetIso(group.resetIso),
   }));
 }

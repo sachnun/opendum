@@ -1,9 +1,9 @@
 import { Cause, Effect, Exit, Result, Stream } from "effect";
-import { numberAsInt, parseJson, stringValue } from "./helpers.js";
+import { Coerce, Safe } from "./helpers.js";
 import { withHeartbeat } from "./heartbeat.js";
 import { SseScanner } from "./sse.js";
 import { transformOpenAIToAnthropic } from "./endpoints.js";
-import { OpenAIStreamUsageTracker, usageCacheCounts, usageFromJson, usageObject } from "./usage.js";
+import { StreamUsageTracker, cacheCounts, usageOf, usageObject } from "./usage.js";
 import type { ResponseContext, StreamCompletion, StreamRecorder } from "./types.js";
 
 type Json = Record<string, unknown>;
@@ -32,7 +32,7 @@ function readableChunks(body: ReadableStream<Uint8Array>): Stream.Stream<Uint8Ar
 export async function passthroughStream(ctx: ResponseContext, recorder: StreamRecorder): Promise<Response> {
   const body = ctx.response.body;
   if (!body) return ctx.response;
-  const tracker = new OpenAIStreamUsageTracker();
+  const tracker = new StreamUsageTracker();
   ctx.streamHandled = true;
 
   let completion: StreamCompletion = "success";
@@ -61,7 +61,7 @@ export async function passthroughStream(ctx: ResponseContext, recorder: StreamRe
         durationMs: Date.now() - ctx.startMs,
         stream: true,
         requestStartMs: ctx.requestStartMs,
-        upstreamFirstResponseMs: ctx.upstreamFirstResponseMs,
+        firstResponseMs: ctx.firstResponseMs,
       });
     }
     ctx.onStreamComplete?.(completion);
@@ -89,11 +89,11 @@ export async function passthroughStream(ctx: ResponseContext, recorder: StreamRe
   return new Response(withHeartbeat(stream, ctx.heartbeatMs ?? 0), { status: 200, headers: sseHeaders(ctx.accountId) });
 }
 
-export async function passthroughNonStream(ctx: ResponseContext, recorder: StreamRecorder): Promise<Response> {
+export async function passthrough(ctx: ResponseContext, recorder: StreamRecorder): Promise<Response> {
   const bodyText = await ctx.response.text();
-  const parsedBody = parseJson(bodyText);
+  const parsedBody = Safe.json(bodyText);
   const parsed = (Result.isSuccess(parsedBody) ? parsedBody.success : {}) as Json;
-  const counts = usageFromJson(parsed);
+  const counts = usageOf(parsed);
   ctx.usage.inputTokens = counts.inputTokens;
   ctx.usage.outputTokens = counts.outputTokens;
   ctx.usage.cachedTokens = counts.cachedTokens;
@@ -128,7 +128,7 @@ export async function passthroughNonStream(ctx: ResponseContext, recorder: Strea
     durationMs: Date.now() - ctx.startMs,
     stream: false,
     requestStartMs: ctx.requestStartMs,
-    upstreamFirstResponseMs: ctx.upstreamFirstResponseMs,
+    firstResponseMs: ctx.firstResponseMs,
   });
   return new Response(bodyText, {
     status: 200,
@@ -139,12 +139,12 @@ export async function passthroughNonStream(ctx: ResponseContext, recorder: Strea
   });
 }
 
-export async function anthropicNonStream(ctx: ResponseContext, recorder: StreamRecorder): Promise<Response> {
+export async function nonStream(ctx: ResponseContext, recorder: StreamRecorder): Promise<Response> {
   const bodyText = await ctx.response.text();
-  const parsedBody = parseJson(bodyText);
+  const parsedBody = Safe.json(bodyText);
   const openAi = (Result.isSuccess(parsedBody) ? parsedBody.success : {}) as Json;
   const response = transformOpenAIToAnthropic(openAi, ctx.model);
-  const counts = usageFromJson(openAi);
+  const counts = usageOf(openAi);
   ctx.usage.inputTokens = counts.inputTokens;
   ctx.usage.outputTokens = counts.outputTokens;
   ctx.usage.cachedTokens = counts.cachedTokens;
@@ -162,7 +162,7 @@ export async function anthropicNonStream(ctx: ResponseContext, recorder: StreamR
     durationMs: Date.now() - ctx.startMs,
     stream: false,
     requestStartMs: ctx.requestStartMs,
-    upstreamFirstResponseMs: ctx.upstreamFirstResponseMs,
+    firstResponseMs: ctx.firstResponseMs,
   });
   return new Response(JSON.stringify(response), {
     status: 200,
@@ -178,8 +178,8 @@ class AnthropicStreamTracker {
   private hasThinkingBlock = false;
   private thinkingBlockOpen = false;
   private pendingText = "";
-  private toolBlockById = new Map<string, number>();
-  private toolBlockByIndex = new Map<number, { index: number; id: string }>();
+  private blockById = new Map<string, number>();
+  private blockByIndex = new Map<number, { index: number; id: string }>();
   private openToolBlocks = new Set<number>();
   inputTokens = 0;
   outputTokens = 0;
@@ -198,18 +198,18 @@ class AnthropicStreamTracker {
   }
 
   private processEvent(data: string): void {
-    const parsedData = parseJson(data);
+    const parsedData = Safe.json(data);
     if (Result.isFailure(parsedData)) return;
     const parsed = parsedData.success as Json;
     const usage = usageObject(parsed);
     if (usage) {
-      let input = numberAsInt(usage.prompt_tokens);
-      if (input === 0) input = numberAsInt(usage.input_tokens);
+      let input = Coerce.int(usage.prompt_tokens);
+      if (input === 0) input = Coerce.int(usage.input_tokens);
       if (input > 0) this.inputTokens = input;
-      let output = numberAsInt(usage.completion_tokens);
-      if (output === 0) output = numberAsInt(usage.output_tokens);
+      let output = Coerce.int(usage.completion_tokens);
+      if (output === 0) output = Coerce.int(usage.output_tokens);
       if (output > 0) this.outputTokens = output;
-      const { cached, write } = usageCacheCounts(usage);
+      const { cached, write } = cacheCounts(usage);
       if (cached > 0) this.cachedTokens = cached;
       if (write > 0) this.cacheWriteTokens = write;
     }
@@ -217,18 +217,18 @@ class AnthropicStreamTracker {
     if (choices.length === 0) return;
     const choice = (choices[0] ?? {}) as Json;
     const delta = (choice.delta ?? {}) as Json;
-    const reasoning = stringValue(delta.reasoning_content);
+    const reasoning = Coerce.string(delta.reasoning_content);
     if (reasoning) this.writeThinkingDelta(reasoning);
-    const text = stringValue(delta.content);
+    const text = Coerce.string(delta.content);
     if (text) this.writeTextDelta(text);
     if (Array.isArray(delta.tool_calls)) {
-      for (const raw of delta.tool_calls) this.writeToolCallDelta(raw);
+      for (const raw of delta.tool_calls) this.writeToolDelta(raw);
     }
-    const finish = stringValue(choice.finish_reason);
+    const finish = Coerce.string(choice.finish_reason);
     if (finish) {
       this.closeThinkingBlock();
       this.flushPendingText();
-      this.finishReason = mapFinishReason(finish);
+      this.finishReason = finishReason(finish);
     }
   }
 
@@ -243,7 +243,7 @@ class AnthropicStreamTracker {
       }
     }
     if (this.openBlockType !== "text") {
-      this.closeOpenToolBlocks();
+      this.closeToolBlocks();
       this.closeOpenBlock();
       this.write("content_block_start", {
         type: "content_block_start",
@@ -262,7 +262,7 @@ class AnthropicStreamTracker {
   private writeThinkingDelta(thinking: string): void {
     if (!this.keepThinkingOpen) {
       if (this.openBlockType !== "thinking") {
-        this.closeOpenToolBlocks();
+        this.closeToolBlocks();
         this.closeOpenBlock();
         this.write("content_block_start", {
           type: "content_block_start",
@@ -280,7 +280,7 @@ class AnthropicStreamTracker {
     }
     if (this.hasThinkingBlock && !this.thinkingBlockOpen) {
       if (this.openBlockType !== "thinking") {
-        this.closeOpenToolBlocks();
+        this.closeToolBlocks();
         this.closeOpenBlock();
         this.write("content_block_start", {
           type: "content_block_start",
@@ -297,7 +297,7 @@ class AnthropicStreamTracker {
       return;
     }
     if (!this.hasThinkingBlock) {
-      this.closeOpenToolBlocks();
+      this.closeToolBlocks();
       this.closeOpenBlock();
       this.thinkingBlock = this.blockIndex;
       this.hasThinkingBlock = true;
@@ -317,17 +317,17 @@ class AnthropicStreamTracker {
     });
   }
 
-  private writeToolCallDelta(raw: unknown): void {
+  private writeToolDelta(raw: unknown): void {
     this.closeThinkingBlock();
     this.flushPendingText();
     const call = (raw ?? {}) as Json;
     const fn = (call.function ?? {}) as Json;
-    const openAiIndex = numberAsInt(call.index);
-    let id = stringValue(call.id) || stringValue(call.call_id);
-    if (!id) id = this.toolBlockByIndex.get(openAiIndex)?.id ?? "";
+    const openAiIndex = Coerce.int(call.index);
+    let id = Coerce.string(call.id) || Coerce.string(call.call_id);
+    if (!id) id = this.blockByIndex.get(openAiIndex)?.id ?? "";
     if (!id) id = `toolu_${Date.now()}_${openAiIndex}`;
-    const index = this.ensureToolBlock(openAiIndex, id, stringValue(fn.name));
-    const args = stringValue(fn.arguments);
+    const index = this.ensureToolBlock(openAiIndex, id, Coerce.string(fn.name));
+    const args = Coerce.string(fn.arguments);
     if (args) {
       this.write("content_block_delta", {
         type: "content_block_delta",
@@ -339,12 +339,12 @@ class AnthropicStreamTracker {
 
   private ensureToolBlock(openAiIndex: number, id: string, name: string): number {
     this.closeOpenBlock();
-    const existing = this.toolBlockById.get(id);
+    const existing = this.blockById.get(id);
     if (existing !== undefined) return existing;
     const index = this.blockIndex;
     this.blockIndex += 1;
-    this.toolBlockById.set(id, index);
-    this.toolBlockByIndex.set(openAiIndex, { index, id });
+    this.blockById.set(id, index);
+    this.blockByIndex.set(openAiIndex, { index, id });
     this.openToolBlocks.add(index);
     this.write("content_block_start", {
       type: "content_block_start",
@@ -379,7 +379,7 @@ class AnthropicStreamTracker {
     this.writeTextDelta(text);
   }
 
-  private closeOpenToolBlocks(): void {
+  private closeToolBlocks(): void {
     if (this.openToolBlocks.size === 0) return;
     const indexes = [...this.openToolBlocks].sort((a, b) => a - b);
     for (const index of indexes) {
@@ -393,7 +393,7 @@ class AnthropicStreamTracker {
     this.closeThinkingBlock();
     this.flushPendingText();
     this.closeOpenBlock();
-    this.closeOpenToolBlocks();
+    this.closeToolBlocks();
     const stopReason = this.finishReason || "end_turn";
     const deltaUsage: Json = { input_tokens: this.inputTokens, output_tokens: this.outputTokens };
     if (this.cachedTokens > 0) deltaUsage.cache_read_input_tokens = this.cachedTokens;
@@ -411,7 +411,7 @@ class AnthropicStreamTracker {
   }
 }
 
-function mapFinishReason(reason: string): string {
+function finishReason(reason: string): string {
   switch (reason) {
     case "length":
       return "max_tokens";
@@ -483,7 +483,7 @@ export async function anthropicStream(ctx: ResponseContext, recorder: StreamReco
         durationMs: Date.now() - ctx.startMs,
         stream: true,
         requestStartMs: ctx.requestStartMs,
-        upstreamFirstResponseMs: ctx.upstreamFirstResponseMs,
+        firstResponseMs: ctx.firstResponseMs,
       });
     }
     ctx.onStreamComplete?.(completion);

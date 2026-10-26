@@ -1,18 +1,18 @@
 import { buildIndex, upstream, sync, persist } from "#models/model-store.ts";
 import { runFetchJson } from "#models/sync/http.ts";
-import { stripParamInfoKey } from "#models/model/clean-key.ts";
-import { arrayAt, asRecord, asTrimmedString, recordAt, stringAt } from "#models/json.ts";
-import { env, packageModelsDir, runScript } from "./shared.ts";
+import { stripParams } from "#models/model/clean-key.ts";
+import { arrayAt, asRecord, trimmed, recordAt, stringAt } from "#models/json.ts";
+import { env, dataDir, runScript } from "./shared.ts";
 import type { ModelData, ModelIndexEntry, ModelModalities } from "#models/types.ts";
 
 const PROVIDER_NAME = "workers_ai";
-const WORKERS_AI_MODELS_API_URL =
+const MODELS_API_URL =
   "https://api.github.com/repos/cloudflare/cloudflare-docs/contents/src/content/workers-ai-models?ref=production";
 const FETCH_CONCURRENCY = 8;
 
-const EXCLUDED_MODEL_KEY_TOKENS = ["guard"];
+const EXCLUDED_TOKENS = ["guard"];
 
-interface WorkersAIModelFile {
+interface ModelFile {
   slug: string;
   downloadUrl: string;
 }
@@ -28,7 +28,7 @@ interface ModelMetadata {
   modalities: ModelModalities;
 }
 
-function githubApiHeaders(): Record<string, string> {
+function apiHeaders(): Record<string, string> {
   const token = env("GITHUB_TOKEN") ?? env("GH_TOKEN");
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
@@ -43,19 +43,19 @@ function isTrue(value: unknown): boolean {
   return value === true || value === "true";
 }
 
-function supportsMessagesInput(value: unknown, depth = 0): boolean {
+function supportsMessages(value: unknown, depth = 0): boolean {
   if (depth > 64 || value === null || value === undefined) return false;
-  if (Array.isArray(value)) return value.some((item) => supportsMessagesInput(item, depth + 1));
+  if (Array.isArray(value)) return value.some((item) => supportsMessages(item, depth + 1));
   const record = asRecord(value);
   if (!record) return false;
 
   const properties = asRecord(record["properties"]);
   if (properties?.["messages"]) return true;
-  return Object.values(record).some((item) => supportsMessagesInput(item, depth + 1));
+  return Object.values(record).some((item) => supportsMessages(item, depth + 1));
 }
 
-function normalizeModelKey(value: string): string {
-  return stripParamInfoKey(
+function normalizeKey(value: string): string {
+  return stripParams(
     value
       .replace(/^@[^/]+\//, "")
       .replace(/[:/]/g, "-")
@@ -65,14 +65,14 @@ function normalizeModelKey(value: string): string {
   );
 }
 
-function toModelKey(model: unknown, slug: string, reverseMap: Map<string, string>): string {
-  const upstreamName = asTrimmedString(stringAt(model, "name")) ?? "";
+function keyOf(model: unknown, slug: string, reverseMap: Map<string, string>): string {
+  const upstreamName = trimmed(stringAt(model, "name")) ?? "";
   const existing = reverseMap.get(upstreamName);
   if (existing) return existing;
-  if (slug) return normalizeModelKey(slug);
+  if (slug) return normalizeKey(slug);
 
   const lastSlash = upstreamName.lastIndexOf("/");
-  return normalizeModelKey(lastSlash === -1 ? upstreamName : upstreamName.slice(lastSlash + 1));
+  return normalizeKey(lastSlash === -1 ? upstreamName : upstreamName.slice(lastSlash + 1));
 }
 
 function deriveFamily(modelKey: string): string | undefined {
@@ -98,7 +98,7 @@ function buildCapabilities(model: unknown): { reasoning: boolean; modalities: Mo
   };
 }
 
-function buildReverseMap(modelsDir: string): Map<string, string> {
+function reverseIndex(modelsDir: string): Map<string, string> {
   const reverseMap = new Map<string, string>();
 
   for (const [modelId, entry] of Object.entries(buildIndex(modelsDir))) {
@@ -110,7 +110,7 @@ function buildReverseMap(modelsDir: string): Map<string, string> {
   return reverseMap;
 }
 
-function isExistingIgnoredWithoutWorkersAI(
+function isIgnored(
   index: Record<string, ModelIndexEntry>,
   modelKey: string
 ): boolean {
@@ -121,26 +121,26 @@ function isExistingIgnoredWithoutWorkersAI(
   return !(entry.data.providers ?? []).includes(PROVIDER_NAME);
 }
 
-function shouldIncludeModel(
+function shouldInclude(
   model: unknown,
   modelKey: string,
   index: Record<string, ModelIndexEntry>,
   existingWorkersAI: boolean
 ): boolean {
-  const name = asTrimmedString(stringAt(model, "name"));
+  const name = trimmed(stringAt(model, "name"));
   if (!name || !name.startsWith("@")) return false;
   if (stringAt(recordAt(model, "task"), "name") !== "Text Generation") return false;
-  if (!supportsMessagesInput(recordAt(recordAt(model, "schema"), "input"))) return false;
+  if (!supportsMessages(recordAt(recordAt(model, "schema"), "input"))) return false;
   if (isTrue(getProperty(model, "lora"))) return false;
   if (isTrue(getProperty(model, "require_workers_paid"))) return false;
   if (getProperty(model, "planned_deprecation_date") && !existingWorkersAI) return false;
-  if (isExistingIgnoredWithoutWorkersAI(index, modelKey)) return false;
+  if (isIgnored(index, modelKey)) return false;
 
   const normalized = modelKey.toLowerCase();
-  return !EXCLUDED_MODEL_KEY_TOKENS.some((token) => normalized.includes(token));
+  return !EXCLUDED_TOKENS.some((token) => normalized.includes(token));
 }
 
-function buildModelMap(
+function modelIndex(
   models: WorkersAIModel[],
   modelsDir: string,
   reverseMap: Map<string, string>
@@ -150,10 +150,10 @@ function buildModelMap(
   const metadata = new Map<string, ModelMetadata>();
 
   for (const item of models) {
-    const upstreamName = asTrimmedString(stringAt(item.model, "name")) ?? "";
+    const upstreamName = trimmed(stringAt(item.model, "name")) ?? "";
     const existingWorkersAI = reverseMap.has(upstreamName);
-    const modelKey = toModelKey(item.model, item.slug, reverseMap);
-    if (!modelKey || !shouldIncludeModel(item.model, modelKey, index, existingWorkersAI)) continue;
+    const modelKey = keyOf(item.model, item.slug, reverseMap);
+    if (!modelKey || !shouldInclude(item.model, modelKey, index, existingWorkersAI)) continue;
 
     map.set(modelKey, upstreamName);
     const capabilities = buildCapabilities(item.model);
@@ -201,7 +201,7 @@ function applyMetadata(modelsDir: string, metadata: Map<string, ModelMetadata>):
   return updated;
 }
 
-function toModelFiles(payload: unknown): WorkersAIModelFile[] {
+function modelFiles(payload: unknown): ModelFile[] {
   if (!Array.isArray(payload)) {
     throw new Error("Unexpected Cloudflare Workers AI model file list payload");
   }
@@ -209,17 +209,17 @@ function toModelFiles(payload: unknown): WorkersAIModelFile[] {
   return payload
     .flatMap((file) => {
       if (stringAt(file, "type") !== "file") return [];
-      const name = asTrimmedString(stringAt(file, "name"));
-      const downloadUrl = asTrimmedString(stringAt(file, "download_url"));
+      const name = trimmed(stringAt(file, "name"));
+      const downloadUrl = trimmed(stringAt(file, "download_url"));
       if (!name || !name.endsWith(".json") || !downloadUrl) return [];
       return [{ slug: name.replace(/\.json$/, ""), downloadUrl }];
     })
     .sort((a, b) => a.slug.localeCompare(b.slug));
 }
 
-async function fetchWorkersAIModels(): Promise<WorkersAIModel[]> {
-  const payload = await runFetchJson(WORKERS_AI_MODELS_API_URL, { headers: githubApiHeaders() });
-  const files = toModelFiles(payload);
+async function fetchModels(): Promise<WorkersAIModel[]> {
+  const payload = await runFetchJson(MODELS_API_URL, { headers: apiHeaders() });
+  const files = modelFiles(payload);
 
   const models: WorkersAIModel[] = [];
   for (let index = 0; index < files.length; index += FETCH_CONCURRENCY) {
@@ -237,11 +237,11 @@ async function fetchWorkersAIModels(): Promise<WorkersAIModel[]> {
 }
 
 async function main(): Promise<void> {
-  const modelsDir = packageModelsDir();
-  const reverseMap = buildReverseMap(modelsDir);
+  const modelsDir = dataDir();
+  const reverseMap = reverseIndex(modelsDir);
 
-  const models = await fetchWorkersAIModels();
-  const { modelMap, metadata } = buildModelMap(models, modelsDir, reverseMap);
+  const models = await fetchModels();
+  const { modelMap, metadata } = modelIndex(models, modelsDir, reverseMap);
 
   const result = await sync(modelsDir, PROVIDER_NAME, modelMap);
   const metadataUpdates = applyMetadata(modelsDir, metadata);

@@ -9,14 +9,14 @@ import type { Health } from "./health.js";
 import type { ProviderPerformance, ProviderRoutingOptions } from "./provider-performance.js";
 import { Priority, Sticky, compose } from "./routing.js";
 import {
-  accountAccessDenial,
-  isSyntheticProviderAccountId,
+  accessDenial,
+  isSynthetic,
   accessMode,
-  normalizeAccountIds,
-  proxyAccessRuleRestrictsTier,
-  proxyTierSatisfiesRule,
-  quotaFallbackTierLocal,
-  sortAccountsByProviderPriority,
+  normalizeIds,
+  ruleRestricts,
+  tierSatisfies,
+  fallbackTier,
+  byPriority,
 } from "./service-helpers.js";
 
 export type StickyMissReason = "cooldown" | "degraded" | "ineligible";
@@ -84,9 +84,9 @@ export class Rotation {
 
   canUse(account: ProviderAccount, model: string): boolean {
     const rule = this.models.rule(model, account.provider);
-    if (!rule || !proxyAccessRuleRestrictsTier(rule.minTier, rule.allowedTiers)) return true;
-    const tier = account.tier ?? quotaFallbackTierLocal(account);
-    return proxyTierSatisfiesRule(tier, rule.minTier, rule.allowedTiers);
+    if (!rule || !ruleRestricts(rule.minTier, rule.allowedTiers)) return true;
+    const tier = account.tier ?? fallbackTier(account);
+    return tierSatisfies(tier, rule.minTier, rule.allowedTiers);
   }
 
   private nextAvailable(
@@ -126,7 +126,7 @@ export class Rotation {
       const targetProviders = provider ? [provider] : this.models.providers(model);
       if (targetProviders.length === 0) return { account: null, configured: false };
       const now = new Date();
-      const sharedRows = yield* this.accounts.listSharedEligibleAccounts({
+      const sharedRows = yield* this.accounts.sharedAccounts({
         userId,
         providers: targetProviders,
         now,
@@ -147,7 +147,7 @@ export class Rotation {
       if (rows.length === 0) return { account: null, configured: false };
       const lookupKeys = this.models.lookupKeys(model);
       const ids = rows.map((row) => row.id);
-      const disabled = yield* this.accounts.listDisabledAccountIDs({
+      const disabled = yield* this.accounts.disabledIds({
         accountIds: ids,
         models: lookupKeys,
       });
@@ -201,13 +201,13 @@ export class Rotation {
         if (!account) continue;
         if (exclude.includes(account.id)) continue;
         if (excludeProviders.includes(account.provider)) continue;
-        if (accountAccessDenial(account.id, accountAccess)) continue;
+        if (accessDenial(account.id, accountAccess)) continue;
         rows.push(account);
       }
 
       const now = new Date();
       const mode = accessMode(accountAccess.mode);
-      const accounts = normalizeAccountIds(accountAccess.accounts);
+      const accounts = normalizeIds(accountAccess.accounts);
       const dbRows = yield* this.accounts.listEligibleAccounts({
         userId,
         providers: targetProviders,
@@ -235,15 +235,15 @@ export class Rotation {
 
       const lookupKeys = this.models.lookupKeys(model);
       const ids = rows.map((row) => row.id);
-      const disabled = yield* this.accounts.listDisabledAccountIDs({
+      const disabled = yield* this.accounts.disabledIds({
         accountIds: ids,
         models: lookupKeys,
       });
       const disabledSet = new Set(disabled.map((row) => row.providerAccountId));
       const enabled = rows.filter(
-        (row) => isSyntheticProviderAccountId(row.id) || (!disabledSet.has(row.id) && this.canUse(row, model))
+        (row) => isSynthetic(row.id) || (!disabledSet.has(row.id) && this.canUse(row, model))
       );
-      if (provider === null) sortAccountsByProviderPriority(enabled, targetProviders);
+      if (provider === null) byPriority(enabled, targetProviders);
       return enabled;
     });
   }
@@ -256,7 +256,7 @@ export class Rotation {
       const results = yield* Effect.forEach(
         providers,
         (custom) =>
-          this.customProviders.listCustomProviderModels(custom.id).pipe(
+          this.customProviders.customModels(custom.id).pipe(
             Effect.map((rows) =>
               rows.some((row) => row.aliased && this.models.resolveAlias(row.modelId) === canonical)
                 ? custom.slug
@@ -288,7 +288,7 @@ export class Rotation {
       let degraded: ProviderAccount | null = null;
       let stickyMiss: StickyMissReason | null = null;
       for (const account of prioritized) {
-        if (isSyntheticProviderAccountId(account.id)) return account;
+        if (isSynthetic(account.id)) return account;
         const coolingDown = yield* this.health.refresh(account.id, now);
         if (coolingDown) {
           if (account.id === stickyId) stickyMiss = "cooldown";
@@ -305,7 +305,7 @@ export class Rotation {
         }
         this.health.bumpRequest(account.id);
         if (stickyId && account.id !== stickyId) {
-          yield* this.logStickyMiss(stickyId, stickyMiss ?? "ineligible", account.id);
+          yield* Rotation.logStickyMiss(stickyId, stickyMiss ?? "ineligible", account.id);
         }
         return account;
       }
@@ -314,7 +314,7 @@ export class Rotation {
     });
   }
 
-  private logStickyMiss(
+  private static logStickyMiss(
     stickyId: string,
     reason: StickyMissReason,
     selectedId: string
@@ -323,7 +323,7 @@ export class Rotation {
   }
 
   private remember(userId: string, account: ProviderAccount, scope: string): Effect.Effect<void> {
-    if (isSyntheticProviderAccountId(account.id)) return Effect.void;
+    if (isSynthetic(account.id)) return Effect.void;
     if (!this.affinity.enabled(account.provider)) return Effect.void;
     return this.affinity.store(userId, account.id, scope);
   }

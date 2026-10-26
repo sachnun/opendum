@@ -1,30 +1,30 @@
 import { and, count as countFn, eq } from "drizzle-orm";
 import { Effect } from "effect";
 
-import type { ConnectCodexSessionInput, ExchangeOAuthInput, GetAuthUrlInput, InitiateDeviceAuthInput, PollDeviceAuthInput } from "@opendum/providers/contract";
+import type { CodexSessionInput, ExchangeInput, AuthUrlInput, DeviceAuthInput, DevicePollInput } from "@opendum/providers/contract";
 import { db, providerAccount } from "@opendum/database";
-import { publishAccountsChanged } from "#web/events/bus.js";
+import { publishAccounts } from "#web/events/bus.js";
 import { encrypt } from "#web/lib/encryption.js";
 import { antigravityProvider } from "#web/lib/providers/antigravity/index.js";
 import { CLIENT_ID as antigravityClientId, REDIRECT_URI as antigravityRedirectUri, SCOPES as antigravityScopes } from "#web/lib/providers/antigravity/constants.js";
-import { AUTHORIZE_ENDPOINT as codexAuthorizeEndpoint, BROWSER_REDIRECT_URI as codexBrowserRedirectUri, CLIENT_ID as codexClientId, ORIGINATOR as codexOriginator, SCOPE as codexScope, buildOAuthResultFromChatGPTSession, codexProvider, generateCodeChallenge as generateCodexCodeChallenge, generateCodeVerifier as generateCodexCodeVerifier, initiateCodexDeviceCodeFlow, pollCodexDeviceCodeAuthorization } from "#web/lib/providers/codex/index.js";
-import { BROWSER_REDIRECT_URI as kiroBrowserRedirectUri, buildKiroAuthUrl, generateCodeVerifier as generateKiroCodeVerifier, kiroProvider } from "#web/lib/providers/kiro/index.js";
-import { initiateWorkbuddyDeviceCodeFlow, pollWorkbuddyDeviceCodeAuthorization } from "#web/lib/providers/workbuddy/index.js";
-import { exchangePerchOAuthCode, initiatePerchOAuth } from "#web/lib/providers/perch/index.js";
-import { initiateClineDeviceCodeFlow, pollClineDeviceCodeAuthorization } from "#web/lib/providers/cline/index.js";
-import { clearRefreshFailCount } from "#web/lib/proxy/auth.js";
+import { AUTHORIZE_ENDPOINT as codexAuthorizeEndpoint, BROWSER_REDIRECT_URI as codexBrowserRedirectUri, CLIENT_ID as codexClientId, ORIGINATOR as codexOriginator, SCOPE as codexScope, sessionResult, codexProvider, generateCodeChallenge as generateCodexCodeChallenge, codeVerifier as generateCodexCodeVerifier, startDeviceFlow as startCodexDevice, pollDeviceAuth as pollCodexDevice } from "#web/lib/providers/codex/index.js";
+import { BROWSER_REDIRECT_URI as kiroBrowserRedirectUri, authUrl, codeVerifier as generateKiroCodeVerifier, kiroProvider } from "#web/lib/providers/kiro/index.js";
+import { startDeviceFlow as startWorkbuddyDevice, pollDeviceAuth as pollWorkbuddyDevice } from "#web/lib/providers/workbuddy/index.js";
+import { exchangeCode, initiateOAuth } from "#web/lib/providers/perch/index.js";
+import { startDeviceFlow as startClineDevice, pollDeviceAuth as pollClineDevice } from "#web/lib/providers/cline/index.js";
+import { clearFails } from "#web/lib/proxy/auth.js";
 import type { OAuthResult } from "#web/lib/providers/types.js";
-import type { DeviceProviderKey, OAuthProviderKey } from "@opendum/providers/provider-accounts";
+import type { DeviceProviderKey, AuthProvider } from "@opendum/providers/provider-accounts";
 import type { ActionResult } from "#web/utils/api.js";
 import { fromPromise } from "#web/lib/task.js";
 import { ServiceFailure, badRequest, internal } from "#web/errors.js";
 import { trackProviderEmail } from "./points.js";
 
-const GOOGLE_OAUTH_AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth";
+const GOOGLE_AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 
-type ProviderAccountKey = OAuthProviderKey | DeviceProviderKey;
+type ProviderAccountKey = AuthProvider | DeviceProviderKey;
 type AuthUrlResult = { authUrl: string; state: string | null; codeVerifier: string | null };
-type OAuthAccountOptions = {
+type OAuthOptions = {
   email?: string;
   accountId?: string | null;
   dedupeByAccountId?: boolean;
@@ -34,30 +34,30 @@ const GOOGLE_OAUTH_CONFIG = {
   antigravity: { clientId: antigravityClientId, redirectUri: antigravityRedirectUri, scopes: antigravityScopes },
 };
 
-function generateOAuthState(): string {
+function oauthState(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
   return Buffer.from(bytes).toString("base64url");
 }
 
-function buildGoogleOAuthUrl(): string {
+function googleUrl(): string {
   const config = GOOGLE_OAUTH_CONFIG.antigravity;
   const params = new URLSearchParams({ client_id: config.clientId, redirect_uri: config.redirectUri, response_type: "code", scope: config.scopes.join(" "), access_type: "offline", prompt: "consent" });
-  return `${GOOGLE_OAUTH_AUTHORIZE_URL}?${params.toString()}`;
+  return `${GOOGLE_AUTHORIZE_URL}?${params.toString()}`;
 }
 
-const buildCodexOAuthUrl = Effect.fn("accountAuth.buildCodexOAuthUrl")(function* (state: string) {
+const codexAuthUrl = Effect.fn("accountAuth.codexAuthUrl")(function* (state: string) {
   const codeVerifier = generateCodexCodeVerifier();
   const codeChallenge = yield* generateCodexCodeChallenge(codeVerifier);
   const params = new URLSearchParams({ response_type: "code", client_id: codexClientId, redirect_uri: codexBrowserRedirectUri, scope: codexScope, code_challenge: codeChallenge, code_challenge_method: "S256", id_token_add_organizations: "true", codex_cli_simplified_flow: "true", state, originator: codexOriginator });
   return { authUrl: `${codexAuthorizeEndpoint}?${params.toString()}`, state, codeVerifier };
 });
 
-const buildKiroOAuthUrl = Effect.fn("accountAuth.buildKiroOAuthUrl")(function* (state: string) {
+const kiroAuthUrl = Effect.fn("accountAuth.kiroAuthUrl")(function* (state: string) {
   const codeVerifier = generateKiroCodeVerifier();
-  return { authUrl: yield* buildKiroAuthUrl(state, codeVerifier), state, codeVerifier };
+  return { authUrl: yield* authUrl(state, codeVerifier), state, codeVerifier };
 });
 
-const OAUTH_PROVIDERS: Record<OAuthProviderKey, {
+const OAUTH_PROVIDERS: Record<AuthProvider, {
   label: string;
   accountIdPrefix?: string;
   requiresCodeVerifier?: boolean;
@@ -66,31 +66,31 @@ const OAUTH_PROVIDERS: Record<OAuthProviderKey, {
 }> = {
   antigravity: {
     label: "Antigravity",
-    buildAuthUrl: () => Effect.succeed({ authUrl: buildGoogleOAuthUrl(), state: null, codeVerifier: null }),
+    buildAuthUrl: () => Effect.succeed({ authUrl: googleUrl(), state: null, codeVerifier: null }),
     exchangeCode: (code) => antigravityProvider.exchangeCode(code, antigravityRedirectUri),
   },
   codex: {
     label: "Codex",
     accountIdPrefix: "codex",
     requiresCodeVerifier: true,
-    buildAuthUrl: () => buildCodexOAuthUrl(generateOAuthState()),
+    buildAuthUrl: () => codexAuthUrl(oauthState()),
     exchangeCode: (code, codeVerifier) => codexProvider.exchangeCode(code, codexBrowserRedirectUri, codeVerifier ?? undefined),
   },
   kiro: {
     label: "Kiro",
     accountIdPrefix: "kiro",
     requiresCodeVerifier: true,
-    buildAuthUrl: () => buildKiroOAuthUrl(generateOAuthState()),
+    buildAuthUrl: () => kiroAuthUrl(oauthState()),
     exchangeCode: (code, codeVerifier) => kiroProvider.exchangeCode(code, kiroBrowserRedirectUri, codeVerifier ?? undefined),
   },
   perch: {
     label: "Perch",
     requiresCodeVerifier: true,
     buildAuthUrl: () =>
-      initiatePerchOAuth().pipe(
+      initiateOAuth().pipe(
         Effect.map((result) => ({ authUrl: result.authUrl, state: null, codeVerifier: result.codeVerifier }))
       ),
-    exchangeCode: (code, codeVerifier) => exchangePerchOAuthCode(code, codeVerifier ?? ""),
+    exchangeCode: (code, codeVerifier) => exchangeCode(code, codeVerifier ?? ""),
   },
 };
 
@@ -98,33 +98,33 @@ const DEVICE_PROVIDERS = {
   codex: {
     label: "Codex",
     emailPrefix: "codex",
-    initiate: initiateCodexDeviceCodeFlow,
-    poll: (input: PollDeviceAuthInput) => pollCodexDeviceCodeAuthorization(input.deviceCode, input.userCode ?? ""),
+    initiate: startCodexDevice,
+    poll: (input: DevicePollInput) => pollCodexDevice(input.deviceCode, input.userCode ?? ""),
   },
   workbuddy: {
     label: "WorkBuddy",
     emailPrefix: "workbuddy",
-    initiate: () => initiateWorkbuddyDeviceCodeFlow(),
-    poll: (input: PollDeviceAuthInput) => pollWorkbuddyDeviceCodeAuthorization(input.deviceCode),
+    initiate: () => startWorkbuddyDevice(),
+    poll: (input: DevicePollInput) => pollWorkbuddyDevice(input.deviceCode),
   },
   cline: {
     label: "Cline",
     emailPrefix: "cline",
-    initiate: () => initiateClineDeviceCodeFlow(),
-    poll: (input: PollDeviceAuthInput) => pollClineDeviceCodeAuthorization(input.deviceCode),
+    initiate: () => startClineDevice(),
+    poll: (input: DevicePollInput) => pollClineDevice(input.deviceCode),
   },
-} satisfies Record<DeviceProviderKey, { label: string; emailPrefix: string; initiate: () => Effect.Effect<unknown, ServiceFailure>; poll: (input: PollDeviceAuthInput) => Effect.Effect<unknown, ServiceFailure> }>;
+} satisfies Record<DeviceProviderKey, { label: string; emailPrefix: string; initiate: () => Effect.Effect<unknown, ServiceFailure>; poll: (input: DevicePollInput) => Effect.Effect<unknown, ServiceFailure> }>;
 
-function encryptOptionalRefreshToken(refreshToken: string | undefined): string {
+function encryptRefresh(refreshToken: string | undefined): string {
   return refreshToken ? encrypt(refreshToken) : "";
 }
 
-const upsertOAuthAccount = Effect.fn("accountAuth.upsertOAuthAccount")(function* (
+const upsertAccount = Effect.fn("accountAuth.upsertAccount")(function* (
   userId: string,
   provider: ProviderAccountKey,
   label: string,
   oauthResult: OAuthResult,
-  options: OAuthAccountOptions = {}
+  options: OAuthOptions = {}
 ) {
   const email = options.email || oauthResult.email || `${provider}-${Date.now()}`;
   const accountId = options.accountId ?? oauthResult.accountId ?? null;
@@ -143,7 +143,7 @@ const upsertOAuthAccount = Effect.fn("accountAuth.upsertOAuthAccount")(function*
         .limit(1),
     "Failed to load provider account"
   );
-  const foundByAccountId =
+  const foundByAccount =
     !foundByEmail[0] && accountId && options.dedupeByAccountId
       ? yield* fromPromise(
           () =>
@@ -161,7 +161,7 @@ const upsertOAuthAccount = Effect.fn("accountAuth.upsertOAuthAccount")(function*
           "Failed to load provider account"
         )
       : [];
-  const existingAccount = foundByEmail[0] ?? foundByAccountId[0] ?? null;
+  const existingAccount = foundByEmail[0] ?? foundByAccount[0] ?? null;
 
   if (existingAccount) {
     const resolvedEmail =
@@ -174,7 +174,7 @@ const upsertOAuthAccount = Effect.fn("accountAuth.upsertOAuthAccount")(function*
           .update(providerAccount)
           .set({
             accessToken: encrypt(oauthResult.accessToken),
-            refreshToken: encryptOptionalRefreshToken(oauthResult.refreshToken),
+            refreshToken: encryptRefresh(oauthResult.refreshToken),
             expiresAt: oauthResult.expiresAt,
             email: resolvedEmail,
             ...(oauthResult.projectId ? { projectId: oauthResult.projectId } : {}),
@@ -186,9 +186,9 @@ const upsertOAuthAccount = Effect.fn("accountAuth.upsertOAuthAccount")(function*
           .where(eq(providerAccount.id, existingAccount.id)),
       "Failed to update provider account"
     );
-    yield* clearRefreshFailCount(existingAccount.id);
+    yield* clearFails(existingAccount.id);
     yield* trackProviderEmail(userId, resolvedEmail);
-    publishAccountsChanged(userId);
+    publishAccounts(userId);
     return { email: resolvedEmail, isUpdate: true };
   }
 
@@ -207,7 +207,7 @@ const upsertOAuthAccount = Effect.fn("accountAuth.upsertOAuthAccount")(function*
         provider,
         name: `${label} ${(countResult[0]?.value ?? 0) + 1}`,
         accessToken: encrypt(oauthResult.accessToken),
-        refreshToken: encryptOptionalRefreshToken(oauthResult.refreshToken),
+        refreshToken: encryptRefresh(oauthResult.refreshToken),
         expiresAt: oauthResult.expiresAt,
         email,
         projectId: oauthResult.projectId,
@@ -218,11 +218,11 @@ const upsertOAuthAccount = Effect.fn("accountAuth.upsertOAuthAccount")(function*
     "Failed to create provider account"
   );
   yield* trackProviderEmail(userId, email);
-  publishAccountsChanged(userId);
+  publishAccounts(userId);
   return { email, isUpdate: false };
 });
 
-function oauthAccountOptions(provider: OAuthProviderKey, config: (typeof OAUTH_PROVIDERS)[OAuthProviderKey], oauthResult: OAuthResult): OAuthAccountOptions | undefined {
+function optionsFor(provider: AuthProvider, config: (typeof OAUTH_PROVIDERS)[AuthProvider], oauthResult: OAuthResult): OAuthOptions | undefined {
   if (provider === "codex") {
     const chatgptAccountId = oauthResult.accountId || null;
     const workspaceAccountId = oauthResult.workspaceId || chatgptAccountId || null;
@@ -247,14 +247,14 @@ function oauthAccountOptions(provider: OAuthProviderKey, config: (typeof OAUTH_P
   return { email: accountId ? `${config.accountIdPrefix}-${accountId}` : `${config.accountIdPrefix}-${Date.now()}`, accountId, dedupeByAccountId: true };
 }
 
-function validateOAuthContext(config: (typeof OAUTH_PROVIDERS)[OAuthProviderKey], input: ExchangeOAuthInput, parsedState: string | null): ServiceFailure | null {
+function validateContext(config: (typeof OAUTH_PROVIDERS)[AuthProvider], input: ExchangeInput, parsedState: string | null): ServiceFailure | null {
   if (!config.requiresCodeVerifier) return null;
   if (parsedState !== input.state) return badRequest("Invalid OAuth state. Please restart authentication.");
   if (!input.codeVerifier) return badRequest("Missing authentication context. Please restart authentication.");
   return null;
 }
 
-function parseOAuthCallbackUrl(callbackUrl: string, providerLabel: string) {
+function parseCallback(callbackUrl: string, providerLabel: string) {
   if (!callbackUrl || typeof callbackUrl !== "string") return badRequest("Callback URL is required");
 
   let url: URL;
@@ -276,72 +276,72 @@ function parseOAuthCallbackUrl(callbackUrl: string, providerLabel: string) {
   return { code, state: url.searchParams.get("state") };
 }
 
-export const getAccountAuthUrl = Effect.fn("accountAuth.getAuthUrl")(function* (input: GetAuthUrlInput) {
+export const authUrlFor = Effect.fn("accountAuth.getAuthUrl")(function* (input: AuthUrlInput) {
   const config = OAUTH_PROVIDERS[input.provider];
   const data = yield* config.buildAuthUrl().pipe(
-    Effect.mapError((failure) => internal(failure.message, failure.cause))
+    Effect.mapError((failure: { message?: string; cause?: unknown }) => internal(failure.message ?? "Account auth failed", failure.cause))
   );
   return { success: true as const, data };
 });
 
-export const exchangeOAuthAccount = Effect.fn("accountAuth.exchangeOAuthAccount")(function* (
+export const exchangeAccount = Effect.fn("accountAuth.exchangeAccount")(function* (
   userId: string,
-  input: ExchangeOAuthInput
+  input: ExchangeInput
 ) {
   const config = OAUTH_PROVIDERS[input.provider];
-  const parsed = parseOAuthCallbackUrl(input.callbackUrl, config.label);
+  const parsed = parseCallback(input.callbackUrl, config.label);
   if (parsed instanceof ServiceFailure) return { success: false as const, error: parsed.message };
-  const invalidContext = validateOAuthContext(config, input, parsed.state);
+  const invalidContext = validateContext(config, input, parsed.state);
   if (invalidContext) return { success: false as const, error: invalidContext.message };
 
   const oauthResult = yield* config.exchangeCode(parsed.code, input.codeVerifier);
-  const data = yield* upsertOAuthAccount(
+  const data = yield* upsertAccount(
     userId,
     input.provider,
     config.label,
     oauthResult,
-    oauthAccountOptions(input.provider, config, oauthResult)
+    optionsFor(input.provider, config, oauthResult)
   );
   return { success: true as const, data };
 }) as (
   userId: string,
-  input: ExchangeOAuthInput
+  input: ExchangeInput
 ) => Effect.Effect<ActionResult<{ email: string; isUpdate: boolean }>, ServiceFailure>;
 
-export const connectCodexSessionAccount = Effect.fn("accountAuth.connectCodexSessionAccount")(function* (
+export const connectCodex = Effect.fn("accountAuth.connectCodex")(function* (
   userId: string,
-  input: ConnectCodexSessionInput
+  input: CodexSessionInput
 ) {
   const oauthResult = yield* Effect.try({
-    try: () => buildOAuthResultFromChatGPTSession(input.sessionJson),
+    try: () => sessionResult(input.sessionJson),
     catch: (cause) => badRequest(cause instanceof Error ? cause.message : "Failed to connect account"),
   });
-  const data = yield* upsertOAuthAccount(
+  const data = yield* upsertAccount(
     userId,
     "codex",
     "Codex",
     oauthResult,
-    oauthAccountOptions("codex", OAUTH_PROVIDERS.codex, oauthResult)
+    optionsFor("codex", OAUTH_PROVIDERS.codex, oauthResult)
   );
   return { success: true as const, data };
 }) as (
   userId: string,
-  input: ConnectCodexSessionInput
+  input: CodexSessionInput
 ) => Effect.Effect<ActionResult<{ email: string; isUpdate: boolean }>, ServiceFailure>;
 
 export const initiateDeviceAuth = Effect.fn("accountAuth.initiateDeviceAuth")(function* (
-  input: InitiateDeviceAuthInput
+  input: DeviceAuthInput
 ) {
   const config = DEVICE_PROVIDERS[input.provider];
   const data = yield* config.initiate().pipe(
-    Effect.mapError((failure) => internal(failure.message, failure.cause))
+    Effect.mapError((failure: { message?: string; cause?: unknown }) => internal(failure.message ?? "Account auth failed", failure.cause))
   );
   return { success: true as const, data };
 });
 
-export const pollDeviceAuth = Effect.fn("accountAuth.pollDeviceAuth")(function* (
+export const pollAuth = Effect.fn("accountAuth.pollAuth")(function* (
   userId: string,
-  input: PollDeviceAuthInput
+  input: DevicePollInput
 ) {
   const config = DEVICE_PROVIDERS[input.provider];
   const result = yield* config.poll(input);
@@ -362,12 +362,12 @@ export const pollDeviceAuth = Effect.fn("accountAuth.pollDeviceAuth")(function* 
   const oauthResult = result as OAuthResult;
   const provider = input.provider;
   const email = oauthResult.email || `${config.emailPrefix}-${Date.now()}`;
-  const saved = yield* upsertOAuthAccount(
+  const saved = yield* upsertAccount(
     userId,
     provider,
     config.label,
     oauthResult,
-    provider === "codex" ? oauthAccountOptions(provider, OAUTH_PROVIDERS.codex, oauthResult) : { email }
+    provider === "codex" ? optionsFor(provider, OAUTH_PROVIDERS.codex, oauthResult) : { email }
   );
   return { success: true as const, data: { status: "success" as const, ...saved } };
 });

@@ -13,7 +13,7 @@ export function asString(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
-export function asTrimmedString(value: unknown): string | undefined {
+export function trimmed(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
@@ -52,18 +52,18 @@ export function uniqueStrings(values: Iterable<unknown>): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
   for (const value of values) {
-    const trimmed = asTrimmedString(value);
-    if (!trimmed || seen.has(trimmed)) continue;
-    seen.add(trimmed);
-    out.push(trimmed);
+    const text = trimmed(value);
+    if (!text || seen.has(text)) continue;
+    seen.add(text);
+    out.push(text);
   }
   return out;
 }
 
-export function sortedUniqueStrings(values: Iterable<unknown>): string[] {
+export function sortedUnique(values: Iterable<unknown>): string[] {
   return uniqueStrings(values).sort((a, b) => a.localeCompare(b));
 }
 
 export function idsOf(value: unknown): string[] {
-  return sortedUniqueStrings(asArray(value).map((item) => stringAt(item, "id")));
+  return sortedUnique(asArray(value).map((item) => stringAt(item, "id")));
 }

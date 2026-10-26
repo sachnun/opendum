@@ -37,7 +37,7 @@ export interface MeData {
   isMaintainer: boolean;
   points?: {
     balance: number;
-    roamingPointsByApiKeyId?: Record<string, number>;
+    roamingByKey?: Record<string, number>;
   };
   sharing?: {
     enabled: boolean;
@@ -48,18 +48,18 @@ export interface MeData {
 
 export interface PointStatusData {
   balance: number;
-  roamingPointsByApiKeyId: Record<string, number>;
+  roamingByKey: Record<string, number>;
 }
 
 export type MaintainerAuditUser = UserIdentity;
 
-export type MaintainerAuditSearchUser = UserIdentity & {
+export type AuditSearchUser = UserIdentity & {
   hasProviderIssue: boolean;
   lastUsedAt: string | Date | null;
 };
 
-export interface MaintainerAuditUserListResult {
-  users: MaintainerAuditSearchUser[];
+export interface AuditListResult {
+  users: AuditSearchUser[];
   hasMore: boolean;
   nextOffset: number;
 }
@@ -90,20 +90,20 @@ interface ProviderAccountItem {
   consecutiveErrors: number;
   lastErrorAt: string | Date | null;
   lastSuccessAt: string | Date | null;
-  lastRecoveredByRotationAt: string | Date | null;
+  lastRecoveredAt: string | Date | null;
   lastErrorCode: number | null;
   unhealthyCount: number;
   successCount: number;
   createdAt: string | Date;
 }
 
-export interface ProviderAccountDetailItem extends ProviderAccountItem {
+export interface AccountDetailItem extends ProviderAccountItem {
   stats: ProviderStats;
 }
 
-export type ProviderAccountUpdateData = Pick<ProviderAccountItem, "id" | "name" | "isActive" | "disabledUntil" | "status" | "statusChangedAt" | "consecutiveErrors" | "unhealthyCount">;
+export type AccountUpdateData = Pick<ProviderAccountItem, "id" | "name" | "isActive" | "disabledUntil" | "status" | "statusChangedAt" | "consecutiveErrors" | "unhealthyCount">;
 
-export interface ProviderAccountModelHealthItem {
+export interface AccountHealthItem {
   status: string;
   consecutiveErrors: number;
   lastErrorAt: string | Date | null;
@@ -124,12 +124,12 @@ export interface AccountPingData {
 export type AccountStatsData = Record<string, ProviderStats>;
 
 export interface ProviderDetailData {
-  accounts: ProviderAccountDetailItem[];
+  accounts: AccountDetailItem[];
   supportedModels: string[];
   freeSupportedModels: string[];
-  supportedModelsByAccountId: Record<string, string[]>;
+  supportedByAccount: Record<string, string[]>;
   disabledModelsByAccountId: Record<string, string[]>;
-  modelHealthByAccountId: Record<string, Record<string, ProviderAccountModelHealthItem>>;
+  modelHealthByAccountId: Record<string, Record<string, AccountHealthItem>>;
   pinnedProviders: string[];
 }
 
@@ -156,13 +156,13 @@ export interface AccountQuotaRequest {
   forceRefresh?: boolean;
 }
 
-export interface AccountQuotaBatchRequest {
+export interface QuotaBatchRequest {
   provider: QuotaProviderKey;
   accountIds: string[];
   forceRefresh?: boolean;
 }
 
-export type AccountQuotaBatchResult = Record<string, ActionResult<AccountQuotaInfo>>;
+export type QuotaBatchResult = Record<string, ActionResult<AccountQuotaInfo>>;
 
 interface ErrorHistoryEntry {
   id: string;
@@ -173,9 +173,9 @@ interface ErrorHistoryEntry {
 }
 
 export type ErrorHistoryResult = ActionResult<{ entries: ErrorHistoryEntry[] }>;
-export type ErrorHistoryBatchResult = ActionResult<Record<string, ErrorHistoryResult>>;
+export type HistoryBatchResult = ActionResult<Record<string, ErrorHistoryResult>>;
 
-export interface ApiKeyListItem {
+export interface KeyListItem {
   id: string;
   name: string | null;
   keyPreview: string;
@@ -204,7 +204,7 @@ export type { ModelListItem, ModelSearchItem, ModelStats, ModelStatsData } from 
 export interface PlaygroundOptions {
   proxyBaseUrl?: string;
   hasAnyProviderAccount: boolean;
-  models: Array<{ id: string; name: string; family: string; providers: string[]; reasoning?: boolean; modalities?: ModelModalities; topPDeprecatedProviders?: string[] }>;
+  models: Array<{ id: string; name: string; family: string; providers: string[]; reasoning?: boolean; modalities?: ModelModalities; deprecatedProviders?: string[] }>;
   providerAccounts: Array<{ id: string; provider: string; name: string; email: string | null; isActive: boolean; disabledUntil: string | Date | null; disabledModels: string[]; supportedModels?: string[] | null }>;
 }
 
@@ -237,13 +237,13 @@ export interface AnalyticsData {
 
 export type AnalyticsSeriesData = Pick<AnalyticsData, "requestsOverTime" | "tokenUsage" | "successRate" | "durationOverTime" | "granularity">;
 
-export interface CustomProviderModelFlags {
+export interface CustomModelFlags {
   responses_api?: boolean;
   top_p_deprecated?: boolean;
   convert_external_images?: boolean;
 }
 
-export interface CustomProviderModelRow {
+export interface CustomModelRow {
   id: string;
   providerId: string;
   modelId: string;
@@ -252,12 +252,12 @@ export interface CustomProviderModelRow {
   authless: boolean;
   minTier: string | null;
   allowedTiers: string[] | null;
-  customFlags: CustomProviderModelFlags | null;
+  customFlags: CustomModelFlags | null;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface CustomProviderListItem {
+export interface CustomListItem {
   id: string;
   userId: string;
   slug: string;
@@ -268,19 +268,19 @@ export interface CustomProviderListItem {
   createdAt: string;
   updatedAt: string;
   accountCount: number;
-  models: CustomProviderModelRow[];
+  models: CustomModelRow[];
 }
 
-export interface CustomProviderCreateResult {
+export interface CustomCreateResult {
   id: string;
   slug: string;
 }
 
-export interface CustomProviderSyncResult {
+export interface CustomSyncResult {
   added: number;
   discovered: number;
 }
 
-export interface CustomProviderConnectResult {
+export interface CustomConnectResult {
   isUpdate: boolean;
 }

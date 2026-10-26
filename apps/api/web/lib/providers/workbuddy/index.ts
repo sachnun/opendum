@@ -1,5 +1,5 @@
 export {
-  initiateWorkbuddyDeviceCodeFlow,
-  pollWorkbuddyDeviceCodeAuthorization,
+  startDeviceFlow,
+  pollDeviceAuth,
 } from "./client.js";
 export * from "./constants.js";

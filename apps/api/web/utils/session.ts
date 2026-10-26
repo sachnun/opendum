@@ -1,7 +1,7 @@
 import { Effect } from "effect";
 import type { H3Event } from "h3";
 
-import { claimsFromPayload, toAuthUser, type AccessTokenClaims } from "#web/lib/claims.js";
+import { claimsOf, authUser, type AccessTokenClaims } from "#web/lib/claims.js";
 import { unauthorized } from "#web/errors.js";
 import { getIdentity, type IdentityService } from "#web/identity.js";
 
@@ -24,14 +24,14 @@ export const identityService = Effect.fn("identityService")(function* () {
   return yield* getIdentity();
 });
 
-export const getSessionFromEvent = Effect.fn("getSessionFromEvent")(function* (event: H3Event) {
+export const sessionOf = Effect.fn("sessionOf")(function* (event: H3Event) {
   const identity = yield* identityService();
   return yield* identity.sessionFromHeaders(event.req.headers);
 });
 
 export const mintAccessToken = Effect.fn("mintAccessToken")(function* (event: H3Event) {
   const identity = yield* identityService();
-  return yield* identity.accessTokenFromHeaders(event.req.headers);
+  return yield* identity.tokenFromHeaders(event.req.headers);
 });
 
 export const requireSessionToken = Effect.fn("requireSessionToken")(function* (event: H3Event) {
@@ -42,10 +42,10 @@ export const requireSessionToken = Effect.fn("requireSessionToken")(function* (e
   const session = yield* identity.sessionFromHeaders(bearerHeaders(token));
   if (!session?.user?.id) return yield* unauthorized();
 
-  return { user: toAuthUser(session.user), sessionToken: token };
+  return { user: authUser(session.user), sessionToken: token };
 });
 
-export const requireSessionFromHeaders = Effect.fn("requireSessionFromHeaders")(function* (
+export const sessionFrom = Effect.fn("sessionFrom")(function* (
   headers: Headers
 ) {
   const token = bearerToken(headers);
@@ -53,7 +53,7 @@ export const requireSessionFromHeaders = Effect.fn("requireSessionFromHeaders")(
 
   const identity = yield* identityService();
   const payload = yield* identity.verifyAccessToken(token);
-  const claims = claimsFromPayload(payload);
+  const claims = claimsOf(payload);
 
   if (!claims) return yield* unauthorized();
 

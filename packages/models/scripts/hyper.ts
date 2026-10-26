@@ -1,8 +1,8 @@
 import { buildIndex, persist, sync } from "#models/model-store.ts";
-import { runFetchJson } from "#models/sync/http.ts";
-import { stripParamInfoKey } from "#models/model/clean-key.ts";
-import { arrayAt, asRecord, asTrimmedString, stringAt } from "#models/json.ts";
-import { packageModelsDir, runScript } from "./shared.ts";
+import { fetchJson } from "#models/sync/http.ts";
+import { stripParams } from "#models/model/clean-key.ts";
+import { arrayAt, asRecord, trimmed, stringAt } from "#models/json.ts";
+import { dataDir, runScript } from "./shared.ts";
 import type { ModelData, ModelIndexEntry } from "#models/types.ts";
 
 const PROVIDER_NAME = "hyper";
@@ -15,32 +15,32 @@ interface HyperModel {
   reasoning: boolean;
 }
 
-function toModelKey(modelId: string): string {
+function keyOf(modelId: string): string {
   const normalized = modelId
     .replace(/[:/]/g, "-")
     .replace(/[^a-zA-Z0-9._-]/g, "-")
     .replace(/-{2,}/g, "-");
 
-  return stripParamInfoKey(normalized);
+  return stripParams(normalized);
 }
 
-function fullModelKey(modelId: string): string {
+function fullKey(modelId: string): string {
   return modelId
     .replace(/[:/]/g, "-")
     .replace(/[^a-zA-Z0-9._-]/g, "-")
     .replace(/-{2,}/g, "-");
 }
 
-function buildModelMap(models: HyperModel[]): Map<string, string> {
+function modelIndex(models: HyperModel[]): Map<string, string> {
   const map = new Map<string, string>();
 
   for (const model of models) {
-    const baseModelKey = toModelKey(model.id);
+    const baseModelKey = keyOf(model.id);
     let modelKey = baseModelKey;
     let suffix = 2;
 
     while (map.has(modelKey) && map.get(modelKey) !== model.id) {
-      modelKey = suffix === 2 ? fullModelKey(model.id) : `${fullModelKey(model.id)}-${suffix}`;
+      modelKey = suffix === 2 ? fullKey(model.id) : `${fullKey(model.id)}-${suffix}`;
       suffix += 1;
     }
 
@@ -50,7 +50,7 @@ function buildModelMap(models: HyperModel[]): Map<string, string> {
   return new Map([...map.entries()].sort(([a], [b]) => a.localeCompare(b)));
 }
 
-function enrichNewModels(
+function enrichModels(
   modelsDir: string,
   addedKeys: string[],
   modelMap: Map<string, string>,
@@ -75,7 +75,7 @@ function enrichNewModels(
   }
 }
 
-function toHyperModels(payload: unknown): HyperModel[] {
+function toModels(payload: unknown): HyperModel[] {
   const data = arrayAt(payload, "data");
   if (data.length === 0) {
     throw new Error("Unexpected Hyper /v1/models payload format");
@@ -83,7 +83,7 @@ function toHyperModels(payload: unknown): HyperModel[] {
 
   const models: HyperModel[] = [];
   for (const item of data) {
-    const id = asTrimmedString(stringAt(item, "id"));
+    const id = trimmed(stringAt(item, "id"));
     if (!id) continue;
     const effortLevels = arrayAt(asRecord(asRecord(item)?.["reasoning"]), "effort_levels");
     models.push({ id, reasoning: effortLevels.length > 0 });
@@ -99,22 +99,22 @@ function toHyperModels(payload: unknown): HyperModel[] {
   return models;
 }
 
-async function fetchHyperModels(): Promise<HyperModel[]> {
-  const payload = await runFetchJson(HYPER_MODELS_URL, { label: "Hyper /v1/models" });
-  return toHyperModels(payload);
+async function fetchModels(): Promise<HyperModel[]> {
+  const payload = await fetchJson(HYPER_MODELS_URL, { label: "Hyper /v1/models" });
+  return toModels(payload);
 }
 
 async function main(): Promise<void> {
-  const modelsDir = packageModelsDir();
+  const modelsDir = dataDir();
 
-  const models = await fetchHyperModels();
-  const modelMap = buildModelMap(models);
+  const models = await fetchModels();
+  const modelMap = modelIndex(models);
   const metadataLookup = new Map(models.map((model) => [model.id, model]));
 
   const result = await sync(modelsDir, PROVIDER_NAME, modelMap);
 
   if (result.added.length > 0) {
-    enrichNewModels(modelsDir, result.added, modelMap, metadataLookup);
+    enrichModels(modelsDir, result.added, modelMap, metadataLookup);
   }
 
   if (result.added.length === 0 && result.removed.length === 0 && result.updated.length === 0) {

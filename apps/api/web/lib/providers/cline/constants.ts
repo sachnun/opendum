@@ -8,6 +8,6 @@ export const DEVICE_AUTHORIZE_PATH = "/user_management/authorize/device";
 export const DEVICE_AUTHENTICATE_PATH = "/user_management/authenticate";
 export const CLINE_REGISTER_PATH = "/auth/register";
 
-export const DEVICE_CODE_EXPIRY_SECONDS = 600;
+export const DEVICE_EXPIRY = 600;
 export const POLLING_INTERVAL_SECONDS = 5;
-export const ACCESS_TOKEN_TTL_SECONDS = 3600;
+export const ACCESS_TTL = 3600;

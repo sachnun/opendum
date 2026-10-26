@@ -44,7 +44,7 @@ interface ParsedSchema {
 
 const drizzleDir = join(dirname(fileURLToPath(import.meta.url)), "drizzle");
 
-const DRIZZLE_TYPE_BY_SQL_TYPE: Record<string, string> = {
+const TYPE_BY_SQL: Record<string, string> = {
   text: "string",
   integer: "number",
   boolean: "boolean",
@@ -60,7 +60,7 @@ const PARSER_SKIPPED_STATEMENTS = [
   /^ALTER TABLE "[^"]+" SET \(/,
 ];
 
-function parseColumnList(raw: string): string[] {
+function columnList(raw: string): string[] {
   return raw
     .split(",")
     .map((column) => column.trim().replace(/^"|"$/g, ""))
@@ -75,7 +75,7 @@ function parseDefault(raw: string | undefined): DefaultValue {
   if (value.startsWith("'") && value.endsWith("'")) {
     const inner = value.slice(1, -1);
     if (inner.startsWith("{") && inner.endsWith("}")) {
-      return { kind: "array", value: parseColumnList(inner.slice(1, -1)) };
+      return { kind: "array", value: columnList(inner.slice(1, -1)) };
     }
     return { kind: "literal", value: inner };
   }
@@ -90,7 +90,7 @@ function parseColumn(line: string): [string, ParsedColumn] {
   if (!match) throw new Error(`Unsupported column definition: ${line}`);
 
   const [, name, type, rawFlags] = match;
-  if (!(type in DRIZZLE_TYPE_BY_SQL_TYPE)) throw new Error(`Unsupported column type: ${type}`);
+  if (!(type in TYPE_BY_SQL)) throw new Error(`Unsupported column type: ${type}`);
 
   let flags = rawFlags;
   const primary = /\bPRIMARY KEY\b/.test(flags);
@@ -102,7 +102,7 @@ function parseColumn(line: string): [string, ParsedColumn] {
   return [
     name,
     {
-      type: DRIZZLE_TYPE_BY_SQL_TYPE[type],
+      type: TYPE_BY_SQL[type],
       notNull,
       primary,
       defaultValue: parseDefault(defaultMatch?.[1]),
@@ -110,7 +110,7 @@ function parseColumn(line: string): [string, ParsedColumn] {
   ];
 }
 
-function parseCreateTable(name: string, body: string, parsed: ParsedSchema): void {
+function createTable(name: string, body: string, parsed: ParsedSchema): void {
   const table: ParsedTable = { columns: new Map(), uniques: new Map() };
 
   for (const rawLine of body.split("\n")) {
@@ -119,7 +119,7 @@ function parseCreateTable(name: string, body: string, parsed: ParsedSchema): voi
 
     const unique = line.match(/^CONSTRAINT "([^"]+)" UNIQUE\(([^)]*)\)$/);
     if (unique) {
-      table.uniques.set(unique[1], parseColumnList(unique[2]));
+      table.uniques.set(unique[1], columnList(unique[2]));
       continue;
     }
 
@@ -137,9 +137,9 @@ function parseSql(statements: string[]): ParsedSchema {
     if (statement.startsWith("INSERT INTO ")) continue;
     if (statement.startsWith("DELETE FROM ")) continue;
 
-    const createTable = statement.match(/^CREATE TABLE "([^"]+)" \(([\s\S]*)\)$/);
-    if (createTable) {
-      parseCreateTable(createTable[1], createTable[2], parsed);
+    const tableMatch = statement.match(/^CREATE TABLE "([^"]+)" \(([\s\S]*)\)$/);
+    if (tableMatch) {
+      createTable(tableMatch[1], tableMatch[2], parsed);
       continue;
     }
 
@@ -149,9 +149,9 @@ function parseSql(statements: string[]): ParsedSchema {
     if (foreignKey) {
       parsed.foreignKeys.set(foreignKey[2], {
         table: foreignKey[1],
-        columns: parseColumnList(foreignKey[3]),
+        columns: columnList(foreignKey[3]),
         foreignTable: foreignKey[4],
-        foreignColumns: parseColumnList(foreignKey[5]),
+        foreignColumns: columnList(foreignKey[5]),
         onDelete: foreignKey[6],
         onUpdate: foreignKey[7],
       });
@@ -163,7 +163,7 @@ function parseSql(statements: string[]): ParsedSchema {
       parsed.indexes.set(createIndex[2], {
         table: createIndex[3],
         unique: Boolean(createIndex[1]),
-        columns: parseColumnList(createIndex[4]),
+        columns: columnList(createIndex[4]),
       });
       continue;
     }
@@ -228,7 +228,7 @@ function loadSql(): ParsedSchema {
   );
 }
 
-function normalizeDrizzleDefault(value: unknown): DefaultValue {
+function normalizeDefault(value: unknown): DefaultValue {
   if (value === undefined) return { kind: "none" };
   if (value instanceof SQL) return { kind: "sql" };
   if (Array.isArray(value)) return { kind: "array", value };
@@ -243,7 +243,7 @@ function drizzleTables(): PgTable[] {
   return Object.values(schema).filter(isTable);
 }
 
-function indexColumnName(column: unknown): string {
+function columnName(column: unknown): string {
   if (column instanceof IndexedColumn && typeof column.name === "string") return column.name;
 
   throw new Error("Only named index columns are supported");
@@ -269,7 +269,7 @@ test("table columns match the drizzle schema", () => {
         type: column.dataType,
         notNull: column.notNull,
         primary: column.primary,
-        defaultValue: normalizeDrizzleDefault(column.default),
+        defaultValue: normalizeDefault(column.default),
       }))
       .sort((left, right) => left.name.localeCompare(right.name));
     const actual = [...(sql.tables.get(name)?.columns ?? new Map())]
@@ -302,7 +302,7 @@ test("indexes match the drizzle schema", () => {
         name: String(index.config.name),
         table: getTableName(table),
         unique: index.config.unique,
-        columns: index.config.columns.map(indexColumnName),
+        columns: index.config.columns.map(columnName),
       })),
     )
     .sort((left, right) => String(left.name).localeCompare(String(right.name)));

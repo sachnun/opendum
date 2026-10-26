@@ -1,11 +1,16 @@
 import { Effect } from "effect";
 import type { OpendumRedis } from "@opendum/core/redis";
 
-const FALLBACK_STICKY_PREFIX = "opendum:provider:fallback";
-const FALLBACK_STRIKE_PREFIX = "opendum:provider:fallback-strikes";
-const FALLBACK_STICKY_TTL_SECONDS = 10 * 60;
-const FALLBACK_STRIKE_WINDOW_SECONDS = 5 * 60;
-const FALLBACK_STRIKE_LIMIT = 2;
+const STICKY_PREFIX = "opendum:provider:fallback";
+const STRIKE_PREFIX = "opendum:provider:fallback-strikes";
+const STICKY_TTL_SECONDS = 10 * 60;
+const STRIKE_WINDOW_SECONDS = 5 * 60;
+const STRIKE_LIMIT = 2;
+
+const stickyKey = (provider: string): string => `${STICKY_PREFIX}:${provider}`;
+const strikeKey = (provider: string): string => `${STRIKE_PREFIX}:${provider}`;
+
+export type EndpointPoster = (url: string) => Effect.Effect<Response, unknown>;
 
 export interface FallbackState {
   sticky(provider: string): Effect.Effect<boolean>;
@@ -17,20 +22,14 @@ export class NoFallbackState implements FallbackState {
   sticky(): Effect.Effect<boolean> {
     return Effect.succeed(false);
   }
+
   recordStrike(): Effect.Effect<void> {
     return Effect.void;
   }
+
   clear(): Effect.Effect<void> {
     return Effect.void;
   }
-}
-
-export function fallbackStickyKey(provider: string): string {
-  return `${FALLBACK_STICKY_PREFIX}:${provider}`;
-}
-
-export function fallbackStrikeKey(provider: string): string {
-  return `${FALLBACK_STRIKE_PREFIX}:${provider}`;
 }
 
 export class RedisFallbackRouter implements FallbackState {
@@ -43,7 +42,7 @@ export class RedisFallbackRouter implements FallbackState {
   sticky(provider: string): Effect.Effect<boolean> {
     if (!provider) return Effect.succeed(false);
     return Effect.tryPromise({
-      try: async () => (await this.redis.exists(fallbackStickyKey(provider))) > 0,
+      try: async () => (await this.redis.exists(stickyKey(provider))) > 0,
       catch: (cause) => cause,
     }).pipe(Effect.orElseSucceed(() => false));
   }
@@ -52,14 +51,14 @@ export class RedisFallbackRouter implements FallbackState {
     if (!provider) return Effect.void;
     return Effect.tryPromise({
       try: async () => {
-        const strikeKey = fallbackStrikeKey(provider);
-        const count = await this.redis.incr(strikeKey);
+        const key = strikeKey(provider);
+        const count = await this.redis.incr(key);
         if (count === 1) {
-          await this.redis.expire(strikeKey, FALLBACK_STRIKE_WINDOW_SECONDS);
+          await this.redis.expire(key, STRIKE_WINDOW_SECONDS);
         }
-        if (count < FALLBACK_STRIKE_LIMIT) return;
-        await this.redis.set(fallbackStickyKey(provider), "1", { EX: FALLBACK_STICKY_TTL_SECONDS });
-        await this.redis.del(strikeKey);
+        if (count < STRIKE_LIMIT) return;
+        await this.redis.set(stickyKey(provider), "1", { EX: STICKY_TTL_SECONDS });
+        await this.redis.del(key);
       },
       catch: (cause) => cause,
     }).pipe(Effect.ignore);
@@ -68,53 +67,67 @@ export class RedisFallbackRouter implements FallbackState {
   clear(provider: string): Effect.Effect<void> {
     if (!provider) return Effect.void;
     return Effect.tryPromise({
-      try: () => this.redis.del([fallbackStickyKey(provider), fallbackStrikeKey(provider)]),
+      try: () => this.redis.del([stickyKey(provider), strikeKey(provider)]),
       catch: (cause) => cause,
     }).pipe(Effect.ignore);
   }
 }
 
-export type EndpointPoster = (url: string) => Effect.Effect<Response, unknown>;
+export class FallbackPolicy {
+  readonly state: FallbackState;
 
-export function shouldUseFallbackEndpoint(status: number): boolean {
-  return status === 403 || status === 429;
-}
+  constructor(state: FallbackState | null) {
+    this.state = state ?? new NoFallbackState();
+  }
 
-export function postWithFallback(
-  state: FallbackState | null,
-  provider: string,
-  primary: string,
-  fallback: string,
-  post: EndpointPoster
-): Effect.Effect<Response, unknown> {
-  const router = state ?? new NoFallbackState();
-  if (!fallback) return post(primary);
+  static triggers(status: number): boolean {
+    return status === 403 || status === 429;
+  }
 
-  return Effect.gen(function* () {
-    if (yield* router.sticky(provider)) {
-      const resp = yield* post(fallback);
-      if (!shouldUseFallbackEndpoint(resp.status)) return resp;
+  sticky(provider: string): Effect.Effect<boolean> {
+    return this.state.sticky(provider);
+  }
+
+  recordStrike(provider: string): Effect.Effect<void> {
+    return this.state.recordStrike(provider);
+  }
+
+  clear(provider: string): Effect.Effect<void> {
+    return this.state.clear(provider);
+  }
+
+  primary<A extends { status: number }>(
+    provider: string,
+    run: Effect.Effect<A, unknown>
+  ): Effect.Effect<A, unknown> {
+    return run.pipe(
+      Effect.tap((resp) =>
+        resp.status >= 200 && resp.status < 300 ? this.state.clear(provider) : Effect.void
+      )
+    );
+  }
+
+  post(
+    provider: string,
+    primary: string,
+    fallback: string,
+    post: EndpointPoster
+  ): Effect.Effect<Response, unknown> {
+    if (!fallback) return post(primary);
+
+    return Effect.gen({ self: this }, function* () {
+      if (yield* this.sticky(provider)) {
+        const resp = yield* post(fallback);
+        if (!FallbackPolicy.triggers(resp.status)) return resp;
+        yield* Effect.promise(() => resp.body?.cancel() ?? Promise.resolve());
+        return yield* this.primary(provider, post(primary));
+      }
+
+      const resp = yield* this.primary(provider, post(primary));
+      if (!FallbackPolicy.triggers(resp.status)) return resp;
       yield* Effect.promise(() => resp.body?.cancel() ?? Promise.resolve());
-      return yield* postPrimary(router, provider, primary, post);
-    }
-
-    const resp = yield* postPrimary(router, provider, primary, post);
-    if (!shouldUseFallbackEndpoint(resp.status)) return resp;
-    yield* Effect.promise(() => resp.body?.cancel() ?? Promise.resolve());
-    yield* router.recordStrike(provider);
-    return yield* post(fallback);
-  });
-}
-
-function postPrimary(
-  router: FallbackState,
-  provider: string,
-  primary: string,
-  post: EndpointPoster
-): Effect.Effect<Response, unknown> {
-  return post(primary).pipe(
-    Effect.tap((resp) =>
-      resp.status >= 200 && resp.status < 300 ? router.clear(provider) : Effect.void
-    )
-  );
+      yield* this.recordStrike(provider);
+      return yield* post(fallback);
+    });
+  }
 }

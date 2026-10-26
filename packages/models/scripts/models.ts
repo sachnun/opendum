@@ -2,13 +2,13 @@ import { Effect } from "effect";
 
 import { buildIndex, prune } from "#models/model-store.ts";
 import { listFiles, readText, writeText } from "#models/fs.ts";
-import { basename, dirname, fromFileUrl, join } from "#models/paths.ts";
+import { basename, dirname, fileUrl, join } from "#models/paths.ts";
 import { orderScripts, runSteps, spawnScript, type RefreshStep } from "#models/refresh.ts";
-import { packageModelsDir, runScript } from "./shared.ts";
+import { dataDir, runScript } from "./shared.ts";
 
-const SCRIPT_DIR = dirname(fromFileUrl(import.meta.url));
-const modelsDir = packageModelsDir();
-const SELF = basename(fromFileUrl(import.meta.url));
+const SCRIPT_DIR = dirname(fileUrl(import.meta.url));
+const modelsDir = dataDir();
+const SELF = basename(fileUrl(import.meta.url));
 
 const TAIL_SCRIPTS = ["aa.ts", "enrich.ts"];
 
@@ -32,7 +32,7 @@ function refreshedProviders(): string[] {
 
 async function main(): Promise<void> {
   const providers = refreshedProviders();
-  const before = snapshotProviderModels(providers);
+  const before = providerSnapshot(providers);
 
   const steps: RefreshStep[] = refreshScripts().map((script) => ({
     script,
@@ -48,7 +48,7 @@ async function main(): Promise<void> {
     console.log(`[models] pruned ${pruned.length} dead entries: ${pruned.join(", ")}`);
   }
 
-  const after = snapshotProviderModels(providers);
+  const after = providerSnapshot(providers);
   const target = summaryPath(Bun.argv);
   if (target) {
     writeText(target, generateSummary(before, after));
@@ -58,7 +58,7 @@ async function main(): Promise<void> {
 
 type ProviderSnapshot = Map<string, Set<string>>;
 
-function snapshotProviderModels(providers: string[]): ProviderSnapshot {
+function providerSnapshot(providers: string[]): ProviderSnapshot {
   const snapshot: ProviderSnapshot = new Map(providers.map((provider) => [provider, new Set<string>()]));
 
   for (const [modelId, entry] of Object.entries(buildIndex(modelsDir))) {

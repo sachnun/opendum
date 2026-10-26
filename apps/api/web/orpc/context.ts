@@ -2,8 +2,8 @@ import { ORPCError } from "@orpc/server";
 import { Effect } from "effect";
 import { HTTPError } from "h3";
 
-import { requireContextFromHeaders, type RequestContext } from "#web/utils/api.js";
-import { asServiceFailure } from "../errors.js";
+import { contextOf, type RequestContext } from "#web/utils/api.js";
+import { asFailure } from "../errors.js";
 
 export interface OrpcInitialContext {
   headers: Headers;
@@ -14,17 +14,17 @@ export interface OrpcContext extends OrpcInitialContext {
   requestContext: RequestContext;
 }
 
-function toOrpcError(error: unknown) {
+function orpcError(error: unknown) {
   if (error instanceof HTTPError) {
     if (error.status === 401) return new ORPCError("UNAUTHORIZED", { message: "Unauthorized" });
     if (error.status === 403) return new ORPCError("FORBIDDEN", { message: error.statusText || "Forbidden" });
   }
-  const failure = asServiceFailure(error);
+  const failure = asFailure(error);
   return new ORPCError("INTERNAL_SERVER_ERROR", { message: failure.message });
 }
 
-export function resolveRequestContext(headers: Headers) {
-  return requireContextFromHeaders(headers).pipe(Effect.mapError(toOrpcError));
+export function resolveContext(headers: Headers) {
+  return contextOf(headers).pipe(Effect.mapError(orpcError));
 }
 
 export function requireWritable(requestContext: RequestContext) {

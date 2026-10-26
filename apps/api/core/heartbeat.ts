@@ -1,6 +1,6 @@
 const encoder = new TextEncoder();
 
-export const DEFAULT_STREAM_HEARTBEAT_MS = 15 * 1000;
+export const STREAM_HEARTBEAT_MS = 15 * 1000;
 
 export const SSE_KEEPALIVE = encoder.encode(": keep-alive\n\n");
 

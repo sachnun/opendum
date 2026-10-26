@@ -1,9 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import { Effect, Exit } from "effect";
 
-import { NoFallbackState, RedisFallbackRouter, postWithFallback, shouldUseFallbackEndpoint } from "./fallback.js";
+import { FallbackPolicy, NoFallbackState, RedisFallbackRouter } from "./fallback.js";
 import { ProviderFallbackFailure } from "./errors.js";
-import { retryTransient, normalizeProviderFailure, statusOf, transportFailure } from "./http.js";
+import { RequestFailure, Retry } from "./http.js";
 
 describe("fallback router", () => {
   it("keeps a best effort sticky check failure on the success channel", async () => {
@@ -32,7 +32,7 @@ describe("fallback router", () => {
   it("falls back to the secondary endpoint on a 429", async () => {
     const calls: string[] = [];
     const response = await Effect.runPromise(
-      postWithFallback(new NoFallbackState(), "openrouter", "primary", "fallback", (url) =>
+      new FallbackPolicy(new NoFallbackState()).post("openrouter", "primary", "fallback", (url) =>
         Effect.sync(() => {
           calls.push(url);
           return new Response(null, { status: url === "primary" ? 429 : 200 });
@@ -46,7 +46,7 @@ describe("fallback router", () => {
   it("uses the primary endpoint without a fallback url", async () => {
     const calls: string[] = [];
     await Effect.runPromise(
-      postWithFallback(null, "openrouter", "primary", "", (url) =>
+      new FallbackPolicy(null).post("openrouter", "primary", "", (url) =>
         Effect.sync(() => {
           calls.push(url);
           return new Response(null, { status: 200 });
@@ -60,7 +60,7 @@ describe("fallback router", () => {
 describe("provider resilience helpers", () => {
   it("normalizes any failure into a ProviderRequestFailure", async () => {
     const exit = await Effect.runPromiseExit(
-      normalizeProviderFailure("openrouter", Effect.fail(new Error("boom")))
+      RequestFailure.normalize("openrouter", Effect.fail(new Error("boom")))
     );
     expect(Exit.isFailure(exit)).toBe(true);
     const failure = Exit.findErrorOption(exit);
@@ -72,22 +72,22 @@ describe("provider resilience helpers", () => {
   });
 
   it("wraps a transport failure with the provider and url", () => {
-    const failure = transportFailure("codex", new Error("dns"), "https://example.test");
+    const failure = RequestFailure.transport("codex", new Error("dns"), "https://example.test");
     expect(failure._tag).toBe("ProviderTransportFailure");
     expect(failure.url).toBe("https://example.test");
     expect(failure.message).toBe("dns");
   });
 
   it("only treats 403 and 429 as fallback triggers", () => {
-    expect(shouldUseFallbackEndpoint(403)).toBe(true);
-    expect(shouldUseFallbackEndpoint(429)).toBe(true);
-    expect(shouldUseFallbackEndpoint(500)).toBe(false);
+    expect(FallbackPolicy.triggers(403)).toBe(true);
+    expect(FallbackPolicy.triggers(429)).toBe(true);
+    expect(FallbackPolicy.triggers(500)).toBe(false);
   });
 
   it("retryTransient evaluates the source once when attempts is one", async () => {
     let calls = 0;
     await Effect.runPromise(
-      retryTransient(
+      Retry.transient(
         Effect.suspend(() => {
           calls += 1;
           return Effect.fail(new ProviderFallbackFailure({ message: "nope", provider: "x" }));
@@ -99,7 +99,7 @@ describe("provider resilience helpers", () => {
   });
 
   it("reports a status for null responses", () => {
-    expect(statusOf(null)).toBe(0);
-    expect(statusOf(new Response(null, { status: 204 }))).toBe(204);
+    expect(RequestFailure.status(null)).toBe(0);
+    expect(RequestFailure.status(new Response(null, { status: 204 }))).toBe(204);
   });
 });

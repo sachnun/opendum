@@ -1,17 +1,17 @@
 import { Effect } from "effect";
-import { putQuotaCache } from "../cache.js";
+import { putQuota } from "../cache.js";
 import {
-  baseQuotaInfo,
+  baseInfo,
   clampFraction,
   displayNumber,
-  errorQuotaInfo,
-  expiredQuotaInfo,
+  errorInfo,
+  expiredInfo,
   formatFloat,
-  formatTimeUntilResetIso,
-  parseQuotaArray,
-  parseQuotaNumber,
-  parseQuotaRecord,
-  parseQuotaString,
+  resetIso,
+  parseArray,
+  parseNumber,
+  parseRecord,
+  parseString,
 } from "../helpers.js";
 import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay } from "../types.js";
 import { quotaAttempt, type Json } from "./shared.js";
@@ -22,7 +22,7 @@ const WORKBUDDY_PAID_URL = "https://www.workbuddy.ai/billing/meter/get-user-reso
 const WORKBUDDY_DOMAIN = "www.workbuddy.ai";
 const WORKBUDDY_PAGE_SIZE = 50;
 
-export function fetchWorkbuddyQuota(
+export function workbuddyQuota(
   ctx: QuotaContext,
   account: QuotaAccount,
   accessToken: string,
@@ -30,7 +30,7 @@ export function fetchWorkbuddyQuota(
 ): Effect.Effect<AccountQuotaInfo> {
   const token = accessToken.trim();
   if (!token) {
-    return Effect.succeed(expiredQuotaInfo("WorkBuddy access token is missing. Re-authenticate this account."));
+    return Effect.succeed(expiredInfo("WorkBuddy access token is missing. Re-authenticate this account."));
   }
   const headers: Record<string, string> = {
     Authorization: `Bearer ${token}`,
@@ -52,16 +52,16 @@ export function fetchWorkbuddyQuota(
     {}
   ).pipe(
     Effect.flatMap((attempt) => {
-      if (!attempt.ok) return Effect.succeed(errorQuotaInfo(attempt.message));
+      if (!attempt.ok) return Effect.succeed(errorInfo(attempt.message));
       const { result } = attempt;
       if (result.statusCode === 401 || result.statusCode === 403) {
         return Effect.succeed(
-          expiredQuotaInfo("WorkBuddy session is invalid or expired. Re-authenticate this account.")
+          expiredInfo("WorkBuddy session is invalid or expired. Re-authenticate this account.")
         );
       }
       if (result.statusCode < 200 || result.statusCode >= 300) {
         return Effect.succeed(
-          errorQuotaInfo(`WorkBuddy quota endpoint failed: HTTP ${result.statusCode} ${result.raw}`)
+          errorInfo(`WorkBuddy quota endpoint failed: HTTP ${result.statusCode} ${result.raw}`)
         );
       }
       const payload = (() => {
@@ -71,44 +71,44 @@ export function fetchWorkbuddyQuota(
           return null;
         }
       })();
-      if (!payload) return Effect.succeed(errorQuotaInfo("WorkBuddy quota response was not valid JSON"));
+      if (!payload) return Effect.succeed(errorInfo("WorkBuddy quota response was not valid JSON"));
       if (payload.code !== 0) {
         return Effect.succeed(
-          errorQuotaInfo(`WorkBuddy quota request failed: ${payload.code} ${payload.msg ?? ""}`)
+          errorInfo(`WorkBuddy quota request failed: ${payload.code} ${payload.msg ?? ""}`)
         );
       }
       const summary = payload.data ?? {};
-      const packages = parseQuotaArray(summary.Packages).map((raw) => (parseQuotaRecord(raw) ?? {}) as Json);
-      return fetchWorkbuddyPackageDetails(ctx, account, headers, forceRefresh, packages).pipe(
+      const packages = parseArray(summary.Packages).map((raw) => (parseRecord(raw) ?? {}) as Json);
+      return packageDetails(ctx, account, headers, forceRefresh, packages).pipe(
         Effect.flatMap((details) => {
-          const groups = workbuddyQuotaGroups(packages, details);
+          const groups = quotaGroups(packages, details);
           if (groups.length === 0) {
-            return Effect.succeed(errorQuotaInfo("WorkBuddy quota response did not include usable quota data"));
+            return Effect.succeed(errorInfo("WorkBuddy quota response did not include usable quota data"));
           }
-          return putQuotaCache(ctx, result).pipe(Effect.as(baseQuotaInfo("success", groups)));
+          return putQuota(ctx, result).pipe(Effect.as(baseInfo("success", groups)));
         })
       );
     })
   );
 }
 
-function workbuddyQuotaGroups(
+function quotaGroups(
   packages: Json[],
   details: Map<string, { packageName: string; cycleEndTime: string }>
 ): QuotaGroupDisplay[] {
   const groups: QuotaGroupDisplay[] = [];
   for (const pkg of packages) {
-    const total = parseQuotaNumber(pkg.CycleTotalCapacity);
-    let remaining = parseQuotaNumber(pkg.CycleRemainCapacity);
-    let used = parseQuotaNumber(pkg.CycleUsedCapacity) ?? 0;
+    const total = parseNumber(pkg.CycleTotalCapacity);
+    let remaining = parseNumber(pkg.CycleRemainCapacity);
+    let used = parseNumber(pkg.CycleUsedCapacity) ?? 0;
     if (total === null || remaining === null || total <= 0) continue;
     used = Math.min(Math.max(0, used), total);
     remaining = Math.max(0, Math.min(remaining, total));
     const fraction = clampFraction(remaining / total);
-    const name = parseQuotaString(pkg.PackageCode) || "package";
+    const name = parseString(pkg.PackageCode) || "package";
     const detail = details.get(name);
-    const display = workbuddyDisplayName(name, detail?.packageName ?? "");
-    const resetIso = workbuddyResetIso(detail?.cycleEndTime ?? "");
+    const display = displayOf(name, detail?.packageName ?? "");
+    const resetValue = resetAt(detail?.cycleEndTime ?? "");
     groups.push({
       name,
       displayName: display,
@@ -116,15 +116,15 @@ function workbuddyQuotaGroups(
       remainingRequests: displayNumber(remaining),
       maxRequests: displayNumber(total),
       usedRequests: displayNumber(used),
-      resetTimeIso: resetIso,
-      resetInHuman: formatTimeUntilResetIso(resetIso),
+      resetTimeIso: resetValue,
+      resetInHuman: resetIso(resetValue),
       remainingLabel: `${formatFloat(remaining)} / ${formatFloat(total)} credits`,
     });
   }
   return groups;
 }
 
-function fetchWorkbuddyPackageDetails(
+function packageDetails(
   ctx: QuotaContext,
   account: QuotaAccount,
   headers: Record<string, string>,
@@ -135,7 +135,7 @@ function fetchWorkbuddyPackageDetails(
   const codes: string[] = [];
   const seen = new Set<string>();
   for (const pkg of packages) {
-    const code = parseQuotaString(pkg.PackageCode);
+    const code = parseString(pkg.PackageCode);
     if (!code || seen.has(code)) continue;
     seen.add(code);
     codes.push(code);
@@ -164,16 +164,16 @@ function fetchWorkbuddyPackageDetails(
           }
         })();
         if (!payload || payload.code !== 0) return Effect.void;
-        return putQuotaCache(ctx, result).pipe(
+        return putQuota(ctx, result).pipe(
           Effect.flatMap(() => {
-            for (const raw of parseQuotaArray(payload.data?.Accounts)) {
-              const entry = parseQuotaRecord(raw);
+            for (const raw of parseArray(payload.data?.Accounts)) {
+              const entry = parseRecord(raw);
               if (!entry) continue;
-              const code = parseQuotaString(entry.PackageCode);
+              const code = parseString(entry.PackageCode);
               if (!code || out.has(code)) continue;
               out.set(code, {
-                packageName: parseQuotaString(entry.PackageName),
-                cycleEndTime: parseQuotaString(entry.CycleEndTime),
+                packageName: parseString(entry.PackageName),
+                cycleEndTime: parseString(entry.CycleEndTime),
               });
             }
             return Effect.void;
@@ -185,27 +185,27 @@ function fetchWorkbuddyPackageDetails(
   return Effect.forEach(targets, loadTarget, { concurrency: 1, discard: true }).pipe(Effect.as(out));
 }
 
-function workbuddyDisplayName(packageCode: string, packageName: string): string {
+function displayOf(packageCode: string, packageName: string): string {
   if (packageName.trim()) {
-    const normalized = workbuddyNormalizePackageName(packageName);
+    const normalized = normalizePackage(packageName);
     return normalized || packageName;
   }
   if (packageCode.startsWith("TCACA_code_006")) return "Bonus Pack";
   if (packageCode.startsWith("TCACA_code_035")) return "Free Plan";
-  const trimmed = workbuddyStripRandomSuffix(packageCode);
+  const trimmed = stripSuffix(packageCode);
   if (trimmed) return trimmed;
   if (packageCode) return packageCode;
   return "package";
 }
 
-function workbuddyNormalizePackageName(name: string): string {
+function normalizePackage(name: string): string {
   const lower = name.trim().toLowerCase();
   if (lower === "free plan subscription") return "Free Plan";
   if (lower === "bonus pack") return "Bonus Pack";
   return name.trim();
 }
 
-function workbuddyStripRandomSuffix(code: string): string {
+function stripSuffix(code: string): string {
   const idx = code.lastIndexOf("_");
   if (idx <= 0 || idx + 1 >= code.length) return code.replace(/_/g, " ");
   const suffix = code.slice(idx + 1);
@@ -221,14 +221,14 @@ function workbuddyStripRandomSuffix(code: string): string {
   return code.replace(/_/g, " ");
 }
 
-function workbuddyResetIso(cycleEndTime: string): string | null {
+function resetAt(cycleEndTime: string): string | null {
   const value = cycleEndTime.trim();
   if (!value) return null;
-  const parsed = workbuddyParseCycleTime(value);
+  const parsed = cycleTime(value);
   return parsed ? parsed.toISOString() : null;
 }
 
-function workbuddyParseCycleTime(value: string): Date | null {
+function cycleTime(value: string): Date | null {
   const direct = Date.parse(value);
   if (Number.isFinite(direct)) return new Date(direct);
   const match = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})$/.exec(value);

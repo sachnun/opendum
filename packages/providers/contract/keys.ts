@@ -3,48 +3,48 @@ import { z } from "zod";
 
 import { emptyInputSchema } from "./common.js";
 
-const MAX_API_KEY_ACCESS_ENTRIES = 500;
-const MAX_API_KEY_RATE_LIMIT_RULES = 500;
-const apiKeyIdSchema = z.string().trim().min(1);
+const ACCESS_ENTRY_LIMIT = 500;
+const RATE_RULE_LIMIT = 500;
+const keyIdSchema = z.string().trim().min(1);
 
-const apiKeyIdInputSchema = z.object({ id: apiKeyIdSchema });
-const createApiKeyInputSchema = z.object({ name: z.string().max(120).optional(), expiresAt: z.coerce.date().nullable().optional() }).optional();
-const updateApiKeyNameInputSchema = z.object({ id: apiKeyIdSchema, name: z.string().max(120), key: z.string().optional() });
-const updateApiKeyExpirationInputSchema = z.object({ id: apiKeyIdSchema, expiresAt: z.coerce.date().nullable() });
-const updateApiKeyRoamingInputSchema = z.object({ id: apiKeyIdSchema, enabled: z.boolean() });
-export const apiKeyAccessModeSchema = z.enum(["all", "whitelist", "blacklist"]);
-const rateLimitRuleSchema = z.object({
+const idInputSchema = z.object({ id: keyIdSchema });
+const createSchema = z.object({ name: z.string().max(120).optional(), expiresAt: z.coerce.date().nullable().optional() }).optional();
+const nameSchema = z.object({ id: keyIdSchema, name: z.string().max(120), key: z.string().optional() });
+const expirationSchema = z.object({ id: keyIdSchema, expiresAt: z.coerce.date().nullable() });
+const roamingSchema = z.object({ id: keyIdSchema, enabled: z.boolean() });
+export const accessModeSchema = z.enum(["all", "whitelist", "blacklist"]);
+const rateRuleSchema = z.object({
   target: z.string().trim().min(1),
   targetType: z.enum(["model", "family"]),
   perMinute: z.number().int().nullable(),
   perHour: z.number().int().nullable(),
   perDay: z.number().int().nullable(),
 });
-const updateApiKeyModelAccessInputSchema = z.object({ id: apiKeyIdSchema, mode: apiKeyAccessModeSchema, models: z.array(z.string().trim().min(1)).max(MAX_API_KEY_ACCESS_ENTRIES) });
-const updateApiKeyAccountAccessInputSchema = z.object({ id: apiKeyIdSchema, mode: apiKeyAccessModeSchema, accounts: z.array(z.string().trim().min(1)).max(MAX_API_KEY_ACCESS_ENTRIES) });
-const updateApiKeyRateLimitsInputSchema = z.object({ id: apiKeyIdSchema, rules: z.array(rateLimitRuleSchema).max(MAX_API_KEY_RATE_LIMIT_RULES) });
+const modelAccessSchema = z.object({ id: keyIdSchema, mode: accessModeSchema, models: z.array(z.string().trim().min(1)).max(ACCESS_ENTRY_LIMIT) });
+const accountAccessSchema = z.object({ id: keyIdSchema, mode: accessModeSchema, accounts: z.array(z.string().trim().min(1)).max(ACCESS_ENTRY_LIMIT) });
+const rateLimitsSchema = z.object({ id: keyIdSchema, rules: z.array(rateRuleSchema).max(RATE_RULE_LIMIT) });
 
 export const keysContract = {
   list: oc.input(emptyInputSchema),
   options: oc.input(emptyInputSchema),
-  create: oc.input(createApiKeyInputSchema),
-  delete: oc.input(apiKeyIdInputSchema),
-  rename: oc.input(updateApiKeyNameInputSchema),
-  expire: oc.input(updateApiKeyExpirationInputSchema),
-  roaming: oc.input(updateApiKeyRoamingInputSchema),
-  models: oc.input(updateApiKeyModelAccessInputSchema),
-  accounts: oc.input(updateApiKeyAccountAccessInputSchema),
-  limits: oc.input(updateApiKeyRateLimitsInputSchema),
-  reveal: oc.input(apiKeyIdInputSchema),
-  toggle: oc.input(apiKeyIdInputSchema),
+  create: oc.input(createSchema),
+  delete: oc.input(idInputSchema),
+  rename: oc.input(nameSchema),
+  expire: oc.input(expirationSchema),
+  roaming: oc.input(roamingSchema),
+  models: oc.input(modelAccessSchema),
+  accounts: oc.input(accountAccessSchema),
+  limits: oc.input(rateLimitsSchema),
+  reveal: oc.input(idInputSchema),
+  toggle: oc.input(idInputSchema),
 };
 
-export type ApiKeyAccessMode = z.infer<typeof apiKeyAccessModeSchema>;
-export type ApiKeyIdInput = z.infer<typeof apiKeyIdInputSchema>;
-export type CreateApiKeyInput = z.infer<typeof createApiKeyInputSchema>;
-export type UpdateApiKeyNameInput = z.infer<typeof updateApiKeyNameInputSchema>;
-export type UpdateApiKeyExpirationInput = z.infer<typeof updateApiKeyExpirationInputSchema>;
-export type UpdateApiKeyRoamingInput = z.infer<typeof updateApiKeyRoamingInputSchema>;
-export type UpdateApiKeyModelAccessInput = z.infer<typeof updateApiKeyModelAccessInputSchema>;
-export type UpdateApiKeyAccountAccessInput = z.infer<typeof updateApiKeyAccountAccessInputSchema>;
-export type UpdateApiKeyRateLimitsInput = z.infer<typeof updateApiKeyRateLimitsInputSchema>;
+export type AccessMode = z.infer<typeof accessModeSchema>;
+export type KeyIdInput = z.infer<typeof idInputSchema>;
+export type CreateInput = z.infer<typeof createSchema>;
+export type NameInput = z.infer<typeof nameSchema>;
+export type ExpirationInput = z.infer<typeof expirationSchema>;
+export type RoamingInput = z.infer<typeof roamingSchema>;
+export type ModelAccessInput = z.infer<typeof modelAccessSchema>;
+export type AccountAccessInput = z.infer<typeof accountAccessSchema>;
+export type RateLimitsInput = z.infer<typeof rateLimitsSchema>;

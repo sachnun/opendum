@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { createGuardedFetch } from "./guard.js";
+import { guardedFetch } from "./guard.js";
 
 function messageOf(error: unknown): string {
   if (!(error instanceof Error)) return String(error);
@@ -7,9 +7,9 @@ function messageOf(error: unknown): string {
   return cause instanceof Error ? `${error.message} ${cause.message}` : error.message;
 }
 
-describe("createGuardedFetch", () => {
+describe("guardedFetch", () => {
   it("rejects literal loopback addresses before connecting", async () => {
-    const guard = createGuardedFetch({ connectTimeout: 1000 });
+    const guard = guardedFetch({ connectTimeout: 1000 });
     try {
       let caught: unknown;
       try {

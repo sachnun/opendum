@@ -5,7 +5,7 @@ function forwardedValue(value: string | null): string | undefined {
   return first ? first : undefined;
 }
 
-export function requestOriginFromHeaders(headers: Headers, url: string): string {
+export function originOf(headers: Headers, url: string): string {
   const parsed = new URL(url);
   const proto = forwardedValue(headers.get("x-forwarded-proto")) ?? parsed.protocol.replace(":", "");
   const host = forwardedValue(headers.get("x-forwarded-host")) ?? headers.get("host") ?? parsed.host;
@@ -13,5 +13,5 @@ export function requestOriginFromHeaders(headers: Headers, url: string): string 
 }
 
 export function requestOrigin(event: H3Event): string {
-  return requestOriginFromHeaders(event.req.headers, String(event.url ?? event.req.url));
+  return originOf(event.req.headers, String(event.url ?? event.req.url));
 }

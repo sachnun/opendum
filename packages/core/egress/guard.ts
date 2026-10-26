@@ -6,7 +6,7 @@ import {
   fetch as undiciFetch,
   type RequestInit as UndiciRequestInit,
 } from "undici/index.js";
-import { PrivateHostError, isPrivateIp } from "./ssrf.js";
+import { PrivateHostError, isPrivate } from "./ssrf.js";
 
 export type GuardedFetchOptions = {
   headersTimeout?: number;
@@ -28,7 +28,7 @@ type LookupCallback = (
   family?: number
 ) => void;
 
-const DEFAULT_CONNECT_TIMEOUT_MS = 15000;
+const CONNECT_TIMEOUT_MS = 15000;
 
 function guardedLookup(hostname: string, options: unknown, callback: LookupCallback): void {
   dnsLookup(hostname, options as never, (error, address, family) => {
@@ -40,7 +40,7 @@ function guardedLookup(hostname: string, options: unknown, callback: LookupCallb
       ? address
       : [{ address: address as string, family: family as number }];
     for (const entry of entries) {
-      if (isPrivateIp(entry.address)) {
+      if (isPrivate(entry.address)) {
         callback(new PrivateHostError(entry.address), undefined, undefined);
         return;
       }
@@ -49,15 +49,15 @@ function guardedLookup(hostname: string, options: unknown, callback: LookupCallb
   });
 }
 
-export function createGuardedFetch(options: GuardedFetchOptions = {}): FetchHandle {
-  const connectTimeout = options.connectTimeout ?? DEFAULT_CONNECT_TIMEOUT_MS;
+export function guardedFetch(options: GuardedFetchOptions = {}): FetchHandle {
+  const connectTimeout = options.connectTimeout ?? CONNECT_TIMEOUT_MS;
   const connectWithLookup = buildConnector({
     lookup: guardedLookup as never,
     timeout: connectTimeout,
   });
   const connection: typeof connectWithLookup = (connectOptions, callback) => {
     const hostname = connectOptions.hostname ?? connectOptions.host ?? "";
-    if (isIP(hostname) !== 0 && isPrivateIp(hostname)) {
+    if (isIP(hostname) !== 0 && isPrivate(hostname)) {
       callback(new PrivateHostError(hostname), null);
       return;
     }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { Effect } from "effect";
 
-import { pendingTaskCount, settlePendingTasks, trackPending, trackWork } from "../core/pending.js";
+import { pendingCount, settleTasks, trackPending, trackWork } from "../core/pending.js";
 
 describe("pending task tracker", () => {
   it("tracks work until it settles", async () => {
@@ -9,12 +9,12 @@ describe("pending task tracker", () => {
     const gate = new Promise<void>((resolve) => {
       release = resolve;
     });
-    const before = pendingTaskCount();
+    const before = pendingCount();
     trackPending(gate);
-    expect(pendingTaskCount()).toBe(before + 1);
+    expect(pendingCount()).toBe(before + 1);
     release?.();
-    expect(await settlePendingTasks(1_000)).toBe(true);
-    expect(pendingTaskCount()).toBe(before);
+    expect(await settleTasks(1_000)).toBe(true);
+    expect(pendingCount()).toBe(before);
   });
 
   it("drains a task that settles while another is added", async () => {
@@ -27,8 +27,8 @@ describe("pending task tracker", () => {
         trackPending(Effect.runPromise(Effect.sleep("1 millis")));
       })()
     );
-    expect(await settlePendingTasks(2_000)).toBe(true);
-    expect(pendingTaskCount()).toBe(0);
+    expect(await settleTasks(2_000)).toBe(true);
+    expect(pendingCount()).toBe(0);
   });
 
   it("reports a timeout without throwing", async () => {
@@ -38,14 +38,14 @@ describe("pending task tracker", () => {
         release = resolve;
       })
     );
-    expect(await settlePendingTasks(10)).toBe(false);
+    expect(await settleTasks(10)).toBe(false);
     release?.();
-    expect(await settlePendingTasks(1_000)).toBe(true);
+    expect(await settleTasks(1_000)).toBe(true);
   });
 
   it("swallows failures so shutdown never rejects", async () => {
     trackWork(Effect.die(new Error("boom")));
-    expect(await settlePendingTasks(1_000)).toBe(true);
-    expect(pendingTaskCount()).toBe(0);
+    expect(await settleTasks(1_000)).toBe(true);
+    expect(pendingCount()).toBe(0);
   });
 });

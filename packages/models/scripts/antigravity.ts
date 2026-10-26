@@ -1,8 +1,8 @@
 import { buildIndex, persist, sync } from "#models/model-store.ts";
 import { runFetchText } from "#models/sync/http.ts";
-import { syncCliVersion } from "./version-sync.ts";
+import { syncCli } from "./version-sync.ts";
 import { join } from "#models/paths.ts";
-import { flags, packageModelsDir, repoRoot, runScript } from "./shared.ts";
+import { flags, dataDir, repoRoot, runScript } from "./shared.ts";
 import type { ModelIndexEntry, ModelModalities } from "#models/types.ts";
 
 interface WidgetEntry {
@@ -30,12 +30,12 @@ const PROVIDER_NAME = "antigravity";
 
 const ANTIGRAVITY_PAID_TIERS = ["g1-pro-tier", "g1-ultra-tier", "standard-tier", "paid"];
 
-const modelsDir = packageModelsDir();
+const modelsDir = dataDir();
 
 const ANTIGRAVITY_CHANGELOG_URL = "https://antigravity.google/docs/changelog.md";
 
-const ANTIGRAVITY_CHANGELOG_RELEASE_TAB = "hub";
-const VERSION_FETCH_TIMEOUT_MS = 15_000;
+const CHANGELOG_TAB = "hub";
+const FETCH_TIMEOUT_MS = 15_000;
 
 const REPO_ROOT = repoRoot();
 
@@ -52,7 +52,7 @@ const ANTIGRAVITY_VERSION_TARGETS = [
   },
 ];
 
-const GEMINI_3X_FLASH_LEVELS = ["low", "medium", "high"];
+const FLASH_LEVELS = ["low", "medium", "high"];
 
 const DOCUMENTED_EFFORT_SUFFIX = new Map([
   ["claude-opus-4-6", "thinking"],
@@ -62,27 +62,27 @@ const DOCUMENTED_EFFORT_SUFFIX = new Map([
   ["gpt-oss-120b", "medium"],
 ]);
 
-const GEMINI_3X_FLASH_PATTERN = /^gemini-3\.(\d+)-flash$/;
+const FLASH_PATTERN = /^gemini-3\.(\d+)-flash$/;
 
-function leveledGeminiModelKey(modelKey: string): string {
-  const flash = GEMINI_3X_FLASH_PATTERN.exec(modelKey);
+function leveledKey(modelKey: string): string {
+  const flash = FLASH_PATTERN.exec(modelKey);
   if (flash) return Number(flash[1]) >= 5 ? modelKey : "";
   return /^gemini-\d+-[a-z]+$/.test(modelKey) ? modelKey : "";
 }
 
-function leveledGeminiUpstream(modelKey: string): string {
-  if (!leveledGeminiModelKey(modelKey)) return "";
-  const flash = GEMINI_3X_FLASH_PATTERN.exec(modelKey);
+function leveledUpstream(modelKey: string): string {
+  if (!leveledKey(modelKey)) return "";
+  const flash = FLASH_PATTERN.exec(modelKey);
   if (flash) return Number(flash[1]) >= 7 ? `${modelKey}-tiered` : `${modelKey}-medium`;
   return `${modelKey}-medium`;
 }
 
-function leveledGeminiAliases(modelKey: string): string[] {
-  if (!leveledGeminiModelKey(modelKey)) return [];
-  return GEMINI_3X_FLASH_LEVELS.map((level) => `${modelKey}-${level}`);
+function leveledAliases(modelKey: string): string[] {
+  if (!leveledKey(modelKey)) return [];
+  return FLASH_LEVELS.map((level) => `${modelKey}-${level}`);
 }
 
-function decodeHtmlEntities(value: string): string {
+function decodeHtml(value: string): string {
   return value
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
@@ -91,7 +91,7 @@ function decodeHtmlEntities(value: string): string {
     .replace(/&gt;/g, ">");
 }
 
-function parseModelSelectorWidget(html: string): WidgetEntry[] {
+function parseWidget(html: string): WidgetEntry[] {
   const groupIndex = html.indexOf("model-selector-group");
   if (groupIndex < 0) {
     throw new Error(
@@ -104,10 +104,10 @@ function parseModelSelectorWidget(html: string): WidgetEntry[] {
     const id = row.match(/data-model-id="([^"]+)"/)?.[1];
     if (!id) continue;
 
-    const name = decodeHtmlEntities(
+    const name = decodeHtml(
       row.match(/<span class="model-name">([^<]*)<\/span>/)?.[1] ?? ""
     ).trim();
-    const tiersRaw = decodeHtmlEntities(row.match(/data-tiers="([^"]*)"/)?.[1] ?? "");
+    const tiersRaw = decodeHtml(row.match(/data-tiers="([^"]*)"/)?.[1] ?? "");
     let tiers: Record<string, unknown> = {};
     try {
       tiers = JSON.parse(tiersRaw);
@@ -115,7 +115,7 @@ function parseModelSelectorWidget(html: string): WidgetEntry[] {
       tiers = {};
     }
 
-    const defaultLevel = decodeHtmlEntities(
+    const defaultLevel = decodeHtml(
       row.match(/data-level-display="[^"]*">([^<]*)</)?.[1] ?? ""
     ).trim();
     const levels: string[] = [...row.matchAll(/data-level-btn="([^"]+)"/g)].map((m) => m[1].trim());
@@ -136,22 +136,22 @@ function parseModelSelectorWidget(html: string): WidgetEntry[] {
   return models;
 }
 
-function keyFromDocsId(id: string): string {
+function keyOf(id: string): string {
   if (id.startsWith("claude-")) return id.replace(/\.(?=\d)/g, "-");
   if (/^gemini-\d+(?:\.\d+)*-pro$/.test(id)) return `${id}-preview`;
   return id;
 }
 
-function aliasesForWidgetEntry(entry: WidgetEntry): string[] {
+function aliasesOf(entry: WidgetEntry): string[] {
   return entry.levels.map((level) => `${entry.id}-${level.toLowerCase()}`);
 }
 
-function canonicalizeWidgetModel(entry: WidgetEntry): DiscoveredModel {
-  const key = keyFromDocsId(entry.id);
+function canonicalize(entry: WidgetEntry): DiscoveredModel {
+  const key = keyOf(entry.id);
   let upstream;
 
-  if (leveledGeminiModelKey(key)) {
-    upstream = leveledGeminiUpstream(key);
+  if (leveledKey(key)) {
+    upstream = leveledUpstream(key);
   } else if (/^gemini-\d+(?:\.\d+)*-pro$/.test(entry.id)) {
     upstream = entry.id;
   } else {
@@ -162,13 +162,13 @@ function canonicalizeWidgetModel(entry: WidgetEntry): DiscoveredModel {
   return { displayName: entry.name, key, upstream };
 }
 
-function buildDiscoveredModelMap(widgetEntries: WidgetEntry[]): { modelMap: Map<string, string>; discovered: DiscoveredModel[] } {
+function discoveredMap(widgetEntries: WidgetEntry[]): { modelMap: Map<string, string>; discovered: DiscoveredModel[] } {
   const map = new Map<string, string>();
   const ranks = new Map<string, number>();
   const discovered: DiscoveredModel[] = [];
 
   for (const entry of widgetEntries) {
-    const model = canonicalizeWidgetModel(entry);
+    const model = canonicalize(entry);
     discovered.push(model);
 
     const rank = upstreamRank(model.upstream);
@@ -192,14 +192,14 @@ function upstreamRank(upstream: string): number {
   return 0;
 }
 
-function buildAntigravityTierConfig(
+function tierMap(
   modelMap: Map<string, string>,
   documentedModelKeys: Set<string>,
   widgetEntries: WidgetEntry[]
 ): Map<string, { allowedTiers: string[] }> {
   const freeByKey = new Map<string, boolean>();
   for (const entry of widgetEntries) {
-    const key = keyFromDocsId(entry.id);
+    const key = keyOf(entry.id);
     if (entry.tiers?.freeAndPlus === true) freeByKey.set(key, true);
     else if (!freeByKey.has(key)) freeByKey.set(key, false);
   }
@@ -213,7 +213,7 @@ function buildAntigravityTierConfig(
   return config;
 }
 
-function mergePreservedExtras(modelMap: Map<string, string>): Array<{ key: string; upstream: string }> {
+function mergeExtras(modelMap: Map<string, string>): Array<{ key: string; upstream: string }> {
   const index = buildIndex(modelsDir);
   const extras: Array<{ key: string; upstream: string }> = [];
 
@@ -223,7 +223,7 @@ function mergePreservedExtras(modelMap: Map<string, string>): Array<{ key: strin
     const key = entry.fileId;
     if (modelMap.has(key)) continue;
 
-    const upstream = getExistingProviderUpstream(entry, PROVIDER_NAME) || key;
+    const upstream = existingUpstream(entry, PROVIDER_NAME) || key;
     modelMap.set(key, upstream);
     extras.push({ key, upstream });
   }
@@ -234,7 +234,7 @@ function mergePreservedExtras(modelMap: Map<string, string>): Array<{ key: strin
     const providers = entry.data.providers || [];
     if (!providers.includes(PROVIDER_NAME)) continue;
 
-    const upstream = getExistingProviderUpstream(entry, PROVIDER_NAME) || id;
+    const upstream = existingUpstream(entry, PROVIDER_NAME) || id;
     modelMap.set(id, upstream);
     extras.push({ key: id, upstream });
   }
@@ -242,7 +242,7 @@ function mergePreservedExtras(modelMap: Map<string, string>): Array<{ key: strin
   return extras;
 }
 
-function findModelEntry(index: Record<string, ModelIndexEntry>, modelKey: string): ModelIndexEntry | null {
+function findEntry(index: Record<string, ModelIndexEntry>, modelKey: string): ModelIndexEntry | null {
   const exact = Object.values(index).find((entry) => entry.fileId === modelKey || entry.id === modelKey);
   if (exact) return exact;
 
@@ -252,7 +252,7 @@ function findModelEntry(index: Record<string, ModelIndexEntry>, modelKey: string
   }) || null;
 }
 
-function getExistingProviderUpstream(entry: ModelIndexEntry, provider: string): string {
+function existingUpstream(entry: ModelIndexEntry, provider: string): string {
   const upstream = entry.data.providerConfig?.[provider]?.upstream;
   if (typeof upstream === "string" && upstream.trim() !== "") {
     return upstream.trim();
@@ -260,11 +260,11 @@ function getExistingProviderUpstream(entry: ModelIndexEntry, provider: string): 
   return entry.id || entry.fileId;
 }
 
-function isGeminiImageModel(modelKey: string): boolean {
+function isImage(modelKey: string): boolean {
   return modelKey.includes("image");
 }
 
-async function enrichModelMetadata(
+async function enrichMetadata(
   result: SyncResult,
   documentedModelKeys: Set<string>,
   aliasesByKey: Map<string, string[]>
@@ -273,7 +273,7 @@ async function enrichModelMetadata(
   const changedKeys = new Set([...result.added, ...result.updated]);
 
   for (const modelKey of changedKeys) {
-    const entry = findModelEntry(index, modelKey);
+    const entry = findEntry(index, modelKey);
     if (!entry) continue;
 
     const data = entry.data;
@@ -298,7 +298,7 @@ async function enrichModelMetadata(
       changed = true;
     }
 
-    const desiredAliases = aliasesByKey.get(modelKey) ?? leveledGeminiAliases(modelKey);
+    const desiredAliases = aliasesByKey.get(modelKey) ?? leveledAliases(modelKey);
     if (desiredAliases.length > 0) {
       const aliases = new Set(data.aliases || []);
       for (const alias of desiredAliases) {
@@ -320,10 +320,10 @@ async function enrichModelMetadata(
 function inferMetadata(modelKey: string): { reasoning: boolean; modalities: ModelModalities } | null {
   if (modelKey.startsWith("gemini-")) {
     return {
-      reasoning: !isGeminiImageModel(modelKey),
+      reasoning: !isImage(modelKey),
       modalities: {
         input: ["text", "image"],
-        output: isGeminiImageModel(modelKey) ? ["image"] : ["text"],
+        output: isImage(modelKey) ? ["image"] : ["text"],
       },
     };
   }
@@ -369,7 +369,7 @@ async function syncJson(
     const wouldAdd: string[] = [];
     const wouldUpdate: string[] = [];
     for (const [key, upstream] of modelMap.entries()) {
-      const existing = findModelEntry(index, key);
+      const existing = findEntry(index, key);
       if (!existing) {
 
         const ignored = Object.values(index).find(
@@ -390,7 +390,7 @@ async function syncJson(
         continue;
       }
 
-      const existingUpstream = getExistingProviderUpstream(existing, PROVIDER_NAME);
+      const existingUpstream = existingUpstream(existing, PROVIDER_NAME);
       if (existingUpstream !== upstream) {
         wouldUpdate.push(key);
       }
@@ -418,7 +418,7 @@ async function syncJson(
   });
 }
 
-function parseLatestVersion(text: string, releaseTab: string): string | null {
+function latestRelease(text: string, releaseTab: string): string | null {
   const versions: string[] = [];
   for (const match of text.matchAll(/^###\s+\[v?(\d+\.\d+\.\d+)\]\(([^)]*)\)/gm)) {
     if (releaseTab && !match[2].includes(`tab=${releaseTab}`)) continue;
@@ -438,15 +438,15 @@ function compareSemver(a: string, b: string): number {
   return 0;
 }
 
-async function syncUserAgent(dryRun: boolean): Promise<void> {
+async function userAgent(dryRun: boolean): Promise<void> {
   let latestVersion = null;
   try {
     const text = await runFetchText(ANTIGRAVITY_CHANGELOG_URL, {
       label: "Antigravity changelog",
-      timeout: VERSION_FETCH_TIMEOUT_MS,
+      timeout: FETCH_TIMEOUT_MS,
       headers: { Accept: "text/markdown" },
     });
-    latestVersion = parseLatestVersion(text, ANTIGRAVITY_CHANGELOG_RELEASE_TAB);
+    latestVersion = latestRelease(text, CHANGELOG_TAB);
     if (latestVersion) {
       console.log(`[antigravity] Latest version from the changelog is ${latestVersion}`);
     }
@@ -464,13 +464,13 @@ async function syncUserAgent(dryRun: boolean): Promise<void> {
     console.log(`[antigravity] Would sync CLI version to ${latestVersion}`);
     return;
   }
-  syncCliVersion("antigravity", ANTIGRAVITY_VERSION_TARGETS, latestVersion);
+  syncCli("antigravity", ANTIGRAVITY_VERSION_TARGETS, latestVersion);
 }
 
 async function main(): Promise<void> {
   const { dryRun, verbose } = flags();
 
-  await syncUserAgent(dryRun).catch((error: unknown) => {
+  await userAgent(dryRun).catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
     console.warn(`[antigravity] User-Agent sync failed (${message})`);
   });
@@ -488,14 +488,14 @@ async function main(): Promise<void> {
     throw error;
   }
 
-  const widgetEntries = parseModelSelectorWidget(html);
-  const { modelMap, discovered } = buildDiscoveredModelMap(widgetEntries);
+  const widgetEntries = parseWidget(html);
+  const { modelMap, discovered } = discoveredMap(widgetEntries);
   const documentedModelKeys = new Set(modelMap.keys());
   const aliasesByKey = new Map(
-    widgetEntries.map((entry) => [keyFromDocsId(entry.id), aliasesForWidgetEntry(entry)])
+    widgetEntries.map((entry) => [keyOf(entry.id), aliasesOf(entry)])
   );
-  const extras = mergePreservedExtras(modelMap);
-  const tierConfig = buildAntigravityTierConfig(modelMap, documentedModelKeys, widgetEntries);
+  const extras = mergeExtras(modelMap);
+  const tierConfig = tierMap(modelMap, documentedModelKeys, widgetEntries);
   console.log(
     `[antigravity] Found ${discovered.length} documented reasoning models ` +
       `and preserved ${extras.length} JSON-configured extras.`
@@ -522,7 +522,7 @@ async function main(): Promise<void> {
   const result = await syncJson(modelMap, dryRun, tierConfig);
 
   if (!dryRun && (result.added.length > 0 || result.updated.length > 0)) {
-    await enrichModelMetadata(result, documentedModelKeys, aliasesByKey);
+    await enrichMetadata(result, documentedModelKeys, aliasesByKey);
   }
 
   if (

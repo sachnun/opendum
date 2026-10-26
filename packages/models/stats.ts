@@ -1,5 +1,5 @@
 export const MODEL_STATS_DAYS = 30;
-export const MODEL_DURATION_LOOKBACK_HOURS = 24;
+export const LOOKBACK_HOURS = 24;
 
 export interface ModelStats {
   totalRequests: number;
@@ -10,7 +10,7 @@ export interface ModelStats {
   durationLast24Hours: Array<{ time: string; avgDuration: number }>;
 }
 
-export function buildDayKeys(days: number): string[] {
+export function dayKeys(days: number): string[] {
   const now = new Date();
   const todayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 
@@ -21,7 +21,7 @@ export function buildDayKeys(days: number): string[] {
   });
 }
 
-export function buildHourKeys(hours: number): string[] {
+export function hourKeys(hours: number): string[] {
   const now = new Date();
   const currentHourUtc = new Date(
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), now.getUTCHours())
@@ -34,7 +34,7 @@ export function buildHourKeys(hours: number): string[] {
   });
 }
 
-export function buildEmptyModelStats(_dayKeys: string[], _hourKeys: string[]): ModelStats {
+export function emptyStats(_dayKeys: string[], _hourKeys: string[]): ModelStats {
   return {
     totalRequests: 0,
     totalTokens: 0,

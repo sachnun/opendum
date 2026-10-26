@@ -1,15 +1,15 @@
-const MOBILE_SIDEBAR_SWIPE_CLOSE_THRESHOLD_PX = 96;
+const CLOSE_THRESHOLD_PX = 96;
 
 export function useMobileSidebar() {
   const mobileOpen = ref(false);
-  const mobileSidebarDragX = ref(0);
-  const isMobileSidebarDragging = ref(false);
+  const dragX = ref(0);
+  const isDragging = ref(false);
   let swipeStartX: number | null = null;
   let swipePointerId: number | null = null;
-  let suppressNextOverlayClick = false;
+  let suppressClick = false;
   let swipeResetTimer: ReturnType<typeof setTimeout> | null = null;
 
-  function resetMobileSidebarSwipe() {
+  function resetSwipe() {
     if (swipeResetTimer) {
       clearTimeout(swipeResetTimer);
       swipeResetTimer = null;
@@ -17,8 +17,8 @@ export function useMobileSidebar() {
 
     swipeStartX = null;
     swipePointerId = null;
-    isMobileSidebarDragging.value = false;
-    mobileSidebarDragX.value = 0;
+    isDragging.value = false;
+    dragX.value = 0;
   }
 
   function closeMobileSidebar(raw?: unknown) {
@@ -28,28 +28,28 @@ export function useMobileSidebar() {
     if (keepDragOffset) {
       swipeStartX = null;
       swipePointerId = null;
-      isMobileSidebarDragging.value = false;
-      swipeResetTimer = setTimeout(resetMobileSidebarSwipe, 350);
+      isDragging.value = false;
+      swipeResetTimer = setTimeout(resetSwipe, 350);
       return;
     }
 
-    resetMobileSidebarSwipe();
+    resetSwipe();
   }
 
   function openMobileSidebar() {
-    resetMobileSidebarSwipe();
+    resetSwipe();
     mobileOpen.value = true;
   }
 
-  function handleMobileOverlayClick(event: MouseEvent) {
-    if (suppressNextOverlayClick) {
-      suppressNextOverlayClick = false;
+  function overlayClick(event: MouseEvent) {
+    if (suppressClick) {
+      suppressClick = false;
       event.preventDefault();
       event.stopPropagation();
       return;
     }
 
-    if (isMobileSidebarDragging.value || mobileSidebarDragX.value !== 0) {
+    if (isDragging.value || dragX.value !== 0) {
       event.preventDefault();
       event.stopPropagation();
       return;
@@ -58,61 +58,61 @@ export function useMobileSidebar() {
     closeMobileSidebar();
   }
 
-  function handleMobileSheetPointerDownOutside(event: Event) {
+  function sheetPointerDown(event: Event) {
     if (swipeStartX === null) return;
     event.preventDefault();
   }
 
-  function handleMobileOverlayPointerDown(event: PointerEvent) {
+  function overlayPointerDown(event: PointerEvent) {
     if (!mobileOpen.value) return;
     if (event.pointerType === "mouse" && event.button !== 0) return;
 
     swipeStartX = event.clientX;
     swipePointerId = event.pointerId;
-    isMobileSidebarDragging.value = false;
-    mobileSidebarDragX.value = 0;
+    isDragging.value = false;
+    dragX.value = 0;
   }
 
-  function handleMobileOverlayPointerMove(event: PointerEvent) {
+  function overlayPointerMove(event: PointerEvent) {
     if (swipeStartX === null || swipePointerId !== event.pointerId) return;
 
     const deltaX = event.clientX - swipeStartX;
     if (deltaX >= 0) {
-      if (isMobileSidebarDragging.value) event.preventDefault();
-      mobileSidebarDragX.value = 0;
+      if (isDragging.value) event.preventDefault();
+      dragX.value = 0;
       return;
     }
 
-    isMobileSidebarDragging.value = true;
-    mobileSidebarDragX.value = deltaX;
+    isDragging.value = true;
+    dragX.value = deltaX;
     event.preventDefault();
   }
 
-  function finishMobileOverlaySwipe(event?: PointerEvent) {
+  function finishSwipe(event?: PointerEvent) {
     if (event && swipePointerId !== event.pointerId) return;
 
-    const wasDragging = isMobileSidebarDragging.value;
-    const shouldClose = Math.abs(mobileSidebarDragX.value) >= MOBILE_SIDEBAR_SWIPE_CLOSE_THRESHOLD_PX;
+    const wasDragging = isDragging.value;
+    const shouldClose = Math.abs(dragX.value) >= CLOSE_THRESHOLD_PX;
     if (shouldClose) {
       closeMobileSidebar({ keepDragOffset: true });
       return;
     }
 
-    resetMobileSidebarSwipe();
-    suppressNextOverlayClick = wasDragging;
+    resetSwipe();
+    suppressClick = wasDragging;
   }
 
   return {
     mobileOpen,
-    mobileSidebarDragX,
-    isMobileSidebarDragging,
+    dragX,
+    isDragging,
     openMobileSidebar,
     closeMobileSidebar,
-    resetMobileSidebarSwipe,
-    handleMobileOverlayClick,
-    handleMobileSheetPointerDownOutside,
-    handleMobileOverlayPointerDown,
-    handleMobileOverlayPointerMove,
-    finishMobileOverlaySwipe,
+    resetSwipe,
+    overlayClick,
+    sheetPointerDown,
+    overlayPointerDown,
+    overlayPointerMove,
+    finishSwipe,
   };
 }

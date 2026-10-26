@@ -1,7 +1,7 @@
 import { buildIndex, persist, sync } from "#models/model-store.ts";
-import { fetchDecoded, runFetchText, runOrThrow } from "#models/sync/http.ts";
-import { arrayAt, asTrimmedString, booleanAt, stringAt } from "#models/json.ts";
-import { packageModelsDir, runScript } from "./shared.ts";
+import { fetchDecoded, fetchText, orThrow } from "#models/sync/http.ts";
+import { arrayAt, trimmed, booleanAt, stringAt } from "#models/json.ts";
+import { dataDir, runScript } from "./shared.ts";
 import type { JsonValue } from "#models/types.ts";
 
 const CODEX_MODELS_URL =
@@ -9,7 +9,7 @@ const CODEX_MODELS_URL =
 
 const CHATGPT_SUPPORTED_VISIBILITY = "list";
 
-const CODEX_PRICING_DOCS_URL = "https://learn.chatgpt.com/docs/pricing.md";
+const PRICING_URL = "https://learn.chatgpt.com/docs/pricing.md";
 const FREE_PLAN_NAMES = new Set(["Free", "Go"]);
 const PAID_CODEX_TIERS = [
   "plus",
@@ -27,21 +27,21 @@ interface CodexModel {
   hasReasoning: boolean;
 }
 
-function toCodexModel(item: unknown): CodexModel | null {
-  const slug = asTrimmedString(stringAt(item, "slug"));
+function toModel(item: unknown): CodexModel | null {
+  const slug = trimmed(stringAt(item, "slug"));
   if (!slug) return null;
 
   const visibility = stringAt(item, "visibility");
   if (visibility && visibility !== CHATGPT_SUPPORTED_VISIBILITY) return null;
   if (booleanAt(item, "supported_in_api") === false) return null;
 
-  const displayName = asTrimmedString(stringAt(item, "display_name")) ?? null;
+  const displayName = trimmed(stringAt(item, "display_name")) ?? null;
   const hasReasoning = arrayAt(item, "supported_reasoning_levels").length > 0;
   return { slug, displayName, hasReasoning };
 }
 
-async function fetchCodexModels(): Promise<CodexModel[]> {
-  return runOrThrow(
+async function fetchModels(): Promise<CodexModel[]> {
+  return orThrow(
     fetchDecoded(
       CODEX_MODELS_URL,
       { label: "Codex CLI models", headers: { Accept: "application/json" } },
@@ -52,7 +52,7 @@ async function fetchCodexModels(): Promise<CodexModel[]> {
           throw new Error("Unexpected Codex models.json payload format");
         }
         return models.flatMap((item) => {
-          const model = toCodexModel(item);
+          const model = toModel(item);
           return model ? [model] : [];
         });
       }
@@ -60,7 +60,7 @@ async function fetchCodexModels(): Promise<CodexModel[]> {
   );
 }
 
-function buildModelMap(models: CodexModel[]): Map<string, string> {
+function modelIndex(models: CodexModel[]): Map<string, string> {
   return new Map(
     models
       .map((model): [string, string] => [model.slug, model.slug])
@@ -68,12 +68,12 @@ function buildModelMap(models: CodexModel[]): Map<string, string> {
   );
 }
 
-function normalizeModelName(value: string): string {
+function normalizeName(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "");
 }
 
-async function fetchFreePlanModelNames(): Promise<string> {
-  const markdown = await runFetchText(CODEX_PRICING_DOCS_URL, {
+async function planNames(): Promise<string> {
+  const markdown = await fetchText(PRICING_URL, {
     label: "Codex pricing docs",
     headers: { Accept: "text/markdown" },
   });
@@ -85,30 +85,30 @@ async function fetchFreePlanModelNames(): Promise<string> {
     if (!FREE_PLAN_NAMES.has(name)) continue;
     for (const line of body.split(/\r?\n/)) {
       const bullet = line.match(/^\s*-\s+(.*)$/)?.[1];
-      if (bullet) mentions.push(normalizeModelName(bullet));
+      if (bullet) mentions.push(normalizeName(bullet));
     }
   }
 
   return mentions.join(" ");
 }
 
-function buildProviderTierConfig(
+function tierMap(
   models: CodexModel[],
   freePlanMentions: string
 ): Map<string, Record<string, JsonValue>> {
-  const providerConfigByModel = new Map<string, Record<string, JsonValue>>();
-  if (!freePlanMentions) return providerConfigByModel;
+  const providerConfig = new Map<string, Record<string, JsonValue>>();
+  if (!freePlanMentions) return providerConfig;
 
   for (const model of models) {
-    const name = normalizeModelName(model.displayName ?? model.slug);
+    const name = normalizeName(model.displayName ?? model.slug);
     if (name && freePlanMentions.includes(name)) continue;
-    providerConfigByModel.set(model.slug, { allowedTiers: PAID_CODEX_TIERS });
+    providerConfig.set(model.slug, { allowedTiers: PAID_CODEX_TIERS });
   }
 
-  return providerConfigByModel;
+  return providerConfig;
 }
 
-function enrichNewModels(modelsDir: string, addedKeys: string[], lookup: Map<string, CodexModel>): void {
+function enrichModels(modelsDir: string, addedKeys: string[], lookup: Map<string, CodexModel>): void {
   const index = buildIndex(modelsDir);
 
   for (const modelKey of addedKeys) {
@@ -127,34 +127,34 @@ function enrichNewModels(modelsDir: string, addedKeys: string[], lookup: Map<str
 }
 
 async function main(): Promise<void> {
-  const modelsDir = packageModelsDir();
+  const modelsDir = dataDir();
 
-  const models = await fetchCodexModels();
-  const modelMap = buildModelMap(models);
+  const models = await fetchModels();
+  const modelMap = modelIndex(models);
   const lookup = new Map(models.map((model) => [model.slug, model]));
 
   let freePlanMentions = "";
   try {
-    freePlanMentions = await fetchFreePlanModelNames();
+    freePlanMentions = await planNames();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.warn(`[codex] Could not load pricing docs for tier gating (${message}); skipping gating.`);
   }
 
-  const providerConfigByModel = buildProviderTierConfig(models, freePlanMentions);
-  if (providerConfigByModel.size > 0) {
+  const providerConfig = tierMap(models, freePlanMentions);
+  if (providerConfig.size > 0) {
     console.log(
-      `[codex] Paid-plan models (gated by allowedTiers): ${[...providerConfigByModel.keys()].join(", ")}`
+      `[codex] Paid-plan models (gated by allowedTiers): ${[...providerConfig.keys()].join(", ")}`
     );
   }
 
   const result = await sync(modelsDir, "codex", modelMap, {
-    providerConfigByModel,
+    providerConfig,
     managedProviderConfigKeys: ["allowedTiers"],
   });
 
   if (result.added.length > 0) {
-    enrichNewModels(modelsDir, result.added, lookup);
+    enrichModels(modelsDir, result.added, lookup);
   }
 
   if (result.added.length === 0 && result.removed.length === 0 && result.updated.length === 0) {

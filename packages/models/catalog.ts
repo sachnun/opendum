@@ -1,5 +1,5 @@
 import { compactStrings, uniqueSorted } from "./collections.ts";
-import { inferFamilyFromFolder } from "./model/families.ts";
+import { familyOf } from "./model/families.ts";
 import type { ModelEntry, ModelInfo } from "./registry.ts";
 
 export class Catalog {
@@ -18,7 +18,7 @@ export class Catalog {
       info.aliases = compactStrings(info.aliases);
       if (entry.owner) info.owner = entry.owner;
       if (options.familyFromFolder && !info.family && entry.owner) {
-        info.family = inferFamilyFromFolder(entry.owner) ?? entry.owner;
+        info.family = familyOf(entry.owner) ?? entry.owner;
       }
       const modelId = info.id ? info.id : entry.fileId;
       catalog.merge(modelId, entry.fileId, info);

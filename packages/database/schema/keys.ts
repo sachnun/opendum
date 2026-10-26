@@ -57,7 +57,7 @@ export const proxyApiKey = pgTable(
   (table) => [index("proxy_api_key_userId_idx").on(table.userId)],
 );
 
-export const proxyApiKeyRateLimit = pgTable(
+export const keyRateLimit = pgTable(
   "proxy_api_key_rate_limit",
   {
     id: text("id")

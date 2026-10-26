@@ -1,5 +1,5 @@
 <script setup lang="ts">
-interface RateLimitRuleInput {
+interface RuleInput {
   target: string;
   targetType: "model" | "family";
   perMinute: number | null;
@@ -7,7 +7,7 @@ interface RateLimitRuleInput {
   perDay: number | null;
 }
 
-interface RateLimitRuleState {
+interface RuleState {
   target: string;
   targetType: "model" | "family";
   perMinute: string;
@@ -19,40 +19,40 @@ const props = defineProps<{
   apiKeyId: string;
   availableModels: string[];
   availableFamilies: string[];
-  initialRules: RateLimitRuleInput[];
+  initialRules: RuleInput[];
   readonly?: boolean;
 }>();
 
 const emit = defineEmits<{
-  updated: [rules: RateLimitRuleInput[]];
+  updated: [rules: RuleInput[]];
 }>();
 
 const api = useApi();
 const isSaving = ref(false);
-const savedRules = ref<RateLimitRuleInput[]>(props.initialRules);
-const draftRules = ref<RateLimitRuleState[]>(props.initialRules.map(ruleToState));
+const savedRules = ref<RuleInput[]>(props.initialRules);
+const draftRules = ref<RuleState[]>(props.initialRules.map(toState));
 const addMode = ref<"model" | "family">("model");
 const pickerOpen = ref(false);
 const search = ref("");
 const errorMessage = ref("");
 
-function ruleToState(rule: RateLimitRuleInput): RateLimitRuleState {
+function toState(rule: RuleInput): RuleState {
   return { target: rule.target, targetType: rule.targetType, perMinute: rule.perMinute != null ? String(rule.perMinute) : "", perHour: rule.perHour != null ? String(rule.perHour) : "", perDay: rule.perDay != null ? String(rule.perDay) : "" };
 }
 
-function stateToRule(state: RateLimitRuleState): RateLimitRuleInput {
+function toRule(state: RuleState): RuleInput {
   return { target: state.target, targetType: state.targetType, perMinute: state.perMinute ? Number.parseInt(state.perMinute, 10) : null, perHour: state.perHour ? Number.parseInt(state.perHour, 10) : null, perDay: state.perDay ? Number.parseInt(state.perDay, 10) : null };
 }
 
-function rulesEqual(left: RateLimitRuleInput[], right: RateLimitRuleInput[]): boolean {
+function rulesEqual(left: RuleInput[], right: RuleInput[]): boolean {
   if (left.length !== right.length) return false;
-  const serialize = (rule: RateLimitRuleInput) => `${rule.targetType}:${rule.target}:${rule.perMinute}:${rule.perHour}:${rule.perDay}`;
+  const serialize = (rule: RuleInput) => `${rule.targetType}:${rule.target}:${rule.perMinute}:${rule.perHour}:${rule.perDay}`;
   const leftSet = new Set(left.map(serialize));
   return right.every((rule) => leftSet.has(serialize(rule)));
 }
 
 function resetDraft() {
-  draftRules.value = savedRules.value.map(ruleToState);
+  draftRules.value = savedRules.value.map(toState);
   pickerOpen.value = false;
   addMode.value = "model";
   search.value = "";
@@ -80,7 +80,7 @@ function updateRule(index: number, field: "perMinute" | "perHour" | "perDay", va
 
 async function save() {
   if (props.readonly) return;
-  const rules = draftRules.value.map(stateToRule);
+  const rules = draftRules.value.map(toRule);
   for (const rule of rules) {
     if (rule.perMinute == null && rule.perHour == null && rule.perDay == null) {
       errorMessage.value = `Set at least one limit for ${rule.target}`;
@@ -94,7 +94,7 @@ async function save() {
     const result = await api.apiKeys.updateRateLimits({ id: props.apiKeyId, rules });
     if (!result.success) throw new Error(result.error);
     savedRules.value = result.data.rules;
-    draftRules.value = result.data.rules.map(ruleToState);
+    draftRules.value = result.data.rules.map(toState);
     pickerOpen.value = false;
     emit("updated", savedRules.value);
   } catch (error) {
@@ -105,7 +105,7 @@ async function save() {
 }
 
 const usedTargets = computed(() => new Set(draftRules.value.map((rule) => `${rule.targetType}:${rule.target}`)));
-const hasChanges = computed(() => !rulesEqual(savedRules.value, draftRules.value.map(stateToRule)));
+const hasChanges = computed(() => !rulesEqual(savedRules.value, draftRules.value.map(toRule)));
 const pickerItems = computed(() => {
   const source = addMode.value === "model" ? props.availableModels : props.availableFamilies;
   const query = search.value.trim().toLowerCase();

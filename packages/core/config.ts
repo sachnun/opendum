@@ -28,7 +28,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
   return result.data;
 }
 
-export function loadEnvFile(path = ".env"): void {
+export function envFile(path = ".env"): void {
   try {
     process.loadEnvFile(path);
   } catch {

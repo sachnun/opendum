@@ -55,13 +55,13 @@ const tablesByName = new Map<string, AnyTable<{ name: string }>>(
     .map((table) => [getTableName(table), table as AnyTable<{ name: string }>]),
 );
 
-const relationsBySourceTable = new Map<string, Map<string, ResolvedRelation>>();
+const relationsByTable = new Map<string, Map<string, ResolvedRelation>>();
 for (const definition of Object.values(relations)) {
   if (!(definition instanceof Relations)) continue;
 
   const sourceTable = getTableName(definition.table);
-  expect(!relationsBySourceTable.has(sourceTable)).toBeTruthy();
-  relationsBySourceTable.set(sourceTable, resolveRelations(definition));
+  expect(!relationsByTable.has(sourceTable)).toBeTruthy();
+  relationsByTable.set(sourceTable, resolveRelations(definition));
 }
 
 interface ForeignKeyShape {
@@ -84,16 +84,16 @@ const foreignKeys: ForeignKeyShape[] = [...tablesByName].flatMap(([tableName, ta
   }),
 );
 
-const tablesWithForeignKeys = new Set(
+const tablesWithFks = new Set(
   foreignKeys.flatMap((foreignKey) => [foreignKey.sourceTable, foreignKey.targetTable]),
 );
 
 test("relations are declared for exactly the tables connected by foreign keys", () => {
-  expect([...relationsBySourceTable.keys()].sort()).toEqual([...tablesWithForeignKeys].sort());
+  expect([...relationsByTable.keys()].sort()).toEqual([...tablesWithFks].sort());
 });
 
 test("relation targets exist in the schema", () => {
-  for (const [sourceTable, definition] of relationsBySourceTable) {
+  for (const [sourceTable, definition] of relationsByTable) {
     for (const [fieldName, relation] of definition) {
       expect(
         tablesByName.has(relation.referencedTable),
@@ -105,7 +105,7 @@ test("relation targets exist in the schema", () => {
 
 test("every foreign key has a matching to-one relation on its source table", () => {
   for (const foreignKey of foreignKeys) {
-    const definition = relationsBySourceTable.get(foreignKey.sourceTable);
+    const definition = relationsByTable.get(foreignKey.sourceTable);
     expect(definition, `${foreignKey.sourceTable} has no relations`).toBeTruthy();
     if (!definition) return;
 
@@ -123,7 +123,7 @@ test("every foreign key has a matching to-one relation on its source table", () 
 
 test("every foreign key is reachable back from its target table", () => {
   for (const foreignKey of foreignKeys) {
-    const definition = relationsBySourceTable.get(foreignKey.targetTable);
+    const definition = relationsByTable.get(foreignKey.targetTable);
     expect(definition, `${foreignKey.targetTable} has no relations`).toBeTruthy();
     if (!definition) continue;
 
@@ -145,7 +145,7 @@ test("every foreign key is reachable back from its target table", () => {
 });
 
 test("to-many relations are backed by a foreign key", () => {
-  for (const [sourceTable, definition] of relationsBySourceTable) {
+  for (const [sourceTable, definition] of relationsByTable) {
     for (const [fieldName, relation] of definition) {
       if (relation.kind !== "many") continue;
 
@@ -162,7 +162,7 @@ test("to-many relations are backed by a foreign key", () => {
 });
 
 test("to-one relations follow a foreign key in one of its two directions", () => {
-  for (const [sourceTable, definition] of relationsBySourceTable) {
+  for (const [sourceTable, definition] of relationsByTable) {
     for (const [fieldName, relation] of definition) {
       if (relation.kind !== "one") continue;
 
@@ -187,7 +187,7 @@ test("to-one relations follow a foreign key in one of its two directions", () =>
 });
 
 test("relation field names are unique per table", () => {
-  for (const [sourceTable, definition] of relationsBySourceTable) {
+  for (const [sourceTable, definition] of relationsByTable) {
     expect(
       new Set(definition.keys()).size,
       `duplicate relation field names on ${sourceTable}`,

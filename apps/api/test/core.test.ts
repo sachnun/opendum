@@ -1,19 +1,19 @@
 import { describe, expect, it } from "bun:test";
 import { Chat, Messages, Responses, adapters, transformAnthropicToOpenAI, transformOpenAIToAnthropic } from "../core/endpoints.js";
 import { SseScanner } from "../core/sse.js";
-import { isRouteError } from "../core/types.js";
-import { retryMetadata, sanitizedProxyError, shouldRotate } from "../core/errors.js";
+import { routeFailure } from "../core/types.js";
+import { ProviderError } from "../core/errors.js";
 
 describe("chat completions parse", () => {
   it("rejects a missing model", () => {
     const parsed = new Chat().parse({ messages: [] });
-    expect(isRouteError(parsed)).toBe(true);
-    if (isRouteError(parsed)) expect(parsed.status).toBe(400);
+    expect(routeFailure(parsed)).toBe(true);
+    if (routeFailure(parsed)) expect(parsed.status).toBe(400);
   });
 
   it("rejects a missing messages array", () => {
     const parsed = new Chat().parse({ model: "gpt-4o" });
-    expect(isRouteError(parsed)).toBe(true);
+    expect(routeFailure(parsed)).toBe(true);
   });
 
   it("parses a valid request and builds a payload", () => {
@@ -23,8 +23,8 @@ describe("chat completions parse", () => {
       stream: true,
       reasoning_effort: "high",
     });
-    expect(isRouteError(parsed)).toBe(false);
-    if (isRouteError(parsed)) return;
+    expect(routeFailure(parsed)).toBe(false);
+    if (routeFailure(parsed)) return;
     expect(parsed.stream).toBe(true);
     expect(parsed.reasoningRequested).toBe(true);
     const built = new Chat().build(parsed, "gpt-4o", true, "sess-1");
@@ -42,8 +42,8 @@ describe("messages transform", () => {
       system: "be nice",
       messages: [{ role: "user", content: [{ type: "text", text: "hello" }] }],
     });
-    expect(isRouteError(parsed)).toBe(false);
-    if (isRouteError(parsed)) return;
+    expect(routeFailure(parsed)).toBe(false);
+    if (routeFailure(parsed)) return;
     const built = new Messages().build(parsed, "claude-sonnet-4-6", false, "");
     expect(built.max_tokens).toBe(128);
     const messages = built.messages as Array<Record<string, unknown>>;
@@ -88,8 +88,8 @@ describe("responses parse", () => {
       input: [{ role: "user", content: [{ type: "input_text", text: "yo" }] }],
       max_output_tokens: 64,
     });
-    expect(isRouteError(parsed)).toBe(false);
-    if (isRouteError(parsed)) return;
+    expect(routeFailure(parsed)).toBe(false);
+    if (routeFailure(parsed)) return;
     expect(parsed.paramsForError.max_tokens).toBe(64);
     const built = new Responses().build(parsed, "gpt-4o", false, "");
     expect(built._responsesInput).toBeArray();
@@ -104,7 +104,7 @@ describe("endpoint adapters", () => {
     expect(Object.keys(map).sort()).toEqual(["chat_completions", "messages", "responses"]);
     expect(map.chat_completions.endpoint).toBe("chat_completions");
     expect(map.messages.format).toBe("anthropic");
-    expect(map.responses.noAccountsStatusCode).toBe(503);
+    expect(map.responses.noAccountsStatus).toBe(503);
   });
 });
 
@@ -127,24 +127,24 @@ describe("sse scanner", () => {
 
 describe("errors", () => {
   it("rotates on 5xx and 429", () => {
-    expect(shouldRotate(500)).toBe(true);
-    expect(shouldRotate(429)).toBe(true);
-    expect(shouldRotate(400)).toBe(false);
+    expect(ProviderError.shouldRotate(500)).toBe(true);
+    expect(ProviderError.shouldRotate(429)).toBe(true);
+    expect(ProviderError.shouldRotate(400)).toBe(false);
   });
 
   it("rotates on 404 so a missing model can move to another account", () => {
-    expect(shouldRotate(404)).toBe(true);
+    expect(ProviderError.shouldRotate(404)).toBe(true);
   });
 
   it("extracts nested provider message", () => {
-    const result = sanitizedProxyError(400, JSON.stringify({ error: { message: "bad  input" } }));
+    const result = ProviderError.sanitize(400, JSON.stringify({ error: { message: "bad  input" } }));
     expect(result.message).toBe("bad input");
     expect(result.type).toBe("invalid_request_error");
   });
 
   it("formats retry metadata", () => {
-    const meta = retryMetadata(1500);
+    const meta = ProviderError.retryMetadata(1500);
     expect(meta.retryAfter).toBe("2s");
-    expect(meta.retryAfterMs).toBe(1500);
+    expect(meta.afterMs).toBe(1500);
   });
 });

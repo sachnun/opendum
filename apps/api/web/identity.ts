@@ -25,7 +25,7 @@ export class IdentityService {
     }).pipe(Effect.catch(() => Effect.succeed(null)));
   }
 
-  accessTokenFromHeaders(headers: Headers): Effect.Effect<string | null> {
+  tokenFromHeaders(headers: Headers): Effect.Effect<string | null> {
     return Effect.tryPromise({
       try: () => this.auth.api.getToken({ headers }),
       catch: (cause) => cause,

@@ -11,11 +11,11 @@ export type UnroxyEgressOptions = {
   headersTimeout?: number;
 };
 
-export const DEFAULT_UNROXY_BASE_URL = "https://unroxy.koyeb.app/";
+export const UNROXY_BASE_URL = "https://unroxy.koyeb.app/";
 
-function normalizeBaseUrl(value: string): string {
+function normalizeUrl(value: string): string {
   const trimmed = value.trim();
-  if (trimmed === "") return DEFAULT_UNROXY_BASE_URL;
+  if (trimmed === "") return UNROXY_BASE_URL;
   return trimmed.endsWith("/") ? trimmed : `${trimmed}/`;
 }
 
@@ -24,14 +24,14 @@ export class UnroxyEgress implements Egress {
   private readonly headersTimeout: number;
 
   constructor(options: UnroxyEgressOptions = {}) {
-    this.baseUrl = normalizeBaseUrl(options.baseUrl ?? DEFAULT_UNROXY_BASE_URL);
+    this.baseUrl = normalizeUrl(options.baseUrl ?? UNROXY_BASE_URL);
     this.headersTimeout = options.headersTimeout ?? 0;
   }
 
   fetch(input: string | URL, init?: RequestInit): Promise<Response> {
     const target = typeof input === "string" ? input : input.toString();
     return this.headersTimeout > 0
-      ? fetchWithHeadersTimeout(`${this.baseUrl}${target}`, init, this.headersTimeout)
+      ? fetchTimeout(`${this.baseUrl}${target}`, init, this.headersTimeout)
       : fetch(`${this.baseUrl}${target}`, init);
   }
 
@@ -40,7 +40,7 @@ export class UnroxyEgress implements Egress {
   }
 }
 
-async function fetchWithHeadersTimeout(
+async function fetchTimeout(
   url: string,
   init: RequestInit | undefined,
   timeoutMs: number

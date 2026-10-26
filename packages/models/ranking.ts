@@ -1,19 +1,19 @@
 import { MODEL_FAMILY_RANKING } from "./ranking.generated.ts";
 
-type ModelFamilyRankingEntry = (typeof MODEL_FAMILY_RANKING)[number];
-export type ModelFamily = ModelFamilyRankingEntry["name"] | "Others";
+type RankingEntry = (typeof MODEL_FAMILY_RANKING)[number];
+export type ModelFamily = RankingEntry["name"] | "Others";
 
 const FAMILY_BENCHMARK_SCORES: ReadonlyMap<string, number> = new Map(
   MODEL_FAMILY_RANKING.map((entry) => [entry.name, entry.score]),
 );
 
-const MODEL_FAMILY_ANCHOR_IDS: ReadonlyMap<string, string> = new Map(
+const ANCHOR_IDS: ReadonlyMap<string, string> = new Map(
   MODEL_FAMILY_RANKING.map((entry) => [entry.name, entry.anchorId]),
 );
 
 const FEATURED_SET: ReadonlySet<string> = new Set(MODEL_FAMILY_RANKING.map((entry) => entry.name));
 
-function slugifyModelFamily(family: string): string {
+function slugifyFamily(family: string): string {
   return family
     .trim()
     .toLowerCase()
@@ -21,19 +21,19 @@ function slugifyModelFamily(family: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
-function compareModelFamilies(a: string, b: string): number {
+function compareFamilies(a: string, b: string): number {
   const aScore = FAMILY_BENCHMARK_SCORES.get(a) ?? 0;
   const bScore = FAMILY_BENCHMARK_SCORES.get(b) ?? 0;
   if (aScore !== bScore) return bScore - aScore;
   return a.localeCompare(b);
 }
 
-export function getModelFamilyAnchorId(family: ModelFamily): string {
+export function anchorId(family: ModelFamily): string {
   if (family === "Others") return "other-models";
-  return MODEL_FAMILY_ANCHOR_IDS.get(family) ?? `${slugifyModelFamily(family)}-models`;
+  return ANCHOR_IDS.get(family) ?? `${slugifyFamily(family)}-models`;
 }
 
-export function categorizeModelFamily(family: string | undefined): ModelFamily {
+export function categorize(family: string | undefined): ModelFamily {
   if (family && FEATURED_SET.has(family)) {
     return family;
   }
@@ -42,18 +42,18 @@ export function categorizeModelFamily(family: string | undefined): ModelFamily {
 }
 
 const SORTED_FEATURED_FAMILIES: readonly string[] = [...MODEL_FAMILY_RANKING]
-  .sort((a, b) => compareModelFamilies(a.name, b.name))
+  .sort((a, b) => compareFamilies(a.name, b.name))
   .map((entry) => entry.name);
 
-export const MODEL_FAMILY_SORT_ORDER: readonly ModelFamily[] = [
+export const SORT_ORDER: readonly ModelFamily[] = [
   ...SORTED_FEATURED_FAMILIES,
   "Others",
 ];
 
-export const MODEL_FAMILY_NAV_ITEMS: Array<{ name: ModelFamily; anchorId: string }> = [
+export const NAV_ITEMS: Array<{ name: ModelFamily; anchorId: string }> = [
   ...SORTED_FEATURED_FAMILIES.map((name) => ({
     name,
-    anchorId: getModelFamilyAnchorId(name),
+    anchorId: anchorId(name),
   })),
   { name: "Others", anchorId: "other-models" },
 ];

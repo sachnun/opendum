@@ -52,7 +52,7 @@ describe("Health", () => {
   });
 
   it("truncates oversized error messages before storing them", async () => {
-    repositories.accounts.getAccountOwnerUserID.mockReturnValueOnce(Effect.succeed("owner-1"));
+    repositories.accounts.ownerId.mockReturnValueOnce(Effect.succeed("owner-1"));
     const stored: string[] = [];
     const redis = fakeRedis({
       set: async (_key: string, value: string) => {
@@ -70,12 +70,12 @@ describe("Health", () => {
 
   it("puts an account into cooldown once unhealthy rows reach the threshold", async () => {
     const now = new Date();
-    repositories.health.getAccountHealthState.mockReturnValueOnce(Effect.succeed({
+    repositories.health.healthState.mockReturnValueOnce(Effect.succeed({
       status: "active",
       consecutiveErrors: 0,
       disabledUntil: null,
     } as never));
-    repositories.health.listModelHealthByAccount.mockReturnValueOnce(Effect.succeed([
+    repositories.health.healthByAccount.mockReturnValueOnce(Effect.succeed([
       {
         id: "row-1",
         consecutiveErrors: 10,
@@ -97,12 +97,12 @@ describe("Health", () => {
   it("marks accounts active again after failures decay", async () => {
     const now = new Date();
     const staleAt = new Date(now.getTime() - 60 * 60 * 1000);
-    repositories.health.getAccountHealthState.mockReturnValueOnce(Effect.succeed({
+    repositories.health.healthState.mockReturnValueOnce(Effect.succeed({
       status: "failed",
       consecutiveErrors: 2,
       disabledUntil: staleAt,
     } as never));
-    repositories.health.listModelHealthByAccount.mockReturnValueOnce(Effect.succeed([
+    repositories.health.healthByAccount.mockReturnValueOnce(Effect.succeed([
       {
         id: "row-1",
         consecutiveErrors: 2,
@@ -137,7 +137,7 @@ describe("Health", () => {
 
     await Effect.runPromise(healthService().markAccountSuccess("acc-1", "gpt-4o"));
     expect(repositories.health.markAccountSuccess).toHaveBeenCalledTimes(1);
-    expect(repositories.health.updateModelHealthSuccess).toHaveBeenCalledTimes(1);
+    expect(repositories.health.markSuccess).toHaveBeenCalledTimes(1);
   });
 
   it("skips synthetic accounts", async () => {
@@ -166,6 +166,6 @@ describe("Health", () => {
   it("bumps request counts in the background", async () => {
     healthService().bumpRequest("acc-1");
     await new Promise((resolve) => setTimeout(resolve, 10));
-    expect(repositories.health.bumpAccountRequestCount).toHaveBeenCalledTimes(1);
+    expect(repositories.health.bumpRequests).toHaveBeenCalledTimes(1);
   });
 });

@@ -17,63 +17,63 @@ const {
   activeProviderPresets,
   familyPresetExpanded,
   providerPresetExpanded,
-  selectionOpenByPanel,
-  selectionStepByPanel,
-  pendingModelByPanel,
-  modelSearchByPanel,
-  routeSearchByPanel,
-  copiedErrorByPanel,
+  pickerOpen,
+  pickerStep,
+  pendingModel,
+  modelSearch,
+  routeSearch,
+  copiedError,
   modelsById,
-  providerAccountsById,
+  accountsById,
   familyPresets,
   providerPresets,
   canAddPanel,
   isAnyLoading,
-  isTopPDeprecated,
+  topPDeprecated,
   additionalParametersError,
   canRunPlayground,
-  isLoopCountValid,
-  activeLoopBadgeLabel,
+  loopCountValid,
+  loopBadge,
   isChatScenario,
-  getValidProviderForPanel,
-  getAccountLabel,
-  getAccountPlaygroundStatus,
-  getProviderPresetAccountLabel,
-  getProviderScopedRouteLabel,
-  getPendingModelProviders,
-  getValidAccountIdForPanel,
-  getSelectedRouteLabel,
-  getPanelProviderAccountHref,
-  shouldShowVisionWarning,
-  getGroupedPanelModels,
-  getPendingModelAccounts,
-  openPanelPicker,
-  setModelSearch,
-  setRouteSearch,
-  selectPendingModel,
-  selectPanelRoute,
+  panelProvider,
+  accountLabel,
+  accountStatus,
+  presetLabel,
+  scopedLabel,
+  pendingProviders,
+  routeAccount,
+  routeLabel,
+  accountLink,
+  visionWarning,
+  groupedModels,
+  pendingAccounts,
+  openPicker,
+  searchModels,
+  searchRoutes,
+  selectModel,
+  selectRoute,
   addPanel,
   removePanel,
-  applyFamilyPreset,
-  applyProviderPreset,
+  toggleFamily,
+  toggleProvider,
   selectScenario,
   resetSettings,
-  getScenarioConversationMessages,
-  getPanelSystemPromptText,
-  getPanelUserScenarioMessages,
-  getPanelWaitLabel,
-  setPanelScrollElement,
-  handlePanelScroll,
-  stopPanelRequest,
-  stopAllRequests,
+  conversationMessages,
+  systemPrompt,
+  userMessages,
+  waitLabel,
+  bindScroll,
+  onScroll,
+  stopPanel,
+  stopAll,
   retryPanel,
-  handleStartPointerDown,
-  handleStartPointerEnd,
-  handleStartClick,
+  onPress,
+  pressRelease,
+  onTap,
   runLoop,
-  copyPanelError,
+  copyError,
   error,
-  getProviderLabel,
+  labelOf,
   extractMessageText,
   extractImageUrls,
   formatToolArguments,
@@ -94,7 +94,7 @@ const {
       </label>
       <div class="flex justify-end gap-2">
         <UiButton variant="outline" size="sm" @click="loopDialogOpen = false">Cancel</UiButton>
-        <UiButton size="sm" :disabled="!isLoopCountValid" @click="runLoop">Run loop</UiButton>
+        <UiButton size="sm" :disabled="!loopCountValid" @click="runLoop">Run loop</UiButton>
       </div>
     </template>
   </UiDialog>
@@ -146,8 +146,8 @@ const {
             </label>
             <label class="grid gap-2 text-sm font-medium">
               <span class="flex items-center justify-between"><span>Top P</span><span class="w-12 text-right text-sm text-muted-foreground">{{ settings.topP.toFixed(2) }}</span></span>
-              <input v-model.number="settings.topP" type="range" min="0" max="1" step="0.05" :disabled="isAnyLoading || isTopPDeprecated" class="w-full accent-primary">
-              <span v-if="isTopPDeprecated" class="text-xs font-normal text-amber-600 dark:text-amber-400">This model's provider no longer accepts top_p; using default value (1.0)</span>
+              <input v-model.number="settings.topP" type="range" min="0" max="1" step="0.05" :disabled="isAnyLoading || topPDeprecated" class="w-full accent-primary">
+              <span v-if="topPDeprecated" class="text-xs font-normal text-amber-600 dark:text-amber-400">This model's provider no longer accepts top_p; using default value (1.0)</span>
               <span v-else class="text-xs font-normal text-muted-foreground">Nucleus sampling threshold (1.0 = consider all tokens)</span>
             </label>
             <label class="grid gap-2 text-sm font-medium">
@@ -231,14 +231,14 @@ const {
       <div class="flex items-center justify-between gap-4">
         <h1 class="text-xl font-semibold">Playground</h1>
         <div class="flex items-center gap-2">
-          <UiButton v-if="isAnyLoading" type="button" variant="outline" size="sm" @click="stopAllRequests">
+          <UiButton v-if="isAnyLoading" type="button" variant="outline" size="sm" @click="stopAll">
             <span class="relative inline-flex">
               <UiIcon name="i-lucide-square" class="size-3.5" />
-              <span v-if="activeLoopBadgeLabel" class="absolute -right-3 -top-2 rounded-full bg-primary px-1 py-0.5 text-[9px] font-semibold leading-none text-primary-foreground">{{ activeLoopBadgeLabel }}</span>
+              <span v-if="loopBadge" class="absolute -right-3 -top-2 rounded-full bg-primary px-1 py-0.5 text-[9px] font-semibold leading-none text-primary-foreground">{{ loopBadge }}</span>
             </span>
             Stop all
           </UiButton>
-          <UiButton type="button" variant="outline" size="sm" class="select-none" :disabled="!canRunPlayground" @click="handleStartClick" @pointerdown="handleStartPointerDown" @pointerup="handleStartPointerEnd" @pointerleave="handleStartPointerEnd" @pointercancel="handleStartPointerEnd" @selectstart.prevent @dragstart.prevent @contextmenu.prevent>
+          <UiButton type="button" variant="outline" size="sm" class="select-none" :disabled="!canRunPlayground" @click="onTap" @pointerdown="onPress" @pointerup="pressRelease" @pointerleave="pressRelease" @pointercancel="pressRelease" @selectstart.prevent @dragstart.prevent @contextmenu.prevent>
             <UiIcon name="i-lucide-play" class="size-4" />
             Start
           </UiButton>
@@ -291,7 +291,7 @@ const {
               'flex h-auto w-full min-w-0 cursor-pointer flex-col items-center gap-0.5 rounded-md border px-3 py-2 text-center text-sm font-medium disabled:cursor-default disabled:pointer-events-none disabled:opacity-50 sm:w-auto sm:min-w-[92px]',
               activeFamilyPresets.includes(preset.family) ? 'border-primary/35 bg-primary/10 text-primary' : 'border-border/70 bg-card/30 text-muted-foreground',
             ]"
-            @click="applyFamilyPreset(preset.family)"
+            @click="toggleFamily(preset.family)"
           >
             <span class="whitespace-normal break-words text-xs leading-tight">{{ preset.family }}</span>
             <span :class="activeFamilyPresets.includes(preset.family) ? 'text-[10px] leading-none text-primary/80' : 'text-[10px] leading-none text-muted-foreground'">{{ preset.models.length }} models</span>
@@ -317,10 +317,10 @@ const {
               'flex h-auto min-h-10 w-full min-w-0 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-md border px-3 py-2 text-center text-sm font-medium disabled:cursor-default disabled:pointer-events-none disabled:opacity-50 sm:w-auto sm:min-w-[92px]',
               activeProviderPresets.includes(preset.provider) ? 'border-primary/35 bg-primary/10 text-primary' : 'border-border/70 bg-card/30 text-muted-foreground',
             ]"
-            @click="applyProviderPreset(preset.provider)"
+            @click="toggleProvider(preset.provider)"
           >
-            <span class="whitespace-normal break-words text-xs leading-tight">{{ getProviderLabel(preset.provider) }}</span>
-            <span v-if="getProviderPresetAccountLabel(preset.accounts)" :class="activeProviderPresets.includes(preset.provider) ? 'text-[10px] leading-none text-primary/80' : 'text-[10px] leading-none text-muted-foreground'">{{ getProviderPresetAccountLabel(preset.accounts) }}</span>
+            <span class="whitespace-normal break-words text-xs leading-tight">{{ labelOf(preset.provider) }}</span>
+            <span v-if="presetLabel(preset.accounts)" :class="activeProviderPresets.includes(preset.provider) ? 'text-[10px] leading-none text-primary/80' : 'text-[10px] leading-none text-muted-foreground'">{{ presetLabel(preset.accounts) }}</span>
           </button>
         </div>
       </div>
@@ -334,34 +334,34 @@ const {
           </UiTooltip>
 
           <UiCardHeader class="flex-none gap-0 bg-muted/10 py-2 pl-3" :class="panels.length > 1 ? 'pr-11' : 'pr-3'">
-            <UiPopover v-model:open="selectionOpenByPanel[panel.id]" :content="{ align: 'start', class: 'w-[340px] max-w-[calc(100vw-2rem)] p-0' }">
-              <UiButton type="button" variant="ghost" class="h-8 flex-1 justify-between bg-transparent px-0 font-normal shadow-none" :disabled="responses[panel.id]?.isLoading" @click="openPanelPicker(panel)">
+            <UiPopover v-model:open="pickerOpen[panel.id]" :content="{ align: 'start', class: 'w-[340px] max-w-[calc(100vw-2rem)] p-0' }">
+              <UiButton type="button" variant="ghost" class="h-8 flex-1 justify-between bg-transparent px-0 font-normal shadow-none" :disabled="responses[panel.id]?.isLoading" @click="openPicker(panel)">
                 <span v-if="panel.modelId && modelsById.get(panel.modelId)" class="flex min-w-0 items-center gap-2">
-                  <UiTooltip v-if="shouldShowVisionWarning(modelsById.get(panel.modelId))" text="This model may not support vision input">
+                  <UiTooltip v-if="visionWarning(modelsById.get(panel.modelId))" text="This model may not support vision input">
                     <UiIcon name="i-lucide-triangle-alert" class="size-3.5 shrink-0 text-yellow-500" />
                   </UiTooltip>
                   <span class="truncate">{{ modelsById.get(panel.modelId)?.name }}</span>
                   <UiBadge variant="secondary" class="shrink-0 whitespace-nowrap bg-muted/40 px-1.5 py-0 text-[10px] text-muted-foreground">
-                    {{ getValidAccountIdForPanel(panel) ? getProviderLabel(providerAccountsById.get(getValidAccountIdForPanel(panel)!)?.provider ?? '') : responses[panel.id]?.usedAccountId ? `Auto - ${getProviderLabel(providerAccountsById.get(responses[panel.id]?.usedAccountId ?? '')?.provider ?? '')}` : getValidProviderForPanel(panel) ? getProviderScopedRouteLabel(getValidProviderForPanel(panel)!) : 'Auto' }}
+                    {{ routeAccount(panel) ? labelOf(accountsById.get(routeAccount(panel)!)?.provider ?? '') : responses[panel.id]?.usedAccountId ? `Auto - ${labelOf(accountsById.get(responses[panel.id]?.usedAccountId ?? '')?.provider ?? '')}` : panelProvider(panel) ? scopedLabel(panelProvider(panel)!) : 'Auto' }}
                   </UiBadge>
                 </span>
                 <span v-else class="text-muted-foreground">Select model...</span>
                 <UiIcon name="i-lucide-chevron-down" class="ml-1 size-3 shrink-0 opacity-50" />
               </UiButton>
               <template #content>
-                <div v-if="selectionStepByPanel[panel.id] !== 'routing'" class="max-h-[420px] overflow-hidden">
+                <div v-if="pickerStep[panel.id] !== 'routing'" class="max-h-[420px] overflow-hidden">
                   <div class="border-b p-2">
-                    <input :value="modelSearchByPanel[panel.id] ?? ''" placeholder="Search models..." class="h-8 w-full rounded-md border border-input bg-background px-2 text-xs outline-none" @input="setModelSearch(panel.id, $event)">
+                    <input :value="modelSearch[panel.id] ?? ''" placeholder="Search models..." class="h-8 w-full rounded-md border border-input bg-background px-2 text-xs outline-none" @input="searchModels(panel.id, $event)">
                   </div>
                   <div class="max-h-[360px] overflow-y-auto p-1">
-                    <p v-if="getGroupedPanelModels(panel).length === 0" class="px-2 py-6 text-center text-sm text-muted-foreground">No model found.</p>
-                    <div v-for="group in getGroupedPanelModels(panel)" :key="group.family" class="py-1">
+                    <p v-if="groupedModels(panel).length === 0" class="px-2 py-6 text-center text-sm text-muted-foreground">No model found.</p>
+                    <div v-for="group in groupedModels(panel)" :key="group.family" class="py-1">
                       <p class="px-2 py-1.5 text-[11px] font-semibold text-muted-foreground">{{ group.family }}</p>
-                      <button v-for="model in group.models" :key="model.id" type="button" class="flex w-full cursor-pointer items-start gap-2 rounded-sm px-2 py-2 text-left hover:bg-accent hover:text-accent-foreground" :class="panel.modelId === model.id ? 'bg-accent' : ''" @click="selectPendingModel(panel, model.id)">
+                      <button v-for="model in group.models" :key="model.id" type="button" class="flex w-full cursor-pointer items-start gap-2 rounded-sm px-2 py-2 text-left hover:bg-accent hover:text-accent-foreground" :class="panel.modelId === model.id ? 'bg-accent' : ''" @click="selectModel(panel, model.id)">
                         <div class="min-w-0 flex-1">
                           <p class="truncate text-xs font-medium">{{ model.name }}</p>
                           <div class="mt-1 flex flex-wrap gap-1">
-                            <UiBadge v-for="provider in model.providers" :key="`${model.id}-${provider}`" variant="outline" class="h-4 px-1.5 text-[9px]">{{ getProviderLabel(provider) }}</UiBadge>
+                            <UiBadge v-for="provider in model.providers" :key="`${model.id}-${provider}`" variant="outline" class="h-4 px-1.5 text-[9px]">{{ labelOf(provider) }}</UiBadge>
                           </div>
                         </div>
                       </button>
@@ -370,38 +370,38 @@ const {
                 </div>
                 <div v-else class="max-h-[420px] overflow-hidden">
                   <div class="flex items-center justify-between border-b px-2 py-1.5">
-                    <UiButton type="button" variant="ghost" size="sm" class="h-7 gap-1 px-2 text-xs" @click="selectionStepByPanel[panel.id] = 'model'; pendingModelByPanel[panel.id] = null">
+                    <UiButton type="button" variant="ghost" size="sm" class="h-7 gap-1 px-2 text-xs" @click="pickerStep[panel.id] = 'model'; pendingModel[panel.id] = null">
                       <UiIcon name="i-lucide-chevron-left" class="size-3.5" />
                       Models
                     </UiButton>
-                    <p class="max-w-[220px] truncate text-xs font-medium">{{ pendingModelByPanel[panel.id] }}</p>
+                    <p class="max-w-[220px] truncate text-xs font-medium">{{ pendingModel[panel.id] }}</p>
                   </div>
                   <div class="border-b p-2">
-                    <input :value="routeSearchByPanel[panel.id] ?? ''" placeholder="Search provider or account..." class="h-8 w-full rounded-md border border-input bg-background px-2 text-xs outline-none" @input="setRouteSearch(panel.id, $event)">
+                    <input :value="routeSearch[panel.id] ?? ''" placeholder="Search provider or account..." class="h-8 w-full rounded-md border border-input bg-background px-2 text-xs outline-none" @input="searchRoutes(panel.id, $event)">
                   </div>
                   <div class="max-h-[330px] overflow-y-auto p-1">
                     <p class="px-2 py-1.5 text-[11px] font-semibold text-muted-foreground">Routing</p>
-                    <button type="button" class="flex w-full cursor-pointer items-center rounded-sm px-2 py-2 text-left hover:bg-accent hover:text-accent-foreground" :class="panel.modelId === pendingModelByPanel[panel.id] && !panel.provider && !panel.accountId ? 'bg-accent' : ''" @click="selectPanelRoute(panel, { provider: null, accountId: null })">
+                    <button type="button" class="flex w-full cursor-pointer items-center rounded-sm px-2 py-2 text-left hover:bg-accent hover:text-accent-foreground" :class="panel.modelId === pendingModel[panel.id] && !panel.provider && !panel.accountId ? 'bg-accent' : ''" @click="selectRoute(panel, { provider: null, accountId: null })">
                       <div class="min-w-0 flex-1">
                         <p class="truncate text-xs font-medium">Auto (load balancer)</p>
                         <p class="truncate text-[10px] text-muted-foreground">System chooses best provider account</p>
                       </div>
                     </button>
-                    <button v-for="provider in getPendingModelProviders(panel)" :key="`provider-${provider}`" type="button" class="flex w-full cursor-pointer items-center rounded-sm px-2 py-2 text-left hover:bg-accent hover:text-accent-foreground" :class="panel.modelId === pendingModelByPanel[panel.id] && panel.provider === provider && !panel.accountId ? 'bg-accent' : ''" @click="selectPanelRoute(panel, { provider, accountId: null })">
+                    <button v-for="provider in pendingProviders(panel)" :key="`provider-${provider}`" type="button" class="flex w-full cursor-pointer items-center rounded-sm px-2 py-2 text-left hover:bg-accent hover:text-accent-foreground" :class="panel.modelId === pendingModel[panel.id] && panel.provider === provider && !panel.accountId ? 'bg-accent' : ''" @click="selectRoute(panel, { provider, accountId: null })">
                       <div class="min-w-0 flex-1">
-                        <p class="truncate text-xs font-medium">{{ getProviderScopedRouteLabel(provider) }}</p>
-                        <p class="truncate text-[10px] text-muted-foreground">Load balance within {{ getProviderLabel(provider) }}</p>
+                        <p class="truncate text-xs font-medium">{{ scopedLabel(provider) }}</p>
+                        <p class="truncate text-[10px] text-muted-foreground">Load balance within {{ labelOf(provider) }}</p>
                       </div>
-                      <UiBadge variant="outline" class="ml-2 shrink-0 text-[10px]">{{ getProviderLabel(provider) }}</UiBadge>
+                      <UiBadge variant="outline" class="ml-2 shrink-0 text-[10px]">{{ labelOf(provider) }}</UiBadge>
                     </button>
-                    <button v-for="account in getPendingModelAccounts(panel)" :key="account.id" type="button" class="flex w-full cursor-pointer items-center rounded-sm px-2 py-2 text-left hover:bg-accent hover:text-accent-foreground" :class="panel.modelId === pendingModelByPanel[panel.id] && panel.accountId === account.id ? 'bg-accent' : ''" @click="selectPanelRoute(panel, { provider: null, accountId: account.id })">
+                    <button v-for="account in pendingAccounts(panel)" :key="account.id" type="button" class="flex w-full cursor-pointer items-center rounded-sm px-2 py-2 text-left hover:bg-accent hover:text-accent-foreground" :class="panel.modelId === pendingModel[panel.id] && panel.accountId === account.id ? 'bg-accent' : ''" @click="selectRoute(panel, { provider: null, accountId: account.id })">
                       <div class="min-w-0 flex-1">
-                        <p class="truncate text-xs font-medium">{{ getAccountLabel(account) }}</p>
-                        <p class="truncate text-[10px] text-muted-foreground">{{ getProviderLabel(account.provider) }}</p>
+                        <p class="truncate text-xs font-medium">{{ accountLabel(account) }}</p>
+                        <p class="truncate text-[10px] text-muted-foreground">{{ labelOf(account.provider) }}</p>
                       </div>
                       <div class="ml-2 flex shrink-0 items-center gap-1">
-                        <UiBadge v-if="getAccountPlaygroundStatus(account)" variant="secondary" class="text-[10px]">{{ getAccountPlaygroundStatus(account) }}</UiBadge>
-                        <UiBadge variant="outline" class="text-[10px]">{{ getProviderLabel(account.provider) }}</UiBadge>
+                        <UiBadge v-if="accountStatus(account)" variant="secondary" class="text-[10px]">{{ accountStatus(account) }}</UiBadge>
+                        <UiBadge variant="outline" class="text-[10px]">{{ labelOf(account.provider) }}</UiBadge>
                       </div>
                     </button>
                   </div>
@@ -411,11 +411,11 @@ const {
           </UiCardHeader>
 
           <UiCardContent class="flex min-h-0 flex-1 flex-col overflow-hidden p-0">
-            <div :ref="(element: unknown) => setPanelScrollElement(panel.id, element)" class="min-h-0 flex-1 overflow-y-auto bg-background/20 p-3" @scroll="handlePanelScroll(panel.id, $event)">
-              <template v-if="getScenarioConversationMessages(panel.id).length > 0">
-                <pre v-if="getPanelSystemPromptText(panel.id)" class="mb-2 whitespace-pre-wrap font-sans text-[11px] leading-relaxed text-muted-foreground">{{ getPanelSystemPromptText(panel.id) }}</pre>
+            <div :ref="(element: unknown) => bindScroll(panel.id, element)" class="min-h-0 flex-1 overflow-y-auto bg-background/20 p-3" @scroll="onScroll(panel.id, $event)">
+              <template v-if="conversationMessages(panel.id).length > 0">
+                <pre v-if="systemPrompt(panel.id)" class="mb-2 whitespace-pre-wrap font-sans text-[11px] leading-relaxed text-muted-foreground">{{ systemPrompt(panel.id) }}</pre>
 
-                <div v-for="(message, index) in getPanelUserScenarioMessages(panel.id)" :key="`${panel.id}-message-${index}`" class="mb-2 flex gap-2">
+                <div v-for="(message, index) in userMessages(panel.id)" :key="`${panel.id}-message-${index}`" class="mb-2 flex gap-2">
                   <div :class="message.role === 'assistant' ? 'bg-secondary/80' : 'bg-primary/10'" class="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full">
                     <UiIcon :name="message.role === 'assistant' ? 'i-lucide-bot' : 'i-lucide-user'" :class="message.role === 'assistant' ? 'text-secondary-foreground' : 'text-primary'" class="size-3" />
                   </div>
@@ -440,9 +440,9 @@ const {
                     <p class="font-medium">Error</p>
                     <p class="break-words text-sm text-destructive/90">{{ responses[panel.id]?.error }}</p>
                   </div>
-                  <UiTooltip :text="copiedErrorByPanel[panel.id] ? 'Copied' : 'Copy error'">
-                    <UiButton type="button" variant="ghost" size="icon-xs" class="absolute right-1.5 top-1.5 h-6 w-6 text-destructive/70 hover:text-destructive" aria-label="Copy error" @click="copyPanelError(panel.id)">
-                      <UiIcon :name="copiedErrorByPanel[panel.id] ? 'i-lucide-check' : 'i-lucide-copy'" class="size-3.5" />
+                  <UiTooltip :text="copiedError[panel.id] ? 'Copied' : 'Copy error'">
+                    <UiButton type="button" variant="ghost" size="icon-xs" class="absolute right-1.5 top-1.5 h-6 w-6 text-destructive/70 hover:text-destructive" aria-label="Copy error" @click="copyError(panel.id)">
+                      <UiIcon :name="copiedError[panel.id] ? 'i-lucide-check' : 'i-lucide-copy'" class="size-3.5" />
                     </UiButton>
                   </UiTooltip>
                 </div>
@@ -506,16 +506,16 @@ const {
                 </div>
               </div>
 
-              <p v-if="panel.modelId && !responses[panel.id]?.isLoading && !responses[panel.id]?.content && !responses[panel.id]?.reasoning && !responses[panel.id]?.error && !responses[panel.id]?.toolCalls?.length && getScenarioConversationMessages(panel.id).length === 0" class="py-8 text-center text-sm text-muted-foreground">Response will appear here</p>
+              <p v-if="panel.modelId && !responses[panel.id]?.isLoading && !responses[panel.id]?.content && !responses[panel.id]?.reasoning && !responses[panel.id]?.error && !responses[panel.id]?.toolCalls?.length && conversationMessages(panel.id).length === 0" class="py-8 text-center text-sm text-muted-foreground">Response will appear here</p>
             </div>
 
             <div class="shrink-0 bg-muted/15 px-3 py-2 text-[11px]">
               <div class="flex items-center justify-between gap-2">
                 <span class="text-muted-foreground">Wait</span>
                 <div class="flex items-center gap-2">
-                  <span class="font-medium tabular-nums">{{ getPanelWaitLabel(panel.id) }}</span>
+                  <span class="font-medium tabular-nums">{{ waitLabel(panel.id) }}</span>
                   <UiTooltip v-if="panel.modelId && responses[panel.id]?.isLoading" text="Stop">
-                    <UiButton type="button" variant="ghost" size="icon-xs" class="h-5 w-5" @click="stopPanelRequest(panel.id)">
+                    <UiButton type="button" variant="ghost" size="icon-xs" class="h-5 w-5" @click="stopPanel(panel.id)">
                       <UiIcon name="i-lucide-square" class="size-3" />
                     </UiButton>
                   </UiTooltip>
@@ -533,15 +533,15 @@ const {
               </div>
               <div class="mt-1 flex items-center justify-between gap-2">
                 <span class="shrink-0 whitespace-nowrap text-muted-foreground">Account</span>
-                <UiTooltip v-if="getPanelProviderAccountHref(panel)" text="Open account">
+                <UiTooltip v-if="accountLink(panel)" text="Open account">
                   <NuxtLink
-                    :to="getPanelProviderAccountHref(panel)!"
+                    :to="accountLink(panel)!"
                     class="min-w-0 truncate text-right font-medium text-foreground underline-offset-2 hover:underline"
                   >
-                    {{ getSelectedRouteLabel(panel) }}
+                    {{ routeLabel(panel) }}
                   </NuxtLink>
                 </UiTooltip>
-                <span v-else class="min-w-0 truncate text-right font-medium">{{ getSelectedRouteLabel(panel) }}</span>
+                <span v-else class="min-w-0 truncate text-right font-medium">{{ routeLabel(panel) }}</span>
               </div>
             </div>
           </UiCardContent>

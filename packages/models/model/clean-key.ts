@@ -26,7 +26,7 @@ export const PARAMETER_INFO_PATTERNS = Object.freeze({
   MODALITY_DESCRIPTOR,
 });
 
-export function isDateToken(token: string): boolean {
+export function isDate(token: string): boolean {
   if (!DATE_CANDIDATE.test(token)) return false;
 
   if (token.length === 4) {
@@ -51,15 +51,15 @@ export function isDateToken(token: string): boolean {
   return month >= 1 && month <= 12;
 }
 
-function isBehaviorDescriptor(token: string): boolean {
+function isDescriptor(token: string): boolean {
   return BEHAVIOR_DESCRIPTOR.test(token);
 }
 
-function isPairableMoESuffix(token: string): boolean {
+function moeSuffix(token: string): boolean {
   return ACTIVE_PARAMS_SUFFIX.test(token) || EXPERT_COUNT_SUFFIX.test(token);
 }
 
-export function stripParamInfoKey(
+export function stripParams(
   modelKey: string | null | undefined,
   options: { keepDescriptors?: boolean; keepDates?: boolean } = {},
 ): string {
@@ -73,12 +73,12 @@ export function stripParamInfoKey(
     const t = tokens[end - 1];
     if (t === undefined) break;
     if (
-      isPairableMoESuffix(t) ||
+      moeSuffix(t) ||
       SIZE_BM.test(t) ||
       SIZE_T.test(t) ||
       QUANTIZATION.test(t) ||
-      (!keepDates && isDateToken(t)) ||
-      isBehaviorDescriptor(t)
+      (!keepDates && isDate(t)) ||
+      isDescriptor(t)
     ) {
       end -= 1;
       continue;
@@ -91,7 +91,7 @@ for (let i = 0; i < end; i += 1) {
   const t = tokens[i];
   if (!t) continue;
 
-  if (isPairableMoESuffix(t)) {
+  if (moeSuffix(t)) {
     const prev = kept.length > 0 ? kept[kept.length - 1] : null;
     if (prev && (SIZE_BM.test(prev) || SIZE_T.test(prev))) {
       kept.pop();
@@ -103,7 +103,7 @@ for (let i = 0; i < end; i += 1) {
     SIZE_BM.test(t) ||
     SIZE_T.test(t) ||
     QUANTIZATION.test(t) ||
-    isBehaviorDescriptor(t)
+    isDescriptor(t)
   ) {
     continue;
   }
@@ -131,7 +131,7 @@ export function extractDescriptors(modelKey: string | null | undefined): ModelDe
   return out;
 }
 
-export function aliasesFromUpstream(upstreamNames?: string[] | null): string[] {
+export function aliasesOf(upstreamNames?: string[] | null): string[] {
   const aliases = new Set<string>();
   if (!upstreamNames) return [];
 
@@ -146,7 +146,7 @@ export function aliasesFromUpstream(upstreamNames?: string[] | null): string[] {
   return [...aliases];
 }
 
-export function largestSizeValue(modelKey: string): number {
+export function largestSize(modelKey: string): number {
   if (typeof modelKey !== "string" || modelKey.length === 0) return 0;
   let largest = 0;
   const matches = modelKey.match(/[0-9]+(?:\.[0-9]+)?[bm]/gi) || [];

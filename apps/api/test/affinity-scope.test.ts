@@ -4,7 +4,7 @@ import {
   AccountAffinity,
   OWN_ACCOUNT_SCOPE,
   SHARED_ACCOUNT_SCOPE,
-  accountAffinityKey,
+  affinityKey,
   type OpendumRedis,
 } from "@opendum/core/redis";
 import type { ProviderAccount, ProviderRegistry } from "@opendum/providers";
@@ -51,14 +51,14 @@ describe("AccountAffinity scopes", () => {
 
     expect(await Effect.runPromise(affinity.lookup("user-1", OWN_ACCOUNT_SCOPE))).toBe("own-1");
     expect(await Effect.runPromise(affinity.lookup("user-1", SHARED_ACCOUNT_SCOPE))).toBe("shared-1");
-    expect(store.has(accountAffinityKey("user-1", SHARED_ACCOUNT_SCOPE))).toBe(true);
-    expect(accountAffinityKey("user-1", SHARED_ACCOUNT_SCOPE)).not.toBe(
-      accountAffinityKey("user-1", OWN_ACCOUNT_SCOPE)
+    expect(store.has(affinityKey("user-1", SHARED_ACCOUNT_SCOPE))).toBe(true);
+    expect(affinityKey("user-1", SHARED_ACCOUNT_SCOPE)).not.toBe(
+      affinityKey("user-1", OWN_ACCOUNT_SCOPE)
     );
   });
 
   it("keeps the legacy key for the own scope", () => {
-    expect(accountAffinityKey("user-1", OWN_ACCOUNT_SCOPE)).toBe("opendum:account-affinity:user-1");
+    expect(affinityKey("user-1", OWN_ACCOUNT_SCOPE)).toBe("opendum:account-affinity:user-1");
   });
 
   it("degrades to an empty affinity when redis fails", async () => {
@@ -72,8 +72,8 @@ describe("AccountAffinity scopes", () => {
 describe("Rotation shared affinity", () => {
   function rotation(affinity: AccountAffinity, accounts: ProviderAccount[], health: Partial<Health>): Rotation {
     const repositories = fakes();
-    repositories.accounts.listSharedEligibleAccounts = mock(() => Effect.succeed(accounts as never));
-    repositories.accounts.listDisabledAccountIDs = mock(() => Effect.succeed([]));
+    repositories.accounts.sharedAccounts = mock(() => Effect.succeed(accounts as never));
+    repositories.accounts.disabledIds = mock(() => Effect.succeed([]));
     return new Rotation({
       accounts: repositories.accounts,
       modelHealth: repositories.health,

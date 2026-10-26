@@ -1,4 +1,4 @@
-import { randomId } from "../core/helpers.js";
+import { Ids } from "../core/helpers.js";
 
 type Json = Record<string, unknown>;
 
@@ -76,7 +76,7 @@ export class Collector {
   toCompletion(): Json {
     const normalize = this.options.normalizeArgs ?? identity;
     const toolCalls = Array.from(this.toolCalls, ([key, call]) => ({
-      id: call.id || (this.options.toolIdFallback ?? defaultToolId)(key),
+      id: call.id || (this.options.toolIdFallback ?? toolId)(key),
       type: call.type || "function",
       function: { name: call.name, arguments: normalize(call.arguments) },
     }));
@@ -91,7 +91,7 @@ export class Collector {
       if (finishReason === "stop" || this.options.forceFinish) finishReason = "tool_calls";
     }
     return {
-      id: this.options.id ?? randomId("chatcmpl"),
+      id: this.options.id ?? Ids.random("chatcmpl"),
       object: "chat.completion",
       created: Math.floor(Date.now() / 1000),
       model: this.options.model,
@@ -105,6 +105,6 @@ function identity(value: string): string {
   return value;
 }
 
-function defaultToolId(key: number | string): string {
+function toolId(key: number | string): string {
   return `call_${key}`;
 }

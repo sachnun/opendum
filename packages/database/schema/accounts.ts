@@ -54,7 +54,7 @@ export const providerAccount = pgTable(
     consecutiveErrors: integer("consecutiveErrors").notNull().default(0),
     lastErrorAt: timestamp("lastErrorAt"),
     lastErrorCode: integer("lastErrorCode"),
-    lastRecoveredByRotationAt: timestamp("lastRecoveredByRotationAt"),
+    lastRecoveredAt: timestamp("lastRecoveredByRotationAt"),
 
     status: text("status").notNull().default("active"),
     statusChangedAt: timestamp("statusChangedAt"),
@@ -83,7 +83,7 @@ export const providerAccount = pgTable(
   ],
 );
 
-export const providerAccountModelHealth = pgTable(
+export const accountModelHealth = pgTable(
   "provider_account_model_health",
   {
     id: text("id")
@@ -120,7 +120,7 @@ export const providerAccountModelHealth = pgTable(
   ],
 );
 
-export const providerAccountDisabledModel = pgTable(
+export const accountDisabledModel = pgTable(
   "provider_account_disabled_model",
   {
     id: text("id")

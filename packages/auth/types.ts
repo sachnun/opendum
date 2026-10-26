@@ -55,7 +55,7 @@ export type AccountModelAvailability = {
   sharedAccountTiersByProvider: Map<string, string[]>;
 };
 
-export function emptyAuthResult(error = ""): AuthResult {
+export function emptyResult(error = ""): AuthResult {
   return {
     valid: false,
     userId: "",

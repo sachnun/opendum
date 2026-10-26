@@ -1,7 +1,7 @@
 import { Effect } from "effect";
 import { tryAsync } from "../best-effort.js";
-import { assertPublicHost } from "./ssrf.js";
-import { createGuardedFetch, type Fetch, type FetchHandle, type GuardedFetchOptions } from "./guard.js";
+import { assertPublic } from "./ssrf.js";
+import { guardedFetch, type Fetch, type FetchHandle, type GuardedFetchOptions } from "./guard.js";
 
 export const MAX_REDIRECTS = 10;
 
@@ -17,7 +17,7 @@ export class Redirects {
     let currentInit = init;
     for (let hop = 0; hop <= this.maxRedirects; hop += 1) {
       const parsed = new URL(current);
-      assertPublicHost(parsed.hostname);
+      assertPublic(parsed.hostname);
       const response = await baseFetch(current, { ...currentInit, redirect: "manual" });
       if (response.status < 300 || response.status >= 400) return response;
       const location = response.headers.get("location");
@@ -42,7 +42,7 @@ export class Fetcher {
 
   constructor(options: GuardedFetchOptions & { policy?: Redirects } = {}) {
     this.policy = options.policy ?? new Redirects();
-    this.handle = createGuardedFetch(options);
+    this.handle = guardedFetch(options);
   }
 
   fetch(url: string, init?: RequestInit): Promise<Response> {

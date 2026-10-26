@@ -1,26 +1,20 @@
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
-import { stringValue } from "../core/helpers.js";
+import { Value, Responses } from "../core/helpers.js";
 import {
-  buildResponsesApiPayload,
-  responsesJsonToChatCompletion,
-  responsesSseToChatStream,
+  buildPayload,
+  sseStream,
   type ResponsesNativeProvider,
 } from "../transform/responses.js";
-import { convertImageURLsToBase64 } from "../core/images.js";
-import { providerConfigBool } from "../core/model-config.js";
-import {
-  jsonResponse,
-  sseResponse,
-} from "../core/helpers.js";
+import { ChatImageInliner } from "../core/images.js";
+import { fromMessages } from "../transform/anthropic.js";
+import { ModelConfig } from "../core/model-config.js";
 import type { FallbackState } from "../core/fallback.js";
 import {
-  postExecuteWithFallback,
-  postJSON,
-  postJSONWithEgressFallback,
-  postJSONWithHeaders,
-  postJSONWithoutAuth,
-  transportFailure,
+  EgressJSONPoster,
+  FallbackPoster,
+  JSONPoster,
+  RequestFailure,
   type FetchLike,
   type Logger,
   type ProviderTransportFailure,
@@ -65,7 +59,7 @@ export const SUPPORTED_HYPER = new Set([
 
 type Json = Record<string, unknown>;
 
-export type OpenAICompatibleOptions = {
+export type CompatOptions = {
   name: string;
   baseUrl: string;
   fallbackBaseUrl?: string;
@@ -81,7 +75,7 @@ export type OpenAICompatibleOptions = {
   logger?: Logger;
 };
 
-export class OpenAICompatibleProvider implements Provider, ResponsesNativeProvider {
+export class CompatProvider implements Provider, ResponsesNativeProvider {
   readonly name: string;
   private readonly baseUrl: string;
   private readonly fallbackBaseUrl: string;
@@ -96,7 +90,7 @@ export class OpenAICompatibleProvider implements Provider, ResponsesNativeProvid
   private readonly isAuthless: ((model: string) => boolean) | undefined;
   private readonly logger: Logger | undefined;
 
-  constructor(options: OpenAICompatibleOptions) {
+  constructor(options: CompatOptions) {
     this.name = options.name;
     this.baseUrl = options.baseUrl;
     this.fallbackBaseUrl = options.fallbackBaseUrl ?? "";
@@ -114,26 +108,26 @@ export class OpenAICompatibleProvider implements Provider, ResponsesNativeProvid
 
   makeRequest(request: ProviderRequest): Effect.Effect<Response, ProviderFailure> {
     const body = request.body;
-    const model = this.normalizeModel(stringValue(body.model));
+    const model = this.normalizeModel(Value.string(body.model));
     const modelName = this.resolveModel(model);
-    const onStart = request.onUpstreamResponseStart;
+    const onStart = request.onResponseStart;
     const direct = this.transport.direct;
 
     if (this.requiresResponsesAPI(model)) {
       return Effect.gen({ self: this }, function* () {
         const payload = yield* Effect.tryPromise({
-          try: () => buildResponsesApiPayload(body, modelName, request.stream, direct),
-          catch: (cause) => transportFailure(this.name, cause),
+          try: () => buildPayload(body, modelName, request.stream, direct),
+          catch: (cause) => RequestFailure.transport(this.name, cause),
         });
         const resp = yield* this.post("/responses", request, payload, model, this.extraRequestHeaders(request.account));
         if (resp.status < 200 || resp.status >= 300) return resp;
         if (Array.isArray(body._responsesInput)) return resp;
         if (request.stream && resp.body) {
-          return sseResponse(responsesSseToChatStream(resp.body, modelName));
+          return Responses.sse(sseStream(resp.body, modelName));
         }
         if (!resp.body) return resp;
         const data = (yield* Effect.promise(() => resp.json())) as Json;
-        return jsonResponse(200, responsesJsonToChatCompletion(data, modelName));
+        return Responses.json(200, fromMessages(data, modelName));
       });
     }
 
@@ -145,8 +139,8 @@ export class OpenAICompatibleProvider implements Provider, ResponsesNativeProvid
         const messages = payload.messages;
         if (Array.isArray(messages)) {
           payload.messages = yield* Effect.tryPromise({
-            try: () => convertImageURLsToBase64(direct, messages),
-            catch: (cause) => transportFailure(this.name, cause),
+            try: () => new ChatImageInliner(direct).run(messages),
+            catch: (cause) => RequestFailure.transport(this.name, cause),
           });
         }
       }
@@ -173,40 +167,46 @@ export class OpenAICompatibleProvider implements Provider, ResponsesNativeProvid
   ): Effect.Effect<Response, ProviderFailure> {
     const credentials = request.credentials;
     const authless = credentials.trim() === "" && this.authlessModel(model);
-    const onStart = request.onUpstreamResponseStart;
+    const onStart = request.onResponseStart;
     const name = this.name;
-    const execute = (fetchFn: FetchLike, url: string): Effect.Effect<Response, ProviderTransportFailure> => {
-      if (authless) return postJSONWithoutAuth(name, fetchFn, url, payload, request.stream, onStart);
-      if (extraHeaders && Object.keys(extraHeaders).length > 0) {
-        return postJSONWithHeaders(name, fetchFn, url, credentials, payload, request.stream, extraHeaders, onStart);
-      }
-      return postJSON(name, fetchFn, url, credentials, payload, request.stream, onStart);
+    const options = {
+      provider: name,
+      url: "",
+      bearer: credentials,
+      payload,
+      stream: request.stream,
+      headers: extraHeaders,
+      onStart,
     };
+    const execute = (fetchFn: FetchLike, url: string): Effect.Effect<Response, ProviderTransportFailure> =>
+      authless
+        ? JSONPoster.anonymous({ ...options, fetchFn, url })
+        : JSONPoster.withAuth({ ...options, fetchFn, url });
 
     const primary = this.baseUrl + path;
     if (this.transport.egressReady()) {
-      return postJSONWithEgressFallback(
-        this.transport,
-        this.fallback,
-        name,
-        primary,
-        credentials,
+      return EgressJSONPoster.send({
+        transport: this.transport,
+        state: this.fallback,
+        provider: name,
+        url: primary,
+        bearer: credentials,
         payload,
-        request.stream,
-        extraHeaders,
+        stream: request.stream,
+        headers: extraHeaders,
         onStart,
-        this.logger
-      );
+        logger: this.logger,
+      });
     }
     const fallbackUrl = this.fallbackBaseUrl ? this.fallbackBaseUrl + path : "";
-    return postExecuteWithFallback(
-      this.transport.direct,
-      this.fallback,
-      name,
+    return new FallbackPoster(this.fallback).send({
+      provider: name,
+      fetchFn: this.transport.direct,
+      state: this.fallback,
       primary,
-      fallbackUrl,
-      execute
-    );
+      fallback: fallbackUrl,
+      execute,
+    });
   }
 
   private buildPayload(body: Json, model: string, modelName: string, stream: boolean): Json {
@@ -250,7 +250,7 @@ export class OpenAICompatibleProvider implements Provider, ResponsesNativeProvid
 
   private flagBool(model: string, key: string): boolean {
     if (this.modelFlags) return this.modelFlags(model)[key] === true;
-    return this.registry ? providerConfigBool(this.registry, model, this.name, key) : false;
+    return this.registry ? new ModelConfig(this.registry, model, this.name).bool(key) : false;
   }
 
   private convertImages(model: string): boolean {

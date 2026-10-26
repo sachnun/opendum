@@ -6,7 +6,7 @@ const { isAuditMode } = useAudit();
 const invalidation = useInvalidate();
 const config = useRuntimeConfig();
 
-type ApiKeyListItem = Awaited<ReturnType<typeof api.apiKeys.list>>[number];
+type KeyListItem = Awaited<ReturnType<typeof api.apiKeys.list>>[number];
 type ApiKeyOptions = Awaited<ReturnType<typeof api.apiKeys.options>>;
 type AccessMode = "all" | "whitelist" | "blacklist";
 type RateLimitRule = ApiKeyOptions["rateLimitsByKeyId"][string][number];
@@ -16,10 +16,10 @@ const { data, error, refresh } = useAsyncData(dataKeys.apiKeys, async () => {
   return { apiKeys, options };
 });
 
-const apiKeys = computed<ApiKeyListItem[]>(() => data.value?.apiKeys ?? []);
+const apiKeys = computed<KeyListItem[]>(() => data.value?.apiKeys ?? []);
 const options = computed<ApiKeyOptions | null>(() => data.value?.options ?? null);
-const activeApiKeyCount = computed(() => apiKeys.value.filter((apiKey) => getApiKeyStatus(apiKey).label === "Active").length);
-const togglingApiKeyIds = ref(new Set<string>());
+const activeCount = computed(() => apiKeys.value.filter((apiKey) => keyStatus(apiKey).label === "Active").length);
+const togglingIds = ref(new Set<string>());
 const toggleErrors = ref<Record<string, string>>({});
 const roamingUpdatingIds = ref(new Set<string>());
 const roamingErrors = ref<Record<string, string>>({});
@@ -27,20 +27,20 @@ const proxyBaseUrl = computed(() => {
   const apiUrl = String(config.public.apiUrl || "").replace(/\/$/, "");
   return `${apiUrl}/v1`;
 });
-const copiedProxyBaseUrl = ref(false);
-let copyProxyBaseUrlTimeout: ReturnType<typeof setTimeout> | null = null;
+const copiedProxy = ref(false);
+let copyTimer: ReturnType<typeof setTimeout> | null = null;
 
-async function copyProxyBaseUrl() {
+async function copyProxy() {
   try {
     await navigator.clipboard.writeText(proxyBaseUrl.value);
-    copiedProxyBaseUrl.value = true;
+    copiedProxy.value = true;
 
-    if (copyProxyBaseUrlTimeout) {
-      clearTimeout(copyProxyBaseUrlTimeout);
+    if (copyTimer) {
+      clearTimeout(copyTimer);
     }
 
-    copyProxyBaseUrlTimeout = setTimeout(() => {
-      copiedProxyBaseUrl.value = false;
+    copyTimer = setTimeout(() => {
+      copiedProxy.value = false;
     }, 1800);
   } catch {
     console.error("Failed to copy proxy base URL");
@@ -48,12 +48,12 @@ async function copyProxyBaseUrl() {
 }
 
 onBeforeUnmount(() => {
-  if (copyProxyBaseUrlTimeout) {
-    clearTimeout(copyProxyBaseUrlTimeout);
+  if (copyTimer) {
+    clearTimeout(copyTimer);
   }
 });
 
-function getApiKeyStatus(apiKey: ApiKeyListItem) {
+function keyStatus(apiKey: KeyListItem) {
   const now = new Date();
 
   if (apiKey.expiresAt && new Date(apiKey.expiresAt) < now) {
@@ -67,19 +67,19 @@ function getApiKeyStatus(apiKey: ApiKeyListItem) {
   return { label: "Active", variant: "default" as const };
 }
 
-function isApiKeyEffectivelyActive(apiKey: ApiKeyListItem) {
-  return getApiKeyStatus(apiKey).label === "Active";
+function keyActive(apiKey: KeyListItem) {
+  return keyStatus(apiKey).label === "Active";
 }
 
-function normalizeModelAccessMode(mode: string): AccessMode {
+function modelMode(mode: string): AccessMode {
   return mode === "whitelist" || mode === "blacklist" ? mode : "all";
 }
 
-function normalizeAccountAccessMode(mode: string): AccessMode {
+function accountMode(mode: string): AccessMode {
   return mode === "whitelist" || mode === "blacklist" ? mode : "all";
 }
 
-function formatRelativeTime(value: string | Date) {
+function relativeTime(value: string | Date) {
   const date = new Date(value);
   const diffMs = Date.now() - date.getTime();
   const diffMinutes = Math.floor(diffMs / 60_000);
@@ -96,25 +96,25 @@ function formatRelativeTime(value: string | Date) {
   return date.toLocaleDateString();
 }
 
-function keyRateLimits(apiKeyId: string) {
+function limitsOf(apiKeyId: string) {
   return options.value?.rateLimitsByKeyId[apiKeyId] ?? [];
 }
 
-function accessModeBadge(mode: string) {
+function accessBadge(mode: string) {
   const normalizedMode = mode === "whitelist" || mode === "blacklist" ? mode : "all";
   return normalizedMode === "all" ? undefined : normalizedMode;
 }
 
-function rateLimitBadge(apiKeyId: string) {
-  const count = keyRateLimits(apiKeyId).length;
+function limitBadge(apiKeyId: string) {
+  const count = limitsOf(apiKeyId).length;
   return count > 0 ? `${count} limit${count === 1 ? "" : "s"}` : undefined;
 }
 
-function formatPointAmount(value: number) {
+function formatPoints(value: number) {
   return value.toLocaleString("en-US");
 }
 
-function updateApiKeyState(apiKeyId: string, value: { isActive: boolean; expiresAt: string | Date | null }) {
+function applyState(apiKeyId: string, value: { isActive: boolean; expiresAt: string | Date | null }) {
   if (!data.value) return;
   data.value = {
     ...data.value,
@@ -122,7 +122,7 @@ function updateApiKeyState(apiKeyId: string, value: { isActive: boolean; expires
   };
 }
 
-function updateApiKeyPatch(apiKeyId: string, value: Partial<ApiKeyListItem>) {
+function applyPatch(apiKeyId: string, value: Partial<KeyListItem>) {
   if (!data.value) return;
   data.value = {
     ...data.value,
@@ -131,7 +131,7 @@ function updateApiKeyPatch(apiKeyId: string, value: Partial<ApiKeyListItem>) {
   invalidation.patchApiKey(apiKeyId, value);
 }
 
-function deleteApiKey(apiKeyId: string) {
+function removeKey(apiKeyId: string) {
   if (!data.value) return;
   const { [apiKeyId]: _removedRateLimits, ...rateLimitsByKeyId } = data.value.options.rateLimitsByKeyId;
   data.value = {
@@ -145,32 +145,32 @@ function deleteApiKey(apiKeyId: string) {
   invalidation.removeApiKey(apiKeyId);
 }
 
-async function toggleApiKey(apiKey: ApiKeyListItem) {
+async function toggleKey(apiKey: KeyListItem) {
   if (isAuditMode.value) return;
-  if (togglingApiKeyIds.value.has(apiKey.id)) return;
+  if (togglingIds.value.has(apiKey.id)) return;
 
-  const nextTogglingIds = new Set(togglingApiKeyIds.value);
+  const nextTogglingIds = new Set(togglingIds.value);
   nextTogglingIds.add(apiKey.id);
-  togglingApiKeyIds.value = nextTogglingIds;
+  togglingIds.value = nextTogglingIds;
   toggleErrors.value = { ...toggleErrors.value, [apiKey.id]: "" };
 
   try {
     const result = await api.apiKeys.toggle({ id: apiKey.id });
     if (!result.success) throw new Error(result.error);
-    updateApiKeyState(apiKey.id, { isActive: result.data.isActive, expiresAt: result.data.expiresAt });
+    applyState(apiKey.id, { isActive: result.data.isActive, expiresAt: result.data.expiresAt });
   } catch (error) {
     toggleErrors.value = {
       ...toggleErrors.value,
       [apiKey.id]: error instanceof Error ? error.message : "Failed to toggle API key",
     };
   } finally {
-    const nextTogglingIds = new Set(togglingApiKeyIds.value);
+    const nextTogglingIds = new Set(togglingIds.value);
     nextTogglingIds.delete(apiKey.id);
-    togglingApiKeyIds.value = nextTogglingIds;
+    togglingIds.value = nextTogglingIds;
   }
 }
 
-async function toggleRoaming(apiKey: ApiKeyListItem, enabled: boolean) {
+async function toggleRoaming(apiKey: KeyListItem, enabled: boolean) {
   if (isAuditMode.value) return;
   if (roamingUpdatingIds.value.has(apiKey.id)) return;
 
@@ -182,7 +182,7 @@ async function toggleRoaming(apiKey: ApiKeyListItem, enabled: boolean) {
   try {
     const result = await api.apiKeys.updateRoaming({ id: apiKey.id, enabled });
     if (!result.success) throw new Error(result.error);
-    updateApiKeyPatch(apiKey.id, { roamingEnabled: result.data.roamingEnabled });
+    applyPatch(apiKey.id, { roamingEnabled: result.data.roamingEnabled });
   } catch (error) {
     roamingErrors.value = {
       ...roamingErrors.value,
@@ -195,7 +195,7 @@ async function toggleRoaming(apiKey: ApiKeyListItem, enabled: boolean) {
   }
 }
 
-function updateApiKeyModelAccess(apiKeyId: string, value: { mode: AccessMode; models: string[] }) {
+function updateModels(apiKeyId: string, value: { mode: AccessMode; models: string[] }) {
   if (!data.value) return;
   data.value = {
     ...data.value,
@@ -203,7 +203,7 @@ function updateApiKeyModelAccess(apiKeyId: string, value: { mode: AccessMode; mo
   };
 }
 
-function updateApiKeyAccountAccess(apiKeyId: string, value: { mode: AccessMode; accounts: string[] }) {
+function updateAccess(apiKeyId: string, value: { mode: AccessMode; accounts: string[] }) {
   if (!data.value) return;
   data.value = {
     ...data.value,
@@ -211,7 +211,7 @@ function updateApiKeyAccountAccess(apiKeyId: string, value: { mode: AccessMode; 
   };
 }
 
-function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
+function saveLimits(apiKeyId: string, rules: RateLimitRule[]) {
   if (!data.value) return;
   data.value = {
     ...data.value,
@@ -232,7 +232,7 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
       <div class="flex min-h-9 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 class="inline-flex min-h-9 items-center gap-2 text-xl font-semibold">
           API Keys
-          <UiBadge v-if="apiKeys.length > 0" variant="outline" class="text-xs">{{ activeApiKeyCount }}/{{ apiKeys.length }}</UiBadge>
+          <UiBadge v-if="apiKeys.length > 0" variant="outline" class="text-xs">{{ activeCount }}/{{ apiKeys.length }}</UiBadge>
         </h2>
         <div class="flex w-full items-center sm:w-auto">
           <CreateApiKeyButton :readonly="isAuditMode" trigger-class="flex-1 sm:w-auto sm:flex-none" @created="refresh" />
@@ -248,9 +248,9 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
           <p class="text-sm font-medium">Proxy Base URL</p>
           <code class="block break-all text-sm text-muted-foreground">{{ proxyBaseUrl }}</code>
         </div>
-        <UiButton type="button" variant="outline" class="shrink-0" @click="copyProxyBaseUrl">
-          <UiIcon :name="copiedProxyBaseUrl ? 'i-lucide-check' : 'i-lucide-copy'" class="size-4" />
-          {{ copiedProxyBaseUrl ? 'Copied' : 'Copy' }}
+        <UiButton type="button" variant="outline" class="shrink-0" @click="copyProxy">
+          <UiIcon :name="copiedProxy ? 'i-lucide-check' : 'i-lucide-copy'" class="size-4" />
+          {{ copiedProxy ? 'Copied' : 'Copy' }}
         </UiButton>
       </UiCardContent>
     </UiCard>
@@ -261,20 +261,20 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
           v-for="apiKey in apiKeys"
           :key="apiKey.id"
           class="flex h-full flex-col bg-transparent transition-colors"
-          :class="getApiKeyStatus(apiKey).label !== 'Active' ? 'opacity-65' : ''"
+          :class="keyStatus(apiKey).label !== 'Active' ? 'opacity-65' : ''"
         >
           <UiCardHeader class="pb-1">
             <div class="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
               <div class="min-w-0 overflow-hidden">
-                <EditableApiKeyName :id="apiKey.id" :name="apiKey.name" :key-preview="apiKey.keyPreview" :show-edit-button="false" :readonly="isAuditMode" @updated="updateApiKeyPatch(apiKey.id, $event)" />
+                <EditableApiKeyName :id="apiKey.id" :name="apiKey.name" :key-preview="apiKey.keyPreview" :show-edit-button="false" :readonly="isAuditMode" @updated="applyPatch(apiKey.id, $event)" />
               </div>
               <div class="flex h-7 shrink-0 items-center justify-end gap-1.5">
-                <span class="text-[11px] leading-none text-muted-foreground">{{ isApiKeyEffectivelyActive(apiKey) ? 'On' : 'Off' }}</span>
+                <span class="text-[11px] leading-none text-muted-foreground">{{ keyActive(apiKey) ? 'On' : 'Off' }}</span>
                 <UiSwitch
-                  :model-value="isApiKeyEffectivelyActive(apiKey)"
-                  :disabled="togglingApiKeyIds.has(apiKey.id) || isAuditMode"
-                  :title="isApiKeyEffectivelyActive(apiKey) ? 'Disable' : 'Enable'"
-                  @update:model-value="toggleApiKey(apiKey)"
+                  :model-value="keyActive(apiKey)"
+                  :disabled="togglingIds.has(apiKey.id) || isAuditMode"
+                  :title="keyActive(apiKey) ? 'Disable' : 'Enable'"
+                  @update:model-value="toggleKey(apiKey)"
                 />
               </div>
             </div>
@@ -283,18 +283,18 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
 
           <UiCardContent class="flex flex-1 flex-col pt-0">
             <div class="flex-1 space-y-3 text-sm">
-              <ApiKeyActions :api-key="apiKey" :readonly="isAuditMode" @renamed="updateApiKeyPatch(apiKey.id, $event)" @deleted="deleteApiKey" />
+              <ApiKeyActions :api-key="apiKey" :readonly="isAuditMode" @renamed="applyPatch(apiKey.id, $event)" @deleted="removeKey" />
 
               <div class="space-y-2 pt-2">
                 <div class="flex items-center justify-between gap-4">
                   <span class="text-muted-foreground">Expiration</span>
                   <div class="text-right">
-                    <ApiKeyExpiration :api-key-id="apiKey.id" :initial-expires-at="apiKey.expiresAt" :readonly="isAuditMode" @updated="updateApiKeyPatch(apiKey.id, $event)" />
+                    <ApiKeyExpiration :api-key-id="apiKey.id" :initial-expires-at="apiKey.expiresAt" :readonly="isAuditMode" @updated="applyPatch(apiKey.id, $event)" />
                   </div>
                 </div>
                 <div class="flex justify-between gap-4">
                   <span class="text-muted-foreground">Last used</span>
-                  <span class="text-right font-medium">{{ apiKey.lastUsedAt ? formatRelativeTime(apiKey.lastUsedAt) : '-' }}</span>
+                  <span class="text-right font-medium">{{ apiKey.lastUsedAt ? relativeTime(apiKey.lastUsedAt) : '-' }}</span>
                 </div>
                 <div class="flex items-center justify-between gap-4">
                   <span class="flex items-center gap-1.5 text-muted-foreground">
@@ -335,7 +335,7 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
                   <div class="flex items-center gap-1.5">
                     <span v-if="apiKey.roamingEnabled" class="flex items-center gap-1 text-[11px] leading-none text-foreground">
                       <UiIcon name="i-lucide-coins" class="size-3" />
-                      <span class="inline-flex items-center leading-none tabular-nums">{{ formatPointAmount(apiKey.roamingPointsUsed) }}</span>
+                      <span class="inline-flex items-center leading-none tabular-nums">{{ formatPoints(apiKey.roamingPointsUsed) }}</span>
                     </span>
                     <UiSwitch
                       :model-value="apiKey.roamingEnabled"
@@ -350,36 +350,36 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
               </div>
 
               <div class="grid gap-2.5 border-t border-border/60 pt-3">
-                <ApiKeyAccessSection title="Model Access" :badge="accessModeBadge(apiKey.modelAccessMode)">
+                <ApiKeyAccessSection title="Model Access" :badge="accessBadge(apiKey.modelAccessMode)">
                   <ApiKeyModelAccess
                     :api-key-id="apiKey.id"
                     :available-models="options?.modelAccessModels ?? options?.availableModels ?? []"
-                    :initial-mode="normalizeModelAccessMode(apiKey.modelAccessMode)"
+                    :initial-mode="modelMode(apiKey.modelAccessMode)"
                     :initial-models="apiKey.modelAccessList"
                     :readonly="isAuditMode"
-                    @updated="updateApiKeyModelAccess(apiKey.id, $event)"
+                    @updated="updateModels(apiKey.id, $event)"
                   />
                 </ApiKeyAccessSection>
 
-                <ApiKeyAccessSection title="Account Access" :badge="accessModeBadge(apiKey.accountAccessMode)">
+                <ApiKeyAccessSection title="Account Access" :badge="accessBadge(apiKey.accountAccessMode)">
                   <ApiKeyAccountAccess
                     :api-key-id="apiKey.id"
                     :available-accounts="options?.providerAccounts ?? []"
-                    :initial-mode="normalizeAccountAccessMode(apiKey.accountAccessMode)"
+                    :initial-mode="accountMode(apiKey.accountAccessMode)"
                     :initial-accounts="apiKey.accountAccessList"
                     :readonly="isAuditMode"
-                    @updated="updateApiKeyAccountAccess(apiKey.id, $event)"
+                    @updated="updateAccess(apiKey.id, $event)"
                   />
                 </ApiKeyAccessSection>
 
-                <ApiKeyAccessSection title="Rate Limits" :badge="rateLimitBadge(apiKey.id)">
+                <ApiKeyAccessSection title="Rate Limits" :badge="limitBadge(apiKey.id)">
                   <ApiKeyRateLimit
                     :api-key-id="apiKey.id"
                     :available-models="options?.availableModels ?? []"
                     :available-families="options?.availableFamilies ?? []"
-                    :initial-rules="keyRateLimits(apiKey.id)"
+                    :initial-rules="limitsOf(apiKey.id)"
                     :readonly="isAuditMode"
-                    @updated="updateApiKeyRateLimits(apiKey.id, $event)"
+                    @updated="saveLimits(apiKey.id, $event)"
                   />
                 </ApiKeyAccessSection>
               </div>

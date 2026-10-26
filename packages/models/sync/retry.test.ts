@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { Effect, Exit } from "effect";
 
-import { fetchDecoded, fetchJson, retryTransient, runOrThrow } from "./http.ts";
+import { fetchDecoded, fetchJson, retryTransient, orThrow } from "./http.ts";
 import { ModelFetchFailure } from "../errors.ts";
 
 type Stub = (url: string, init?: RequestInit) => Promise<Response>;
@@ -23,7 +23,7 @@ describe("retrying fetch helpers", () => {
         if (calls < 3) throw new Error("network down");
         return new Response(JSON.stringify({ ok: true }), { status: 200 });
       },
-      () => runOrThrow(fetchJson("https://example.test/data", { attempts: 3 })),
+      () => orThrow(fetchJson("https://example.test/data", { attempts: 3 })),
     );
     expect(calls).toBe(3);
     expect(payload).toEqual({ ok: true });
@@ -67,7 +67,7 @@ describe("retrying fetch helpers", () => {
     const value = await withFetch(
       async () => new Response("<p>hello</p>", { status: 200 }),
       () =>
-        runOrThrow(
+        orThrow(
           fetchDecoded("https://example.test/page", { attempts: 1 }, (response) => response.text()),
         ),
     );

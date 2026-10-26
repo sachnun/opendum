@@ -20,7 +20,7 @@ export type RouteError = {
   param?: string | null;
   code?: string | null;
   retryAfter?: string | null;
-  retryAfterMs?: number | null;
+  afterMs?: number | null;
   accountId?: string;
 };
 
@@ -38,7 +38,7 @@ export type ResponseContext = {
   accountId: string;
   provider: string;
   requestStartMs: number;
-  upstreamFirstResponseMs: number;
+  firstResponseMs: number;
   startMs: number;
   userId: string;
   apiKeyId: string;
@@ -56,7 +56,7 @@ export type Failure = {
   failedAt: Date;
 };
 
-export function isRouteError(value: unknown): value is RouteError {
+export function routeFailure(value: unknown): value is RouteError {
   return (
     value !== null &&
     typeof value === "object" &&
@@ -71,7 +71,7 @@ export type AttemptResult = {
   account: ProviderAccount;
   response: Response;
   requestStartMs: number;
-  upstreamFirstResponseMs: number;
+  firstResponseMs: number;
   rotationFailures: Failure[];
   roaming: PointReservation | null;
 };
@@ -96,7 +96,7 @@ export type SuccessRecord = {
   durationMs: number;
   stream: boolean;
   requestStartMs: number;
-  upstreamFirstResponseMs: number;
+  firstResponseMs: number;
 };
 
 export type StreamRecorder = {

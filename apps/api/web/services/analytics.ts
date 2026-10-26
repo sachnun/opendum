@@ -70,7 +70,7 @@ const GRANULARITY_ROUNDERS: Record<Granularity, (date: Date) => string | undefin
   },
 };
 
-function resolveFilterConfig(
+function filterConfig(
   filter: AnalyticsFilter
 ):
   | { success: true; data: { startDate: Date; endDate: Date; config: PeriodConfig } }
@@ -94,43 +94,43 @@ function resolveFilterConfig(
   return { success: true, data: { startDate, endDate, config } };
 }
 
-function formatTimeSlot(date: Date, granularity: Granularity): string {
+function slotLabel(date: Date, granularity: Granularity): string {
   const d = new Date(date);
   return GRANULARITY_ROUNDERS[granularity](d) || d.toISOString();
 }
 
-function generateTimeSlots(startDate: Date, endDate: Date, config: PeriodConfig): string[] {
+function timeSlots(startDate: Date, endDate: Date, config: PeriodConfig): string[] {
   const slots: string[] = [];
   const current = new Date(startDate);
   GRANULARITY_ROUNDERS[config.granularity](current);
   while (current <= endDate) {
-    slots.push(formatTimeSlot(current, config.granularity));
+    slots.push(slotLabel(current, config.granularity));
     current.setTime(current.getTime() + config.granularityMs);
   }
   return slots;
 }
 
-function getGranularityBucketSeconds(granularity: Granularity): number {
+function bucketSeconds(granularity: Granularity): number {
   return GRANULARITY_BUCKET_SECONDS[granularity];
 }
 
-function toRoundedValue(value: number | string | null | undefined): number {
+function roundValue(value: number | string | null | undefined): number {
   const parsed = typeof value === "number" ? value : typeof value === "string" ? Number(value) : 0;
   return Number.isFinite(parsed) ? Math.round(parsed) : 0;
 }
 
-function toRoundedNullableValue(value: number | string | null | undefined): number | null {
+function roundNullable(value: number | string | null | undefined): number | null {
   if (value === null || value === undefined || value === "") return null;
-  return toRoundedValue(value);
+  return roundValue(value);
 }
 
-function toDateValue(value: Date | string | null): Date | null {
+function dateValue(value: Date | string | null): Date | null {
   if (!value) return null;
   const date = value instanceof Date ? value : new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-const getAnalyticsDataForUser = Effect.fn("analytics.getDataForUser")(function* (
+const analyticsFor = Effect.fn("analytics.getDataForUser")(function* (
   userId: string,
   filter: AnalyticsFilter,
   apiKeyId?: string,
@@ -149,7 +149,7 @@ const buildAnalyticsData = Effect.fnUntraced(function* (
   apiKeyId?: string,
   options: { includeSummary?: boolean; includeSeries?: boolean } = {}
 ) {
-  const resolvedFilter = resolveFilterConfig(filter);
+  const resolvedFilter = filterConfig(filter);
   if (!resolvedFilter.success) return resolvedFilter;
 
   const { startDate, endDate, config } = resolvedFilter.data;
@@ -172,8 +172,8 @@ const buildAnalyticsData = Effect.fnUntraced(function* (
     const conditions = [eq(usageLog.userId, userId), gte(usageLog.createdAt, startDate), lte(usageLog.createdAt, endDate)];
     if (apiKeyId) conditions.push(eq(usageLog.proxyApiKeyId, apiKeyId));
     const whereCondition = and(...conditions);
-    const bucketSeconds = sql.raw(String(getGranularityBucketSeconds(config.granularity)));
-    const bucketExpression = sql<Date>`to_timestamp(floor(extract(epoch from ${usageLog.createdAt}) / ${bucketSeconds}) * ${bucketSeconds})`;
+    const bucketSql = sql.raw(String(bucketSeconds(config.granularity)));
+    const bucketExpression = sql<Date>`to_timestamp(floor(extract(epoch from ${usageLog.createdAt}) / ${bucketSql}) * ${bucketSql})`;
 
     const timeSeriesRows = includeSeries
       ? yield* fromPromise(
@@ -194,31 +194,31 @@ const buildAnalyticsData = Effect.fnUntraced(function* (
         )
       : undefined;
 
-    const timeSeriesBySlot = new Map<string, { requestCount: number; inputTokens: number; outputTokens: number; cachedTokens: number; cacheWriteTokens: number; successCount: number; errorCount: number; avgDuration: number | null; p30: number | null; p50: number | null; p60: number | null; p75: number | null; p90: number | null; p95: number | null; p99: number | null }>();
+    const seriesBySlot = new Map<string, { requestCount: number; inputTokens: number; outputTokens: number; cachedTokens: number; cacheWriteTokens: number; successCount: number; errorCount: number; avgDuration: number | null; p30: number | null; p50: number | null; p60: number | null; p75: number | null; p90: number | null; p95: number | null; p99: number | null }>();
     for (const row of timeSeriesRows) {
-      const bucketDate = toDateValue(row.bucket);
+      const bucketDate = dateValue(row.bucket);
       if (!bucketDate) continue;
-      timeSeriesBySlot.set(formatTimeSlot(bucketDate, config.granularity), { requestCount: toRoundedValue(row.requestCount), inputTokens: toRoundedValue(row.inputTokens), outputTokens: toRoundedValue(row.outputTokens), cachedTokens: toRoundedValue(row.cachedTokens), cacheWriteTokens: toRoundedValue(row.cacheWriteTokens), successCount: toRoundedValue(row.successCount), errorCount: toRoundedValue(row.errorCount), avgDuration: toRoundedNullableValue(row.avgDuration), p30: toRoundedNullableValue(row.p30), p50: toRoundedNullableValue(row.p50), p60: toRoundedNullableValue(row.p60), p75: toRoundedNullableValue(row.p75), p90: toRoundedNullableValue(row.p90), p95: toRoundedNullableValue(row.p95), p99: toRoundedNullableValue(row.p99) });
+      seriesBySlot.set(slotLabel(bucketDate, config.granularity), { requestCount: roundValue(row.requestCount), inputTokens: roundValue(row.inputTokens), outputTokens: roundValue(row.outputTokens), cachedTokens: roundValue(row.cachedTokens), cacheWriteTokens: roundValue(row.cacheWriteTokens), successCount: roundValue(row.successCount), errorCount: roundValue(row.errorCount), avgDuration: roundNullable(row.avgDuration), p30: roundNullable(row.p30), p50: roundNullable(row.p50), p60: roundNullable(row.p60), p75: roundNullable(row.p75), p90: roundNullable(row.p90), p95: roundNullable(row.p95), p99: roundNullable(row.p99) });
     }
 
-    const timeSlots = includeSeries ? generateTimeSlots(startDate, endDate, config) : [];
-    const requestsByModel = includeSummary ? topModelRows.map((row) => ({ model: row.model, count: toRoundedValue(row.count) })) : [];
-    const totalRequests = toRoundedValue(totalsRow?.totalRequests);
-    const successfulRequests = toRoundedValue(totalsRow?.successfulRequests);
+    const slots = includeSeries ? timeSlots(startDate, endDate, config) : [];
+    const requestsByModel = includeSummary ? topModelRows.map((row) => ({ model: row.model, count: roundValue(row.count) })) : [];
+    const totalRequests = roundValue(totalsRow?.totalRequests);
+    const successfulRequests = roundValue(totalsRow?.successfulRequests);
     const analyticsData: AnalyticsData = {
-      requestsOverTime: timeSlots.map((date) => ({ date, count: timeSeriesBySlot.get(date)?.requestCount ?? 0 })),
-      tokenUsage: timeSlots.map((date) => ({ date, input: timeSeriesBySlot.get(date)?.inputTokens ?? 0, output: timeSeriesBySlot.get(date)?.outputTokens ?? 0, cache: timeSeriesBySlot.get(date)?.cachedTokens ?? 0, cacheWrite: timeSeriesBySlot.get(date)?.cacheWriteTokens ?? 0 })),
+      requestsOverTime: slots.map((date) => ({ date, count: seriesBySlot.get(date)?.requestCount ?? 0 })),
+      tokenUsage: slots.map((date) => ({ date, input: seriesBySlot.get(date)?.inputTokens ?? 0, output: seriesBySlot.get(date)?.outputTokens ?? 0, cache: seriesBySlot.get(date)?.cachedTokens ?? 0, cacheWrite: seriesBySlot.get(date)?.cacheWriteTokens ?? 0 })),
       requestsByModel,
       modelDistribution: requestsByModel.map(({ model, count }) => ({ model, value: count, percentage: totalRequests > 0 ? Math.round((count / totalRequests) * 100) : 0 })),
-      successRate: timeSlots.map((date) => {
-        const success = timeSeriesBySlot.get(date)?.successCount ?? 0;
-        const error = timeSeriesBySlot.get(date)?.errorCount ?? 0;
+      successRate: slots.map((date) => {
+        const success = seriesBySlot.get(date)?.successCount ?? 0;
+        const error = seriesBySlot.get(date)?.errorCount ?? 0;
         const total = success + error;
         return { date, success, error, successRate: total > 0 ? Math.round((success / total) * 1000) / 10 : 0, errorRate: total > 0 ? Math.round((error / total) * 1000) / 10 : 0 };
       }),
-      durationOverTime: timeSlots.map((date) => ({ date, avg: timeSeriesBySlot.get(date)?.avgDuration ?? null, p30: timeSeriesBySlot.get(date)?.p30 ?? null, p50: timeSeriesBySlot.get(date)?.p50 ?? null, p60: timeSeriesBySlot.get(date)?.p60 ?? null, p75: timeSeriesBySlot.get(date)?.p75 ?? null, p90: timeSeriesBySlot.get(date)?.p90 ?? null, p95: timeSeriesBySlot.get(date)?.p95 ?? null, p99: timeSeriesBySlot.get(date)?.p99 ?? null })),
+      durationOverTime: slots.map((date) => ({ date, avg: seriesBySlot.get(date)?.avgDuration ?? null, p30: seriesBySlot.get(date)?.p30 ?? null, p50: seriesBySlot.get(date)?.p50 ?? null, p60: seriesBySlot.get(date)?.p60 ?? null, p75: seriesBySlot.get(date)?.p75 ?? null, p90: seriesBySlot.get(date)?.p90 ?? null, p95: seriesBySlot.get(date)?.p95 ?? null, p99: seriesBySlot.get(date)?.p99 ?? null })),
       granularity: config.granularity,
-      totals: { totalRequests, totalInputTokens: toRoundedValue(totalsRow?.totalInputTokens), totalOutputTokens: toRoundedValue(totalsRow?.totalOutputTokens), totalCachedTokens: toRoundedValue(totalsRow?.totalCachedTokens), totalCacheWriteTokens: toRoundedValue(totalsRow?.totalCacheWriteTokens), avgDuration: toRoundedNullableValue(totalsRow?.avgDuration) ?? 0, durationPercentiles: { p30: toRoundedValue(totalsRow?.p30), p50: toRoundedValue(totalsRow?.p50), p60: toRoundedValue(totalsRow?.p60), p75: toRoundedValue(totalsRow?.p75), p90: toRoundedValue(totalsRow?.p90), p95: toRoundedValue(totalsRow?.p95), p99: toRoundedValue(totalsRow?.p99) }, successRate: totalRequests > 0 ? Math.round((successfulRequests / totalRequests) * 100) : 0 },
+      totals: { totalRequests, totalInputTokens: roundValue(totalsRow?.totalInputTokens), totalOutputTokens: roundValue(totalsRow?.totalOutputTokens), totalCachedTokens: roundValue(totalsRow?.totalCachedTokens), totalCacheWriteTokens: roundValue(totalsRow?.totalCacheWriteTokens), avgDuration: roundNullable(totalsRow?.avgDuration) ?? 0, durationPercentiles: { p30: roundValue(totalsRow?.p30), p50: roundValue(totalsRow?.p50), p60: roundValue(totalsRow?.p60), p75: roundValue(totalsRow?.p75), p90: roundValue(totalsRow?.p90), p95: roundValue(totalsRow?.p95), p99: roundValue(totalsRow?.p99) }, successRate: totalRequests > 0 ? Math.round((successfulRequests / totalRequests) * 100) : 0 },
     };
 
     return { success: true as const, data: analyticsData };
@@ -228,7 +228,7 @@ export const getAnalyticsData = Effect.fn("analytics.data")(function* (
   userId: string,
   input?: AnalyticsDataInput
 ) {
-  const result = yield* getAnalyticsDataForUser(userId, input?.filter ?? "30d", input?.apiKeyId, {
+  const result = yield* analyticsFor(userId, input?.filter ?? "30d", input?.apiKeyId, {
     includeSeries: input?.includeSeries ?? true,
   });
   if (!result.success) return yield* internal(result.error);
@@ -239,7 +239,7 @@ export const getAnalyticsSeries = Effect.fn("analytics.series")(function* (
   userId: string,
   input?: AnalyticsSeriesInput
 ) {
-  const result = yield* getAnalyticsDataForUser(userId, input?.filter ?? "30d", input?.apiKeyId, {
+  const result = yield* analyticsFor(userId, input?.filter ?? "30d", input?.apiKeyId, {
     includeSummary: false,
     includeSeries: true,
   });
@@ -255,7 +255,7 @@ export const getAnalyticsSeries = Effect.fn("analytics.series")(function* (
 });
 
 export const getAnalyticsOverview = Effect.fn("analytics.overview")(function* (userId: string) {
-  const result = yield* getAnalyticsDataForUser(userId, "24h", undefined, { includeSeries: false });
+  const result = yield* analyticsFor(userId, "24h", undefined, { includeSeries: false });
   if (!result.success) return yield* internal(result.error);
 
   const totals = result.data.totals;
@@ -274,7 +274,7 @@ export const getUsageRows = Effect.fn("analytics.usageRows")(function* (
   userId: string,
   input?: AnalyticsUsageInput
 ) {
-  const resolvedFilter = resolveFilterConfig(input?.range ?? "30d");
+  const resolvedFilter = filterConfig(input?.range ?? "30d");
   if (!resolvedFilter.success) return yield* internal(resolvedFilter.error);
 
   return yield* fromPromise(

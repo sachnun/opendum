@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { compareModelIds } from "@opendum/models/sort";
+import { compareIds } from "@opendum/models/sort";
 
 type AccessMode = "all" | "whitelist" | "blacklist";
 
@@ -26,14 +26,14 @@ const draftModels = ref<string[]>(normalizeModels(props.initialModels));
 const errorMessage = ref("");
 
 function normalizeModels(models: string[]): string[] {
-  return Array.from(new Set(models)).sort(compareModelIds);
+  return Array.from(new Set(models)).sort(compareIds);
 }
 
 function sameList(left: string[], right: string[]): boolean {
   return left.length === right.length && left.every((item, index) => item === right[index]);
 }
 
-function setDraftMode(value: AccessMode) {
+function setMode(value: AccessMode) {
   if (props.readonly) return;
   draftMode.value = value;
 }
@@ -45,7 +45,7 @@ function toggleModel(modelId: string) {
     : normalizeModels([...draftModels.value, modelId]);
 }
 
-function resetDraftState() {
+function resetDraft() {
   draftMode.value = savedMode.value;
   draftModels.value = [...savedModels.value];
   modelPickerOpen.value = false;
@@ -93,7 +93,7 @@ const filteredModels = computed(() => {
   <section class="flex h-full flex-col">
     <div class="flex-1 space-y-3">
       <div class="grid grid-cols-3 gap-1 rounded-md border border-border/70 bg-card/30 p-1">
-        <button v-for="mode in ['all', 'whitelist', 'blacklist']" :key="mode" type="button" :disabled="readonly" :class="['h-8 rounded-sm border px-2 text-xs font-medium disabled:cursor-default disabled:pointer-events-none disabled:opacity-60', draftMode === mode ? 'border-primary/35 bg-primary/10 text-primary' : 'border-transparent text-muted-foreground']" @click="setDraftMode(mode as AccessMode)">
+        <button v-for="mode in ['all', 'whitelist', 'blacklist']" :key="mode" type="button" :disabled="readonly" :class="['h-8 rounded-sm border px-2 text-xs font-medium disabled:cursor-default disabled:pointer-events-none disabled:opacity-60', draftMode === mode ? 'border-primary/35 bg-primary/10 text-primary' : 'border-transparent text-muted-foreground']" @click="setMode(mode as AccessMode)">
           {{ mode === 'all' ? 'All' : mode === 'whitelist' ? 'Whitelist' : 'Blacklist' }}
         </button>
       </div>
@@ -141,7 +141,7 @@ const filteredModels = computed(() => {
     </div>
 
     <div class="flex items-center justify-end gap-2 border-t border-border/60 pt-3 lg:mt-4">
-      <UiButton variant="outline" size="sm" :disabled="isSaving || !hasChanges || readonly" @click="resetDraftState">Cancel</UiButton>
+      <UiButton variant="outline" size="sm" :disabled="isSaving || !hasChanges || readonly" @click="resetDraft">Cancel</UiButton>
       <UiButton size="sm" :disabled="isSaving || !hasChanges || readonly" @click="save">{{ isSaving ? 'Saving...' : 'Save' }}</UiButton>
     </div>
   </section>

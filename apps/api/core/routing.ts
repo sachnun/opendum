@@ -1,7 +1,7 @@
 import { preferSticky } from "@opendum/core/redis";
 import type { ProviderAccount } from "@opendum/providers";
 import type { ProviderRoutingOptions } from "./provider-performance.js";
-import { isSyntheticProviderAccountId, prioritizeAccounts } from "./service-helpers.js";
+import { isSynthetic, prioritizeAccounts } from "./service-helpers.js";
 
 export type Context = {
   crossProvider: boolean;
@@ -28,7 +28,7 @@ export class Sticky implements Strategy {
 
   order(candidates: ProviderAccount[]): ProviderAccount[] {
     const accountId = this.accountId;
-    if (!accountId || isSyntheticProviderAccountId(accountId)) return candidates;
+    if (!accountId || isSynthetic(accountId)) return candidates;
     return preferSticky(candidates, (account) => account.id === accountId);
   }
 }

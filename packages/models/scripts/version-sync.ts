@@ -10,7 +10,7 @@ function globalize(pattern: RegExp): RegExp {
   return new RegExp(pattern.source, pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`);
 }
 
-export function syncCliVersion(label: string, targets: CliVersionTarget[], latest: string | null): void {
+export function syncCli(label: string, targets: CliVersionTarget[], latest: string | null): void {
   if (!latest) {
     console.warn(`[${label}] Could not determine the latest version, skipping.`);
     return;

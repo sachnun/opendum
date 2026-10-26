@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import { Effect, Exit } from "effect";
 
-import { ServiceFailure, asServiceFailure, badRequest, forbidden, internal, notFound, unauthorized, unavailable } from "#web/errors.js";
-import { fromPromise, fromSync, toActionResult, toVoidActionResult, withContext } from "#web/lib/task.js";
+import { ServiceFailure, asFailure, badRequest, forbidden, internal, notFound, unauthorized, unavailable } from "#web/errors.js";
+import { fromPromise, fromSync, toResult, toVoid, withContext } from "#web/lib/task.js";
 
 describe("web errors", () => {
   it("maps status codes to tagged failures", () => {
@@ -21,21 +21,21 @@ describe("web errors", () => {
     expect(failure.cause).toBe(cause);
   });
 
-  it("passes tagged failures through asServiceFailure", () => {
+  it("passes tagged failures through asFailure", () => {
     const failure = notFound("missing");
-    expect(asServiceFailure(failure)).toBe(failure);
+    expect(asFailure(failure)).toBe(failure);
   });
 
   it("wraps unknown causes as internal failures", () => {
-    const failure = asServiceFailure(new Error("raw"));
+    const failure = asFailure(new Error("raw"));
     expect(failure._tag).toBe("ServiceFailure");
     expect(failure.status).toBe(500);
     expect(failure.message).toBe("raw");
   });
 
   it("falls back to the provided message for non error causes", () => {
-    expect(asServiceFailure("nope", "Request failed").message).toBe("nope");
-    expect(asServiceFailure(undefined, "Request failed").message).toBe("Request failed");
+    expect(asFailure("nope", "Request failed").message).toBe("nope");
+    expect(asFailure(undefined, "Request failed").message).toBe("Request failed");
   });
 });
 
@@ -70,17 +70,17 @@ describe("web task helpers", () => {
   });
 
   it("turns a success into an ActionResult", async () => {
-    const result = await Effect.runPromise(toActionResult(Effect.succeed("data")));
+    const result = await Effect.runPromise(toResult(Effect.succeed("data")));
     expect(result).toEqual({ success: true, data: "data" });
   });
 
   it("turns a failure into a failed ActionResult", async () => {
-    const result = await Effect.runPromise(toActionResult(Effect.fail(badRequest("nope"))));
+    const result = await Effect.runPromise(toResult(Effect.fail(badRequest("nope"))));
     expect(result).toEqual({ success: false, error: "nope" });
   });
 
   it("turns void effects into data undefined", async () => {
-    const result = await Effect.runPromise(toVoidActionResult(Effect.void));
+    const result = await Effect.runPromise(toVoid(Effect.void));
     expect(result).toEqual({ success: true, data: undefined });
   });
 });

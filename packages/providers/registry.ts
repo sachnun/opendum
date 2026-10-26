@@ -1,12 +1,12 @@
 import type { Registry } from "@opendum/models/runtime";
 import type { OpendumRedis } from "@opendum/core/redis";
-import { createTransport, type EgressFetch, type Logger, type MutableTransport } from "./core/http.js";
+import { Transport, type EgressFetch, type Logger } from "./core/http.js";
 import type { FallbackState } from "./core/fallback.js";
-import { OpenAICompatibleProvider, SUPPORTED_HARBOR, SUPPORTED_HYPER, SUPPORTED_KILO, SUPPORTED_NVIDIA, SUPPORTED_OPENROUTER, SUPPORTED_ZENMUX } from "./upstreams/openai-compatible.js";
+import { CompatProvider, SUPPORTED_HARBOR, SUPPORTED_HYPER, SUPPORTED_KILO, SUPPORTED_NVIDIA, SUPPORTED_OPENROUTER, SUPPORTED_ZENMUX } from "./upstreams/openai-compatible.js";
 import { OpencodeProvider } from "./upstreams/opencode.js";
 import { ClineProvider } from "./upstreams/cline.js";
 import { WorkbuddyProvider } from "./upstreams/workbuddy.js";
-import { PerchProvider } from "./upstreams/perch.js";
+import { PerchProvider } from "./upstreams/perch/index.js";
 import { CodexProvider } from "./upstreams/codex.js";
 import { KiroProvider } from "./upstreams/kiro/index.js";
 import { AntigravityProvider } from "./upstreams/antigravity/index.js";
@@ -22,12 +22,12 @@ export type ProviderRegistryOptions = {
 };
 
 export class ProviderRegistry {
-  readonly transport: MutableTransport;
+  readonly transport: Transport;
   private readonly providers = new Map<string, Provider>();
 
   constructor(options: ProviderRegistryOptions) {
     const direct = options.directFetch ?? ((url, init) => fetch(url, init));
-    this.transport = createTransport(direct);
+    this.transport = new Transport(direct);
     const common = {
       registry: options.models,
       transport: this.transport,
@@ -56,7 +56,7 @@ export class ProviderRegistry {
     );
     this.register(new WorkersAiProvider({ registry: options.models, transport: this.transport }));
     this.register(
-      new OpenAICompatibleProvider({
+      new CompatProvider({
         name: "openrouter",
         baseUrl: "https://openrouter.ai/api/v1",
         supportedParams: SUPPORTED_OPENROUTER,
@@ -65,7 +65,7 @@ export class ProviderRegistry {
       })
     );
     this.register(
-      new OpenAICompatibleProvider({
+      new CompatProvider({
         name: "nvidia_nim",
         baseUrl: "https://integrate.api.nvidia.com/v1",
         supportedParams: SUPPORTED_NVIDIA,
@@ -74,7 +74,7 @@ export class ProviderRegistry {
       })
     );
     this.register(
-      new OpenAICompatibleProvider({
+      new CompatProvider({
         name: "kilo_code",
         baseUrl: "https://api.kilo.ai/api/gateway",
         fallbackBaseUrl: "https://unroxy.koyeb.app/api.kilo.ai/api/gateway",
@@ -84,7 +84,7 @@ export class ProviderRegistry {
       })
     );
     this.register(
-      new OpenAICompatibleProvider({
+      new CompatProvider({
         name: "harbor",
         baseUrl: "https://tokenharbor.ai/v1",
         supportedParams: SUPPORTED_HARBOR,
@@ -93,7 +93,7 @@ export class ProviderRegistry {
       })
     );
     this.register(
-      new OpenAICompatibleProvider({
+      new CompatProvider({
         name: "zenmux",
         baseUrl: "https://zenmux.ai/api/v1",
         supportedParams: SUPPORTED_ZENMUX,
@@ -102,7 +102,7 @@ export class ProviderRegistry {
       })
     );
     this.register(
-      new OpenAICompatibleProvider({
+      new CompatProvider({
         name: "hyper",
         baseUrl: "https://hyper.charm.land/v1",
         supportedParams: SUPPORTED_HYPER,
@@ -139,7 +139,7 @@ export class ProviderRegistry {
   refreshableProviderNames(): string[] {
     const names: string[] = [];
     for (const [name, provider] of this.providers) {
-      if (isCredentialRefresher(provider)) names.push(name);
+      if (isRefresher(provider)) names.push(name);
     }
     return names.sort((a, b) => a.localeCompare(b));
   }
@@ -154,6 +154,6 @@ export function isAuthless(provider: Provider): provider is Provider & AuthlessP
   return typeof (provider as Partial<AuthlessProvider>).authless === "function";
 }
 
-export function isCredentialRefresher(provider: Provider): provider is Provider & CredentialRefresher {
+export function isRefresher(provider: Provider): provider is Provider & CredentialRefresher {
   return typeof (provider as Partial<CredentialRefresher>).refreshCredentials === "function";
 }

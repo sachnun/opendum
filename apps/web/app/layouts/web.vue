@@ -1,17 +1,17 @@
 <script setup lang="ts">
 import {
-  emptyShellAccountSummary,
-  emptyModelFamilyCounts,
-  toShellAccountSummary,
-  normalizeModelFamilyCounts,
+  emptySummary,
+  emptyCounts,
+  toSummary,
+  familyCounts,
   type ShellAccountSummary,
 } from "~~/lib/account-overview";
 
 import type { AccountsData, ModelsData, UsageData } from "@opendum/providers/contract";
 import type { NavItem, NavSubItem, ProviderAccountIndicator } from "../../lib/navigation";
 import type { AccountOverviewData, MeData } from "../../lib/api-types";
-import { isSwitchSubItem, primaryNavigation, subItemHref } from "../../lib/navigation";
-import { buildProviderHrefMap, getProviderAccountPath, PROVIDER_ACCOUNT_DEFINITIONS } from "@opendum/providers/provider-accounts";
+import { isSwitch, primaryNavigation, hrefOf } from "../../lib/navigation";
+import { hrefMap, accountPath, PROVIDER_ACCOUNT_DEFINITIONS } from "@opendum/providers/provider-accounts";
 import { avatarUrl } from "../../lib/utils";
 
 const route = useRoute();
@@ -19,23 +19,23 @@ const { user: authUser, signOut: endSession } = useAuth();
 
 const {
   mobileOpen,
-  mobileSidebarDragX,
-  isMobileSidebarDragging,
+  dragX,
+  isDragging,
   openMobileSidebar,
   closeMobileSidebar,
-  resetMobileSidebarSwipe,
-  handleMobileOverlayClick,
-  handleMobileSheetPointerDownOutside,
-  handleMobileOverlayPointerDown,
-  handleMobileOverlayPointerMove,
-  finishMobileOverlaySwipe,
+  resetSwipe,
+  overlayClick,
+  sheetPointerDown,
+  overlayPointerDown,
+  overlayPointerMove,
+  finishSwipe,
 } = useMobileSidebar();
 const userMenuOpen = ref(false);
 const modelSearchFocused = ref(false);
 const auditDialogOpen = ref(false);
 const sharingEnabled = ref(false);
 const sharingUpdating = ref(false);
-const disableSharingDialogOpen = ref(false);
+const sharingDialog = ref(false);
 const supportItemOpen = reactive<Record<string, boolean>>({ Tools: false });
 const pointMenuOpen = ref(false);
 const cachedPinnedProviders = useState<string[] | null>(stateKeys.pinnedProviders, () => null);
@@ -59,17 +59,17 @@ const PROVIDER_STATUS_ORDER = { error: 0, warning: 1, normal: 2 } as const;
 const api = useApi();
 const invalidation = useInvalidate();
 const { models: liveModels } = useEventStream({
-  onPoints: applyPointsBalance,
-  onAccounts: applyAccountsSnapshot,
-  onModels: applyModelsSnapshot,
-  onUsage: applyUsageSnapshot,
+  onPoints: applyPoints,
+  onAccounts: applyAccounts,
+  onModels: applyModels,
+  onUsage: applyUsage,
 });
 const accountsNavigationHref = "/";
 const { data: accountsOverviewData } = useNuxtData<AccountOverviewData>(dataKeys.accountsOverview);
 const { data: customProvidersData } = useAsyncData(dataKeys.customProviders, () => api.customProviders.list());
 const customProviders = computed(() => customProvidersData.value ?? []);
-const providerHrefByKey = computed<Record<string, string>>(() => Object.fromEntries([
-  ...PROVIDER_ACCOUNT_DEFINITIONS.map((definition) => [definition.key, getProviderAccountPath(definition.key)]),
+const hrefByKey = computed<Record<string, string>>(() => Object.fromEntries([
+  ...PROVIDER_ACCOUNT_DEFINITIONS.map((definition) => [definition.key, accountPath(definition.key)]),
   ...customProviders.value.map((provider) => [provider.slug, `/${provider.slug}`]),
 ]));
 const navigation = computed<NavItem[]>(() => primaryNavigation.map((item) => item.href === accountsNavigationHref
@@ -78,7 +78,7 @@ const navigation = computed<NavItem[]>(() => primaryNavigation.map((item) => ite
       children: [
         ...[...PROVIDER_ACCOUNT_DEFINITIONS]
           .sort((a, b) => (a.navOrder ?? Number.MAX_SAFE_INTEGER) - (b.navOrder ?? Number.MAX_SAFE_INTEGER))
-          .map((definition) => ({ name: definition.label, href: getProviderAccountPath(definition.key) })),
+          .map((definition) => ({ name: definition.label, href: accountPath(definition.key) })),
         ...customProviders.value.map((provider) => ({ name: provider.name, href: `/${provider.slug}` })),
       ],
     }
@@ -87,11 +87,11 @@ const navigation = computed<NavItem[]>(() => primaryNavigation.map((item) => ite
 const { data: me } = useAsyncData<MeData>(dataKeys.me, () => api.me.get(), {
   default: () => ({ role: "user" as const, isMaintainer: false }),
 });
-const { auditUser, me: meState, isAuditMode, refreshAfterAuditChange } = useAudit();
+const { auditUser, me: meState, isAuditMode, refreshAfterAudit } = useAudit();
 meState.value = me.value ?? null;
 watch(me, (value) => {
   meState.value = value ?? null;
-  invalidation.patchApiKeyRoamingPoints(value?.points?.roamingPointsByApiKeyId ?? {});
+  invalidation.patchRoaming(value?.points?.roamingByKey ?? {});
 }, { immediate: true });
 const isMaintainer = computed(() => me.value?.isMaintainer ?? false);
 const pointBalance = computed(() => (me.value as MeData | null | undefined)?.points?.balance ?? 0);
@@ -114,62 +114,62 @@ watch(me, (value) => {
 
 
 
-function applyAccountOverview(summary: AccountOverviewData): void {
+function applyOverview(summary: AccountOverviewData): void {
   accountsOverviewData.value = summary;
 }
 
-function applyAccountsSnapshot(data: AccountsData): void {
-  applyAccountOverview(data.overview);
+function applyAccounts(data: AccountsData): void {
+  applyOverview(data.overview);
 }
 
-function applyUsageSnapshot(data: UsageData): void {
-  applyAccountOverview(data.overview);
-  invalidation.patchApiKeyRoamingPoints(data.roamingPointsByApiKeyId);
+function applyUsage(data: UsageData): void {
+  applyOverview(data.overview);
+  invalidation.patchRoaming(data.roamingByKey);
 }
 
-function applyModelsSnapshot(data: ModelsData): void {
+function applyModels(data: ModelsData): void {
   invalidation.patchModels(data.list);
 }
 
-const isProviderOverviewRoute = computed(() => route.path === accountsNavigationHref);
+const isOverviewRoute = computed(() => route.path === accountsNavigationHref);
 
 const { data: accountSummaryData } = useAsyncData(dataKeys.shellAccounts, async (): Promise<ShellAccountSummary> => {
-  if (isProviderOverviewRoute.value) {
+  if (isOverviewRoute.value) {
     const snapshot = accountsOverviewData.value;
-    return snapshot ? toShellAccountSummary(snapshot) : emptyShellAccountSummary;
+    return snapshot ? toSummary(snapshot) : emptySummary;
   }
 
-  return toShellAccountSummary(await api.accounts.ping());
+  return toSummary(await api.accounts.ping());
 });
 
 watch(accountsOverviewData, (snapshot) => {
   if (!snapshot) return;
 
-  accountSummaryData.value = toShellAccountSummary(snapshot);
+  accountSummaryData.value = toSummary(snapshot);
 }, { immediate: true });
 
-const accountCounts = computed(() => accountSummaryData.value?.accountCounts ?? emptyShellAccountSummary.accountCounts);
-const activeAccountCounts = computed(() => accountSummaryData.value?.activeAccountCounts ?? emptyShellAccountSummary.activeAccountCounts);
+const accountCounts = computed(() => accountSummaryData.value?.accountCounts ?? emptySummary.accountCounts);
+const activeAccountCounts = computed(() => accountSummaryData.value?.activeAccountCounts ?? emptySummary.activeAccountCounts);
 const accountIndicators = computed(
-  () => accountSummaryData.value?.accountIndicators ?? emptyShellAccountSummary.accountIndicators
+  () => accountSummaryData.value?.accountIndicators ?? emptySummary.accountIndicators
 );
-const pinnedProviders = computed(() => accountSummaryData.value?.pinnedProviders ?? cachedPinnedProviders.value ?? emptyShellAccountSummary.pinnedProviders);
-const hasLoadedAccountSummary = computed(() => Boolean(accountSummaryData.value));
-const hasResolvedPinnedProviders = computed(() => hasLoadedAccountSummary.value || cachedPinnedProviders.value !== null);
+const pinnedProviders = computed(() => accountSummaryData.value?.pinnedProviders ?? cachedPinnedProviders.value ?? emptySummary.pinnedProviders);
+const summaryLoaded = computed(() => Boolean(accountSummaryData.value));
+const pinnedResolved = computed(() => summaryLoaded.value || cachedPinnedProviders.value !== null);
 
 watch(accountSummaryData, (value) => {
   if (value) cachedPinnedProviders.value = value.pinnedProviders;
 }, { immediate: true });
 
-const activeAccountCountByHref = computed<Record<string, number>>(() => ({ ...buildProviderHrefMap(activeAccountCounts.value), ...customHrefCounts(activeAccountCounts.value) }));
-const accountCountByHref = computed<Record<string, number>>(() => ({ ...buildProviderHrefMap(accountCounts.value), ...customHrefCounts(accountCounts.value) }));
-const accountIndicatorByHref = computed<Record<string, ProviderAccountIndicator>>(() => ({ ...buildProviderHrefMap(accountIndicators.value), ...customHrefCounts(accountIndicators.value) }));
+const activeByHref = computed<Record<string, number>>(() => ({ ...hrefMap(activeAccountCounts.value), ...customCounts(activeAccountCounts.value) }));
+const countByHref = computed<Record<string, number>>(() => ({ ...hrefMap(accountCounts.value), ...customCounts(accountCounts.value) }));
+const indicatorByHref = computed<Record<string, ProviderAccountIndicator>>(() => ({ ...hrefMap(accountIndicators.value), ...customCounts(accountIndicators.value) }));
 const accountNavigationHrefs = computed(() => new Set([
-  ...PROVIDER_ACCOUNT_DEFINITIONS.map((definition) => getProviderAccountPath(definition.key)),
+  ...PROVIDER_ACCOUNT_DEFINITIONS.map((definition) => accountPath(definition.key)),
   ...customProviders.value.map((provider) => `/${provider.slug}`),
 ]));
 
-function customHrefCounts<V>(counts: Record<string, V>): Record<string, V> {
+function customCounts<V>(counts: Record<string, V>): Record<string, V> {
   const result: Record<string, V> = {};
   for (const provider of customProviders.value) {
     const value = counts[provider.slug];
@@ -182,40 +182,40 @@ function customHrefCounts<V>(counts: Record<string, V>): Record<string, V> {
 
 const { data: defaultModelFamilyCounts } = useAsyncData(dataKeys.shellModelFamilyCounts, async () => {
   const counts = await api.models.familyCounts();
-  return normalizeModelFamilyCounts(counts);
+  return familyCounts(counts);
 }, {
-  default: () => ({ ...emptyModelFamilyCounts }),
+  default: () => ({ ...emptyCounts }),
 });
 
-const modelFamilyCounts = computed(() => defaultModelFamilyCounts.value ?? emptyModelFamilyCounts);
+const modelFamilyCounts = computed(() => defaultModelFamilyCounts.value ?? emptyCounts);
 
 watch(liveModels, (data) => {
-  if (data) defaultModelFamilyCounts.value = normalizeModelFamilyCounts(data.familyCounts);
+  if (data) defaultModelFamilyCounts.value = familyCounts(data.familyCounts);
 }, { immediate: true });
 
 const pinnedProviderHrefs = computed(() => {
   const hrefs = new Set<string>();
 
   pinnedProviders.value.forEach((key) => {
-    const href = providerHrefByKey.value[key];
+    const href = hrefByKey.value[key];
     if (href) hrefs.add(href);
   });
 
   return hrefs;
 });
-const mobileSheetContentStyle = computed(() => {
-  if (mobileSidebarDragX.value === 0) return undefined;
+const sheetContentStyle = computed(() => {
+  if (dragX.value === 0) return undefined;
 
   return {
-    transform: `translateX(${mobileSidebarDragX.value}px)`,
-    transition: isMobileSidebarDragging.value ? "none" : undefined,
+    transform: `translateX(${dragX.value}px)`,
+    transition: isDragging.value ? "none" : undefined,
   };
 });
-const mobileSheetOverlayStyle = computed(() => {
-  if (mobileSidebarDragX.value === 0) return undefined;
+const sheetOverlayStyle = computed(() => {
+  if (dragX.value === 0) return undefined;
 
   return {
-    opacity: Math.max(0.35, 1 - Math.abs(mobileSidebarDragX.value) / 320),
+    opacity: Math.max(0.35, 1 - Math.abs(dragX.value) / 320),
   };
 });
 
@@ -224,27 +224,27 @@ function isActive(href: string) {
   return route.path === href || (href !== "/" && route.path.startsWith(href));
 }
 
-function isAccountsNavItem(item: NavItem) {
+function accountsItem(item: NavItem) {
   return item.href === accountsNavigationHref;
 }
 
-function isSupportItemActive(item: NavItem) {
-  return isActive(item.href) || Boolean(item.children?.some((subItem) => isSubItemActive(subItem)));
+function supportActive(item: NavItem) {
+  return isActive(item.href) || Boolean(item.children?.some((subItem) => subActive(subItem)));
 }
 
-function isSupportItemOpen(item: NavItem) {
+function supportOpen(item: NavItem) {
   return !item.children?.length || supportItemOpen[item.name] !== false;
 }
 
-function toggleSupportItem(item: NavItem) {
+function toggleSupport(item: NavItem) {
   if (!item.children?.length) return;
 
-  supportItemOpen[item.name] = !isSupportItemOpen(item);
+  supportItemOpen[item.name] = !supportOpen(item);
 }
 
 
 
-function isSubItemActive(subItem: NavSubItem) {
+function subActive(subItem: NavSubItem) {
   if (subItem.anchorId) {
     return route.path === subItem.href && (activeAnchorId.value ? activeAnchorId.value === subItem.anchorId : route.hash === `#${subItem.anchorId}`);
   }
@@ -252,19 +252,19 @@ function isSubItemActive(subItem: NavSubItem) {
   return route.path === subItem.href || route.path.startsWith(`${subItem.href}/`);
 }
 
-function visibleSubItems(item: NavItem) {
+function subItems(item: NavItem) {
   if (!item.children) {
     return [];
   }
 
-  if (isAccountsNavItem(item)) {
+  if (accountsItem(item)) {
     return item.children
       .filter((subItem) => pinnedProviderHrefs.value.has(subItem.href))
       .sort((a, b) => {
-        const availabilityA = (activeAccountCountByHref.value[a.href] ?? 0) > 0 ? "active" : "inactive";
-        const availabilityB = (activeAccountCountByHref.value[b.href] ?? 0) > 0 ? "active" : "inactive";
-        const indicatorA = accountIndicatorByHref.value[a.href] ?? "normal";
-        const indicatorB = accountIndicatorByHref.value[b.href] ?? "normal";
+        const availabilityA = (activeByHref.value[a.href] ?? 0) > 0 ? "active" : "inactive";
+        const availabilityB = (activeByHref.value[b.href] ?? 0) > 0 ? "active" : "inactive";
+        const indicatorA = indicatorByHref.value[a.href] ?? "normal";
+        const indicatorB = indicatorByHref.value[b.href] ?? "normal";
         return PROVIDER_AVAILABILITY_ORDER[availabilityA] - PROVIDER_AVAILABILITY_ORDER[availabilityB]
           || PROVIDER_STATUS_ORDER[indicatorA] - PROVIDER_STATUS_ORDER[indicatorB]
           || a.name.localeCompare(b.name);
@@ -278,14 +278,14 @@ function visibleSubItems(item: NavItem) {
   return item.children;
 }
 
-function modelCountFor(subItem: NavSubItem) {
+function modelsFor(subItem: NavSubItem) {
   return subItem.anchorId ? (modelFamilyCounts.value[subItem.anchorId] ?? 0) : 0;
 }
 
 
 
-function isSwitchSubItemToggleDisabled(subItem: NavSubItem) {
-  return isSwitchSubItem(subItem) && (isAuditMode.value || sharingUpdating.value);
+function toggleDisabled(subItem: NavSubItem) {
+  return isSwitch(subItem) && (isAuditMode.value || sharingUpdating.value);
 }
 
 async function updateSharing(enabled: boolean) {
@@ -310,7 +310,7 @@ function toggleSharing() {
   if (isAuditMode.value || sharingUpdating.value) return;
 
   if (sharingEnabled.value) {
-    disableSharingDialogOpen.value = true;
+    sharingDialog.value = true;
     return;
   }
 
@@ -318,35 +318,35 @@ function toggleSharing() {
 }
 
 function disableSharing() {
-  disableSharingDialogOpen.value = false;
+  sharingDialog.value = false;
   void updateSharing(false);
 }
 
-function cancelDisableSharing() {
-  disableSharingDialogOpen.value = false;
+function cancelSharing() {
+  sharingDialog.value = false;
 }
 
-const subNavigationAnchorIds = computed(() => primaryNavigation.flatMap((item) => visibleSubItems(item)
+const anchorIds = computed(() => primaryNavigation.flatMap((item) => subItems(item)
   .filter((subItem) => subItem.href === route.path && subItem.anchorId)
   .map((subItem) => subItem.anchorId as string)));
 
-const { mainContent, activeAnchorId, handleNavClick } = useAnchorNavigation({ anchorIds: subNavigationAnchorIds, onNavigate: closeMobileSidebar });
+const { mainContent, activeAnchorId, handleNavClick } = useAnchorNavigation({ anchorIds: anchorIds, onNavigate: closeMobileSidebar });
 
-function applyPointsBalance(balance: number) {
+function applyPoints(balance: number) {
   if (!me.value) return;
 
   me.value = { ...me.value, points: { balance } };
 }
 
 onBeforeUnmount(() => {
-  resetMobileSidebarSwipe();
+  resetSwipe();
 });
 
-async function handleSignOut() {
+async function signOut() {
   if (isAuditMode.value) {
     await api.maintainer.audit.stop();
     userMenuOpen.value = false;
-    await refreshAfterAuditChange();
+    await refreshAfterAudit();
     return;
   }
 
@@ -354,13 +354,13 @@ async function handleSignOut() {
   await navigateTo("/");
 }
 
-function openAuditDialog() {
+function openAudit() {
   userMenuOpen.value = false;
   auditDialogOpen.value = true;
 }
 
-async function handleAuditSelected() {
-  await refreshAfterAuditChange();
+async function auditSelected() {
+  await refreshAfterAudit();
 }
 </script>
 
@@ -400,8 +400,8 @@ async function handleAuditSelected() {
               </NuxtLink>
 
               <div v-if="item.children?.length" class="ml-6 space-y-1 border-l border-border/60 pl-3">
-                <template v-if="visibleSubItems(item).length">
-                  <template v-for="subItem in visibleSubItems(item)" :key="`${item.name}-${subItem.name}`">
+                <template v-if="subItems(item).length">
+                  <template v-for="subItem in subItems(item)" :key="`${item.name}-${subItem.name}`">
                     <div
                       v-if="subItem.disabled"
                       class="flex cursor-default items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground/60"
@@ -415,7 +415,7 @@ async function handleAuditSelected() {
                       </span>
                     </div>
                     <div
-                      v-else-if="isSwitchSubItem(subItem)"
+                      v-else-if="isSwitch(subItem)"
                       :class="[
                         'flex w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-xs font-medium outline-none transition-colors',
                         'cursor-pointer text-muted-foreground hover:text-foreground/70',
@@ -461,8 +461,8 @@ async function handleAuditSelected() {
                         type="button"
                         role="switch"
                         :aria-checked="sharingEnabled"
-                        :aria-disabled="isSwitchSubItemToggleDisabled(subItem) ? true : undefined"
-                        :disabled="isSwitchSubItemToggleDisabled(subItem)"
+                        :aria-disabled="toggleDisabled(subItem) ? true : undefined"
+                        :disabled="toggleDisabled(subItem)"
                         class="inline-flex shrink-0 cursor-pointer outline-none disabled:cursor-default"
                         @click.stop="toggleSharing"
                       >
@@ -471,14 +471,14 @@ async function handleAuditSelected() {
                           aria-hidden="true"
                           :class="[
                             'inline-flex h-3.5 w-6 shrink-0 items-center rounded-full border border-transparent shadow-xs transition-all',
-                            isSwitchSubItemToggleDisabled(subItem) ? 'bg-muted opacity-60' : sharingEnabled ? 'bg-primary' : 'bg-input/80',
+                            toggleDisabled(subItem) ? 'bg-muted opacity-60' : sharingEnabled ? 'bg-primary' : 'bg-input/80',
                           ]"
                         >
                           <span
                             :class="[
                               'block size-3 rounded-full transition-transform',
                               sharingEnabled ? 'translate-x-[calc(100%-2px)]' : 'translate-x-0',
-                              isSwitchSubItemToggleDisabled(subItem) ? 'bg-muted-foreground/50' : sharingEnabled ? 'bg-primary-foreground' : 'bg-foreground',
+                              toggleDisabled(subItem) ? 'bg-muted-foreground/50' : sharingEnabled ? 'bg-primary-foreground' : 'bg-foreground',
                             ]"
                           />
                         </span>
@@ -486,10 +486,10 @@ async function handleAuditSelected() {
                     </div>
                     <NuxtLink
                       v-else
-                      :to="subItemHref(subItem)"
+                      :to="hrefOf(subItem)"
                       :class="[
                         'flex items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors',
-                        isSubItemActive(subItem) ? 'text-foreground' : 'text-muted-foreground hover:text-foreground/70',
+                        subActive(subItem) ? 'text-foreground' : 'text-muted-foreground hover:text-foreground/70',
                       ]"
                       @click="handleNavClick(subItem, $event)"
                     >
@@ -499,32 +499,32 @@ async function handleAuditSelected() {
                           {{ subItem.tag }}
                         </UiBadge>
                       </span>
-                      <span v-if="isAccountsNavItem(item)" class="flex items-center gap-2">
+                      <span v-if="accountsItem(item)" class="flex items-center gap-2">
                         <AccountStatusIndicator
-                          :account-count="accountCountByHref[subItem.href]"
-                          :active-account-count="activeAccountCountByHref[subItem.href]"
-                          :indicator="accountIndicatorByHref[subItem.href]"
+                          :account-count="countByHref[subItem.href]"
+                          :active-account-count="activeByHref[subItem.href]"
+                          :indicator="indicatorByHref[subItem.href]"
                         />
                       </span>
                       <span
-                        v-else-if="item.href === '/models' && subItem.anchorId && modelCountFor(subItem) > 0"
+                        v-else-if="item.href === '/models' && subItem.anchorId && modelsFor(subItem) > 0"
                         :class="[
                           'px-1.5 py-0.5 text-[10px] font-semibold leading-none',
-                          isSubItemActive(subItem) ? 'text-foreground' : 'text-muted-foreground',
+                          subActive(subItem) ? 'text-foreground' : 'text-muted-foreground',
                         ]"
                       >
-                        {{ modelCountFor(subItem) }}
+                        {{ modelsFor(subItem) }}
                       </span>
                     </NuxtLink>
                   </template>
                 </template>
                 <p
-                  v-else-if="isAccountsNavItem(item)"
+                  v-else-if="accountsItem(item)"
                   :class="[
                     'min-h-6 px-2.5 py-1.5 text-[11px] text-muted-foreground transition-opacity',
-                    hasResolvedPinnedProviders ? 'opacity-100' : 'opacity-0',
+                    pinnedResolved ? 'opacity-100' : 'opacity-0',
                   ]"
-                  :aria-hidden="!hasResolvedPinnedProviders"
+                  :aria-hidden="!pinnedResolved"
                 >
                   No pinned providers.
                 </p>
@@ -539,16 +539,16 @@ async function handleAuditSelected() {
               <button
                 v-if="item.children?.length"
                 type="button"
-                :aria-expanded="isSupportItemOpen(item)"
+                :aria-expanded="supportOpen(item)"
                 :class="[
                   'group flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-all',
-                  isSupportItemActive(item) ? 'text-foreground' : 'text-muted-foreground hover:text-foreground/70',
+                  supportActive(item) ? 'text-foreground' : 'text-muted-foreground hover:text-foreground/70',
                 ]"
-                @click="toggleSupportItem(item)"
+                @click="toggleSupport(item)"
               >
-                <UiIcon :name="item.icon" :class="['size-4', isSupportItemActive(item) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground/70']" />
+                <UiIcon :name="item.icon" :class="['size-4', supportActive(item) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground/70']" />
                 <span class="min-w-0 flex-1 truncate">{{ item.name }}</span>
-                <UiIcon name="i-lucide-chevron-down" :class="['size-3.5 transition-transform', isSupportItemOpen(item) ? 'rotate-0' : '-rotate-90']" />
+                <UiIcon name="i-lucide-chevron-down" :class="['size-3.5 transition-transform', supportOpen(item) ? 'rotate-0' : '-rotate-90']" />
               </button>
               <NuxtLink
                 v-else
@@ -564,7 +564,7 @@ async function handleAuditSelected() {
                 {{ item.name }}
               </NuxtLink>
 
-              <div v-if="item.children?.length && isSupportItemOpen(item)" class="ml-6 space-y-1 border-l border-border/60 pl-3">
+              <div v-if="item.children?.length && supportOpen(item)" class="ml-6 space-y-1 border-l border-border/60 pl-3">
                 <template v-for="subItem in item.children" :key="`${item.name}-${subItem.name}`">
                   <div
                     v-if="subItem.disabled"
@@ -580,10 +580,10 @@ async function handleAuditSelected() {
                   </div>
                   <NuxtLink
                     v-else
-                    :to="subItemHref(subItem)"
+                    :to="hrefOf(subItem)"
                     :class="[
                       'flex items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors',
-                      isSubItemActive(subItem) ? 'text-foreground' : 'text-muted-foreground hover:text-foreground/70',
+                      subActive(subItem) ? 'text-foreground' : 'text-muted-foreground hover:text-foreground/70',
                     ]"
                     @click="handleNavClick(subItem, $event)"
                   >
@@ -667,7 +667,7 @@ async function handleAuditSelected() {
                             type="button"
                             aria-label="Change"
                             class="inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md border border-border/70 bg-background/80 text-muted-foreground shadow-xs outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                            @click="openAuditDialog"
+                            @click="openAudit"
                           >
                             <UiIcon name="i-lucide-refresh-cw" class="size-3.5" />
                           </button>
@@ -719,14 +719,14 @@ async function handleAuditSelected() {
                     v-if="isMaintainer && !isAuditMode"
                     type="button"
                     class="relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-left text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
-                    @click="openAuditDialog"
+                    @click="openAudit"
                   >
                     Auditing
                   </button>
                   <button
                     type="button"
                     class="relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-left text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
-                    @click="handleSignOut"
+                    @click="signOut"
                   >
                     Sign out
                   </button>
@@ -750,14 +750,14 @@ async function handleAuditSelected() {
       v-model:open="mobileOpen"
       side="left"
       :ui="{ overlay: 'touch-none', content: 'w-[78vw] max-w-[18rem] p-0' }"
-      :overlay-style="mobileSheetOverlayStyle"
-      :content-style="mobileSheetContentStyle"
-      @overlay-click="handleMobileOverlayClick"
-      @overlay-pointer-down="handleMobileOverlayPointerDown"
-      @overlay-pointer-move="handleMobileOverlayPointerMove"
-      @overlay-pointer-up="finishMobileOverlaySwipe"
-      @overlay-pointer-cancel="finishMobileOverlaySwipe"
-      @content-pointer-down-outside="handleMobileSheetPointerDownOutside"
+      :overlay-style="sheetOverlayStyle"
+      :content-style="sheetContentStyle"
+      @overlay-click="overlayClick"
+      @overlay-pointer-down="overlayPointerDown"
+      @overlay-pointer-move="overlayPointerMove"
+      @overlay-pointer-up="finishSwipe"
+      @overlay-pointer-cancel="finishSwipe"
+      @content-pointer-down-outside="sheetPointerDown"
     >
       <template #content>
         <div class="flex h-full flex-col bg-background">
@@ -797,8 +797,8 @@ async function handleAuditSelected() {
                   </NuxtLink>
 
                   <div v-if="item.children?.length" class="ml-6 space-y-1 border-l border-border/60 pl-3">
-                    <template v-if="visibleSubItems(item).length">
-                      <template v-for="subItem in visibleSubItems(item)" :key="`mobile-${item.name}-${subItem.name}`">
+                    <template v-if="subItems(item).length">
+                      <template v-for="subItem in subItems(item)" :key="`mobile-${item.name}-${subItem.name}`">
                         <div
                           v-if="subItem.disabled"
                           class="flex cursor-default items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground/60"
@@ -812,7 +812,7 @@ async function handleAuditSelected() {
                           </span>
                         </div>
                         <div
-                          v-else-if="isSwitchSubItem(subItem)"
+                          v-else-if="isSwitch(subItem)"
                           :class="[
                             'flex w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-xs font-medium outline-none transition-colors',
                             'cursor-pointer text-muted-foreground hover:text-foreground/70',
@@ -858,8 +858,8 @@ async function handleAuditSelected() {
                             type="button"
                             role="switch"
                             :aria-checked="sharingEnabled"
-                            :aria-disabled="isSwitchSubItemToggleDisabled(subItem) ? true : undefined"
-                            :disabled="isSwitchSubItemToggleDisabled(subItem)"
+                            :aria-disabled="toggleDisabled(subItem) ? true : undefined"
+                            :disabled="toggleDisabled(subItem)"
                             class="inline-flex shrink-0 cursor-pointer outline-none disabled:cursor-default"
                             @click.stop="toggleSharing"
                           >
@@ -868,14 +868,14 @@ async function handleAuditSelected() {
                               aria-hidden="true"
                               :class="[
                                 'inline-flex h-3.5 w-6 shrink-0 items-center rounded-full border border-transparent shadow-xs transition-all',
-                                isSwitchSubItemToggleDisabled(subItem) ? 'bg-muted opacity-60' : sharingEnabled ? 'bg-primary' : 'bg-input/80',
+                                toggleDisabled(subItem) ? 'bg-muted opacity-60' : sharingEnabled ? 'bg-primary' : 'bg-input/80',
                               ]"
                             >
                               <span
                                 :class="[
                                   'block size-3 rounded-full transition-transform',
                                   sharingEnabled ? 'translate-x-[calc(100%-2px)]' : 'translate-x-0',
-                                  isSwitchSubItemToggleDisabled(subItem) ? 'bg-muted-foreground/50' : sharingEnabled ? 'bg-primary-foreground' : 'bg-foreground',
+                                  toggleDisabled(subItem) ? 'bg-muted-foreground/50' : sharingEnabled ? 'bg-primary-foreground' : 'bg-foreground',
                                 ]"
                               />
                             </span>
@@ -883,10 +883,10 @@ async function handleAuditSelected() {
                         </div>
                         <NuxtLink
                           v-else
-                          :to="subItemHref(subItem)"
+                          :to="hrefOf(subItem)"
                           :class="[
                             'flex items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors',
-                            isSubItemActive(subItem) ? 'text-foreground' : 'text-muted-foreground hover:text-foreground/70',
+                            subActive(subItem) ? 'text-foreground' : 'text-muted-foreground hover:text-foreground/70',
                           ]"
                           @click="handleNavClick(subItem, $event)"
                         >
@@ -897,30 +897,30 @@ async function handleAuditSelected() {
                             </UiBadge>
                           </span>
                           <AccountStatusIndicator
-                            v-if="isAccountsNavItem(item)"
-                            :account-count="accountCountByHref[subItem.href]"
-                            :active-account-count="activeAccountCountByHref[subItem.href]"
-                            :indicator="accountIndicatorByHref[subItem.href]"
+                            v-if="accountsItem(item)"
+                            :account-count="countByHref[subItem.href]"
+                            :active-account-count="activeByHref[subItem.href]"
+                            :indicator="indicatorByHref[subItem.href]"
                           />
                           <span
-                            v-else-if="item.href === '/models' && subItem.anchorId && modelCountFor(subItem) > 0"
+                            v-else-if="item.href === '/models' && subItem.anchorId && modelsFor(subItem) > 0"
                             :class="[
                               'px-1.5 py-0.5 text-[10px] font-semibold leading-none',
-                              isSubItemActive(subItem) ? 'text-foreground' : 'text-muted-foreground',
+                              subActive(subItem) ? 'text-foreground' : 'text-muted-foreground',
                             ]"
                           >
-                            {{ modelCountFor(subItem) }}
+                            {{ modelsFor(subItem) }}
                           </span>
                         </NuxtLink>
                       </template>
                     </template>
                     <p
-                      v-else-if="isAccountsNavItem(item)"
+                      v-else-if="accountsItem(item)"
                       :class="[
                         'min-h-6 px-2.5 py-1.5 text-[11px] text-muted-foreground transition-opacity',
-                        hasResolvedPinnedProviders ? 'opacity-100' : 'opacity-0',
+                        pinnedResolved ? 'opacity-100' : 'opacity-0',
                       ]"
-                      :aria-hidden="!hasResolvedPinnedProviders"
+                      :aria-hidden="!pinnedResolved"
                     >
                       No pinned providers.
                     </p>
@@ -935,16 +935,16 @@ async function handleAuditSelected() {
                   <button
                     v-if="item.children?.length"
                     type="button"
-                    :aria-expanded="isSupportItemOpen(item)"
+                    :aria-expanded="supportOpen(item)"
                     :class="[
                       'group flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-all',
-                      isSupportItemActive(item) ? 'text-foreground' : 'text-muted-foreground hover:text-foreground/70',
+                      supportActive(item) ? 'text-foreground' : 'text-muted-foreground hover:text-foreground/70',
                     ]"
-                    @click="toggleSupportItem(item)"
+                    @click="toggleSupport(item)"
                   >
-                    <UiIcon :name="item.icon" :class="['size-4', isSupportItemActive(item) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground/70']" />
+                    <UiIcon :name="item.icon" :class="['size-4', supportActive(item) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground/70']" />
                     <span class="min-w-0 flex-1 truncate">{{ item.name }}</span>
-                    <UiIcon name="i-lucide-chevron-down" :class="['size-3.5 transition-transform', isSupportItemOpen(item) ? 'rotate-0' : '-rotate-90']" />
+                    <UiIcon name="i-lucide-chevron-down" :class="['size-3.5 transition-transform', supportOpen(item) ? 'rotate-0' : '-rotate-90']" />
                   </button>
                   <NuxtLink
                     v-else
@@ -960,7 +960,7 @@ async function handleAuditSelected() {
                     {{ item.name }}
                   </NuxtLink>
 
-                  <div v-if="item.children?.length && isSupportItemOpen(item)" class="ml-6 space-y-1 border-l border-border/60 pl-3">
+                  <div v-if="item.children?.length && supportOpen(item)" class="ml-6 space-y-1 border-l border-border/60 pl-3">
                     <template v-for="subItem in item.children" :key="`mobile-${item.name}-${subItem.name}`">
                       <div
                         v-if="subItem.disabled"
@@ -976,10 +976,10 @@ async function handleAuditSelected() {
                       </div>
                       <NuxtLink
                         v-else
-                        :to="subItemHref(subItem)"
+                        :to="hrefOf(subItem)"
                         :class="[
                           'flex items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors',
-                          isSubItemActive(subItem) ? 'text-foreground' : 'text-muted-foreground hover:text-foreground/70',
+                          subActive(subItem) ? 'text-foreground' : 'text-muted-foreground hover:text-foreground/70',
                         ]"
                         @click="handleNavClick(subItem, $event)"
                       >
@@ -1000,19 +1000,19 @@ async function handleAuditSelected() {
       </template>
     </UiSheet>
 
-    <UiDialog v-model:open="disableSharingDialogOpen" :ui="{ content: 'sm:max-w-[400px]' }">
+    <UiDialog v-model:open="sharingDialog" :ui="{ content: 'sm:max-w-[400px]' }">
       <template #content>
         <div class="space-y-1.5 pr-6">
           <h2 class="text-lg font-semibold leading-none tracking-tight">Stop Sharing</h2>
           <p class="text-sm text-muted-foreground">You won't earn points anymore?</p>
         </div>
         <div class="flex justify-end gap-2">
-          <UiButton variant="outline" size="sm" @click="cancelDisableSharing">Cancel</UiButton>
+          <UiButton variant="outline" size="sm" @click="cancelSharing">Cancel</UiButton>
           <UiButton variant="destructive" size="sm" @click="disableSharing">Stop</UiButton>
         </div>
       </template>
     </UiDialog>
 
-    <MaintainerAuditDialog v-model:open="auditDialogOpen" @selected="handleAuditSelected" />
+    <MaintainerAuditDialog v-model:open="auditDialogOpen" @selected="auditSelected" />
   </div>
 </template>

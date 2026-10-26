@@ -1,12 +1,12 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { Effect } from "effect";
 
-import type { ModelListItem, ModelSearchItem, ModelStatsData, ModelStatsInput, SetModelEnabledInput, SetModelEnabledResult } from "@opendum/providers/contract";
+import type { ModelListItem, ModelSearchItem, ModelStatsData, ModelStatsInput, EnableModelInput, EnableModelResult } from "@opendum/providers/contract";
 import { db, disabledModel } from "@opendum/database";
-import { getModelStatsByModel } from "#web/lib/model-stats.js";
-import { getAccountModelAvailability, invalidateDisabledModelsCache, usable, type AccountModelAvailability } from "#web/lib/proxy/auth.js";
-import { MODEL_REGISTRY, getAllModels, getModelFamily, getModelLookupKeys, getProvidersForModel, isModelSupported, resolveModelAlias } from "#web/lib/proxy/models.js";
-import { compareModelEntries } from "@opendum/models/sort";
+import { statsByModel } from "#web/lib/model-stats.js";
+import { modelAvailability, invalidateDisabled, usable, type AccountModelAvailability } from "#web/lib/proxy/auth.js";
+import { MODEL_REGISTRY, allModels, familyOf, keysOf, providersFor, supportsModel, aliasOf } from "#web/lib/proxy/models.js";
+import { compareEntries } from "@opendum/models/sort";
 import { fromEffect, fromPromise } from "#web/lib/task.js";
 import { internal } from "#web/errors.js";
 
@@ -19,7 +19,7 @@ function modelInfo(model: string) {
   };
 }
 
-const getAvailableModelsForUser = Effect.fn("models.getAvailableModelsForUser")(function* (
+const availableFor = Effect.fn("models.availableFor")(function* (
   userId: string
 ) {
   const [disabledModels, availability] = yield* Effect.all(
@@ -32,7 +32,7 @@ const getAvailableModelsForUser = Effect.fn("models.getAvailableModelsForUser")(
             .where(eq(disabledModel.userId, userId)),
         "Failed to load disabled models"
       ),
-      getAccountModelAvailability(userId),
+      modelAvailability(userId),
     ],
     { concurrency: "unbounded" }
   );
@@ -41,27 +41,27 @@ const getAvailableModelsForUser = Effect.fn("models.getAvailableModelsForUser")(
     availability,
     disabledModelSet: new Set(disabledModels.map((entry) => {
       const model = entry.model.trim();
-      const canonical = resolveModelAlias(model);
-      return isModelSupported(canonical) ? canonical : model;
+      const canonical = aliasOf(model);
+      return supportsModel(canonical) ? canonical : model;
     })),
-    models: getAllModels()
+    models: allModels()
       .filter((model) => usable(model, availability))
-      .sort((a, b) => compareModelEntries({ id: a, family: getModelFamily(a) }, { id: b, family: getModelFamily(b) })),
+      .sort((a, b) => compareEntries({ id: a, family: familyOf(a) }, { id: b, family: familyOf(b) })),
   };
 });
 
 function modelProviders(model: string, availability: AccountModelAvailability, options: { all?: boolean } = {}): string[] {
-  const canonical = resolveModelAlias(model);
-  if (options.all) return getProvidersForModel(model);
+  const canonical = aliasOf(model);
+  if (options.all) return providersFor(model);
 
-  const providers = getProvidersForModel(model).filter((provider) => availability.activeProviders.has(provider));
+  const providers = providersFor(model).filter((provider) => availability.activeProviders.has(provider));
   for (const [provider, models] of availability.customProviderModels) {
     if (models.has(canonical) && (availability.accountCountByProvider.get(provider) ?? 0) > 0) providers.push(provider);
   }
   return providers;
 }
 
-function customModelEntries(availability: AccountModelAvailability): Array<{ id: string; slug: string; modelId: string }> {
+function customEntries(availability: AccountModelAvailability): Array<{ id: string; slug: string; modelId: string }> {
   const entries: Array<{ id: string; slug: string; modelId: string }> = [];
   for (const [slug, modelIds] of availability.customProviderStandaloneModels) {
     if ((availability.accountCountByProvider.get(slug) ?? 0) === 0) continue;
@@ -84,36 +84,36 @@ const listModelsInner = Effect.fnUntraced(function* (
   options: { includeStats?: boolean } = {}
 ) {
   const includeStats = options.includeStats ?? true;
-  const { availability, disabledModelSet, models: availableModels } = yield* getAvailableModelsForUser(
+  const { availability, disabledModelSet, models: availableModels } = yield* availableFor(
     userId
   );
   const availableSet = new Set(availableModels);
-  const statsByModel = includeStats
-    ? yield* fromEffect(getModelStatsByModel(userId, availableModels), "Failed to load model stats")
+  const modelStats = includeStats
+    ? yield* fromEffect(statsByModel(userId, availableModels), "Failed to load model stats")
     : ({} as Record<string, ModelStatsData[string]>);
 
     const result: ModelListItem[] = [
-      ...getAllModels()
-        .sort((a, b) => compareModelEntries({ id: a, family: getModelFamily(a) }, { id: b, family: getModelFamily(b) }))
+      ...allModels()
+        .sort((a, b) => compareEntries({ id: a, family: familyOf(a) }, { id: b, family: familyOf(b) }))
         .map((model): ModelListItem => {
           const available = availableSet.has(model);
           return {
             id: model,
             name: model,
-            family: getModelFamily(model) ?? "Others",
+            family: familyOf(model) ?? "Others",
             providers: modelProviders(model, availability, { all: !available }),
             ...modelInfo(model),
             isEnabled: !disabledModelSet.has(model),
             available,
-            ...(includeStats && available ? { stats: statsByModel[model] } : {}),
+            ...(includeStats && available ? { stats: modelStats[model] } : {}),
           };
         }),
-      ...customModelEntries(availability).map((entry): ModelListItem => {
-        const canonical = resolveModelAlias(entry.modelId);
+      ...customEntries(availability).map((entry): ModelListItem => {
+        const canonical = aliasOf(entry.modelId);
         return {
           id: entry.id,
           name: entry.id,
-          family: getModelFamily(entry.modelId) ?? "Others",
+          family: familyOf(entry.modelId) ?? "Others",
           providers: [entry.slug],
           ...modelInfo(canonical),
           isEnabled: !disabledModelSet.has(entry.id),
@@ -125,8 +125,8 @@ const listModelsInner = Effect.fnUntraced(function* (
     return result;
 });
 
-export function listKnownModels(): string[] {
-  return getAllModels().sort((left, right) => compareModelEntries({ id: left, family: getModelFamily(left) }, { id: right, family: getModelFamily(right) }));
+export function knownModels(): string[] {
+  return allModels().sort((left, right) => compareEntries({ id: left, family: familyOf(left) }, { id: right, family: familyOf(right) }));
 }
 
 export const searchModels = Effect.fn("models.searchModels")(function* (userId: string) {
@@ -136,7 +136,7 @@ export const searchModels = Effect.fn("models.searchModels")(function* (userId: 
 });
 
 const searchModelsInner = Effect.fnUntraced(function* (userId: string) {
-    const { availability, disabledModelSet, models } = yield* getAvailableModelsForUser(userId);
+    const { availability, disabledModelSet, models } = yield* availableFor(userId);
 
     return [
       ...models.map((model): ModelSearchItem => ({
@@ -145,7 +145,7 @@ const searchModelsInner = Effect.fnUntraced(function* (userId: string) {
         ...modelInfo(model),
         isEnabled: !disabledModelSet.has(model),
       })),
-      ...customModelEntries(availability).map((entry): ModelSearchItem => ({
+      ...customEntries(availability).map((entry): ModelSearchItem => ({
         id: entry.id,
         providers: [entry.slug],
         isEnabled: !disabledModelSet.has(entry.id),
@@ -158,62 +158,62 @@ export const getModelStats = Effect.fn("models.getModelStats")(function* (
   userId: string,
   input: ModelStatsInput
 ) {
-  const { models } = yield* getAvailableModelsForUser(userId);
+  const { models } = yield* availableFor(userId);
   const availableModelSet = new Set(models);
   const requestedModels = Array.from(
     new Set(
       input.models
-        .map((model) => resolveModelAlias(model.trim()))
-        .filter((model) => model && isModelSupported(model) && availableModelSet.has(model))
+        .map((model) => aliasOf(model.trim()))
+        .filter((model) => model && supportsModel(model) && availableModelSet.has(model))
     )
   );
 
   if (requestedModels.length === 0) return {} as ModelStatsData;
 
   return yield* fromEffect(
-    getModelStatsByModel(userId, requestedModels),
+    statsByModel(userId, requestedModels),
     "Failed to load model stats"
   ).pipe(Effect.mapError((failure) => internal(failure.message, failure.cause)));
 });
 
-export function getModelFamilyCounts() {
-  return getAllModels().reduce<Record<string, number>>((counts, model) => {
-    const family = getModelFamily(model) ?? "Others";
+export function familyCounts() {
+  return allModels().reduce<Record<string, number>>((counts, model) => {
+    const family = familyOf(model) ?? "Others";
     counts[family] = (counts[family] ?? 0) + 1;
     return counts;
   }, {});
 }
 
-export const setModelEnabled = Effect.fn("models.setModelEnabled")(function* (
+export const enableModel = Effect.fn("models.enableModel")(function* (
   userId: string,
-  input: SetModelEnabledInput
+  input: EnableModelInput
 ) {
-  return yield* setModelEnabledInner(userId, input).pipe(
+  return yield* enableInner(userId, input).pipe(
     Effect.catch((failure) =>
       Effect.succeed({
         success: false,
         error: failure.message === "Model not found" ? failure.message : "Failed to update model status",
-      } as const satisfies SetModelEnabledResult)
+      } as const satisfies EnableModelResult)
     )
   );
 });
 
-const setModelEnabledInner = Effect.fnUntraced(function* (
+const enableInner = Effect.fnUntraced(function* (
   userId: string,
-  input: SetModelEnabledInput
+  input: EnableModelInput
 ) {
   const modelId = input.modelId.trim();
 
-  const canonical = resolveModelAlias(modelId);
-  const normalizedModel = isModelSupported(canonical)
+  const canonical = aliasOf(modelId);
+  const normalizedModel = supportsModel(canonical)
     ? canonical
-    : customModelEntries(yield* getAccountModelAvailability(userId)).find((entry) => entry.id === modelId)
+    : customEntries(yield* modelAvailability(userId)).find((entry) => entry.id === modelId)
         ?.id;
   if (!normalizedModel) {
-    return { success: false, error: "Model not found" } as const satisfies SetModelEnabledResult;
+    return { success: false, error: "Model not found" } as const satisfies EnableModelResult;
   }
 
-  const lookupKeys = isModelSupported(canonical) ? getModelLookupKeys(normalizedModel) : [normalizedModel];
+  const lookupKeys = supportsModel(canonical) ? keysOf(normalizedModel) : [normalizedModel];
   yield* fromPromise(
     () =>
       db
@@ -232,10 +232,10 @@ const setModelEnabledInner = Effect.fnUntraced(function* (
     );
   }
 
-  yield* invalidateDisabledModelsCache(userId);
+  yield* invalidateDisabled(userId);
 
   return {
     success: true,
     data: { model: normalizedModel, enabled: input.enabled },
-  } as const satisfies SetModelEnabledResult;
+  } as const satisfies EnableModelResult;
 });

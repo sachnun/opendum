@@ -2,13 +2,13 @@ import { eq } from "drizzle-orm";
 import { Effect } from "effect";
 import { db, type DbExecutor } from "../client.js";
 import { tryDb } from "../errors.js";
-import { proxyApiKey, proxyApiKeyRateLimit } from "../schema/keys.js";
+import { proxyApiKey, keyRateLimit } from "../schema/keys.js";
 
-export const getAPIKeyByHash = Effect.fn("db.getAPIKeyByHash")(function* (
+export const keyByHash = Effect.fn("db.keyByHash")(function* (
   keyHash: string,
   database: DbExecutor = db
 ) {
-  const rows = yield* tryDb("getAPIKeyByHash", () =>
+  const rows = yield* tryDb("keyByHash", () =>
     database
       .select({
         id: proxyApiKey.id,
@@ -29,11 +29,11 @@ export const getAPIKeyByHash = Effect.fn("db.getAPIKeyByHash")(function* (
   return rows[0] ?? null;
 });
 
-export const getAPIKeyFreshnessByID = Effect.fn("db.getAPIKeyFreshnessByID")(function* (
+export const freshnessById = Effect.fn("db.freshnessById")(function* (
   id: string,
   database: DbExecutor = db
 ) {
-  const rows = yield* tryDb("getAPIKeyFreshnessByID", () =>
+  const rows = yield* tryDb("freshnessById", () =>
     database
       .select({
         id: proxyApiKey.id,
@@ -48,29 +48,29 @@ export const getAPIKeyFreshnessByID = Effect.fn("db.getAPIKeyFreshnessByID")(fun
   return rows[0] ?? null;
 });
 
-export const listAPIKeyRateLimits = Effect.fn("db.listAPIKeyRateLimits")(function* (
+export const rateLimits = Effect.fn("db.rateLimits")(function* (
   apiKeyId: string,
   database: DbExecutor = db
 ) {
-  return yield* tryDb("listAPIKeyRateLimits", () =>
+  return yield* tryDb("rateLimits", () =>
     database
       .select({
-        target: proxyApiKeyRateLimit.target,
-        targetType: proxyApiKeyRateLimit.targetType,
-        perMinute: proxyApiKeyRateLimit.perMinute,
-        perHour: proxyApiKeyRateLimit.perHour,
-        perDay: proxyApiKeyRateLimit.perDay,
+        target: keyRateLimit.target,
+        targetType: keyRateLimit.targetType,
+        perMinute: keyRateLimit.perMinute,
+        perHour: keyRateLimit.perHour,
+        perDay: keyRateLimit.perDay,
       })
-      .from(proxyApiKeyRateLimit)
-      .where(eq(proxyApiKeyRateLimit.apiKeyId, apiKeyId))
+      .from(keyRateLimit)
+      .where(eq(keyRateLimit.apiKeyId, apiKeyId))
   );
 });
 
-export const touchAPIKeyLastUsed = Effect.fn("db.touchAPIKeyLastUsed")(function* (
+export const touchLastUsed = Effect.fn("db.touchLastUsed")(function* (
   id: string,
   database: DbExecutor = db
 ) {
-  yield* tryDb("touchAPIKeyLastUsed", () =>
+  yield* tryDb("touchLastUsed", () =>
     database.update(proxyApiKey).set({ lastUsedAt: new Date() }).where(eq(proxyApiKey.id, id))
   );
 });

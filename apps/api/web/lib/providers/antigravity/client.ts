@@ -7,28 +7,28 @@ import { fetchExternalEffect } from "#web/lib/external.js";
 import { fromPromise } from "#web/lib/task.js";
 import { unavailable } from "#web/errors.js";
 import type { OAuthResult } from "../types.js";
-import { formatProviderHttpError } from "../provider-http-errors.js";
+import { httpError } from "../provider-http-errors.js";
 import {
   AUTH_HEADERS,
   CLIENT_ID,
   CLIENT_SECRET,
   DEFAULT_PROJECT_ID,
-  LOAD_CODE_ASSIST_ENDPOINTS,
+  LOAD_ENDPOINTS,
   ONBOARD_USER_ENDPOINTS,
   REFRESH_BUFFER_SECONDS,
 } from "./constants.js";
 
-function isTokenExpired(expiresAt: Date): boolean {
+function tokenExpired(expiresAt: Date): boolean {
   const bufferMs = REFRESH_BUFFER_SECONDS * 1000;
   return Date.now() > expiresAt.getTime() - bufferMs;
 }
 
-function normalizeAntigravityTierId(value: unknown): string {
+function normalizeTier(value: unknown): string {
   return typeof value === "string" ? value.trim().toLowerCase() : "";
 }
 
-function isPaidAntigravityTierId(value: string): boolean {
-  const normalized = normalizeAntigravityTierId(value);
+function isPaid(value: string): boolean {
+  const normalized = normalizeTier(value);
   if (!normalized || normalized === "free-tier") return false;
   return normalized === "paid" || normalized === "standard-tier" || normalized.startsWith("g1-");
 }
@@ -61,7 +61,7 @@ const exchangeAntigravityCode = Effect.fn("antigravity.exchangeCode")(function* 
   if (!response.ok) {
     const error = yield* readText(response);
     return yield* unavailable(
-      formatProviderHttpError("Antigravity", response, error, {
+      httpError("Antigravity", response, error, {
         endpointLabel: "token exchange endpoint",
       })
     );
@@ -97,7 +97,7 @@ const refreshAntigravityToken = Effect.fn("antigravity.refreshToken")(function* 
   if (!response.ok) {
     const error = yield* readText(response);
     return yield* unavailable(
-      formatProviderHttpError("Antigravity", response, error, {
+      httpError("Antigravity", response, error, {
         endpointLabel: "token refresh endpoint",
       })
     );
@@ -118,11 +118,11 @@ const refreshAntigravityToken = Effect.fn("antigravity.refreshToken")(function* 
   } satisfies OAuthResult;
 });
 
-const getValidAntigravityCredentials = Effect.fn("antigravity.getValidCredentials")(function* (
+const validCredentials = Effect.fn("antigravity.getValidCredentials")(function* (
   account: CredentialAccount
 ) {
   const accessToken = decrypt(account.accessToken);
-  if (!isTokenExpired(account.expiresAt)) return accessToken;
+  if (!tokenExpired(account.expiresAt)) return accessToken;
 
   const refreshed = yield* refreshAntigravityToken(decrypt(account.refreshToken)).pipe(
     Effect.catch((error) =>
@@ -153,7 +153,7 @@ const getValidAntigravityCredentials = Effect.fn("antigravity.getValidCredential
 export const antigravityProvider = {
   exchangeCode: exchangeAntigravityCode,
   refreshToken: refreshAntigravityToken,
-  getValidCredentials: getValidAntigravityCredentials,
+  getValidCredentials: validCredentials,
 };
 
 const fetchAccountInfo = Effect.fn("antigravity.fetchAccountInfo")(function* (accessToken: string) {
@@ -169,7 +169,7 @@ const fetchAccountInfo = Effect.fn("antigravity.fetchAccountInfo")(function* (ac
   let currentTier: Record<string, unknown> | null = null;
   let allowedTiers: Array<Record<string, unknown>> = [];
 
-  for (const baseEndpoint of LOAD_CODE_ASSIST_ENDPOINTS) {
+  for (const baseEndpoint of LOAD_ENDPOINTS) {
     const loaded = yield* Effect.gen(function* () {
       const response = yield* fetchExternalEffect(`${baseEndpoint}/v1internal:loadCodeAssist`, {
         method: "POST",
@@ -199,24 +199,24 @@ const fetchAccountInfo = Effect.fn("antigravity.fetchAccountInfo")(function* (ac
     }
 
     const data = loaded.data;
-    projectId = extractProjectId(data);
+    projectId = projectFrom(data);
     currentTier = (data.currentTier as Record<string, unknown>) ?? null;
     allowedTiers = (data.allowedTiers as Array<Record<string, unknown>>) ?? [];
 
-    const currentTierId = extractTierId(currentTier);
+    const currentTierId = tierId(currentTier);
     if (currentTierId) {
       detectedTier = currentTierId;
     }
 
     const defaultTier = allowedTiers.find((tier) => tier.isDefault);
-    const defaultTierId = extractTierId(defaultTier ?? null);
+    const defaultTierId = tierId(defaultTier ?? null);
     if (!currentTierId && defaultTierId) {
       detectedTier = defaultTierId;
     }
 
-    const paidTier = data.paidTier as Record<string, unknown> | undefined;
-    const paidTierId = extractTierId(paidTier ?? null);
-    if (paidTierId && isPaidAntigravityTierId(paidTierId)) {
+    const paidInfo = data.paidTier as Record<string, unknown> | undefined;
+    const paidTierId = tierId(paidInfo ?? null);
+    if (paidTierId && isPaid(paidTierId)) {
       detectedTier = paidTierId;
     }
 
@@ -253,7 +253,7 @@ const fetchAccountInfo = Effect.fn("antigravity.fetchAccountInfo")(function* (ac
   return { projectId, tier: detectedTier, email };
 });
 
-function extractProjectId(data: Record<string, unknown>): string {
+function projectFrom(data: Record<string, unknown>): string {
   const cloudProject = data.cloudaicompanionProject;
 
   if (typeof cloudProject === "string" && cloudProject) {
@@ -271,9 +271,9 @@ function extractProjectId(data: Record<string, unknown>): string {
   return "";
 }
 
-function extractTierId(tier: Record<string, unknown> | null): string {
+function tierId(tier: Record<string, unknown> | null): string {
   if (!tier) return "";
-  return normalizeAntigravityTierId(tier.id) || normalizeAntigravityTierId(tier.name);
+  return normalizeTier(tier.id) || normalizeTier(tier.name);
 }
 
 const onboardUser = Effect.fn("antigravity.onboardUser")(function* (
@@ -335,9 +335,9 @@ const onboardUser = Effect.fn("antigravity.onboardUser")(function* (
       if (!lroData.done) return null;
 
       const lroResponse = (lroData.response ?? lroData) as Record<string, unknown>;
-      const projectId = extractProjectId(lroResponse);
+      const projectId = projectFrom(lroResponse);
       if (!projectId) return null;
-      return { projectId, tier: normalizeAntigravityTierId(tierId) || "free-tier" };
+      return { projectId, tier: normalizeTier(tierId) || "free-tier" };
     }).pipe(Effect.catch(() => Effect.succeed(null)));
 
     if (onboarded) return onboarded;

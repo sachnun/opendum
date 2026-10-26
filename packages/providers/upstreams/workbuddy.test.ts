@@ -4,7 +4,7 @@ import type { Registry } from "@opendum/models/runtime";
 import { WORKBUDDY_BASE_URL, WORKBUDDY_DOMAIN } from "../endpoints.js";
 import type { UpstreamTransport } from "../core/http.js";
 import type { ProviderAccount } from "../types.js";
-import { WorkbuddyProvider, workbuddyStreamToCompletion } from "./workbuddy.js";
+import { WorkbuddyProvider, fromStream } from "./workbuddy.js";
 
 const account = { id: "acc-1" } as unknown as ProviderAccount;
 const FALLBACK_TTL_MS = 31536000 * 1000;
@@ -298,7 +298,7 @@ describe("WorkbuddyProvider.makeRequest", () => {
   });
 });
 
-describe("workbuddyStreamToCompletion", () => {
+describe("fromStream", () => {
   it("aggregates content, reasoning and tool call fragments", () => {
     const sse = [
       'data: {"choices":[{"delta":{"content":"he"}}]}',
@@ -309,7 +309,7 @@ describe("workbuddyStreamToCompletion", () => {
       "data: [DONE]",
     ].join("\n");
 
-    const completion = workbuddyStreamToCompletion(sse, "gpt-5.1-codex");
+    const completion = fromStream(sse, "gpt-5.1-codex");
     expect(completion.id).toBe("chatcmpl-workbuddy");
     expect(completion.model).toBe("gpt-5.1-codex");
     const choice = (completion.choices as Array<Record<string, unknown>>)[0] as Record<string, unknown>;
@@ -328,7 +328,7 @@ describe("workbuddyStreamToCompletion", () => {
       'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}',
     ].join("\n");
 
-    const completion = workbuddyStreamToCompletion(sse, "m");
+    const completion = fromStream(sse, "m");
     const choice = (completion.choices as Array<Record<string, unknown>>)[0] as Record<string, unknown>;
     const message = choice.message as Record<string, unknown>;
     expect(choice.finish_reason).toBe("tool_calls");

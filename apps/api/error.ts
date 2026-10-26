@@ -1,11 +1,11 @@
 import { defineErrorHandler, HTTPError } from "nitro";
-import { errorEnvelope, formatForPath, isInferencePath } from "./handlers/errors.js";
+import { errorEnvelope, formatPath, inferencePath } from "./handlers/errors.js";
 
 export default defineErrorHandler((error, event) => {
   const pathname = new URL(event.req.url).pathname;
-  if (!isInferencePath(pathname)) return;
+  if (!inferencePath(pathname)) return;
 
-  const format = formatForPath(pathname);
+  const format = formatPath(pathname);
   if (HTTPError.isError(error) && !error.unhandled) {
     const status = error.status ?? 500;
     const message = error.message || error.statusText || "Request failed";

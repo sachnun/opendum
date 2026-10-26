@@ -45,7 +45,7 @@ export function normalizeName(value: unknown): string {
     .replace(/^-|-$/g, "");
 }
 
-export function stripDateSuffix(value: string): string {
+export function stripDate(value: string): string {
   const parts = value.split("-");
   const last = parts[parts.length - 1];
   if (parts.length > 1 && last !== undefined && /^\d{4,8}$/.test(last)) {
@@ -55,7 +55,7 @@ export function stripDateSuffix(value: string): string {
 }
 
 export function normalizeKey(value: unknown): string {
-  return stripDateSuffix(normalizeName(value));
+  return stripDate(normalizeName(value));
 }
 
 import { ratio, token_sort_ratio } from "fuzzball";
@@ -73,11 +73,11 @@ export function similarityScore(left: string, right: string): number {
   const b = right.replace(/-/g, "");
   if (a === b) return 1;
   if (a.length === 0 || b.length === 0) return 0;
-  if (hasTokenPrefix(left, right)) return 0.95;
+  if (hasPrefix(left, right)) return 0.95;
   return Math.max(editSimilarity(left, right), reorderedSimilarity(left, right));
 }
 
-function hasTokenPrefix(left: string, right: string): boolean {
+function hasPrefix(left: string, right: string): boolean {
   const a = left.split("-").filter(Boolean);
   const b = right.split("-").filter(Boolean);
   if (a.length === 0 || b.length === 0 || a.length === b.length) return false;
@@ -113,7 +113,7 @@ export function isCompatible(left: string, right: string): boolean {
   return !(onlyLeft && onlyRight);
 }
 
-function sharedPrefixLength(left: string, right: string): number {
+function prefixLength(left: string, right: string): number {
   const a = left.split("-");
   const b = right.split("-");
   let index = 0;
@@ -167,7 +167,7 @@ export function resolveCandidates<TEntry>(
       if (score < threshold || !isCompatible(key, indexedKey)) continue;
       if (score < 0.9 && familyToken(key) !== familyToken(indexedKey)) continue;
 
-      const prefix = sharedPrefixLength(key, indexedKey);
+      const prefix = prefixLength(key, indexedKey);
       const better = !match
         || prefix > (match.prefix ?? 0)
         || (prefix === (match.prefix ?? 0) && score > (match.score ?? 0));

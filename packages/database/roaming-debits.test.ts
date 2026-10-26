@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { Effect } from "effect";
 import { drizzle } from "drizzle-orm/bun-sql";
 
-import { listOrphanedRoamingDebits } from "./queries/usage-points.js";
+import { listOrphaned } from "./queries/usage-points.js";
 import type { DbExecutor } from "./client.js";
 
 function captureSql(): { database: DbExecutor; statements: Array<{ sql: string; params: unknown[] }> } {
@@ -19,11 +19,11 @@ function captureSql(): { database: DbExecutor; statements: Array<{ sql: string; 
   return { database: db as unknown as DbExecutor, statements };
 }
 
-describe("listOrphanedRoamingDebits", () => {
+describe("listOrphaned", () => {
   it("treats every terminal marker as evidence the reservation closed", async () => {
     const { database, statements } = captureSql();
 
-    await Effect.runPromise(listOrphanedRoamingDebits({ olderThan: new Date(0), limit: 10 }, database));
+    await Effect.runPromise(listOrphaned({ olderThan: new Date(0), limit: 10 }, database));
 
     expect(statements).toHaveLength(1);
     const statement = statements[0]?.sql ?? "";
@@ -37,7 +37,7 @@ describe("listOrphanedRoamingDebits", () => {
     const { database, statements } = captureSql();
 
     await Effect.runPromise(
-      listOrphanedRoamingDebits({ olderThan: new Date("2025-01-01T00:00:00.000Z"), limit: 5 }, database)
+      listOrphaned({ olderThan: new Date("2025-01-01T00:00:00.000Z"), limit: 5 }, database)
     );
 
     expect(statements[0]?.params[0]).toBe("roaming_debit");
@@ -49,7 +49,7 @@ describe("listOrphanedRoamingDebits", () => {
     const createdAt = new Date(0);
 
     const rows = await Effect.runPromise(
-      listOrphanedRoamingDebits(
+      listOrphaned(
         { olderThan: createdAt, limit: 1 },
         {
           select: () => ({
