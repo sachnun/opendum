@@ -3,20 +3,20 @@ export type UserRole = "user" | "maintainer";
 const MAINTAINER_ROLE: UserRole = "maintainer";
 const USER_ROLE: UserRole = "user";
 
-let hasWarnedInvalidMaintainers = false;
+let hasWarned = false;
 
 function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
 }
 
-function warnInvalidMaintainers() {
-  if (hasWarnedInvalidMaintainers) return;
+function warnInvalid() {
+  if (hasWarned) return;
 
   console.warn("MAINTAINERS must be a JSON array of email strings. Ignoring invalid value.");
-  hasWarnedInvalidMaintainers = true;
+  hasWarned = true;
 }
 
-function getMaintainerEmails(): Set<string> {
+function maintainerEmails(): Set<string> {
   const rawValue = process.env.MAINTAINERS?.trim();
 
   if (!rawValue) {
@@ -27,7 +27,7 @@ function getMaintainerEmails(): Set<string> {
     const parsedValue = JSON.parse(rawValue) as unknown;
 
     if (!Array.isArray(parsedValue)) {
-      warnInvalidMaintainers();
+      warnInvalid();
       return new Set();
     }
 
@@ -38,13 +38,13 @@ function getMaintainerEmails(): Set<string> {
       return email ? [email] : [];
     }));
   } catch {
-    warnInvalidMaintainers();
+    warnInvalid();
     return new Set();
   }
 }
 
-export function roleForEmail(email: string | null | undefined): UserRole {
+export function roleOf(email: string | null | undefined): UserRole {
   if (!email) return USER_ROLE;
 
-  return getMaintainerEmails().has(normalizeEmail(email)) ? MAINTAINER_ROLE : USER_ROLE;
+  return maintainerEmails().has(normalizeEmail(email)) ? MAINTAINER_ROLE : USER_ROLE;
 }

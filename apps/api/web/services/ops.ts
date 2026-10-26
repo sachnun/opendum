@@ -1,11 +1,11 @@
 import { ORPCError } from "@orpc/server";
-import { assertPublicHost, PrivateHostError } from "@opendum/core/egress";
+import { assertPublic, PrivateHostError } from "@opendum/core/egress";
 import { Effect, Result } from "effect";
 
 import type { QuotaInput, RelayInput, RelayResult } from "@opendum/providers/contract";
 import type { ProxyContext } from "../../core/context.js";
-import { trySyncResult } from "../../core/helpers.js";
-import { fetchAccountQuota } from "../../core/quota.js";
+import { Safe } from "../../core/helpers.js";
+import { fetchQuota } from "../../core/quota.js";
 import { fromPromise } from "#web/lib/task.js";
 
 const RELAY_TIMEOUT_MS = 20 * 1000;
@@ -16,12 +16,12 @@ const BLOCKED_RELAY_HEADERS = new Set([
   "x-forwarded-host", "x-forwarded-proto", "x-real-ip",
 ]);
 
-const BLOCKED_RELAY_RESPONSE_HEADERS = new Set([
+const BLOCKED_HEADERS = new Set([
   "connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailer",
   "transfer-encoding", "upgrade", "content-length", "set-cookie",
 ]);
 
-export const runOpsAccountQuota = Effect.fn("ops.runAccountQuota")(function* (
+export const opsQuota = Effect.fn("ops.runAccountQuota")(function* (
   context: ProxyContext,
   input: QuotaInput
 ) {
@@ -34,7 +34,7 @@ export const runOpsAccountQuota = Effect.fn("ops.runAccountQuota")(function* (
 
   const outcome = yield* fromPromise(
     () =>
-      fetchAccountQuota(context, {
+      fetchQuota(context, {
         userId,
         provider,
         accountId,
@@ -51,7 +51,7 @@ export const runOpsAccountQuota = Effect.fn("ops.runAccountQuota")(function* (
   return { success: true as const, data: outcome.data };
 });
 
-function resolveRelayTarget(
+function relayTarget(
   url: string,
   method: string
 ): { method: string; target: string } | { error: string } {
@@ -64,7 +64,7 @@ function resolveRelayTarget(
   if (target.protocol !== "https:" || !target.hostname || target.username || target.password) {
     return { error: "url must be an https provider URL" };
   }
-  const hostCheck = trySyncResult(() => assertPublicHost(target.hostname));
+  const hostCheck = Safe.result(() => assertPublic(target.hostname));
   if (Result.isFailure(hostCheck)) {
     return {
       error:
@@ -85,7 +85,7 @@ export const runOpsRelay = Effect.fn("ops.runRelay")(function* (
   const url = (input.url ?? "").trim();
   if (!url) return yield* Effect.fail(new ORPCError("BAD_REQUEST", { message: "url is required" }));
 
-  const resolved = resolveRelayTarget(url, input.method ?? "");
+  const resolved = relayTarget(url, input.method ?? "");
   if ("error" in resolved) {
     return yield* Effect.fail(new ORPCError("BAD_REQUEST", { message: resolved.error }));
   }
@@ -122,7 +122,7 @@ export const runOpsRelay = Effect.fn("ops.runRelay")(function* (
   upstream.headers.forEach((value, key) => {
     const normalized = key.toLowerCase();
     if (normalized.startsWith("proxy-")) return;
-    if (BLOCKED_RELAY_RESPONSE_HEADERS.has(normalized)) return;
+    if (BLOCKED_HEADERS.has(normalized)) return;
     responseHeaders[key] = value;
   });
 

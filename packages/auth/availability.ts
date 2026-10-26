@@ -4,9 +4,9 @@ import type { Registry } from "@opendum/models/runtime";
 import { disabledKey, type OpendumRedis } from "@opendum/core/redis";
 import { ignore, tryAsync } from "@opendum/core/best-effort";
 import {
-  listActiveAccountTiers,
-  listDisabledModelsByAccounts,
-  listDisabledModelsByUser,
+  activeTiers,
+  disabledByAccounts,
+  disabledByUser,
   listSharedAccounts,
 } from "@opendum/database/queries";
 import type { Policy } from "./policy.js";
@@ -18,16 +18,16 @@ import { type AccountModelAvailability, emptyAvailability } from "./types.js";
 const DISABLED_TTL = 60;
 
 export type Queries = {
-  listActiveAccountTiers: typeof listActiveAccountTiers;
-  listDisabledModelsByAccounts: typeof listDisabledModelsByAccounts;
-  listDisabledModelsByUser: typeof listDisabledModelsByUser;
+  activeTiers: typeof activeTiers;
+  disabledByAccounts: typeof disabledByAccounts;
+  disabledByUser: typeof disabledByUser;
   listSharedAccounts: typeof listSharedAccounts;
 };
 
 const defaultQueries: Queries = {
-  listActiveAccountTiers,
-  listDisabledModelsByAccounts,
-  listDisabledModelsByUser,
+  activeTiers,
+  disabledByAccounts,
+  disabledByUser,
   listSharedAccounts,
 };
 
@@ -56,11 +56,11 @@ export class Availability {
 
   disabledModels(userId: string): Effect.Effect<Set<string>, DatabaseFailure> {
     return Effect.gen({ self: this }, function* () {
-      const cached = yield* this.getCachedDisabledModels(userId);
+      const cached = yield* this.cachedDisabled(userId);
       if (cached) return new Set(cached);
-      const rows = yield* this.queries.listDisabledModelsByUser(userId);
+      const rows = yield* this.queries.disabledByUser(userId);
       const modelList = disabledList(this.registry, rows.map((row) => row.trim()));
-      yield* this.setCachedDisabledModels(userId, modelList);
+      yield* this.setDisabled(userId, modelList);
       return new Set(modelList);
     });
   }
@@ -102,7 +102,7 @@ export class Availability {
       }
 
       const now = new Date();
-      const accounts = yield* this.queries.listActiveAccountTiers(
+      const accounts = yield* this.queries.activeTiers(
         userId,
         now,
         options.includeInactiveAccounts === true
@@ -126,7 +126,7 @@ export class Availability {
       }
 
       if (accountIds.length > 0) {
-        const disabledRows = yield* this.queries.listDisabledModelsByAccounts(accountIds);
+        const disabledRows = yield* this.queries.disabledByAccounts(accountIds);
         for (const row of disabledRows) {
           const provider = accountProvider.get(row.providerAccountId);
           if (!provider) continue;
@@ -166,7 +166,7 @@ export class Availability {
         }
       }
       if (sharedAccountIds.length > 0) {
-        const disabledRows = yield* this.queries.listDisabledModelsByAccounts(sharedAccountIds);
+        const disabledRows = yield* this.queries.disabledByAccounts(sharedAccountIds);
         for (const row of disabledRows) {
           const provider = sharedAccountProvider.get(row.providerAccountId);
           if (!provider) continue;
@@ -209,7 +209,7 @@ export class Availability {
     });
   }
 
-  private getCachedDisabledModels(userId: string): Effect.Effect<string[] | null> {
+  private cachedDisabled(userId: string): Effect.Effect<string[] | null> {
     return tryAsync(async () => {
       const raw = await this.redis.get(disabledKey(userId));
       if (!raw) return null;
@@ -218,7 +218,7 @@ export class Availability {
     }, null);
   }
 
-  private setCachedDisabledModels(userId: string, models: string[]): Effect.Effect<void> {
+  private setDisabled(userId: string, models: string[]): Effect.Effect<void> {
     return ignore(() =>
       this.redis.set(
         disabledKey(userId),

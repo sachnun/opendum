@@ -1,6 +1,6 @@
-import { resolveCanonicalFrom, type CanonicalIndex } from "./canonical.ts";
+import { resolveFrom, type CanonicalIndex } from "./canonical.ts";
 import { GENERATED_PROVIDER_FIELDS } from "./merge.ts";
-import { modelProbeSets } from "./probes.ts";
+import { probeSets } from "./probes.ts";
 import type { ModelData, ProviderModelConfig } from "../types.ts";
 
 export interface CanonicalizationModel {
@@ -46,7 +46,7 @@ function modelId(model: CanonicalizationModel): string {
   return id || model.fileId;
 }
 
-function mergeProviderConfig(
+function mergeConfig(
   target: Record<string, ProviderModelConfig> | undefined,
   source: Record<string, ProviderModelConfig> | undefined,
 ): Record<string, ProviderModelConfig> {
@@ -108,7 +108,7 @@ function fillMissing(target: ModelData, source: ModelData): void {
   }
 }
 
-export function authoredProviderConflict(target: ModelData, source: ModelData): string | null {
+export function providerConflict(target: ModelData, source: ModelData): string | null {
   for (const [provider, config] of Object.entries(source.providerConfig ?? {})) {
     const existing = target.providerConfig?.[provider];
     if (!existing) continue;
@@ -122,13 +122,13 @@ export function authoredProviderConflict(target: ModelData, source: ModelData): 
   return null;
 }
 
-export function applyCanonicalMerge(target: ModelData, merge: CanonicalMerge): void {
+export function applyMerge(target: ModelData, merge: CanonicalMerge): void {
   const source = merge.data;
   fillMissing(target, source);
 
   const providers = new Set([...(target.providers ?? []), ...(source.providers ?? [])]);
   target.providers = [...providers].sort();
-  target.providerConfig = mergeProviderConfig(target.providerConfig, source.providerConfig);
+  target.providerConfig = mergeConfig(target.providerConfig, source.providerConfig);
 
   const aliases = new Set([...(target.aliases ?? []), ...merge.aliases]);
   aliases.delete(merge.to);
@@ -159,9 +159,9 @@ export function planCanonicalization(
   for (const model of ordered) {
     const from = modelId(model);
     const data = model.data;
-    const probes = modelProbeSets({ id: modelId(model), fileId: model.fileId, data });
+    const probes = probeSets({ id: modelId(model), fileId: model.fileId, data });
 
-    const resolved = resolveCanonicalFrom(probes.core, canonical, { fallbackProbes: probes.aliases });
+    const resolved = resolveFrom(probes.core, canonical, { fallbackProbes: probes.aliases });
     if (!resolved) {
       unresolved.push(from);
       continue;
@@ -173,7 +173,7 @@ export function planCanonicalization(
 
     const existing = byId.get(resolved.id);
     if (existing && existing !== model) {
-      const conflict = authoredProviderConflict(existing.data, data);
+      const conflict = providerConflict(existing.data, data);
       if (conflict) {
         conflicts.push(`${from} -> ${resolved.id} (${conflict})`);
         continue;
@@ -197,7 +197,7 @@ export function planCanonicalization(
 
     if (claimed.has(resolved.id)) {
       const claimant = renames.find((rename) => rename.to === resolved.id);
-      const conflict = claimant ? authoredProviderConflict(claimant.data, data) : null;
+      const conflict = claimant ? providerConflict(claimant.data, data) : null;
       if (conflict) {
         conflicts.push(`${from} -> ${resolved.id} (${conflict})`);
         continue;

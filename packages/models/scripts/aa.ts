@@ -1,52 +1,52 @@
 import { Effect } from "effect";
 
 import {
-  buildAaIndex,
+  aaIndex,
   parseLeaderboard,
-  parseLeaderboardManifest,
-  resolveAaScore,
-  tryDecodeLeaderboardManifest,
+  parseManifest,
+  aaScore,
+  tryDecode,
   type AaEntry,
 } from "#models/sync/aa.ts";
 import { modelProbes } from "#models/model/probes.ts";
-import { fetchBytes, fetchText, runOrThrow } from "#models/sync/http.ts";
+import { fetchBytes, fetchText, orThrow } from "#models/sync/http.ts";
 import { buildIndex, generatedPath, read, writeGenerated } from "#models/model-store.ts";
 import { exists, readText } from "#models/fs.ts";
-import { packageModelsDir } from "./shared.ts";
+import { dataDir } from "./shared.ts";
 import type { ModelData } from "#models/types.ts";
 
 const LEADERBOARD_URL = "https://artificialanalysis.ai/leaderboards/models";
 const USER_AGENT = "Mozilla/5.0 (compatible; opendum-model-sync)";
 const MIN_EXPECTED_MODELS = 100;
 
-function fetchManifestModels(path: string, key: string): Effect.Effect<AaEntry[], Error> {
+function manifestModels(path: string, key: string): Effect.Effect<AaEntry[], Error> {
   const url = new URL(path, LEADERBOARD_URL).toString();
   return Effect.gen(function* () {
     const payload = yield* fetchBytes(url, {
       label: "Artificial Analysis manifest",
       headers: { "User-Agent": USER_AGENT },
     });
-    return yield* tryDecodeLeaderboardManifest(payload, key);
+    return yield* tryDecode(payload, key);
   });
 }
 
 async function loadModels(): Promise<AaEntry[]> {
-  const html = await runOrThrow(
+  const html = await orThrow(
     fetchText(LEADERBOARD_URL, {
       label: "Artificial Analysis leaderboard",
       headers: { "User-Agent": USER_AGENT },
     })
   );
-  const manifest = parseLeaderboardManifest(html);
+  const manifest = parseManifest(html);
   if (!manifest) return parseLeaderboard(html);
 
-  const models = await runOrThrow(fetchManifestModels(manifest.path, manifest.key));
+  const models = await orThrow(manifestModels(manifest.path, manifest.key));
   console.log(`[aa] manifest ${manifest.path} returned ${models.length} entries`);
   return models;
 }
 
 async function main(): Promise<void> {
-  const modelsDir = packageModelsDir();
+  const modelsDir = dataDir();
   const dryRun = process.argv.includes("--dry-run");
 
   const models = await loadModels();
@@ -56,7 +56,7 @@ async function main(): Promise<void> {
     );
   }
 
-  const index = buildAaIndex(models);
+  const index = aaIndex(models);
   console.log(`[aa] ${index.bySlug.size} slugs from ${models.length} entries`);
 
   const registry = buildIndex(modelsDir);
@@ -68,7 +68,7 @@ async function main(): Promise<void> {
   for (const entry of Object.values(registry)) {
     if (entry.data.ignored) continue;
     const file = entry.generatedPath ?? generatedPath(entry.generatedDir, entry.relativeId);
-    const hit = resolveAaScore(modelProbes(entry), index);
+    const hit = aaScore(modelProbes(entry), index);
     if (!hit) {
       unmatched.push(entry.id);
       if (!entry.data.scores?.artificialAnalysis || !exists(file)) continue;

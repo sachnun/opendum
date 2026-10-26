@@ -1,16 +1,7 @@
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
-import {
-  contentToText,
-  jsonResponse,
-  numberFromAny,
-  parseSseDataLines,
-  hex,
-  randomUuidV7Hex,
-  seededUuidV7Hex,
-  stringValue,
-} from "../core/helpers.js";
-import { normalizeProviderFailure, transportFailure, type UpstreamTransport } from "../core/http.js";
+import { Value, Payload, Ids, Responses, JSONText } from "../core/helpers.js";
+import { RequestFailure, type UpstreamTransport } from "../core/http.js";
 import { ProviderCredentialFailure } from "../core/errors.js";
 import { OAuth } from "../core/oauth.js";
 import { Collector } from "../transform/collector.js";
@@ -30,8 +21,8 @@ const WORKBUDDY_CHAT_PATH = "/v2/chat/completions";
 const WORKBUDDY_REFRESH_PATH = "/v2/plugin/auth/token/refresh";
 const WORKBUDDY_REFRESH_SOURCE = "plugin";
 const WORKBUDDY_DEFAULT_SYSTEM = "You are a helpful assistant.";
-const WORKBUDDY_DEFAULT_MAX_TOKENS = 32768;
-const WORKBUDDY_FALLBACK_TTL_SECONDS = 31536000;
+const DEFAULT_MAX_TOKENS = 32768;
+const FALLBACK_TTL = 31536000;
 const WORKBUDDY_IDE_TYPE = "WorkBuddy";
 const WORKBUDDY_IDE_NAME = "WorkBuddy";
 const WORKBUDDY_IDE_VERSION = "5.8.4";
@@ -60,15 +51,15 @@ export const SUPPORTED_WORKBUDDY = new Set([
 
 type Json = Record<string, unknown>;
 
-function lastModelSegment(model: string): string {
+function lastSegment(model: string): string {
   const parts = model.split("/");
   return parts[parts.length - 1];
 }
 
 function traceHeaders(): Record<string, string> {
-  const traceId = hex(crypto.getRandomValues(new Uint8Array(16)));
-  const spanId = hex(crypto.getRandomValues(new Uint8Array(8)));
-  const parentSpanId = hex(crypto.getRandomValues(new Uint8Array(8)));
+  const traceId = Ids.hex(crypto.getRandomValues(new Uint8Array(16)));
+  const spanId = Ids.hex(crypto.getRandomValues(new Uint8Array(8)));
+  const parentSpanId = Ids.hex(crypto.getRandomValues(new Uint8Array(8)));
   return {
     traceparent: `00-${traceId}-${spanId}-01`,
     b3: `${traceId}-${spanId}-1-${parentSpanId}`,
@@ -80,7 +71,7 @@ function traceHeaders(): Record<string, string> {
   };
 }
 
-function parseJsonValue(text: string): unknown {
+function parseJson(text: string): unknown {
   try {
     return JSON.parse(text) as unknown;
   } catch {
@@ -93,7 +84,7 @@ function normalizeTools(value: unknown): unknown[] | null {
   if (typeof candidate === "string") {
     const trimmed = candidate.trim();
     if (!trimmed) return null;
-    candidate = parseJsonValue(trimmed);
+    candidate = parseJson(trimmed);
   }
   if (!Array.isArray(candidate)) return null;
   const tools = candidate.filter((tool) => tool !== null && typeof tool === "object" && !Array.isArray(tool));
@@ -101,12 +92,12 @@ function normalizeTools(value: unknown): unknown[] | null {
 }
 
 function conversationSeed(uid: string, request: ProviderRequest, messages: unknown[]): string {
-  const sessionId = stringValue(request.sessionId).trim();
+  const sessionId = Value.string(request.sessionId).trim();
   if (sessionId) return `${uid}:${sessionId}`;
   for (const raw of messages) {
     const message = (raw ?? {}) as Json;
-    if (stringValue(message.role) !== "user") continue;
-    const text = contentToText(message.content).trim();
+    if (Value.string(message.role) !== "user") continue;
+    const text = Payload.text(message.content).trim();
     if (text) return `${uid}:${text}`;
   }
   return "";
@@ -117,7 +108,7 @@ function workbuddyExpiry(expiresAt: number, expiresIn: number): Date {
     return expiresAt > 10_000_000_000 ? new Date(expiresAt) : new Date(expiresAt * 1000);
   }
   if (expiresIn > 0) return new Date(Date.now() + expiresIn * 1000);
-  return new Date(Date.now() + WORKBUDDY_FALLBACK_TTL_SECONDS * 1000);
+  return new Date(Date.now() + FALLBACK_TTL * 1000);
 }
 
 export type WorkbuddyOptions = {
@@ -179,7 +170,7 @@ export class WorkbuddyProvider implements Provider, CredentialRefresher {
     const uid = accountId ? accountId.trim() : "";
     if (!uid) {
       return Effect.fail(
-        transportFailure("workbuddy", new Error("workbuddy account is missing user id, re-authenticate this account"))
+        RequestFailure.transport("workbuddy", new Error("workbuddy account is missing user id, re-authenticate this account"))
       );
     }
     const payload: Json = {};
@@ -193,31 +184,31 @@ export class WorkbuddyProvider implements Provider, CredentialRefresher {
       const toolChoice = request.body.tool_choice;
       if (toolChoice !== undefined && toolChoice !== null) payload.tool_choice = toolChoice;
     }
-    let model = stringValue(request.body.model);
+    let model = Value.string(request.body.model);
     if (model.startsWith("workbuddy/")) model = model.slice("workbuddy/".length);
-    let modelName = lastModelSegment(model);
+    let modelName = lastSegment(model);
     modelName = this.registry.upstream(modelName, "workbuddy") || model;
     const messages = Array.isArray(request.body.messages) ? request.body.messages : [];
-    const normalizedMessages = ensureSystemMessage(messages);
+    const normalizedMessages = ensureSystem(messages);
     payload.messages = normalizedMessages;
-    let maxTokens = numberFromAny(request.body.max_tokens);
-    if (maxTokens <= 0) maxTokens = numberFromAny(request.body.max_completion_tokens);
-    if (maxTokens <= 0) maxTokens = WORKBUDDY_DEFAULT_MAX_TOKENS;
+    let maxTokens = Value.number(request.body.max_tokens);
+    if (maxTokens <= 0) maxTokens = Value.number(request.body.max_completion_tokens);
+    if (maxTokens <= 0) maxTokens = DEFAULT_MAX_TOKENS;
     payload.max_tokens = maxTokens;
     payload.max_completion_tokens = maxTokens;
     payload.model = modelName;
     payload.stream = true;
 
     const seed = conversationSeed(uid, request, normalizedMessages);
-    const conversationId = seed ? seededUuidV7Hex(seed) : randomUuidV7Hex();
-    const conversationRequestId = stringValue(request.requestId).trim() || randomUuidV7Hex();
-    const messageId = randomUuidV7Hex();
-    const acpConnectionId = seed ? seededUuidV7Hex(`${seed}:acp`) : randomUuidV7Hex();
+    const conversationId = seed ? Ids.seeded(seed) : Ids.uuidV7();
+    const conversationRequestId = Value.string(request.requestId).trim() || Ids.uuidV7();
+    const messageId = Ids.uuidV7();
+    const acpConnectionId = seed ? Ids.seeded(`${seed}:acp`) : Ids.uuidV7();
     const sessionTag = conversationId;
 
     const url = `${WORKBUDDY_API_BASE}${WORKBUDDY_CHAT_PATH}`;
     const direct = this.transport.direct;
-    return normalizeProviderFailure(
+    return RequestFailure.normalize(
       "workbuddy",
       Effect.gen(function* () {
         const resp = yield* Effect.tryPromise({
@@ -254,19 +245,19 @@ export class WorkbuddyProvider implements Provider, CredentialRefresher {
               },
               body: JSON.stringify(payload),
             }),
-          catch: (cause) => transportFailure("workbuddy", cause, url),
+          catch: (cause) => RequestFailure.transport("workbuddy", cause, url),
         });
         if (resp.status < 200 || resp.status >= 300) return resp;
-        request.onUpstreamResponseStart?.();
+        request.onResponseStart?.();
         if (request.stream) return resp;
         const body = yield* Effect.promise(() => resp.text());
-        return jsonResponse(200, workbuddyStreamToCompletion(body, modelName));
+        return Responses.json(200, fromStream(body, modelName));
       })
     );
   }
 }
 
-function sanitizeChannelText(text: string): string {
+function channelText(text: string): string {
   if (!text) return text;
   let out = text;
   if (out.includes("Anthropic's official CLI for Claude")) {
@@ -279,44 +270,44 @@ function sanitizeChannelText(text: string): string {
 }
 
 function sanitizeContent(content: unknown): unknown {
-  if (typeof content === "string") return sanitizeChannelText(content);
+  if (typeof content === "string") return channelText(content);
   if (Array.isArray(content)) return content.map(sanitizeContent);
   if (content !== null && typeof content === "object") {
     const record = content as Json;
     const next: Json = { ...record };
-    if (typeof record.text === "string") next.text = sanitizeChannelText(record.text);
+    if (typeof record.text === "string") next.text = channelText(record.text);
     if (record.content !== undefined) next.content = sanitizeContent(record.content);
     return next;
   }
   return content;
 }
 
-function ensureSystemMessage(messages: unknown[]): unknown[] {
+function ensureSystem(messages: unknown[]): unknown[] {
   const normalized: unknown[] = [];
   for (const raw of messages) {
     const msg = raw as Json;
-    if (msg && stringValue(msg.role) === "developer") {
+    if (msg && Value.string(msg.role) === "developer") {
       normalized.push({ ...msg, role: "system", content: sanitizeContent(msg.content) });
       continue;
     }
-    if (msg && stringValue(msg.role) === "system") {
+    if (msg && Value.string(msg.role) === "system") {
       normalized.push({ ...msg, content: sanitizeContent(msg.content) });
       continue;
     }
     normalized.push(raw);
   }
   const first = normalized[0] as Json | undefined;
-  if (first && stringValue(first.role) === "system") return normalized;
+  if (first && Value.string(first.role) === "system") return normalized;
   return [{ role: "system", content: WORKBUDDY_DEFAULT_SYSTEM }, ...normalized];
 }
 
-function workbuddyDeltaText(value: unknown): string {
+function deltaText(value: unknown): string {
   if (typeof value === "string") return value;
   if (Array.isArray(value)) {
     let out = "";
     for (const part of value) {
       const m = part as Json;
-      const text = stringValue(m?.text) || stringValue(m?.content);
+      const text = Value.string(m?.text) || Value.string(m?.content);
       if (text) out += text;
     }
     return out;
@@ -324,9 +315,9 @@ function workbuddyDeltaText(value: unknown): string {
   return "";
 }
 
-export function workbuddyStreamToCompletion(text: string, model: string): Json {
+export function fromStream(text: string, model: string): Json {
   const collector = new Collector({ model, id: "chatcmpl-workbuddy" });
-  for (const event of parseSseDataLines(text)) {
+  for (const event of JSONText.sseLines(text)) {
     const nextUsage = event.usage;
     if (nextUsage !== null && typeof nextUsage === "object" && Object.keys(nextUsage as Json).length > 0) {
       collector.setUsage(nextUsage as Json);
@@ -334,11 +325,11 @@ export function workbuddyStreamToCompletion(text: string, model: string): Json {
     const choices = Array.isArray(event.choices) ? event.choices : [];
     if (choices.length === 0) continue;
     const choice = (choices[0] ?? {}) as Json;
-    collector.setFinish(stringValue(choice.finish_reason));
+    collector.setFinish(Value.string(choice.finish_reason));
     const delta = choice.delta;
     if (delta === null || typeof delta !== "object") continue;
     const d = delta as Json;
-    collector.addContent(workbuddyDeltaText(d.content));
+    collector.addContent(deltaText(d.content));
     if (typeof d.reasoning_content === "string") collector.addContent(d.reasoning_content);
     const fragments = Array.isArray(d.tool_calls) ? d.tool_calls : [];
     for (const raw of fragments) {
@@ -347,10 +338,10 @@ export function workbuddyStreamToCompletion(text: string, model: string): Json {
       const hasFunction = fn !== null && typeof fn === "object" && !Array.isArray(fn);
       const args = hasFunction ? (fn as Json).arguments : undefined;
       collector.addToolCall({
-        key: numberFromAny(fragment.index),
-        id: stringValue(fragment.id),
-        type: stringValue(fragment.type),
-        name: hasFunction ? stringValue((fn as Json).name) : "",
+        key: Value.number(fragment.index),
+        id: Value.string(fragment.id),
+        type: Value.string(fragment.type),
+        name: hasFunction ? Value.string((fn as Json).name) : "",
         nameMode: "append",
         arguments: typeof args === "string" ? args : "",
       });

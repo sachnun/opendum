@@ -20,7 +20,7 @@ function policyOf(options: {
   const registry = {
     resolveAlias: (model: string) => aliases[model] ?? model,
     isSupported: (model: string) => supported.has(model),
-    isSupportedByProvider: (model: string, provider: string) => (providerModels[provider] ?? []).includes(model),
+    supportsProvider: (model: string, provider: string) => (providerModels[provider] ?? []).includes(model),
     providers: (model: string) =>
       Object.entries(providerModels)
         .filter(([, models]) => models.includes(model))

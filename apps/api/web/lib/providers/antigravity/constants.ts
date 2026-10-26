@@ -18,18 +18,18 @@ const CLIENT_METADATA =
 const AUTH_USER_AGENT = "google-api-nodejs-client/10.3.0";
 const AUTH_API_CLIENT = "gl-node/22.18.0";
 
-const CODE_ASSIST_ENDPOINT_DAILY =
+const ENDPOINT_DAILY =
   "https://daily-cloudcode-pa.googleapis.com";
-const CODE_ASSIST_ENDPOINT_PROD = "https://cloudcode-pa.googleapis.com";
+const ENDPOINT_PROD = "https://cloudcode-pa.googleapis.com";
 
-export const LOAD_CODE_ASSIST_ENDPOINTS = [
-  CODE_ASSIST_ENDPOINT_PROD,
-  CODE_ASSIST_ENDPOINT_DAILY,
+export const LOAD_ENDPOINTS = [
+  ENDPOINT_PROD,
+  ENDPOINT_DAILY,
 ] as const;
 
 export const ONBOARD_USER_ENDPOINTS = [
-  CODE_ASSIST_ENDPOINT_DAILY,
-  CODE_ASSIST_ENDPOINT_PROD,
+  ENDPOINT_DAILY,
+  ENDPOINT_PROD,
 ] as const;
 
 export const AUTH_HEADERS = {
@@ -40,4 +40,4 @@ export const AUTH_HEADERS = {
 
 export const REFRESH_BUFFER_SECONDS = 60 * 60;
 
-export { ANTIGRAVITY_DEFAULT_PROJECT_ID as DEFAULT_PROJECT_ID } from "@opendum/providers/endpoints";
+export { ANTIGRAVITY_PROJECT_ID as DEFAULT_PROJECT_ID } from "@opendum/providers/endpoints";

@@ -1,48 +1,42 @@
 import type { Registry } from "@opendum/models/runtime";
 import type { ProviderModelConfig } from "@opendum/models/runtime";
 
-function configValue(
-  registry: Registry,
-  model: string,
-  provider: string,
-  key: string
-): unknown {
-  const cfg = registry.config(model, provider);
-  if (!cfg) return undefined;
-  if (key in cfg) return cfg[key];
-  const custom = cfg.custom;
-  if (custom && typeof custom === "object" && key in custom) return custom[key];
-  return undefined;
-}
+export class ModelConfig {
+  private readonly registry: Registry;
 
-export function providerConfigBool(
-  registry: Registry,
-  model: string,
-  provider: string,
-  key: string
-): boolean {
-  return configValue(registry, model, provider, key) === true;
-}
+  private readonly model: string;
 
-export function providerConfigString(
-  registry: Registry,
-  model: string,
-  provider: string,
-  key: string
-): string {
-  const value = configValue(registry, model, provider, key);
-  return typeof value === "string" ? value.trim() : "";
-}
+  private readonly provider: string;
 
-export function providerConfig(registry: Registry, model: string, provider: string): ProviderModelConfig | null {
-  return registry.config(model, provider);
-}
+  constructor(registry: Registry, model: string, provider: string) {
+    this.registry = registry;
+    this.model = model;
+    this.provider = provider;
+  }
 
-export function providerMaxOutputTokens(
-  registry: Registry,
-  model: string,
-  provider: string
-): number {
-  const cfg = registry.config(model, provider);
-  return cfg?.maxOutputTokens ?? 0;
+  private value(key: string): unknown {
+    const cfg = this.registry.config(this.model, this.provider);
+    if (!cfg) return undefined;
+    if (key in cfg) return cfg[key];
+    const custom = cfg.custom;
+    if (custom && typeof custom === "object" && key in custom) return custom[key];
+    return undefined;
+  }
+
+  all(): ProviderModelConfig | null {
+    return this.registry.config(this.model, this.provider);
+  }
+
+  bool(key: string): boolean {
+    return this.value(key) === true;
+  }
+
+  string(key: string): string {
+    const value = this.value(key);
+    return typeof value === "string" ? value.trim() : "";
+  }
+
+  maxOutputTokens(): number {
+    return this.all()?.maxOutputTokens ?? 0;
+  }
 }

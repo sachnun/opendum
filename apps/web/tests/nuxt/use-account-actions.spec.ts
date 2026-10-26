@@ -2,14 +2,14 @@ import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { defineComponent, h } from "vue";
 import { mount } from "@vue/test-utils";
 
-import { useProviderAccountActions } from "~/composables/useProviderAccountActions";
+import { useAccountActions } from "~/composables/useAccountActions";
 
 const update = mock(async () => ({ success: true, data: { id: "a1" } }));
 const remove = mock(async () => ({ success: true, data: undefined }));
 
 (globalThis as Record<string, unknown>).useApi = () => ({ accounts: { update, delete: remove } });
 
-type Actions = ReturnType<typeof useProviderAccountActions>;
+type Actions = ReturnType<typeof useAccountActions>;
 type Handlers = {
   onActiveUpdated: ReturnType<typeof mock>;
   onTemporarilyDisabled: ReturnType<typeof mock>;
@@ -25,7 +25,7 @@ const Probe = defineComponent({
       onRenamed: mock(() => {}),
       onDeleted: mock(() => {}),
     };
-    const actions = useProviderAccountActions({ account: { id: "a1", isActive: true } as never, readonly: false }, handlers);
+    const actions = useAccountActions({ account: { id: "a1", isActive: true } as never, readonly: false }, handlers);
     return { actions, handlers };
   },
   render() {
@@ -38,7 +38,7 @@ function mountProbe() {
   return wrapper.vm as unknown as { actions: Actions; handlers: Handlers };
 }
 
-describe("useProviderAccountActions", () => {
+describe("useAccountActions", () => {
   beforeEach(() => {
     mock.clearAllMocks();
     update.mockImplementation(async () => ({ success: true, data: { id: "a1" } }));

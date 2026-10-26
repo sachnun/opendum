@@ -1,11 +1,11 @@
 import type {
   AccountOverviewData,
-  ApiKeyListItem,
+  KeyListItem,
   ApiKeyOptions,
   ModelListItem,
   ModelSearchItem,
   PlaygroundOptions,
-  ProviderAccountDetailItem,
+  AccountDetailItem,
   ProviderDetailData,
 } from "../../lib/api-types";
 
@@ -17,8 +17,8 @@ type ShellAccountSummary = {
   hasConnectedAccounts: boolean;
 };
 
-type ApiKeyPageData = {
-  apiKeys: ApiKeyListItem[];
+type PageData = {
+  apiKeys: KeyListItem[];
   options: ApiKeyOptions;
 };
 
@@ -42,7 +42,7 @@ function replacePinnedProvider(providers: string[], provider: string, pinned: bo
   return pinned ? [...nextProviders, provider] : nextProviders;
 }
 
-function patchProviderAccount(provider: string, accountId: string, patch: Partial<ProviderAccountDetailItem>) {
+function patchProviderAccount(provider: string, accountId: string, patch: Partial<AccountDetailItem>) {
   patchNuxtData<ProviderDetailData>(dataKeys.accountsDetail(provider), (value) => ({
     ...value,
     accounts: value.accounts.map((account) => (account.id === accountId ? { ...account, ...patch } : account)),
@@ -53,14 +53,14 @@ function removeProviderAccount(provider: string, accountId: string) {
   patchNuxtData<ProviderDetailData>(dataKeys.accountsDetail(provider), (value) => ({
     ...value,
     accounts: value.accounts.filter((account) => account.id !== accountId),
-    supportedModelsByAccountId: Object.fromEntries(Object.entries(value.supportedModelsByAccountId).filter(([id]) => id !== accountId)),
+    supportedByAccount: Object.fromEntries(Object.entries(value.supportedByAccount).filter(([id]) => id !== accountId)),
     disabledModelsByAccountId: Object.fromEntries(Object.entries(value.disabledModelsByAccountId).filter(([id]) => id !== accountId)),
     modelHealthByAccountId: Object.fromEntries(Object.entries(value.modelHealthByAccountId).filter(([id]) => id !== accountId)),
   }));
 }
 
-function patchAccountNameInOptions(accountId: string, name: string) {
-  patchNuxtData<ApiKeyPageData>(dataKeys.apiKeys, (value) => ({
+function patchName(accountId: string, name: string) {
+  patchNuxtData<PageData>(dataKeys.apiKeys, (value) => ({
     ...value,
     options: {
       ...value.options,
@@ -89,24 +89,24 @@ function patchDisabledModels(provider: string, accountId: string, disabledModels
   }));
 }
 
-function patchApiKey(apiKeyId: string, patch: Partial<ApiKeyListItem>) {
-  patchNuxtData<ApiKeyPageData>(dataKeys.apiKeys, (value) => ({
+function patchApiKey(apiKeyId: string, patch: Partial<KeyListItem>) {
+  patchNuxtData<PageData>(dataKeys.apiKeys, (value) => ({
     ...value,
     apiKeys: value.apiKeys.map((apiKey) => (apiKey.id === apiKeyId ? { ...apiKey, ...patch } : apiKey)),
   }));
 }
 
-function patchApiKeyRoamingPoints(roamingPointsByApiKeyId: Record<string, number>) {
-  patchNuxtData<ApiKeyPageData>(dataKeys.apiKeys, (value) => ({
+function patchRoaming(roamingByKey: Record<string, number>) {
+  patchNuxtData<PageData>(dataKeys.apiKeys, (value) => ({
     ...value,
-    apiKeys: value.apiKeys.map((apiKey) => (Object.prototype.hasOwnProperty.call(roamingPointsByApiKeyId, apiKey.id)
-      ? { ...apiKey, roamingPointsUsed: roamingPointsByApiKeyId[apiKey.id] ?? 0 }
+    apiKeys: value.apiKeys.map((apiKey) => (Object.prototype.hasOwnProperty.call(roamingByKey, apiKey.id)
+      ? { ...apiKey, roamingPointsUsed: roamingByKey[apiKey.id] ?? 0 }
       : apiKey)),
   }));
 }
 
 function removeApiKey(apiKeyId: string) {
-  patchNuxtData<ApiKeyPageData>(dataKeys.apiKeys, (value) => {
+  patchNuxtData<PageData>(dataKeys.apiKeys, (value) => {
     const { [apiKeyId]: _removedRateLimits, ...rateLimitsByKeyId } = value.options.rateLimitsByKeyId;
 
     return {
@@ -147,7 +147,7 @@ function invalidateAccountOverview() {
   return refreshData([dataKeys.shellAccounts, dataKeys.accountsOverview]);
 }
 
-function clearAccountDependentOptions() {
+function clearOptions() {
   clearData([dataKeys.playgroundOptions, dataKeys.apiKeys]);
 }
 
@@ -183,14 +183,14 @@ function patchPinnedProvider(provider: string, pinned: boolean) {
 
 export function useInvalidate() {
   return {
-    clearAccountDependentOptions,
+    clearOptions,
     invalidateAccountCollection,
     invalidateAccountOverview,
     invalidateModelAvailability,
     clearModelAvailability,
-    patchAccountNameInOptions,
+    patchName,
     patchApiKey,
-    patchApiKeyRoamingPoints,
+    patchRoaming,
     patchDisabledModels,
     patchModelEnabled,
     patchModels,

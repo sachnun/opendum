@@ -2,10 +2,10 @@ import { Effect } from "effect";
 import { eq } from "drizzle-orm";
 
 import { db, user } from "@opendum/database";
-import { toAuthUser, type AuthUser } from "#web/lib/claims.js";
+import { authUser, type AuthUser } from "#web/lib/claims.js";
 import { fromPromise } from "#web/lib/task.js";
 
-export const findUserById = Effect.fn("findUserById")(function* (userId: string) {
+export const findUser = Effect.fn("findUser")(function* (userId: string) {
   const rows = yield* fromPromise(
     () =>
       db
@@ -17,5 +17,5 @@ export const findUserById = Effect.fn("findUserById")(function* (userId: string)
   );
 
   const found = rows[0];
-  return found ? toAuthUser(found) : null;
+  return found ? authUser(found) : null;
 }) satisfies (userId: string) => Effect.Effect<AuthUser | null, import("#web/errors.js").ServiceFailure>;

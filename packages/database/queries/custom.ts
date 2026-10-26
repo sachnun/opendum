@@ -38,11 +38,11 @@ export const getCustomProvider = Effect.fn("db.getCustomProvider")(function* (
   return rows[0] ?? null;
 });
 
-export const listCustomProviderModels = Effect.fn("db.listCustomProviderModels")(function* (
+export const customModels = Effect.fn("db.customModels")(function* (
   providerId: string,
   database: DbExecutor = db
 ) {
-  return yield* tryDb("listCustomProviderModels", () =>
+  return yield* tryDb("customModels", () =>
     database
       .select()
       .from(customProviderModel)

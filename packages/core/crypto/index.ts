@@ -1,7 +1,7 @@
 export {
   decrypt,
   encrypt,
-  evpBytesToKey,
+  evpKey,
   generateSalt,
   hashString,
   pkcs7Pad,
@@ -11,5 +11,5 @@ export {
   hmacHex,
   playgroundSignature,
   signaturesMatch,
-  timingSafeEqualHex,
+  equalHex,
 } from "./signature.js";

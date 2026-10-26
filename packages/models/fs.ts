@@ -93,21 +93,21 @@ export function readJson(path: string): unknown {
   return JSON.parse(content);
 }
 
-export function tryReadText(path: string): Effect.Effect<string, ModelReadFailure> {
+export function loadText(path: string): Effect.Effect<string, ModelReadFailure> {
   return Effect.try({
     try: () => readText(path),
     catch: (cause) => readFailure(path, cause),
   });
 }
 
-export function tryReadBytes(path: string): Effect.Effect<Uint8Array, ModelReadFailure> {
+export function loadBytes(path: string): Effect.Effect<Uint8Array, ModelReadFailure> {
   return Effect.try({
     try: () => readBytes(path),
     catch: (cause) => readFailure(path, cause),
   });
 }
 
-export function tryReadJson(
+export function loadJson(
   path: string
 ): Effect.Effect<unknown, ModelReadFailure | ModelParseFailure> {
   return Effect.try({
@@ -119,7 +119,7 @@ export function tryReadJson(
   });
 }
 
-export function tryWriteBytes(
+export function saveBytes(
   path: string,
   content: Uint8Array
 ): Effect.Effect<void, ModelWriteFailure> {
@@ -129,8 +129,8 @@ export function tryWriteBytes(
   });
 }
 
-export function tryWriteText(path: string, content: string): Effect.Effect<void, ModelWriteFailure> {
-  return tryWriteBytes(path, encoder.encode(content));
+export function saveText(path: string, content: string): Effect.Effect<void, ModelWriteFailure> {
+  return saveBytes(path, encoder.encode(content));
 }
 
 export function tryRemove(path: string): Effect.Effect<void, ModelWriteFailure> {
@@ -164,11 +164,11 @@ export function tryRename(
 }
 
 export function writeBytes(path: string, content: Uint8Array): Promise<void> {
-  return Effect.runPromise(tryWriteBytes(path, content));
+  return Effect.runPromise(saveBytes(path, content));
 }
 
 export function writeText(path: string, content: string): Promise<void> {
-  return Effect.runPromise(tryWriteText(path, content));
+  return Effect.runPromise(saveText(path, content));
 }
 
 export function remove(path: string): Promise<void> {
@@ -195,13 +195,13 @@ export function listFiles(root: string, pattern = "*", options: { dot?: boolean 
   return listWith(() => new Bun.Glob(pattern).scanSync({ cwd: root, dot: options.dot ?? true }));
 }
 
-export function listJsonFiles(root: string): string[] {
+export function listJson(root: string): string[] {
   return listFiles(root, JSON_GLOB);
 }
 
-export function tryListJsonFiles(root: string): Effect.Effect<string[], ModelReadFailure> {
+export function scanJson(root: string): Effect.Effect<string[], ModelReadFailure> {
   return Effect.try({
-    try: () => listJsonFiles(root),
+    try: () => listJson(root),
     catch: (cause) => readFailure(root, cause),
   });
 }
@@ -240,7 +240,7 @@ export function decodeText(value: Uint8Array): string {
   return decoder.decode(value);
 }
 
-export async function aesGcmDecrypt(
+export async function decryptAes(
   key: Uint8Array,
   iv: Uint8Array,
   payload: Uint8Array

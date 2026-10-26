@@ -7,12 +7,12 @@ import {
   asNumber,
   asRecord,
   asString,
-  asTrimmedString,
+  trimmed,
   booleanAt,
   idsOf,
   numberAt,
   recordAt,
-  sortedUniqueStrings,
+  sortedUnique,
   stringAt,
   uniqueStrings,
 } from "./json.ts";
@@ -28,8 +28,8 @@ describe("json accessors", () => {
   test("narrow primitives", () => {
     expect(asString("x")).toBe("x");
     expect(asString(1)).toBeUndefined();
-    expect(asTrimmedString("  x  ")).toBe("x");
-    expect(asTrimmedString("   ")).toBeUndefined();
+    expect(trimmed("  x  ")).toBe("x");
+    expect(trimmed("   ")).toBeUndefined();
     expect(asNumber(1.5)).toBe(1.5);
     expect(asNumber(Number.NaN)).toBeUndefined();
     expect(asNumber("1")).toBeUndefined();
@@ -53,6 +53,6 @@ describe("json accessors", () => {
   test("collect unique ids and strings deterministically", () => {
     expect(idsOf([{ id: " b " }, { id: "a" }, { id: "a" }, {}, null, { id: 5 }])).toEqual(["a", "b"]);
     expect(uniqueStrings(["b", "a", "b", "  ", undefined])).toEqual(["b", "a"]);
-    expect(sortedUniqueStrings(["b", "a", "b"])).toEqual(["a", "b"]);
+    expect(sortedUnique(["b", "a", "b"])).toEqual(["a", "b"]);
   });
 });

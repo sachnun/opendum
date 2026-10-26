@@ -1,8 +1,8 @@
 import { defineHandler } from "nitro";
-import { getProxyContext } from "../../context.js";
+import { proxyContext } from "../../context.js";
 import { handleInference } from "../../handlers/inference.js";
 import { Messages } from "../../core/endpoints.js";
 
 export default defineHandler(async (event) =>
-  handleInference(event, await getProxyContext(), new Messages())
+  handleInference(event, await proxyContext(), new Messages())
 );

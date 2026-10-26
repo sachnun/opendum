@@ -1,9 +1,9 @@
 import { sync } from "#models/model-store.ts";
 import { fetchDecoded, runFetchText, FETCH_TIMEOUT_MS, runOrThrow } from "#models/sync/http.ts";
-import { stripParamInfoKey } from "#models/model/clean-key.ts";
-import { syncCliVersion } from "./version-sync.ts";
+import { stripParams } from "#models/model/clean-key.ts";
+import { syncCli } from "./version-sync.ts";
 import { join } from "#models/paths.ts";
-import { flags, packageModelsDir, repoRoot, runScript } from "./shared.ts";
+import { flags, dataDir, repoRoot, runScript } from "./shared.ts";
 
 const KIRO_DOCS_URL = "https://kiro.dev/docs/models/";
 const KIRO_DOWNLOADS_URL = "https://kiro.dev/downloads/";
@@ -11,7 +11,7 @@ const PROVIDER_NAME = "kiro";
 
 const REPO_ROOT = repoRoot();
 
-const KIRO_IDE_VERSION_TARGETS = [
+const IDE_TARGETS = [
   {
     label: "kiro provider",
     path: join(REPO_ROOT, "packages/providers/upstreams/kiro/index.ts"),
@@ -32,28 +32,28 @@ interface OfficialModel {
   paidAvailable: boolean;
 }
 
-function parseLatestIdeVersion(html: string): string | null {
+function ideVersion(html: string): string | null {
   const labelMatch = html.match(/IDE\s+(\d+\.\d+\.\d+)\s*Latest/);
   if (labelMatch) return labelMatch[1];
   const downloadMatch = html.match(/kiro-ide-(\d+\.\d+\.\d+)-stable/);
   return downloadMatch ? downloadMatch[1] : null;
 }
 
-async function syncIdeVersion() {
+async function ideVersion() {
   const html = await runFetchText(KIRO_DOWNLOADS_URL, {
     label: "Kiro downloads page",
     headers: { Accept: "text/html" },
   });
-  syncCliVersion("kiro", KIRO_IDE_VERSION_TARGETS, parseLatestIdeVersion(html));
+  syncCli("kiro", IDE_TARGETS, ideVersion(html));
 }
 
-function isIgnoredDisplayName(name: string): boolean {
+function isIgnored(name: string): boolean {
   return !/[0-9]/.test(name);
 }
 
 const PAID_KIRO_TIERS = ["pro", "pro+", "power", "standalone"];
 
-const MODELS_WITH_1M_VARIANT = new Set([
+const LONG_CONTEXT_MODELS = new Set([
   "claude-opus-4.6",
   "claude-sonnet-4.6",
   "claude-sonnet-4.5",
@@ -73,17 +73,17 @@ function stripHtml(html: string): string {
     .trim();
 }
 
-async function fetchOfficialModels() {
+async function fetchModels() {
   return runOrThrow(
     fetchDecoded(
       KIRO_DOCS_URL,
       { label: "Kiro docs", headers: { Accept: "text/html" } },
-      async (response) => parseModelsFromHtml(await response.text())
+      async (response) => modelsOf(await response.text())
     )
   );
 }
 
-function parseModelsFromHtml(html: string): OfficialModel[] {
+function modelsOf(html: string): OfficialModel[] {
   const tables: string[] = [];
   const tableRegex = /<table[^>]*>([\s\S]*?)<\/table>/gi;
   let tableMatch;
@@ -99,7 +99,7 @@ function parseModelsFromHtml(html: string): OfficialModel[] {
 
   let comparisonTable = null;
   for (const table of tables) {
-    const candidateRows = parseTableRows(table);
+    const candidateRows = tableRows(table);
     if (candidateRows.length === 0) continue;
 
     const candidateHeader = candidateRows[0].map((h) => h.toLowerCase());
@@ -121,7 +121,7 @@ function parseModelsFromHtml(html: string): OfficialModel[] {
     );
   }
 
-  const rows = parseTableRows(comparisonTable);
+  const rows = tableRows(comparisonTable);
   if (rows.length < 2) {
     throw new Error("Models table has fewer than 2 rows (header + data).");
   }
@@ -172,7 +172,7 @@ function parseModelsFromHtml(html: string): OfficialModel[] {
   return models;
 }
 
-function parseTableRows(tableInnerHtml: string): string[][] {
+function tableRows(tableInnerHtml: string): string[][] {
   const rows: string[][] = [];
   const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
   let rowMatch;
@@ -194,7 +194,7 @@ function parseTableRows(tableInnerHtml: string): string[][] {
   return rows;
 }
 
-async function fetchDocsCatalog() {
+async function fetchCatalog() {
   let html: string;
   try {
     const response = await fetch(KIRO_DOCS_URL, {
@@ -232,7 +232,7 @@ async function fetchDocsCatalog() {
   return byName;
 }
 
-function displayNameToKiroId(displayName: string, catalog: Map<string, string>): string {
+function kiroId(displayName: string, catalog: Map<string, string>): string {
   const published = catalog?.get(displayName);
   if (published) return published;
 
@@ -248,7 +248,7 @@ function displayNameToKiroId(displayName: string, catalog: Map<string, string>):
 function expandVariants(kiroId: string): string[] {
   const ids = [kiroId];
 
-  if (MODELS_WITH_1M_VARIANT.has(kiroId)) {
+  if (LONG_CONTEXT_MODELS.has(kiroId)) {
     ids.push(`${kiroId}-1m`);
   }
 
@@ -266,7 +266,7 @@ function toCanonical(kiroModelId: string): { key: string; upstream: string } {
     key = key.replace(/^deepseek-/, "deepseek-v");
   }
 
-  key = stripParamInfoKey(key).replace(/[^a-z0-9.-]/g, "");
+  key = stripParams(key).replace(/[^a-z0-9.-]/g, "");
 
   return { key, upstream: kiroModelId };
 }
@@ -275,23 +275,23 @@ async function main(): Promise<void> {
   const { dryRun, verbose } = flags();
 
   console.log(`[kiro] Fetching models from ${KIRO_DOCS_URL} ...`);
-  const officialModels = await fetchOfficialModels();
+  const officialModels = await fetchModels();
   console.log(
     `[kiro] Found ${officialModels.length} models on docs page: ${officialModels.map((m) => m.name).join(", ")}`
   );
 
-  const catalog = await fetchDocsCatalog();
+  const catalog = await fetchCatalog();
   console.log(`[kiro] Resolved ${catalog.size} published model IDs from the docs bundle.`);
 
-  const paidOnlyDisplayNames = new Set(
+  const paidNames = new Set(
     officialModels
-      .filter((m) => !isIgnoredDisplayName(m.name) && !m.freeAvailable && m.paidAvailable)
+      .filter((m) => !isIgnored(m.name) && !m.freeAvailable && m.paidAvailable)
       .map((m) => m.name)
   );
 
   if (verbose || dryRun) {
-    const freeModels = officialModels.filter((m) => !isIgnoredDisplayName(m.name) && m.freeAvailable);
-    const paidModels = officialModels.filter((m) => paidOnlyDisplayNames.has(m.name));
+    const freeModels = officialModels.filter((m) => !isIgnored(m.name) && m.freeAvailable);
+    const paidModels = officialModels.filter((m) => paidNames.has(m.name));
     console.log(`\n[kiro] Tier breakdown:`);
     console.log(`  Free models (${freeModels.length}): ${freeModels.map((m) => m.name).join(", ")}`);
     console.log(`  Paid-only models (${paidModels.length}): ${paidModels.map((m) => m.name).join(", ")}`);
@@ -300,14 +300,14 @@ async function main(): Promise<void> {
 
   const allKiroIds: string[] = [];
   for (const model of officialModels) {
-    if (isIgnoredDisplayName(model.name)) {
+    if (isIgnored(model.name)) {
       if (verbose) {
         console.log(`[kiro] Skipping "${model.name}" (ignored)`);
       }
       continue;
     }
 
-    const baseId = displayNameToKiroId(model.name, catalog);
+    const baseId = kiroId(model.name, catalog);
     const variants = expandVariants(baseId);
     allKiroIds.push(...variants);
 
@@ -339,22 +339,22 @@ async function main(): Promise<void> {
     console.log();
   }
 
-  const providerConfigByModel = new Map<string, { allowedTiers: string[] }>();
+  const providerConfig = new Map<string, { allowedTiers: string[] }>();
   for (const model of officialModels) {
-    if (isIgnoredDisplayName(model.name)) continue;
-    if (!paidOnlyDisplayNames.has(model.name)) continue;
+    if (isIgnored(model.name)) continue;
+    if (!paidNames.has(model.name)) continue;
 
-    const baseId = displayNameToKiroId(model.name, catalog);
+    const baseId = kiroId(model.name, catalog);
     const variants = expandVariants(baseId);
     for (const kiroId of variants) {
       const { key } = toCanonical(kiroId);
-      providerConfigByModel.set(key, { allowedTiers: PAID_KIRO_TIERS });
+      providerConfig.set(key, { allowedTiers: PAID_KIRO_TIERS });
     }
   }
 
   if (verbose || dryRun) {
     console.log("\n[kiro] Provider config by model (allowedTiers):");
-    for (const [key, config] of [...providerConfigByModel.entries()].sort(([a], [b]) =>
+    for (const [key, config] of [...providerConfig.entries()].sort(([a], [b]) =>
       a.localeCompare(b)
     )) {
       console.log(`  ${key}: allowedTiers = [${config.allowedTiers.join(", ")}]`);
@@ -367,10 +367,10 @@ async function main(): Promise<void> {
     return;
   }
 
-  const modelsDir = packageModelsDir();
+  const modelsDir = dataDir();
 
   const result = await sync(modelsDir, PROVIDER_NAME, modelMap, {
-    providerConfigByModel,
+    providerConfig,
     managedProviderConfigKeys: ["allowedTiers"],
   });
 
@@ -398,7 +398,7 @@ async function main(): Promise<void> {
     }
   }
 
-  await syncIdeVersion().catch((error: unknown) => {
+  await ideVersion().catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
     console.warn(`[kiro] IDE version sync failed (${message})`);
   });

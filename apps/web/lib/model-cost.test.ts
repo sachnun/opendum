@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { MODEL_COST_FIELDS, costEntries, formatCostPoints } from "./model-cost";
+import { MODEL_COST_FIELDS, costEntries, costPoints } from "./model-cost";
 
 test("MODEL_COST_FIELDS covers every cost dimension", () => {
   expect(MODEL_COST_FIELDS.map((field) => field.key)).toEqual(["input", "output", "cacheRead", "cacheWrite"]);
@@ -22,8 +22,8 @@ test("costEntries preserves declared field order", () => {
   ]);
 });
 
-test("formatCostPoints formats with at most three fraction digits", () => {
-  expect(formatCostPoints(1)).toBe("1");
-  expect(formatCostPoints(1234.5)).toBe("1,234.5");
-  expect(formatCostPoints(1.23456)).toBe("1.235");
+test("costPoints formats with at most three fraction digits", () => {
+  expect(costPoints(1)).toBe("1");
+  expect(costPoints(1234.5)).toBe("1,234.5");
+  expect(costPoints(1.23456)).toBe("1.235");
 });

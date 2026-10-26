@@ -2,12 +2,12 @@ import { and, eq, gt, gte, inArray, ne, sql } from "drizzle-orm";
 
 import { db, normalizeEmail, pointTransaction, providerEmailRegistry, proxyApiKey, user, userPointBalance, type Database } from "@opendum/database";
 import { Effect } from "effect";
-import { publishPointsBalance } from "#web/events/bus.js";
+import { publishPoints } from "#web/events/bus.js";
 import { fromPromise } from "#web/lib/task.js";
 import { badRequest } from "#web/errors.js";
-import { roamingUsagePointsByApiKey } from "#web/lib/roaming-points.js";
+import { roamingByKey as roamingPoints } from "#web/lib/roaming-points.js";
 
-export const API_KEY_UPDATE_POINT_COST = 20;
+export const UPDATE_COST = 20;
 export const DAILY_ACCESS_POINTS = 5;
 
 const INITIAL_POINT_BALANCE = 15;
@@ -23,7 +23,7 @@ interface PointTransactionInput {
   idempotencyKey: string;
 }
 
-export function dailyAccessDateKey(now: Date = new Date()): string {
+export function dailyDate(now: Date = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Jakarta",
     year: "numeric",
@@ -32,7 +32,7 @@ export function dailyAccessDateKey(now: Date = new Date()): string {
   }).format(now);
 }
 
-const isUserRewardExcluded = Effect.fn("points.isUserRewardExcluded")(function* (
+const isExcluded = Effect.fn("points.isExcluded")(function* (
   client: PointDatabase,
   userId: string
 ) {
@@ -58,7 +58,7 @@ const isUserRewardExcluded = Effect.fn("points.isUserRewardExcluded")(function* 
   return matches.length > 0;
 });
 
-const applyPointTransactionWithClient = Effect.fn("points.applyPointTransaction")(function* (
+const applyTransaction = Effect.fn("points.applyPointTransaction")(function* (
   client: PointDatabase,
   input: PointTransactionInput
 ) {
@@ -104,12 +104,12 @@ const applyPointTransactionWithClient = Effect.fn("points.applyPointTransaction"
     "Failed to update point transaction balance"
   );
 
-  publishPointsBalance(input.userId, balance);
+  publishPoints(input.userId, balance);
 
   return { applied: true, balance };
 });
 
-const revokeUserBonusWithClient = Effect.fn("points.revokeUserBonus")(function* (
+const revokeBonus = Effect.fn("points.revokeUserBonus")(function* (
   client: PointDatabase,
   userId: string
 ) {
@@ -154,7 +154,7 @@ const revokeUserBonusWithClient = Effect.fn("points.revokeUserBonus")(function* 
 
   if (deduction <= 0) return row.balance;
 
-  const result = yield* applyPointTransactionWithClient(client, {
+  const result = yield* applyTransaction(client, {
     userId,
     amount: -deduction,
     type: "reward_revoke",
@@ -164,7 +164,7 @@ const revokeUserBonusWithClient = Effect.fn("points.revokeUserBonus")(function* 
   return result.balance ?? row.balance;
 });
 
-const ensureUserPointBalanceWithClient = Effect.fn("points.ensureUserPointBalance")(function* (
+const ensureBalanceWith = Effect.fn("points.ensureBalance")(function* (
   client: PointDatabase,
   userId: string
 ) {
@@ -180,14 +180,14 @@ const ensureUserPointBalanceWithClient = Effect.fn("points.ensureUserPointBalanc
   const existing = rows[0];
 
   if (existing) {
-    if (!existing.rewardsExcluded && (yield* isUserRewardExcluded(client, userId))) {
-      return yield* revokeUserBonusWithClient(client, userId);
+    if (!existing.rewardsExcluded && (yield* isExcluded(client, userId))) {
+      return yield* revokeBonus(client, userId);
     }
 
     return existing.balance;
   }
 
-  const excluded = yield* isUserRewardExcluded(client, userId);
+  const excluded = yield* isExcluded(client, userId);
   const balance = excluded ? 0 : INITIAL_POINT_BALANCE;
 
   yield* fromPromise(
@@ -224,11 +224,11 @@ const ensureUserPointBalanceWithClient = Effect.fn("points.ensureUserPointBalanc
   return balance;
 });
 
-export const ensureUserPointBalance = Effect.fn("points.ensureUserPointBalance")(function* (
+export const ensureBalance = Effect.fn("points.ensureBalance")(function* (
   userId: string
 ) {
   return yield* fromPromise(
-    () => db.transaction((tx) => Effect.runPromise(ensureUserPointBalanceWithClient(tx, userId))),
+    () => db.transaction((tx) => Effect.runPromise(ensureBalanceWith(tx, userId))),
     "Failed to ensure point balance"
   );
 });
@@ -250,10 +250,10 @@ export const trackProviderEmail = Effect.fn("points.trackProviderEmail")(functio
   );
 });
 
-export const claimDailyAccessPoints = Effect.fn("points.claimDailyAccessPoints")(function* (
+export const claimDaily = Effect.fn("points.claimDaily")(function* (
   userId: string
 ) {
-  const idempotencyKey = `daily:${userId}:${dailyAccessDateKey()}`;
+  const idempotencyKey = `daily:${userId}:${dailyDate()}`;
 
   const existing = yield* fromPromise(
     () =>
@@ -269,7 +269,7 @@ export const claimDailyAccessPoints = Effect.fn("points.claimDailyAccessPoints")
   return yield* fromPromise(
     () =>
       db.transaction(async (tx) => {
-        await Effect.runPromise(ensureUserPointBalanceWithClient(tx, userId));
+        await Effect.runPromise(ensureBalanceWith(tx, userId));
 
         const rows = await tx
           .select({ rewardsExcluded: userPointBalance.rewardsExcluded })
@@ -280,7 +280,7 @@ export const claimDailyAccessPoints = Effect.fn("points.claimDailyAccessPoints")
         if (!row || row.rewardsExcluded) return false;
 
         const result = await Effect.runPromise(
-          applyPointTransactionWithClient(tx, {
+          applyTransaction(tx, {
             userId,
             amount: DAILY_ACCESS_POINTS,
             type: "daily_access",
@@ -294,8 +294,8 @@ export const claimDailyAccessPoints = Effect.fn("points.claimDailyAccessPoints")
   );
 });
 
-export const getUserPointStatus = Effect.fn("points.getUserPointStatus")(function* (userId: string) {
-  const balance = yield* ensureUserPointBalance(userId);
+export const pointStatus = Effect.fn("points.pointStatus")(function* (userId: string) {
+  const balance = yield* ensureBalance(userId);
   const roamingApiKeys = yield* fromPromise(
     () =>
       db
@@ -305,12 +305,12 @@ export const getUserPointStatus = Effect.fn("points.getUserPointStatus")(functio
     "Failed to load roaming api keys"
   );
   const apiKeyIds = roamingApiKeys.map((apiKey) => apiKey.id);
-  const pointsByApiKeyId = yield* roamingUsagePointsByApiKey(userId, apiKeyIds);
-  const roamingPointsByApiKeyId: Record<string, number> = Object.fromEntries(
-    apiKeyIds.map((id) => [id, pointsByApiKeyId.get(id) ?? 0])
+  const pointsByKey = yield* roamingPoints(userId, apiKeyIds);
+  const roamingByKey: Record<string, number> = Object.fromEntries(
+    apiKeyIds.map((id) => [id, pointsByKey.get(id) ?? 0])
   );
 
-  return { balance, roamingPointsByApiKeyId };
+  return { balance, roamingByKey };
 });
 
 export const debitUserPoints = Effect.fn("points.debitUserPoints")(function* (
@@ -321,7 +321,7 @@ export const debitUserPoints = Effect.fn("points.debitUserPoints")(function* (
 ) {
   if (amount <= 0) return yield* badRequest("Point debit amount must be positive");
 
-  yield* ensureUserPointBalanceWithClient(client, userId);
+  yield* ensureBalanceWith(client, userId);
 
   const debited = yield* fromPromise(
     () =>
@@ -361,7 +361,7 @@ export const debitUserPoints = Effect.fn("points.debitUserPoints")(function* (
     "Failed to record point transaction"
   );
 
-  publishPointsBalance(userId, debited[0].balance);
+  publishPoints(userId, debited[0].balance);
 
   return { success: true as const, balance: debited[0].balance };
 });

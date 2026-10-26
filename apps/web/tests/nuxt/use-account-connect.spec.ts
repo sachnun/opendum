@@ -19,7 +19,7 @@ const Probe = defineComponent({
   setup() {
     const connect = useAccountConnect(
       { initialProvider: null, readonly: false },
-      { onConnected: mock(() => {}), onCustomCreated: mock(() => {}) }
+      { onConnected: mock(() => {}), customCreated: mock(() => {}) }
     );
     return { connect };
   },
@@ -33,7 +33,7 @@ function mountProbe() {
   return (wrapper.vm as unknown as { connect: Connect }).connect;
 }
 
-describe("useAccountConnect", () => {
+describe("useConnect", () => {
   beforeEach(() => {
     mock.clearAllMocks();
   });

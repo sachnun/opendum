@@ -9,17 +9,17 @@ import { registry } from "./models.js";
 const VALIDATION_PREFIX = "opendum:api-key:validation";
 const LAST_USED_PREFIX = "opendum:api-key:last-used";
 const DISABLED_MODELS_PREFIX = "opendum:user:disabled-models";
-const REFRESH_FAIL_COUNT_PREFIX = "opendum:provider-account:refresh-fail-count";
+const FAIL_PREFIX = "opendum:provider-account:refresh-fail-count";
 
-function getApiKeyValidationCacheKey(keyHash: string): string {
+function validationKey(keyHash: string): string {
   return `${VALIDATION_PREFIX}:${keyHash}`;
 }
 
-function getApiKeyLastUsedThrottleKey(apiKeyId: string): string {
+function usedKey(apiKeyId: string): string {
   return `${LAST_USED_PREFIX}:${apiKeyId}`;
 }
 
-function getDisabledModelsCacheKey(userId: string): string {
+function disabledKey(userId: string): string {
   return `${DISABLED_MODELS_PREFIX}:${userId}`;
 }
 
@@ -34,26 +34,26 @@ function deleteKeys(build: (redis: OpendumRedis) => Promise<unknown>) {
   }).pipe(Effect.ignore);
 }
 
-export const invalidateDisabledModelsCache = Effect.fn("invalidateDisabledModelsCache")(function* (
+export const invalidateDisabled = Effect.fn("invalidateDisabled")(function* (
   userId: string
 ) {
-  yield* deleteKeys((redis) => redis.del(getDisabledModelsCacheKey(userId)));
+  yield* deleteKeys((redis) => redis.del(disabledKey(userId)));
 });
 
-export const clearRefreshFailCount = Effect.fn("clearRefreshFailCount")(function* (accountId: string) {
-  yield* deleteKeys((redis) => redis.del(`${REFRESH_FAIL_COUNT_PREFIX}:${accountId}`));
+export const clearFails = Effect.fn("clearFails")(function* (accountId: string) {
+  yield* deleteKeys((redis) => redis.del(`${FAIL_PREFIX}:${accountId}`));
 });
 
-export const invalidateApiKeyValidationCache = Effect.fn("invalidateApiKeyValidationCache")(function* (
+export const invalidateValidation = Effect.fn("invalidateValidation")(function* (
   keyHash: string,
   apiKeyId?: string
 ) {
-  const keys = [getApiKeyValidationCacheKey(keyHash)];
-  if (apiKeyId) keys.push(getApiKeyLastUsedThrottleKey(apiKeyId));
+  const keys = [validationKey(keyHash)];
+  if (apiKeyId) keys.push(usedKey(apiKeyId));
   yield* deleteKeys((redis) => redis.del(keys));
 });
 
-export const getAccountModelAvailability = Effect.fn("getAccountModelAvailability")(function* (
+export const modelAvailability = Effect.fn("modelAvailability")(function* (
   userId: string,
   options: { includeInactiveAccounts?: boolean } = {}
 ) {

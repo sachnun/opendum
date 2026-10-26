@@ -1,6 +1,6 @@
 export {
   kiroProvider,
-  generateCodeVerifier,
-  buildKiroAuthUrl,
+  codeVerifier,
+  authUrl,
 } from "./client.js";
 export * from "./constants.js";

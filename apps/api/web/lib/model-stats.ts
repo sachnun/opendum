@@ -1,10 +1,10 @@
 import { and, eq, gte, inArray, sql } from "drizzle-orm";
 
-import { buildDayKeys, buildEmptyModelStats, buildHourKeys, MODEL_DURATION_LOOKBACK_HOURS, MODEL_STATS_DAYS, type ModelStats } from "@opendum/models/stats";
+import { dayKeys, emptyStats, hourKeys, LOOKBACK_HOURS, MODEL_STATS_DAYS, type ModelStats } from "@opendum/models/stats";
 import { db, usageLog } from "@opendum/database";
 import { Effect } from "effect";
 import { fromPromise } from "./task.js";
-import { getModelLookupKeys, resolveModelAlias } from "./proxy/models.js";
+import { keysOf, aliasOf } from "./proxy/models.js";
 
 interface RawModelStats {
   totalRequests: number;
@@ -16,7 +16,7 @@ interface RawModelStats {
   durationByHour: Map<string, { total: number; count: number }>;
 }
 
-function createRawModelStats(): RawModelStats {
+function rawStats(): RawModelStats {
   return {
     totalRequests: 0,
     totalTokens: 0,
@@ -28,23 +28,23 @@ function createRawModelStats(): RawModelStats {
   };
 }
 
-function normalizeLoggedModel(model: string): string {
+function normalizeModel(model: string): string {
   const slashIndex = model.indexOf("/");
   const baseModel = slashIndex >= 0 ? model.slice(slashIndex + 1) : model;
-  return resolveModelAlias(baseModel);
+  return aliasOf(baseModel);
 }
 
-export const getModelStatsByModel = Effect.fn("getModelStatsByModel")(function* (userId: string, allModels: string[]) {
+export const statsByModel = Effect.fn("statsByModel")(function* (userId: string, allModels: string[]) {
   if (allModels.length === 0) return {} as Record<string, ModelStats>;
 
-  const dayKeys = buildDayKeys(MODEL_STATS_DAYS);
-  const dayKeySet = new Set(dayKeys);
-  const hourKeys = buildHourKeys(MODEL_DURATION_LOOKBACK_HOURS);
-  const hourKeySet = new Set(hourKeys);
-  const durationStartDate = new Date(hourKeys[0] ?? Date.now());
-  const statsStartDate = new Date(`${dayKeys[0]}T00:00:00.000Z`);
+  const days = dayKeys(MODEL_STATS_DAYS);
+  const dayKeySet = new Set(days);
+  const hours = hourKeys(LOOKBACK_HOURS);
+  const hourKeySet = new Set(hours);
+  const durationStartDate = new Date(hours[0] ?? Date.now());
+  const statsStartDate = new Date(`${days[0]}T00:00:00.000Z`);
   const supportedModelSet = new Set(allModels);
-  const lookupKeys = Array.from(new Set(allModels.flatMap(getModelLookupKeys)));
+
 
   const normalizedModelExpression = sql<string>`case
     when strpos(${usageLog.model}, '/') > 0 then split_part(${usageLog.model}, '/', 2)
@@ -52,7 +52,7 @@ export const getModelStatsByModel = Effect.fn("getModelStatsByModel")(function* 
   end`;
   const dayBucketExpression = sql<Date>`date_trunc('day', ${usageLog.createdAt})`;
   const hourBucketExpression = sql<Date>`date_trunc('hour', ${usageLog.createdAt})`;
-  const modelWhere = and(eq(usageLog.userId, userId), inArray(normalizedModelExpression, lookupKeys));
+  const modelWhere = and(eq(usageLog.userId, userId), inArray(normalizedModelExpression, Array.from(new Set(allModels.flatMap(keysOf)))));
 
   const allTimeRows = yield* fromPromise(
     () =>
@@ -101,23 +101,23 @@ export const getModelStatsByModel = Effect.fn("getModelStatsByModel")(function* 
     "Failed to load model durations"
   );
 
-  const rawStatsByModel = new Map<string, RawModelStats>();
+  const rawByModel = new Map<string, RawModelStats>();
 
   for (const row of allTimeRows) {
-    const modelId = normalizeLoggedModel(row.model);
+    const modelId = normalizeModel(row.model);
     if (!supportedModelSet.has(modelId)) continue;
 
-    const current = rawStatsByModel.get(modelId) ?? createRawModelStats();
+    const current = rawByModel.get(modelId) ?? rawStats();
     current.totalRequests += Number(row.requestCount) || 0;
     current.totalTokens += Number(row.totalTokens) || 0;
     current.successfulRequests += Number(row.successCount) || 0;
     current.durationTotal += Number(row.durationTotal) || 0;
     current.durationCount += Number(row.durationCount) || 0;
-    rawStatsByModel.set(modelId, current);
+    rawByModel.set(modelId, current);
   }
 
   for (const row of dailyRows) {
-    const modelId = normalizeLoggedModel(row.model);
+    const modelId = normalizeModel(row.model);
     if (!supportedModelSet.has(modelId)) continue;
 
     const dayDate = row.dayBucket instanceof Date ? row.dayBucket : new Date(row.dayBucket);
@@ -126,16 +126,16 @@ export const getModelStatsByModel = Effect.fn("getModelStatsByModel")(function* 
     const dayKey = dayDate.toISOString().split("T")[0] ?? "";
     if (!dayKeySet.has(dayKey)) continue;
 
-    const current = rawStatsByModel.get(modelId) ?? createRawModelStats();
+    const current = rawByModel.get(modelId) ?? rawStats();
 
     const requestCount = Number(row.requestCount) || 0;
 
     current.dailyCounts.set(dayKey, (current.dailyCounts.get(dayKey) ?? 0) + requestCount);
-    rawStatsByModel.set(modelId, current);
+    rawByModel.set(modelId, current);
   }
 
   for (const row of durationRows) {
-    const modelId = normalizeLoggedModel(row.model);
+    const modelId = normalizeModel(row.model);
     if (!supportedModelSet.has(modelId)) continue;
 
     const hourDate = row.hourBucket instanceof Date ? row.hourBucket : new Date(row.hourBucket);
@@ -148,23 +148,23 @@ export const getModelStatsByModel = Effect.fn("getModelStatsByModel")(function* 
     const durationTotal = Number(row.durationTotal) || 0;
     if (durationCount <= 0) continue;
 
-    const current = rawStatsByModel.get(modelId) ?? createRawModelStats();
+    const current = rawByModel.get(modelId) ?? rawStats();
 
     const durationBucket = current.durationByHour.get(hourKey) ?? { total: 0, count: 0 };
     durationBucket.total += durationTotal;
     durationBucket.count += durationCount;
     current.durationByHour.set(hourKey, durationBucket);
-    rawStatsByModel.set(modelId, current);
+    rawByModel.set(modelId, current);
   }
 
   return Object.fromEntries(
     allModels.map((model) => {
-      const modelStats = rawStatsByModel.get(model);
+      const modelStats = rawByModel.get(model);
       if (!modelStats) {
-        return [model, buildEmptyModelStats(dayKeys, hourKeys)];
+        return [model, emptyStats(days, hours)];
       }
 
-      const durationLast24Hours = hourKeys.flatMap((time) => {
+      const durationLast24Hours = hours.flatMap((time) => {
         const durationBucket = modelStats.durationByHour.get(time);
         return durationBucket && durationBucket.count > 0 ? [{ time, avgDuration: Math.round(durationBucket.total / durationBucket.count) }] : [];
       });
@@ -173,7 +173,7 @@ export const getModelStatsByModel = Effect.fn("getModelStatsByModel")(function* 
         totalRequests: modelStats.totalRequests,
         totalTokens: modelStats.totalTokens,
         successRate: modelStats.totalRequests > 0 ? Math.round((modelStats.successfulRequests / modelStats.totalRequests) * 100) : null,
-        dailyRequests: dayKeys.flatMap((day) => {
+        dailyRequests: days.flatMap((day) => {
           const count = modelStats.dailyCounts.get(day) ?? 0;
           return count > 0 ? [{ date: day, count }] : [];
         }),

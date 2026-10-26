@@ -2,21 +2,21 @@ import { Effect } from "effect";
 import { fetchExternalEffect } from "#web/lib/external.js";
 import { fromPromise } from "#web/lib/task.js";
 import { unavailable } from "#web/errors.js";
-import { formatProviderHttpError } from "../provider-http-errors.js";
+import { httpError } from "../provider-http-errors.js";
 import type { OAuthResult } from "../types.js";
 import {
-  ACCESS_TOKEN_TTL_SECONDS,
+  ACCESS_TTL,
   CLIENT_ID,
   CLINE_BASE_URL,
   CLINE_REGISTER_PATH,
   DEVICE_AUTHENTICATE_PATH,
   DEVICE_AUTHORIZE_PATH,
-  DEVICE_CODE_EXPIRY_SECONDS,
+  DEVICE_EXPIRY,
   POLLING_INTERVAL_SECONDS,
   WORKOS_BASE_URL,
 } from "./constants.js";
 
-interface ClineDeviceCodeResponse {
+interface CodeResponse {
   device_code?: string;
   user_code?: string;
   verification_uri?: string;
@@ -25,7 +25,7 @@ interface ClineDeviceCodeResponse {
   interval?: number;
 }
 
-interface ClineDeviceAuthenticateResponse {
+interface AuthResponse {
   access_token?: string;
   refresh_token?: string;
   error?: string;
@@ -45,8 +45,8 @@ export interface ClineInitiateResult {
   interval: number;
 }
 
-function formatClineError(response: Response, body: string, endpointLabel: string): string {
-  return formatProviderHttpError("Cline", response, body, { endpointLabel });
+function errorText(response: Response, body: string, endpointLabel: string): string {
+  return httpError("Cline", response, body, { endpointLabel });
 }
 
 function readText(response: Response) {
@@ -60,7 +60,7 @@ function readJson<T>(response: Response, fallback: T) {
   );
 }
 
-export const initiateClineDeviceCodeFlow = Effect.fn("cline.initiateDeviceCodeFlow")(function* () {
+export const startDeviceFlow = Effect.fn("cline.initiateDeviceCodeFlow")(function* () {
   const response = yield* fetchExternalEffect(`${WORKOS_BASE_URL}${DEVICE_AUTHORIZE_PATH}`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -70,10 +70,10 @@ export const initiateClineDeviceCodeFlow = Effect.fn("cline.initiateDeviceCodeFl
 
   if (!response.ok) {
     const body = yield* readText(response);
-    return yield* unavailable(formatClineError(response, body, "device code endpoint"));
+    return yield* unavailable(errorText(response, body, "device code endpoint"));
   }
 
-  const data = yield* readJson<ClineDeviceCodeResponse>(response, {});
+  const data = yield* readJson<CodeResponse>(response, {});
   if (!data.device_code || !data.verification_uri_complete) {
     return yield* unavailable("Cline device code response is missing required fields");
   }
@@ -83,7 +83,7 @@ export const initiateClineDeviceCodeFlow = Effect.fn("cline.initiateDeviceCodeFl
     userCode: data.user_code ?? "",
     verificationUrl: data.verification_uri ?? data.verification_uri_complete,
     verificationUrlComplete: data.verification_uri_complete,
-    expiresIn: data.expires_in ?? DEVICE_CODE_EXPIRY_SECONDS,
+    expiresIn: data.expires_in ?? DEVICE_EXPIRY,
     interval: data.interval ?? POLLING_INTERVAL_SECONDS,
   } satisfies ClineInitiateResult;
 });
@@ -101,7 +101,7 @@ const registerWithCline = Effect.fn("cline.register")(function* (
 
   if (!response.ok) {
     const body = yield* readText(response);
-    return yield* unavailable(formatClineError(response, body, "registration endpoint"));
+    return yield* unavailable(errorText(response, body, "registration endpoint"));
   }
 
   const data = yield* readJson<ClineRegisterResponse>(response, {});
@@ -112,7 +112,7 @@ const registerWithCline = Effect.fn("cline.register")(function* (
   return { accessToken: `workos:${data.data.accessToken}`, refreshToken: data.data.refreshToken };
 });
 
-export const pollClineDeviceCodeAuthorization = Effect.fn("cline.pollDeviceCodeAuthorization")(
+export const pollDeviceAuth = Effect.fn("cline.pollDeviceCodeAuthorization")(
   function* (deviceCode: string) {
     const response = yield* fetchExternalEffect(`${WORKOS_BASE_URL}${DEVICE_AUTHENTICATE_PATH}`, {
       method: "POST",
@@ -121,7 +121,7 @@ export const pollClineDeviceCodeAuthorization = Effect.fn("cline.pollDeviceCodeA
       cache: "no-store",
     });
 
-    const data = yield* readJson<ClineDeviceAuthenticateResponse>(response, {});
+    const data = yield* readJson<AuthResponse>(response, {});
 
     if (data.error === "authorization_pending") return { pending: true as const };
     if (data.error === "slow_down") return { pending: true as const, retryAfterSeconds: 5 };
@@ -131,7 +131,7 @@ export const pollClineDeviceCodeAuthorization = Effect.fn("cline.pollDeviceCodeA
     if (!data.access_token) {
       if (!response.ok) {
         const body = yield* readText(response);
-        return { error: formatClineError(response, body, "device authorization endpoint") };
+        return { error: errorText(response, body, "device authorization endpoint") };
       }
       return { pending: true as const };
     }
@@ -140,7 +140,7 @@ export const pollClineDeviceCodeAuthorization = Effect.fn("cline.pollDeviceCodeA
     return {
       accessToken: registered.accessToken,
       refreshToken: registered.refreshToken,
-      expiresAt: new Date(Date.now() + ACCESS_TOKEN_TTL_SECONDS * 1000),
+      expiresAt: new Date(Date.now() + ACCESS_TTL * 1000),
       email: data.user?.email ?? "",
     } satisfies OAuthResult;
   }

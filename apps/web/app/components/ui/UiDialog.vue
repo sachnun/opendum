@@ -27,19 +27,19 @@ const props = withDefaults(
 
 const open = defineModel<boolean>("open", { default: false });
 
-function handleInteractOutside(event: Event) {
+function onOutside(event: Event) {
   if (props.preventOutsideClose) event.preventDefault();
 }
 
-function handleEscapeKeyDown(event: Event) {
+function onEscape(event: Event) {
   if (props.preventEscapeClose) event.preventDefault();
 }
 
-function handleOpenAutoFocus(event: Event) {
+function onOpen(event: Event) {
   event.preventDefault();
 }
 
-function handleCloseAutoFocus(event: Event) {
+function onClose(event: Event) {
   if (props.preventCloseAutoFocus) event.preventDefault();
 }
 </script>
@@ -58,10 +58,10 @@ function handleCloseAutoFocus(event: Event) {
           'fixed left-1/2 top-1/2 z-50 flex max-h-[85dvh] w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col gap-4 overflow-hidden rounded-lg border border-border bg-background p-6 text-foreground shadow-lg outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:max-w-lg',
           props.ui.content,
         )"
-        @open-auto-focus="handleOpenAutoFocus"
-        @close-auto-focus="handleCloseAutoFocus"
-        @interact-outside="handleInteractOutside"
-        @escape-key-down="handleEscapeKeyDown"
+        @open-auto-focus="onOpen"
+        @close-auto-focus="onClose"
+        @interact-outside="onOutside"
+        @escape-key-down="onEscape"
       >
         <slot name="content">
           <slot />

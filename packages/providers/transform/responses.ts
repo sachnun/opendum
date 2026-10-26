@@ -1,28 +1,14 @@
-import {
-  cloneAnyMap,
-  contentToText,
-  defaultEmpty,
-  defaultStringValue,
-  jsonResponse,
-  normalizeToolChoice,
-  numberFromAny,
-  parseJsonRecord,
-  randomId,
-  stringSlice,
-  stringValue,
-  sseResponse,
-  uniqueStrings,
-} from "../core/helpers.js";
-import { convertResponsesInputImageURLsToBase64 } from "../core/images.js";
+import { Value, Payload, Ids, Responses, JSONText } from "../core/helpers.js";
+import { ResponsesImageInliner } from "../core/images.js";
 
 type Json = Record<string, unknown>;
 
-export function messagesToResponsesInput(messages: unknown[]): unknown[] {
+export function toInput(messages: unknown[]): unknown[] {
   const input: unknown[] = [];
   for (const raw of messages) {
     const msg = (raw ?? {}) as Json;
-    const role = stringValue(msg.role);
-    const content = normalizeResponsesContent(msg.content, role);
+    const role = Value.string(msg.role);
+    const content = contentOf(msg.content, role);
     switch (role) {
       case "system":
       case "developer":
@@ -34,21 +20,21 @@ export function messagesToResponsesInput(messages: unknown[]): unknown[] {
       case "assistant": {
         const calls = Array.isArray(msg.tool_calls) ? msg.tool_calls : [];
         if (calls.length > 0) {
-          if (content != null && contentToText(content) !== "") {
+          if (content != null && Payload.text(content) !== "") {
             input.push({ type: "message", role: "assistant", content });
           }
           for (const rawCall of calls) {
             const call = (rawCall ?? {}) as Json;
             const fn = (call.function ?? {}) as Json;
-            const name = stringValue(fn.name);
+            const name = Value.string(fn.name);
             if (!name) continue;
-            const id = toResponsesApiId(stringValue(call.id));
+            const id = apiId(Value.string(call.id));
             input.push({
               type: "function_call",
               id,
               call_id: id,
               name,
-              arguments: defaultStringValue(fn.arguments, "{}"),
+              arguments: Value.stringOr(fn.arguments, "{}"),
             });
           }
         } else {
@@ -59,14 +45,14 @@ export function messagesToResponsesInput(messages: unknown[]): unknown[] {
       case "tool":
         input.push({
           type: "function_call_output",
-          call_id: toResponsesApiId(stringValue(msg.tool_call_id)),
-          output: contentToText(msg.content),
+          call_id: apiId(Value.string(msg.tool_call_id)),
+          output: Payload.text(msg.content),
         });
         break;
       default:
         input.push({
           type: "message",
-          role: defaultEmpty(role, "user"),
+          role: Value.nonEmpty(role, "user"),
           content,
         });
     }
@@ -74,36 +60,36 @@ export function messagesToResponsesInput(messages: unknown[]): unknown[] {
   return input;
 }
 
-export function normalizeResponsesInput(input: unknown[]): unknown[] {
+export function inputOf(input: unknown[]): unknown[] {
   const out: unknown[] = [];
   for (const raw of input) {
     if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
       out.push(raw);
       continue;
     }
-    const item = cloneAnyMap(raw as Json);
-    let type = stringValue(item.type);
+    const item = Payload.clone(raw as Json);
+    let type = Value.string(item.type);
     if (!type) {
-      type = inferResponsesInputType(item);
+      type = inputType(item);
       if (type) item.type = type;
     }
     if (type === "function_call") {
-      const id = toResponsesApiId(defaultStringValue(item.id, stringValue(item.call_id)));
+      const id = apiId(Value.stringOr(item.id, Value.string(item.call_id)));
       item.id = id;
       item.call_id = id;
     }
     if (type === "function_call_output") {
-      item.call_id = toResponsesApiId(stringValue(item.call_id));
+      item.call_id = apiId(Value.string(item.call_id));
     }
     if (type === "message") {
-      item.content = normalizeResponsesContent(item.content, defaultStringValue(item.role, "user"));
+      item.content = contentOf(item.content, Value.stringOr(item.role, "user"));
     }
     out.push(item);
   }
   return out;
 }
 
-function inferResponsesInputType(item: Json): string {
+function inputType(item: Json): string {
   if ("summary" in item) return "reasoning";
   if ("encrypted_content" in item) return "reasoning";
   if (item.call_id !== undefined && item.name !== undefined) return "function_call";
@@ -112,7 +98,7 @@ function inferResponsesInputType(item: Json): string {
   return "";
 }
 
-export function normalizeResponsesContent(content: unknown, role: string): unknown {
+export function contentOf(content: unknown, role: string): unknown {
   if (!Array.isArray(content)) return content;
   const targetTextType = role === "assistant" ? "output_text" : "input_text";
   const out: unknown[] = [];
@@ -121,14 +107,14 @@ export function normalizeResponsesContent(content: unknown, role: string): unkno
       out.push(raw);
       continue;
     }
-    const copy = cloneAnyMap(raw as Json);
+    const copy = Payload.clone(raw as Json);
     if (copy.type === "text") copy.type = targetTextType;
     if (copy.type === "image_url") {
       copy.type = "input_image";
       const imageUrl = copy.image_url;
       if (imageUrl !== null && typeof imageUrl === "object" && !Array.isArray(imageUrl)) {
         const image = imageUrl as Json;
-        copy.image_url = stringValue(image.url);
+        copy.image_url = Value.string(image.url);
         if (image.detail !== undefined) copy.detail = image.detail;
       }
     }
@@ -137,15 +123,15 @@ export function normalizeResponsesContent(content: unknown, role: string): unkno
   return out;
 }
 
-export function convertToolsForResponses(raw: unknown): unknown[] {
+export function toolsFor(raw: unknown): unknown[] {
   if (!Array.isArray(raw)) return [];
   const out: unknown[] = [];
   for (const item of raw) {
     const tool = (item ?? {}) as Json;
     let fn = (tool.function ?? {}) as Json;
-    let name = stringValue(fn.name);
+    let name = Value.string(fn.name);
     if (!name) {
-      name = stringValue(tool.name);
+      name = Value.string(tool.name);
       fn = tool;
     }
     if (!name) continue;
@@ -156,7 +142,7 @@ export function convertToolsForResponses(raw: unknown): unknown[] {
     const converted: Json = {
       type: "function",
       name,
-      description: defaultStringValue(fn.description, ""),
+      description: Value.stringOr(fn.description, ""),
       parameters: params,
     };
     if (typeof fn.strict === "boolean") converted.strict = fn.strict;
@@ -165,21 +151,21 @@ export function convertToolsForResponses(raw: unknown): unknown[] {
   return out;
 }
 
-export function toResponsesApiId(id: string): string {
-  if (!id) return randomId("fc");
+export function apiId(id: string): string {
+  if (!id) return Ids.random("fc");
   if (id.startsWith("fc_") || id.startsWith("fc-") || id.startsWith("apc_")) return id;
   if (id.startsWith("call_")) return `fc_${id.slice("call_".length)}`;
   return `fc_${id}`;
 }
 
-export function toChatCallId(id: string): string {
-  if (!id) return randomId("call");
+export function callId(id: string): string {
+  if (!id) return Ids.random("call");
   if (id.startsWith("call_")) return id;
   if (id.startsWith("fc_") || id.startsWith("fc-")) return `call_${id.slice(3)}`;
   return `call_${id}`;
 }
 
-async function* sseDataLines(source: ReadableStream<Uint8Array>): AsyncGenerator<string> {
+async function* dataLines(source: ReadableStream<Uint8Array>): AsyncGenerator<string> {
   const reader = source.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -249,13 +235,13 @@ class ReasoningParts {
     return chunks.join("\n\n");
   }
 
-  addItem(item: Json, emit: (key: string, text: string) => void): void {
+  static addItem(self: ReasoningParts, item: Json, emit: (key: string, text: string) => void): void {
     const summary = Array.isArray(item.summary) ? item.summary : [];
     if (summary.length > 0) {
       summary.forEach((raw, index) => {
         let text = "";
         if (typeof raw === "string") text = raw;
-        else if (raw !== null && typeof raw === "object") text = stringValue((raw as Json).text);
+        else if (raw !== null && typeof raw === "object") text = Value.string((raw as Json).text);
         if (text) emit(reasoningKey("summary", index), text);
       });
       return;
@@ -264,25 +250,25 @@ class ReasoningParts {
     if (content.length > 0) {
       content.forEach((raw, index) => {
         const part = (raw ?? {}) as Json;
-        const text = stringValue(part.text);
+        const text = Value.string(part.text);
         if (text) emit(reasoningKey("text", index), text);
       });
       return;
     }
-    const text = stringValue(item.text);
+    const text = Value.string(item.text);
     if (text) emit(reasoningKey("text", 0), text);
   }
 }
 
 function reasoningKey(family: string, index: unknown): string {
-  return `${family}:${numberFromAny(index)}`;
+  return `${family}:${Value.number(index)}`;
 }
 
-async function* transformResponsesSseToChat(
+async function* chatStreams(
   source: ReadableStream<Uint8Array>,
   model: string
 ): AsyncGenerator<string> {
-  const completionId = randomId("chatcmpl");
+  const completionId = Ids.random("chatcmpl");
   let sentRole = false;
   let toolIndex = 0;
   const reasoning = new ReasoningParts();
@@ -314,46 +300,46 @@ async function* transformResponsesSseToChat(
     return out;
   };
 
-  for await (const data of sseDataLines(source)) {
+  for await (const data of dataLines(source)) {
     if (!data || data === "[DONE]") continue;
-    const event = parseJsonRecord(data);
+    const event = JSONText.record(data);
     if (!event) continue;
-    const type = stringValue(event.type);
+    const type = Value.string(event.type);
     switch (type) {
       case "response.output_text.delta": {
         if (!sentRole) {
           yield writeChunk({ role: "assistant", content: "" }, null);
           sentRole = true;
         }
-        const delta = stringValue(event.delta);
+        const delta = Value.string(event.delta);
         if (delta) yield writeChunk({ content: delta }, null);
         break;
       }
       case "response.reasoning.delta":
       case "response.reasoning_text.delta":
-        for (const chunk of emitReasoning(reasoningKey("text", event.content_index), stringValue(event.delta))) {
+        for (const chunk of emitReasoning(reasoningKey("text", event.content_index), Value.string(event.delta))) {
           yield chunk;
         }
         break;
       case "response.reasoning_summary_text.delta":
-        for (const chunk of emitReasoning(reasoningKey("summary", event.summary_index), stringValue(event.delta))) {
+        for (const chunk of emitReasoning(reasoningKey("summary", event.summary_index), Value.string(event.delta))) {
           yield chunk;
         }
         break;
       case "response.reasoning_text.done":
-        for (const chunk of emitReasoning(reasoningKey("text", event.content_index), stringValue(event.text))) {
+        for (const chunk of emitReasoning(reasoningKey("text", event.content_index), Value.string(event.text))) {
           yield chunk;
         }
         break;
       case "response.reasoning_summary_text.done":
-        for (const chunk of emitReasoning(reasoningKey("summary", event.summary_index), stringValue(event.text))) {
+        for (const chunk of emitReasoning(reasoningKey("summary", event.summary_index), Value.string(event.text))) {
           yield chunk;
         }
         break;
       case "response.reasoning_summary_part.done": {
         const part = (event.part ?? {}) as Json;
-        let text = stringValue(part.text);
-        if (!text) text = stringValue(event.text);
+        let text = Value.string(part.text);
+        if (!text) text = Value.string(event.text);
         for (const chunk of emitReasoning(reasoningKey("summary", event.summary_index), text)) {
           yield chunk;
         }
@@ -366,7 +352,7 @@ async function* transformResponsesSseToChat(
             yield writeChunk({ role: "assistant" }, null);
             sentRole = true;
           }
-          const id = toChatCallId(defaultStringValue(item.call_id, stringValue(item.id)));
+          const id = callId(Value.stringOr(item.call_id, Value.string(item.id)));
           yield writeChunk(
             {
               tool_calls: [
@@ -374,7 +360,7 @@ async function* transformResponsesSseToChat(
                   index: toolIndex,
                   id,
                   type: "function",
-                  function: { name: stringValue(item.name), arguments: "" },
+                  function: { name: Value.string(item.name), arguments: "" },
                 },
               ],
             },
@@ -385,7 +371,7 @@ async function* transformResponsesSseToChat(
       }
       case "response.function_call_arguments.delta":
       case "response.custom_tool_call_input.delta": {
-        const delta = stringValue(event.delta);
+        const delta = Value.string(event.delta);
         if (delta) {
           yield writeChunk({ tool_calls: [{ index: toolIndex, function: { arguments: delta } }] }, null);
         }
@@ -398,7 +384,7 @@ async function* transformResponsesSseToChat(
           toolIndex += 1;
         } else if (item.type === "reasoning") {
           const collected: string[] = [];
-          reasoning.addItem(item, (key, text) => {
+          ReasoningParts.addItem(reasoning, item, (key, text) => {
             collected.push(...emitReasoning(key, text));
           });
           for (const chunk of collected) yield chunk;
@@ -408,7 +394,7 @@ async function* transformResponsesSseToChat(
       case "response.completed":
       case "response.done": {
         const response = (event.response ?? event) as Json;
-        const usage = responseUsageToChatUsage(response.usage);
+        const usage = chatUsage(response.usage);
         let finish = "stop";
         if (response.status === "incomplete") finish = "length";
         if (toolIndex > 0) finish = "tool_calls";
@@ -422,27 +408,27 @@ async function* transformResponsesSseToChat(
   yield "data: [DONE]\n\n";
 }
 
-export function responseUsageToChatUsage(raw: unknown): Json {
+export function chatUsage(raw: unknown): Json {
   const usage = (raw ?? {}) as Json;
-  let input = numberFromAny(usage.input_tokens);
-  if (input === 0) input = numberFromAny(usage.prompt_tokens);
-  let output = numberFromAny(usage.output_tokens);
-  if (output === 0) output = numberFromAny(usage.completion_tokens);
+  let input = Value.number(usage.input_tokens);
+  if (input === 0) input = Value.number(usage.prompt_tokens);
+  let output = Value.number(usage.output_tokens);
+  if (output === 0) output = Value.number(usage.completion_tokens);
   const out: Json = { prompt_tokens: input, completion_tokens: output, total_tokens: input + output };
 
   let cached = 0;
   let write = 0;
   const details = usage.input_tokens_details;
   if (details !== null && typeof details === "object") {
-    cached = numberFromAny((details as Json).cached_tokens);
-    write = numberFromAny((details as Json).cache_write_tokens);
+    cached = Value.number((details as Json).cached_tokens);
+    write = Value.number((details as Json).cache_write_tokens);
   }
   if (cached === 0 || write === 0) {
     const promptDetails = usage.prompt_tokens_details;
     if (promptDetails !== null && typeof promptDetails === "object") {
       const pd = promptDetails as Json;
-      if (cached === 0) cached = numberFromAny(pd.cached_tokens);
-      if (write === 0) write = numberFromAny(pd.cache_write_tokens);
+      if (cached === 0) cached = Value.number(pd.cached_tokens);
+      if (write === 0) write = Value.number(pd.cache_write_tokens);
     }
   }
   if (cached > 0 || write > 0) {
@@ -452,19 +438,19 @@ export function responseUsageToChatUsage(raw: unknown): Json {
   let reasoning = 0;
   const outputDetails = usage.output_tokens_details;
   if (outputDetails !== null && typeof outputDetails === "object") {
-    reasoning = numberFromAny((outputDetails as Json).reasoning_tokens);
+    reasoning = Value.number((outputDetails as Json).reasoning_tokens);
   }
   if (reasoning === 0) {
     const completionDetails = usage.completion_tokens_details;
     if (completionDetails !== null && typeof completionDetails === "object") {
-      reasoning = numberFromAny((completionDetails as Json).reasoning_tokens);
+      reasoning = Value.number((completionDetails as Json).reasoning_tokens);
     }
   }
   if (reasoning > 0) out.completion_tokens_details = { reasoning_tokens: reasoning };
   return out;
 }
 
-export function responsesJsonToChatCompletion(data: Json, model: string): Json {
+export function toChat(data: Json, model: string): Json {
   let content = "";
   let reasoning = "";
   const toolCalls: unknown[] = [];
@@ -476,20 +462,20 @@ export function responsesJsonToChatCompletion(data: Json, model: string): Json {
         const parts = Array.isArray(item.content) ? item.content : [];
         for (const rawPart of parts) {
           const part = (rawPart ?? {}) as Json;
-          if (part.type === "output_text") content += stringValue(part.text);
+          if (part.type === "output_text") content += Value.string(part.text);
         }
         break;
       }
       case "reasoning":
-        reasoning += extractReasoningFromItem(item);
+        reasoning += reasoningOf(item);
         break;
       case "function_call":
         toolCalls.push({
-          id: toChatCallId(defaultStringValue(item.call_id, stringValue(item.id))),
+          id: callId(Value.stringOr(item.call_id, Value.string(item.id))),
           type: "function",
           function: {
-            name: stringValue(item.name),
-            arguments: defaultStringValue(item.arguments, "{}"),
+            name: Value.string(item.name),
+            arguments: Value.stringOr(item.arguments, "{}"),
           },
         });
         break;
@@ -505,28 +491,28 @@ export function responsesJsonToChatCompletion(data: Json, model: string): Json {
   if (data.status === "incomplete") finish = "length";
   if (toolCalls.length > 0) finish = "tool_calls";
   return {
-    id: randomId("chatcmpl"),
+    id: Ids.random("chatcmpl"),
     object: "chat.completion",
     created: Math.floor(Date.now() / 1000),
     model,
     choices: [{ index: 0, message, finish_reason: finish }],
-    usage: responseUsageToChatUsage(data.usage),
+    usage: chatUsage(data.usage),
   };
 }
 
-function extractReasoningFromItem(item: Json): string {
+function reasoningOf(item: Json): string {
   if (Array.isArray(item.summary)) {
-    const text = joinReasoningParts(item.summary);
+    const text = joinReasoning(item.summary);
     if (text) return text;
   }
   if (Array.isArray(item.content)) {
-    const text = joinReasoningParts(item.content);
+    const text = joinReasoning(item.content);
     if (text) return text;
   }
-  return stringValue(item.text);
+  return Value.string(item.text);
 }
 
-function joinReasoningParts(parts: unknown[]): string {
+function joinReasoning(parts: unknown[]): string {
   const chunks: string[] = [];
   for (const raw of parts) {
     if (typeof raw === "string") {
@@ -534,13 +520,13 @@ function joinReasoningParts(parts: unknown[]): string {
       continue;
     }
     const part = (raw ?? {}) as Json;
-    const text = stringValue(part.text);
+    const text = Value.string(part.text);
     if (text) chunks.push(text);
   }
   return chunks.join("\n\n");
 }
 
-export function chatCompletionToResponsesJson(data: Json, model: string): Json {
+export function toJson(data: Json, model: string): Json {
   const choices = Array.isArray(data.choices) ? data.choices : [];
   let message: Json = {};
   let finishReason = "stop";
@@ -548,22 +534,22 @@ export function chatCompletionToResponsesJson(data: Json, model: string): Json {
     const choice = (choices[0] ?? {}) as Json;
     const msg = choice.message;
     if (msg !== null && typeof msg === "object" && !Array.isArray(msg)) message = msg as Json;
-    const fr = stringValue(choice.finish_reason);
+    const fr = Value.string(choice.finish_reason);
     if (fr) finishReason = fr;
   }
   const output: unknown[] = [];
-  const content = stringValue(message.content);
-  const reasoning = stringValue(message.reasoning_content);
-  if (reasoning) output.push(responsesReasoningItem(reasoning));
-  if (content) output.push(responsesMessageItem(content));
+  const content = Value.string(message.content);
+  const reasoning = Value.string(message.reasoning_content);
+  if (reasoning) output.push(reasoningItem(reasoning));
+  if (content) output.push(messageItem(content));
   const tcs = Array.isArray(message.tool_calls) ? message.tool_calls : [];
   for (const raw of tcs) {
     const tc = (raw ?? {}) as Json;
     const fn = (tc.function ?? {}) as Json;
-    const name = stringValue(fn.name);
+    const name = Value.string(fn.name);
     if (!name) continue;
-    const id = toResponsesApiId(stringValue(tc.id));
-    output.push(responsesFunctionCallItem(id, name, defaultStringValue(fn.arguments, "{}")));
+    const id = apiId(Value.string(tc.id));
+    output.push(callItem(id, name, Value.stringOr(fn.arguments, "{}")));
   }
   const usage = (data.usage ?? {}) as Json;
   let status = "completed";
@@ -573,29 +559,29 @@ export function chatCompletionToResponsesJson(data: Json, model: string): Json {
     incompleteDetails = { reason: "max_output_tokens" };
   }
   const response: Json = {
-    id: randomId("resp"),
+    id: Ids.random("resp"),
     object: "response",
     model,
     output,
     status,
-    usage: responsesUsageFromChat(usage),
+    usage: usageOf(usage),
   };
   if (incompleteDetails) response.incomplete_details = incompleteDetails;
   return response;
 }
 
-export function responsesReasoningItem(text: string): Json {
+export function reasoningItem(text: string): Json {
   return {
-    id: randomId("rs"),
+    id: Ids.random("rs"),
     type: "reasoning",
     status: "completed",
     summary: [{ type: "summary_text", text }],
   };
 }
 
-export function responsesMessageItem(text: string): Json {
+export function messageItem(text: string): Json {
   return {
-    id: randomId("msg"),
+    id: Ids.random("msg"),
     type: "message",
     role: "assistant",
     status: "completed",
@@ -603,31 +589,31 @@ export function responsesMessageItem(text: string): Json {
   };
 }
 
-export function responsesFunctionCallItem(id: string, name: string, args: string): Json {
+export function callItem(id: string, name: string, args: string): Json {
   return {
     id,
     type: "function_call",
     status: "completed",
     call_id: id,
     name,
-    arguments: defaultStringValue(args, "{}"),
+    arguments: Value.stringOr(args, "{}"),
   };
 }
 
-export function responsesUsageFromChat(usage: Json): Json {
-  const input = numberFromAny(usage.prompt_tokens);
-  const output = numberFromAny(usage.completion_tokens);
+export function usageOf(usage: Json): Json {
+  const input = Value.number(usage.prompt_tokens);
+  const output = Value.number(usage.completion_tokens);
   let cached = 0;
   let write = 0;
   const details = usage.prompt_tokens_details;
   if (details !== null && typeof details === "object") {
-    cached = numberFromAny((details as Json).cached_tokens);
-    write = numberFromAny((details as Json).cache_write_tokens);
+    cached = Value.number((details as Json).cached_tokens);
+    write = Value.number((details as Json).cache_write_tokens);
   }
   let reasoning = 0;
   const completionDetails = usage.completion_tokens_details;
   if (completionDetails !== null && typeof completionDetails === "object") {
-    reasoning = numberFromAny((completionDetails as Json).reasoning_tokens);
+    reasoning = Value.number((completionDetails as Json).reasoning_tokens);
   }
   return {
     input_tokens: input,
@@ -673,10 +659,10 @@ class ResponsesSseState {
     if (!this.openKind) return;
     let item: Json | null = null;
     if (this.openKind === "reasoning") {
-      item = responsesReasoningItem(this.openText);
+      item = reasoningItem(this.openText);
       item.id = this.openId;
     } else if (this.openKind === "text") {
-      item = responsesMessageItem(this.openText);
+      item = messageItem(this.openText);
       item.id = this.openId;
     }
     if (item) this.appendItem(item, this.openIndex);
@@ -688,7 +674,7 @@ class ResponsesSseState {
   private closeTool(index: number): void {
     const tool = this.tools.get(index);
     if (!tool) return;
-    this.appendItem(responsesFunctionCallItem(tool.id, tool.name, tool.args), tool.index);
+    this.appendItem(callItem(tool.id, tool.name, tool.args), tool.index);
     this.tools.delete(index);
   }
 
@@ -746,7 +732,7 @@ class ResponsesSseState {
     let tool = this.tools.get(index);
     if (!tool) {
       this.ensureClosed();
-      const toolId = id || randomId("fc");
+      const toolId = id || Ids.random("fc");
       tool = { index: this.items.length + this.tools.size, id: toolId, name: "", args: "" };
       this.tools.set(index, tool);
       this.toolOrder.push(index);
@@ -787,7 +773,7 @@ class ResponsesSseState {
       model: this.model,
       output: this.items,
       status: "completed",
-      usage: responsesUsageFromChat(this.usage),
+      usage: usageOf(this.usage),
     };
     let eventType = "response.completed";
     if (this.finishReason === "length") {
@@ -799,7 +785,7 @@ class ResponsesSseState {
   }
 }
 
-async function* transformChatSseToResponses(
+async function* responsesStreams(
   source: ReadableStream<Uint8Array>,
   model: string
 ): AsyncGenerator<string> {
@@ -807,7 +793,7 @@ async function* transformChatSseToResponses(
   const state = new ResponsesSseState(
     (event) => buffer.push(`data: ${JSON.stringify(event)}\n\n`),
     model,
-    randomId("resp")
+    Ids.random("resp")
   );
   state.emit({
     type: "response.created",
@@ -821,10 +807,10 @@ async function* transformChatSseToResponses(
   });
   for (const chunk of buffer.splice(0)) yield chunk;
 
-  for await (const data of sseDataLines(source)) {
+  for await (const data of dataLines(source)) {
     if (!data) continue;
     if (data === "[DONE]") break;
-    const chunk = parseJsonRecord(data);
+    const chunk = JSONText.record(data);
     if (!chunk) continue;
     const usage = chunk.usage;
     if (usage !== null && typeof usage === "object" && Object.keys(usage as Json).length > 0) {
@@ -837,20 +823,20 @@ async function* transformChatSseToResponses(
       const choiceUsage = choice.usage as Json;
       if (Object.keys(choiceUsage).length > 0) state.usage = choiceUsage;
     }
-    const finishReason = stringValue(choice.finish_reason);
+    const finishReason = Value.string(choice.finish_reason);
     if (finishReason) state.finishReason = finishReason;
     const delta = (choice.delta ?? {}) as Json;
-    state.addReasoning(stringValue(delta.reasoning_content));
-    state.addText(stringValue(delta.content));
+    state.addReasoning(Value.string(delta.reasoning_content));
+    state.addText(Value.string(delta.content));
     const tcs = Array.isArray(delta.tool_calls) ? delta.tool_calls : [];
     for (const raw of tcs) {
       const tc = (raw ?? {}) as Json;
       const fn = (tc.function ?? {}) as Json;
       state.addToolDelta(
-        numberFromAny(tc.index),
-        toResponsesApiId(stringValue(tc.id)),
-        stringValue(fn.name),
-        stringValue(fn.arguments)
+        Value.number(tc.index),
+        apiId(Value.string(tc.id)),
+        Value.string(fn.name),
+        Value.string(fn.arguments)
       );
     }
     for (const chunkOut of buffer.splice(0)) yield chunkOut;
@@ -859,21 +845,21 @@ async function* transformChatSseToResponses(
   for (const chunkOut of buffer.splice(0)) yield chunkOut;
 }
 
-export function responsesSseToChatStream(
+export function sseStream(
   source: ReadableStream<Uint8Array>,
   model: string
 ): ReadableStream<Uint8Array> {
-  return toStream(transformResponsesSseToChat(source, model));
+  return toStream(chatStreams(source, model));
 }
 
-export function chatSseToResponsesStream(
+export function chatStream(
   source: ReadableStream<Uint8Array>,
   model: string
 ): ReadableStream<Uint8Array> {
-  return toStream(transformChatSseToResponses(source, model));
+  return toStream(responsesStreams(source, model));
 }
 
-export async function responsesSseToResponsesJson(source: ReadableStream<Uint8Array>): Promise<Json> {
+export async function sseJson(source: ReadableStream<Uint8Array>): Promise<Json> {
   const reader = source.getReader();
   const decoder = new TextDecoder();
   let raw = "";
@@ -888,16 +874,16 @@ export async function responsesSseToResponsesJson(source: ReadableStream<Uint8Ar
     reader.releaseLock();
   }
   const trimmed = raw.trim();
-  if (trimmed.startsWith("{")) return parseJsonRecord(trimmed) ?? {};
+  if (trimmed.startsWith("{")) return JSONText.record(trimmed) ?? {};
   let result: Json | null = null;
   for (const line of trimmed.split("\n")) {
     const text = line.trim();
     if (!text.startsWith("data:")) continue;
     const data = text.slice("data:".length).trim();
     if (!data || data === "[DONE]") continue;
-    const event = parseJsonRecord(data);
+    const event = JSONText.record(data);
     if (!event) continue;
-    const type = stringValue(event.type);
+    const type = Value.string(event.type);
     if (
       type === "response.completed" ||
       type === "response.incomplete" ||
@@ -911,7 +897,7 @@ export async function responsesSseToResponsesJson(source: ReadableStream<Uint8Ar
   return result;
 }
 
-export async function chatSseToChatCompletion(
+export async function sseCompletion(
   source: ReadableStream<Uint8Array>,
   model: string
 ): Promise<Json> {
@@ -929,7 +915,7 @@ export async function chatSseToChatCompletion(
     reader.releaseLock();
   }
   const trimmed = raw.trim();
-  if (trimmed.startsWith("{")) return parseJsonRecord(trimmed) ?? {};
+  if (trimmed.startsWith("{")) return JSONText.record(trimmed) ?? {};
 
   let content = "";
   let reasoning = "";
@@ -943,7 +929,7 @@ export async function chatSseToChatCompletion(
     if (!text.startsWith("data:")) continue;
     const data = text.slice("data:".length).trim();
     if (!data || data === "[DONE]") continue;
-    const chunk = parseJsonRecord(data);
+    const chunk = JSONText.record(data);
     if (!chunk) continue;
     const usageValue = chunk.usage;
     if (usageValue !== null && typeof usageValue === "object" && Object.keys(usageValue as Json).length > 0) {
@@ -956,25 +942,25 @@ export async function chatSseToChatCompletion(
     const delta = choice.delta;
     if (delta !== null && typeof delta === "object") {
       const d = delta as Json;
-      content += stringValue(d.content);
-      reasoning += stringValue(d.reasoning_content);
+      content += Value.string(d.content);
+      reasoning += Value.string(d.reasoning_content);
       const calls = Array.isArray(d.tool_calls) ? d.tool_calls : [];
       for (const rawCall of calls) {
         const call = (rawCall ?? {}) as Json;
         const fn = (call.function ?? {}) as Json;
-        const index = numberFromAny(call.index);
+        const index = Value.number(call.index);
         let tool = byIndex.get(index);
         if (!tool) {
-          tool = { id: stringValue(call.id), name: stringValue(fn.name), args: "" };
+          tool = { id: Value.string(call.id), name: Value.string(fn.name), args: "" };
           byIndex.set(index, tool);
           tools.push(tool);
         }
-        if (!tool.id) tool.id = stringValue(call.id);
-        if (!tool.name) tool.name = stringValue(fn.name);
-        tool.args += stringValue(fn.arguments);
+        if (!tool.id) tool.id = Value.string(call.id);
+        if (!tool.name) tool.name = Value.string(fn.name);
+        tool.args += Value.string(fn.arguments);
       }
     }
-    const finish = stringValue(choice.finish_reason);
+    const finish = Value.string(choice.finish_reason);
     if (finish) finishReason = finish;
   }
 
@@ -990,7 +976,7 @@ export async function chatSseToChatCompletion(
     if (finishReason === "stop") finishReason = "tool_calls";
   }
   return {
-    id: randomId("chatcmpl"),
+    id: Ids.random("chatcmpl"),
     object: "chat.completion",
     created: Math.floor(Date.now() / 1000),
     model,
@@ -999,7 +985,7 @@ export async function chatSseToChatCompletion(
   };
 }
 
-export async function adaptChatResponseToResponses(
+export async function toResponses(
   resp: Response,
   model: string,
   stream: boolean
@@ -1008,37 +994,37 @@ export async function adaptChatResponseToResponses(
     throw new Error("upstream response has no body");
   }
   if (stream) {
-    return sseResponse(chatSseToResponsesStream(resp.body, model));
+    return Responses.sse(chatStream(resp.body, model));
   }
   const data = (await resp.json()) as Json;
-  return jsonResponse(200, chatCompletionToResponsesJson(data, model));
+  return Responses.json(200, toJson(data, model));
 }
 
 export interface ResponsesNativeProvider {
   responsesNative(model: string): boolean;
 }
 
-export async function adaptForResponsesClient(
+export async function adapt(
   provider: { responsesNative?(model: string): boolean },
   resp: Response,
   payload: Json,
   stream: boolean
 ): Promise<Response> {
   if (!Array.isArray(payload._responsesInput)) return resp;
-  const model = stringValue(payload.model);
+  const model = Value.string(payload.model);
   if (typeof provider.responsesNative === "function" && provider.responsesNative(model)) {
     return resp;
   }
-  return adaptChatResponseToResponses(resp, model, stream);
+  return toResponses(resp, model, stream);
 }
 
-export function clampPromptCacheKey(key: string): string {
+export function cacheKey(key: string): string {
   const chars = [...key];
   if (chars.length > 64) return chars.slice(0, 64).join("");
   return key;
 }
 
-export async function buildResponsesApiPayload(
+export async function buildPayload(
   body: Json,
   modelName: string,
   stream: boolean,
@@ -1047,13 +1033,13 @@ export async function buildResponsesApiPayload(
   const messages = Array.isArray(body.messages) ? body.messages : [];
   const payload: Json = { model: modelName, stream };
   if (Array.isArray(body._responsesInput)) {
-    payload.input = normalizeResponsesInput(body._responsesInput);
+    payload.input = inputOf(body._responsesInput);
   } else {
-    payload.input = messagesToResponsesInput(messages);
+    payload.input = toInput(messages);
   }
   const finishPayload = (input: unknown[]): Json => {
     payload.input = input;
-    const instructions = stringValue(body.instructions);
+    const instructions = Value.string(body.instructions);
     if (instructions) payload.instructions = instructions;
     if (body.temperature !== undefined && body.temperature !== null) payload.temperature = body.temperature;
     if (body.top_p !== undefined && body.top_p !== null) payload.top_p = body.top_p;
@@ -1064,18 +1050,18 @@ export async function buildResponsesApiPayload(
     } else if (body.max_output_tokens !== undefined && body.max_output_tokens !== null) {
       payload.max_output_tokens = body.max_output_tokens;
     }
-    const tools = convertToolsForResponses(body.tools);
+    const tools = toolsFor(body.tools);
     if (tools.length > 0) payload.tools = tools;
     if (body.tool_choice !== undefined && body.tool_choice !== null) {
-      payload.tool_choice = normalizeToolChoice(body.tool_choice);
+      payload.tool_choice = Payload.toolChoice(body.tool_choice);
     }
     if (body.parallel_tool_calls !== undefined && body.parallel_tool_calls !== null) {
       payload.parallel_tool_calls = body.parallel_tool_calls;
     }
     if (body.reasoning !== null && typeof body.reasoning === "object" && !Array.isArray(body.reasoning)) {
-      payload.reasoning = cloneAnyMap(body.reasoning as Json);
+      payload.reasoning = Payload.clone(body.reasoning as Json);
     } else {
-      const effort = stringValue(body.reasoning_effort);
+      const effort = Value.string(body.reasoning_effort);
       if (effort) payload.reasoning = { effort };
     }
     let reasoning = payload.reasoning;
@@ -1089,9 +1075,9 @@ export async function buildResponsesApiPayload(
       (reasoning as Json).summary = "auto";
     }
     reasoning = undefined;
-    let include = stringSlice(body.include);
+    let include = Value.strings(body.include);
     if (body._includeReasoning === true) include.push("reasoning.encrypted_content");
-    if (include.length > 0) payload.include = uniqueStrings(include);
+    if (include.length > 0) payload.include = Value.unique(include);
     for (const key of [
       "previous_response_id",
       "prompt_cache_key",
@@ -1104,13 +1090,13 @@ export async function buildResponsesApiPayload(
       if (body[key] !== undefined && body[key] !== null) payload[key] = body[key];
     }
     if (payload.prompt_cache_key === undefined || payload.prompt_cache_key === null) {
-      const sessionId = stringValue(body._sessionId);
-      if (sessionId) payload.prompt_cache_key = clampPromptCacheKey(sessionId);
+      const sessionId = Value.string(body._sessionId);
+      if (sessionId) payload.prompt_cache_key = cacheKey(sessionId);
     }
     return payload;
   };
 
   const input = payload.input as unknown[];
-  const converted = imageFetch ? await convertResponsesInputImageURLsToBase64(imageFetch, input) : input;
+  const converted = imageFetch ? await new ResponsesImageInliner(imageFetch).run(input) : input;
   return finishPayload(converted);
 }

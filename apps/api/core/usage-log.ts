@@ -8,7 +8,7 @@ import type { ProviderAccount } from "@opendum/providers";
 import type { Health } from "./health.js";
 import type { ProviderPerformance } from "./provider-performance.js";
 import type { ProxyEvents } from "./events.js";
-import { isSyntheticProviderAccountId } from "./service-helpers.js";
+import { isSynthetic } from "./service-helpers.js";
 import { trackWork } from "./pending.js";
 import type { StreamRecorder, SuccessRecord } from "./types.js";
 
@@ -85,8 +85,8 @@ export class Usage implements StreamRecorder {
           provider: params.provider,
           model: this.models.resolveAlias(params.model),
           ttftMs:
-            params.upstreamFirstResponseMs > params.requestStartMs
-              ? params.upstreamFirstResponseMs - params.requestStartMs
+            params.firstResponseMs > params.requestStartMs
+              ? params.firstResponseMs - params.requestStartMs
               : 0,
           outputTokens: params.outputTokens,
           durationMs: params.durationMs,
@@ -135,7 +135,7 @@ export class Usage implements StreamRecorder {
   private writeUsageLog(params: UsageLog): Effect.Effect<void, DatabaseFailure> {
     if (!params.userId || !params.model) return Effect.void;
     const providerAccountId =
-      params.providerAccountId && !isSyntheticProviderAccountId(params.providerAccountId)
+      params.providerAccountId && !isSynthetic(params.providerAccountId)
         ? params.providerAccountId
         : null;
     return Effect.gen({ self: this }, function* () {

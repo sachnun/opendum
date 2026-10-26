@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { HTTPError, mockEvent } from "h3";
 import errorHandler from "../error.js";
-import { errorEnvelope, formatForPath, isInferencePath } from "../handlers/errors.js";
+import { errorEnvelope, formatPath, inferencePath } from "../handlers/errors.js";
 
 const fallback = () => ({ status: 500 });
 
@@ -34,16 +34,16 @@ describe("error envelopes", () => {
   });
 
   it("selects the anthropic format only for /v1/messages", () => {
-    expect(formatForPath("/v1/messages")).toBe("anthropic");
-    expect(formatForPath("/v1/chat/completions")).toBe("openai");
-    expect(formatForPath("/v1/responses")).toBe("openai");
+    expect(formatPath("/v1/messages")).toBe("anthropic");
+    expect(formatPath("/v1/chat/completions")).toBe("openai");
+    expect(formatPath("/v1/responses")).toBe("openai");
   });
 
   it("matches every /v1 path", () => {
-    expect(isInferencePath("/v1")).toBe(true);
-    expect(isInferencePath("/v1/messages")).toBe(true);
-    expect(isInferencePath("/health")).toBe(false);
-    expect(isInferencePath("/v10")).toBe(false);
+    expect(inferencePath("/v1")).toBe(true);
+    expect(inferencePath("/v1/messages")).toBe(true);
+    expect(inferencePath("/health")).toBe(false);
+    expect(inferencePath("/v10")).toBe(false);
   });
 });
 

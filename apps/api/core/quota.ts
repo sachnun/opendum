@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import { fetchQuota, isQuota } from "@opendum/providers/quota";
+import { fetchQuota as providerQuota, isQuota } from "@opendum/providers/quota";
 import type { QuotaContext, QuotaJournal } from "@opendum/providers/quota";
 import { decrypt } from "@opendum/core/crypto";
 import type { ProxyContext } from "./context.js";
@@ -28,7 +28,7 @@ function quotaContext(context: ProxyContext): QuotaContext {
   };
 }
 
-export async function fetchAccountQuota(
+export async function fetchQuota(
   context: ProxyContext,
   input: { userId: string; provider: string; accountId: string; forceRefresh: boolean }
 ): Promise<AccountQuotaOutcome> {
@@ -43,7 +43,7 @@ export async function fetchAccountQuota(
 
   try {
     const data = await Effect.runPromise(
-      fetchQuota(
+      providerQuota(
         quotaContext(context),
         {
           id: row.id,

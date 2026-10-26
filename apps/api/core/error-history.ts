@@ -1,11 +1,11 @@
 import { Effect } from "effect";
 import type { OpendumRedis } from "@opendum/core/redis";
 
-const ERROR_HISTORY_KEY_PREFIX = "opendum:provider-account:error-history";
-const ERROR_HISTORY_ENTRY_PREFIX = "opendum:provider-account:error-history-entry";
-const ERROR_HISTORY_DEDUPE_PREFIX = "opendum:provider-account:error-history-dedupe";
-const ERROR_HISTORY_DEFAULT_TTL_SECONDS = 14 * 24 * 60 * 60;
-const ERROR_HISTORY_RATE_LIMIT_TTL_SECONDS = 3 * 24 * 60 * 60;
+const KEY_PREFIX = "opendum:provider-account:error-history";
+const ENTRY_PREFIX = "opendum:provider-account:error-history-entry";
+const DEDUPE_PREFIX = "opendum:provider-account:error-history-dedupe";
+const DEFAULT_TTL = 14 * 24 * 60 * 60;
+const RATE_LIMIT_TTL = 3 * 24 * 60 * 60;
 
 type Entry = {
   id: string;
@@ -18,19 +18,19 @@ type Entry = {
   dedupeKey: string;
 };
 
-export function errorHistoryTtl(statusCode: number): number {
-  return statusCode === 429 ? ERROR_HISTORY_RATE_LIMIT_TTL_SECONDS : ERROR_HISTORY_DEFAULT_TTL_SECONDS;
+export function historyTtl(statusCode: number): number {
+  return statusCode === 429 ? RATE_LIMIT_TTL : DEFAULT_TTL;
 }
 
-export function errorHistoryKey(accountId: string): string {
-  return `${ERROR_HISTORY_KEY_PREFIX}:${accountId}`;
+export function historyKey(accountId: string): string {
+  return `${KEY_PREFIX}:${accountId}`;
 }
 
-export function errorHistoryEntryKey(entryId: string): string {
-  return `${ERROR_HISTORY_ENTRY_PREFIX}:${entryId}`;
+export function entryKey(entryId: string): string {
+  return `${ENTRY_PREFIX}:${entryId}`;
 }
 
-export function errorHistoryDedupeKey(
+export function dedupeKey(
   accountId: string,
   model: string | null,
   statusCode: number,
@@ -39,10 +39,10 @@ export function errorHistoryDedupeKey(
   const hash = new Bun.CryptoHasher("sha256")
     .update([accountId, model ?? "", String(statusCode), message].join("\u0000"))
     .digest("hex");
-  return `${ERROR_HISTORY_DEDUPE_PREFIX}:${accountId}:${hash}`;
+  return `${DEDUPE_PREFIX}:${accountId}:${hash}`;
 }
 
-export function upsertErrorHistory(
+export function upsertHistory(
   redis: OpendumRedis | null,
   accountId: string,
   userId: string,
@@ -52,10 +52,10 @@ export function upsertErrorHistory(
   createdAt: Date
 ): Effect.Effect<void> {
   if (!redis) return Effect.void;
-  const dedupeKey = errorHistoryDedupeKey(accountId, model, statusCode, message);
-  const ttl = errorHistoryTtl(statusCode);
+  const key = dedupeKey(accountId, model, statusCode, message);
+  const ttl = historyTtl(statusCode);
   return Effect.gen(function* () {
-    const cachedEntryId = yield* redisEffect(() => redis.get(dedupeKey)).pipe(Effect.orElseSucceed(() => null));
+    const cachedEntryId = yield* redisEffect(() => redis.get(key)).pipe(Effect.orElseSucceed(() => null));
     const entryId = cachedEntryId ? cachedEntryId : crypto.randomUUID();
     const entry: Entry = {
       id: entryId,
@@ -65,12 +65,12 @@ export function upsertErrorHistory(
       errorCode: statusCode,
       errorMessage: message,
       createdAt: createdAt.toISOString(),
-      dedupeKey,
+      dedupeKey: key,
     };
-    yield* redisEffect(() => redis.set(errorHistoryEntryKey(entryId), JSON.stringify(entry), { EX: ttl }));
-    yield* redisEffect(() => redis.set(dedupeKey, entryId, { EX: ttl }));
-    yield* redisEffect(() => redis.zAdd(errorHistoryKey(accountId), { score: createdAt.getTime(), value: entryId }));
-    yield* redisEffect(() => redis.expire(errorHistoryKey(accountId), ERROR_HISTORY_DEFAULT_TTL_SECONDS));
+    yield* redisEffect(() => redis.set(entryKey(entryId), JSON.stringify(entry), { EX: ttl }));
+    yield* redisEffect(() => redis.set(key, entryId, { EX: ttl }));
+    yield* redisEffect(() => redis.zAdd(historyKey(accountId), { score: createdAt.getTime(), value: entryId }));
+    yield* redisEffect(() => redis.expire(historyKey(accountId), DEFAULT_TTL));
   }).pipe(
     Effect.tapError((error) => Effect.logDebug("error history write failed", { accountId, error: error.message })),
     Effect.ignore

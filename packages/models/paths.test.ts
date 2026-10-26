@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { basename, dirname, extname, fromFileUrl, join, moduleDir, relative, resolve, sep } from "./paths.ts";
+import { basename, dirname, extname, fileUrl, join, moduleDir, relative, resolve, sep } from "./paths.ts";
 
 describe("posix path helpers", () => {
   test("join matches node:path semantics", () => {
@@ -54,7 +54,7 @@ describe("posix path helpers", () => {
   });
 
   test("converts file URLs to paths", () => {
-    expect(fromFileUrl("file:///tmp/a/b.json")).toBe("/tmp/a/b.json");
+    expect(fileUrl("file:///tmp/a/b.json")).toBe("/tmp/a/b.json");
     expect(moduleDir("file:///tmp/a/script.ts")).toBe("/tmp/a");
     expect(sep).toBe("/");
   });

@@ -41,12 +41,12 @@ const FAMILY_BY_FOLDER: Readonly<Record<string, string>> = Object.fromEntries(
   FAMILY_RULES.map((rule) => [rule.folder, rule.family]),
 );
 
-export function inferFamilyFromFolder(folderName: string | null | undefined): string | null {
+export function familyOf(folderName: string | null | undefined): string | null {
   if (!folderName) return null;
   return FAMILY_BY_FOLDER[folderName] ?? null;
 }
 
-export function inferModelFolder(modelKey: string): string | null {
+export function folderOf(modelKey: string): string | null {
   const normalized = modelKey.toLowerCase();
   for (const rule of FAMILY_RULES) {
     if (rule.test.test(normalized)) return rule.folder;

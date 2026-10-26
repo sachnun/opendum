@@ -2,19 +2,19 @@ import { existsSync } from "node:fs";
 import { Effect, Layer } from "effect";
 import { AuthService } from "@opendum/auth";
 import { closeRedis, openRedis } from "@opendum/core/redis";
-import { resolveModelsDir } from "@opendum/models";
-import { tryLoadRegistry } from "@opendum/models/runtime";
+import { modelsDir } from "@opendum/models";
+import { tryLoad } from "@opendum/models/runtime";
 import { Fetcher, UnroxyEgress, type Fetch } from "@opendum/core/egress";
 import { ProviderRegistry, RedisFallbackRouter, type EgressFetch } from "@opendum/providers";
 import { db, closeDatabase } from "@opendum/database";
 import { ProxyService } from "./service.js";
-import { reconcileOrphanedRoaming, roamingReconcileLoop } from "./roaming-reconcile.js";
+import { reconcileOrphans, reconcileLoop } from "./roaming-reconcile.js";
 import { proxyConfig } from "../config.js";
 import { ProxyContextTag, type ProxyContext } from "./services.js";
 
 export type { ProxyContext } from "./services.js";
 
-export function resolveModelsDirForService(): string {
+export function dirFor(): string {
   const cwd = process.cwd();
   const candidates = [
     `${cwd}/../../packages/models/data`,
@@ -24,15 +24,15 @@ export function resolveModelsDirForService(): string {
   for (const candidate of candidates) {
     if (existsSync(candidate)) return candidate;
   }
-  return resolveModelsDir();
+  return modelsDir();
 }
 
 export const ProxyContextLayer = Layer.effect(
   ProxyContextTag,
   Effect.gen(function* () {
     const config = yield* proxyConfig;
-    const dir = yield* Effect.sync(() => resolveModelsDirForService());
-    const models = yield* tryLoadRegistry(dir);
+    const dir = yield* Effect.sync(() => dirFor());
+    const models = yield* tryLoad(dir);
     const redis = yield* Effect.acquireRelease(
       Effect.promise(() => openRedis(config.redisUrl)),
       (client) => Effect.promise(() => closeRedis(client))
@@ -92,8 +92,8 @@ export const ProxyContextLayer = Layer.effect(
 
     if (config.roamingReconcileIntervalMs > 0) {
       yield* Effect.forkScoped(
-        roamingReconcileLoop(config.roamingReconcileIntervalMs, () =>
-          reconcileOrphanedRoaming(service.points)
+        reconcileLoop(config.roamingReconcileIntervalMs, () =>
+          reconcileOrphans(service.points)
         ).pipe(Effect.catchCause(() => Effect.void))
       );
     }

@@ -1,6 +1,6 @@
 const MAX_REDIRECT_LENGTH = 512;
 
-export function sanitizeRedirectPath(value: unknown): string | null {
+export function safePath(value: unknown): string | null {
   if (typeof value !== "string") return null;
 
   const path = value.trim();
@@ -9,7 +9,7 @@ export function sanitizeRedirectPath(value: unknown): string | null {
   return path;
 }
 
-export function resolveWebOrigin(value: unknown): string | null {
+export function webOrigin(value: unknown): string | null {
   if (typeof value !== "string") return null;
 
   const candidate = value.trim();
@@ -34,7 +34,7 @@ export function handoffUrl(baseUrl: string, options: { to: string; redirect?: st
   return url.toString();
 }
 
-export function signInRedirectUrl(origin: string, params: { token?: string; session?: string; redirect?: string | null; error?: string | null }): string {
+export function loginUrl(origin: string, params: { token?: string; session?: string; redirect?: string | null; error?: string | null }): string {
   if (params.error) {
     const url = new URL("/", `${origin}/`);
     url.searchParams.set("error", params.error);

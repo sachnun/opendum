@@ -3,13 +3,13 @@ import type { DatabaseFailure } from "@opendum/database";
 import type { HealthPort, AccountPort } from "./repositories.js";
 import type { OpendumRedis } from "@opendum/core/redis";
 import type { Registry } from "@opendum/models/runtime";
-import { upsertErrorHistory } from "./error-history.js";
+import { upsertHistory } from "./error-history.js";
 import {
-  cooldownRecoveryCount,
-  effectiveUnhealthyCount,
-  isSyntheticProviderAccountId,
-  modelHealthStatus,
-  successRecoveryCount,
+  recoveryCount,
+  unhealthyCount,
+  isSynthetic,
+  healthStatus,
+  successRecovery,
 } from "./service-helpers.js";
 import type { Failure } from "./types.js";
 import { trackWork } from "./pending.js";
@@ -41,19 +41,19 @@ export class Health {
 
   refresh(accountId: string, now: Date): Effect.Effect<boolean, DatabaseFailure> {
     return Effect.gen({ self: this }, function* () {
-      if (isSyntheticProviderAccountId(accountId)) return false;
-      const account = yield* this.health.getAccountHealthState(accountId);
+      if (isSynthetic(accountId)) return false;
+      const account = yield* this.health.healthState(accountId);
       if (!account) return false;
-      const rows = yield* this.health.listModelHealthByAccount(accountId);
+      const rows = yield* this.health.healthByAccount(accountId);
       const applyCooldownRecovery =
         account.status === "failed" &&
         account.disabledUntil !== null &&
         account.disabledUntil.getTime() <= now.getTime();
-      const total = yield* this.normalizeModelHealthRows(rows, now, applyCooldownRecovery);
+      const total = yield* this.normalizeRows(rows, now, applyCooldownRecovery);
 
       if (account.disabledUntil && account.disabledUntil.getTime() > now.getTime()) {
         if (account.consecutiveErrors !== total) {
-          yield* this.health.setAccountHealthFailed({
+          yield* this.health.markFailed({
             id: accountId,
             consecutiveErrors: total,
             status: "failed",
@@ -88,8 +88,8 @@ export class Health {
     });
   }
 
-  private normalizeModelHealthRows(
-    rows: Awaited<ReturnType<HealthPort["listModelHealthByAccount"]>> extends Effect.Effect<infer A, any, any>
+  private normalizeRows(
+    rows: Awaited<ReturnType<HealthPort["healthByAccount"]>> extends Effect.Effect<infer A, any, any>
       ? A
       : never,
     now: Date,
@@ -98,14 +98,14 @@ export class Health {
     return Effect.gen({ self: this }, function* () {
       let total = 0;
       for (const row of rows) {
-        let count = effectiveUnhealthyCount(row, now);
-        if (applyCooldownRecovery) count = cooldownRecoveryCount(count);
-        const status = modelHealthStatus(count);
+        let count = unhealthyCount(row, now);
+        if (applyCooldownRecovery) count = recoveryCount(count);
+        const status = healthStatus(count);
         const statusChanged = status !== row.status;
         total += count;
         if (count === row.consecutiveErrors && !statusChanged && !applyCooldownRecovery) continue;
         if (row.status === "failed" || statusChanged) {
-          yield* this.health.updateModelHealthStatus({
+          yield* this.health.setStatus({
             id: row.id,
             consecutiveErrors: count,
             unhealthyCountUpdatedAt: now,
@@ -114,7 +114,7 @@ export class Health {
           });
           continue;
         }
-        yield* this.health.updateModelHealthCounters({
+        yield* this.health.bumpCounters({
           id: row.id,
           consecutiveErrors: count,
           unhealthyCountUpdatedAt: now,
@@ -126,7 +126,7 @@ export class Health {
 
   markAccountSuccess(accountId: string, model: string): Effect.Effect<void, DatabaseFailure> {
     return Effect.gen({ self: this }, function* () {
-      if (isSyntheticProviderAccountId(accountId)) return;
+      if (isSynthetic(accountId)) return;
       const now = new Date();
       yield* this.health.markAccountSuccess({ id: accountId, at: now });
       const resolved = this.models.resolveAlias(model);
@@ -135,10 +135,10 @@ export class Health {
         yield* this.refresh(accountId, now);
         return;
       }
-      const nextErrors = successRecoveryCount(health, now);
-      const nextStatus = modelHealthStatus(nextErrors);
+      const nextErrors = successRecovery(health, now);
+      const nextStatus = healthStatus(nextErrors);
       if (nextStatus !== health.status) {
-        yield* this.health.updateModelHealthSuccessWithStatus({
+        yield* this.health.successStatus({
           id: health.id,
           consecutiveErrors: nextErrors,
           lastSuccessAt: now,
@@ -147,7 +147,7 @@ export class Health {
           statusChangedAt: now,
         });
       } else {
-        yield* this.health.updateModelHealthSuccess({
+        yield* this.health.markSuccess({
           id: health.id,
           consecutiveErrors: nextErrors,
           lastSuccessAt: now,
@@ -166,16 +166,16 @@ export class Health {
   ): Effect.Effect<Date, DatabaseFailure> {
     return Effect.gen({ self: this }, function* () {
       const now = new Date();
-      if (isSyntheticProviderAccountId(accountId)) return now;
+      if (isSynthetic(accountId)) return now;
       const stored = message.length > MAX_ERROR_LEN ? message.slice(0, MAX_ERROR_LEN) : message;
       yield* this.health.recordRequestError({ id: accountId, at: now, code: statusCode });
       const resolved = this.models.resolveAlias(model);
       const health = yield* this.health.getModelHealth(accountId, resolved);
       if (health) {
-        const nextErrors = effectiveUnhealthyCount(health, now) + 1;
-        const nextStatus = modelHealthStatus(nextErrors);
+        const nextErrors = unhealthyCount(health, now) + 1;
+        const nextStatus = healthStatus(nextErrors);
         if (nextStatus !== health.status) {
-          yield* this.health.updateModelHealthFailureWithStatus({
+          yield* this.health.failStatus({
             id: health.id,
             consecutiveErrors: nextErrors,
             lastErrorAt: now,
@@ -185,7 +185,7 @@ export class Health {
             statusChangedAt: now,
           });
         } else {
-          yield* this.health.updateModelHealthFailure({
+          yield* this.health.recordFailure({
             id: health.id,
             consecutiveErrors: nextErrors,
             lastErrorAt: now,
@@ -200,7 +200,7 @@ export class Health {
           providerAccountId: accountId,
           model: resolved,
           consecutiveErrors: nextErrors,
-          status: modelHealthStatus(nextErrors),
+          status: healthStatus(nextErrors),
           lastErrorAt: now,
           lastErrorCode: statusCode,
           unhealthyCountUpdatedAt: now,
@@ -209,9 +209,9 @@ export class Health {
         });
       }
       yield* this.refresh(accountId, now);
-      const ownerUserId = yield* this.accounts.getAccountOwnerUserID(accountId);
+      const ownerUserId = yield* this.accounts.ownerId(accountId);
       if (ownerUserId) {
-        yield* upsertErrorHistory(this.redis, accountId, ownerUserId, resolved, statusCode, stored, now).pipe(
+        yield* upsertHistory(this.redis, accountId, ownerUserId, resolved, statusCode, stored, now).pipe(
           Effect.ignore
         );
       }
@@ -219,16 +219,16 @@ export class Health {
     });
   }
 
-  markAccountUsageLimited(
+  markUsageLimited(
     accountId: string,
     model: string,
     disabledUntil: Date,
     failedAt: Date
   ): Effect.Effect<void, DatabaseFailure> {
     return Effect.gen({ self: this }, function* () {
-      if (isSyntheticProviderAccountId(accountId)) return;
+      if (isSynthetic(accountId)) return;
       const resolved = this.models.resolveAlias(model);
-      yield* this.health.markUsageLimitedHealth({
+      yield* this.health.markUsageLimited({
         providerAccountId: accountId,
         model: resolved,
         status: "failed",
@@ -236,7 +236,7 @@ export class Health {
         consecutiveErrors: UNHEALTHY_THRESHOLD,
       });
       yield* this.refresh(accountId, failedAt);
-      yield* this.health.setAccountUsageLimited({
+      yield* this.health.markLimited({
         id: accountId,
         disabledUntil,
         status: "failed",
@@ -257,8 +257,8 @@ export class Health {
       if (latest.size === 0) return;
       const recoveredAt = new Date();
       for (const [accountId, failedAt] of latest) {
-        if (isSyntheticProviderAccountId(accountId)) continue;
-        yield* this.health.markAccountRecoveredByRotation({
+        if (isSynthetic(accountId)) continue;
+        yield* this.health.markRecovered({
           id: accountId,
           at: recoveredAt,
           beforeOrAt: failedAt,
@@ -275,10 +275,10 @@ export class Health {
     message: string
   ): Effect.Effect<void, DatabaseFailure> {
     return Effect.gen({ self: this }, function* () {
-      if (isSyntheticProviderAccountId(accountId)) return;
+      if (isSynthetic(accountId)) return;
       const stored = message.length > MAX_ERROR_LEN ? message.slice(0, MAX_ERROR_LEN) : message;
       const resolved = this.models.resolveAlias(model);
-      yield* upsertErrorHistory(
+      yield* upsertHistory(
         this.redis,
         accountId,
         userId,
@@ -291,8 +291,8 @@ export class Health {
   }
 
   bumpRequest(accountId: string): void {
-    if (isSyntheticProviderAccountId(accountId)) return;
+    if (isSynthetic(accountId)) return;
     const at = new Date();
-    trackWork(this.health.bumpAccountRequestCount({ id: accountId, at }).pipe(Effect.ignore));
+    trackWork(this.health.bumpRequests({ id: accountId, at }).pipe(Effect.ignore));
   }
 }

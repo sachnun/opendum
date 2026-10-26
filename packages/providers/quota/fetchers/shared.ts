@@ -1,11 +1,11 @@
 import { Effect, Option } from "effect";
-import { getQuotaJson, putQuotaCache, type QuotaJsonResult } from "../cache.js";
+import { quotaJson, putQuota, type QuotaJsonResult } from "../cache.js";
 import { asError } from "../../core/errors.js";
 import type { QuotaAccount, QuotaContext } from "../types.js";
 
 export type Json = Record<string, unknown>;
 
-export function quotaFallbackTier(account: QuotaAccount): string {
+export function fallbackTier(account: QuotaAccount): string {
   const tier = account.tier?.trim();
   return tier ? tier : "free";
 }
@@ -24,7 +24,7 @@ export function quotaAttempt(
   headers: Record<string, string>,
   body: unknown
 ): Effect.Effect<QuotaAttempt> {
-  return getQuotaJson(ctx, account, forceRefresh, cacheName, method, target, headers, body).pipe(
+  return quotaJson(ctx, account, forceRefresh, cacheName, method, target, headers, body).pipe(
     Effect.map((result): QuotaAttempt => ({ ok: true, result })),
     Effect.catch((cause): Effect.Effect<QuotaAttempt> =>
       Effect.succeed({ ok: false, message: asError(cause).message })
@@ -34,7 +34,7 @@ export function quotaAttempt(
 
 export type QuotaJsonData = { data: Json | null; error: string | null };
 
-export function fetchJsonData(
+export function jsonData(
   ctx: QuotaContext,
   account: QuotaAccount,
   forceRefresh: boolean,
@@ -57,7 +57,7 @@ export function fetchJsonData(
       return Effect.gen(function* () {
         const parsed = yield* Effect.try(() => JSON.parse(result.raw) as Json).pipe(Effect.option);
         if (Option.isNone(parsed)) return { data: null, error: "response was not valid JSON" };
-        yield* putQuotaCache(ctx, result);
+        yield* putQuota(ctx, result);
         return { data: parsed.value, error: null };
       });
     })

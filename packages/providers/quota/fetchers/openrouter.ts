@@ -1,17 +1,17 @@
 import { Effect } from "effect";
 import {
-  baseQuotaInfo,
+  baseInfo,
   clampFraction,
   displayNumber,
-  errorQuotaInfo,
-  expiredQuotaInfo,
-  parseQuotaNumber,
-  parseQuotaRecord,
+  errorInfo,
+  expiredInfo,
+  parseNumber,
+  parseRecord,
 } from "../helpers.js";
 import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay } from "../types.js";
-import { fetchJsonData, type Json } from "./shared.js";
+import { jsonData, type Json } from "./shared.js";
 
-export function fetchOpenRouterQuota(
+export function openrouterQuota(
   ctx: QuotaContext,
   account: QuotaAccount,
   forceRefresh: boolean
@@ -21,30 +21,30 @@ export function fetchOpenRouterQuota(
     apiKey = ctx.decrypt(account.accessToken ?? "");
   } catch {
     return Effect.succeed(
-      expiredQuotaInfo("API key is missing or invalid. Please reconnect this account.")
+      expiredInfo("API key is missing or invalid. Please reconnect this account.")
     );
   }
   const headers = { Authorization: `Bearer ${apiKey.trim()}`, Accept: "application/json" };
   return Effect.all(
     [
-      fetchJsonData(ctx, account, forceRefresh, "openrouter:key", "GET", "https://openrouter.ai/api/v1/key", headers, null),
-      fetchJsonData(ctx, account, forceRefresh, "openrouter:credits", "GET", "https://openrouter.ai/api/v1/credits", headers, null),
+      jsonData(ctx, account, forceRefresh, "openrouter:key", "GET", "https://openrouter.ai/api/v1/key", headers, null),
+      jsonData(ctx, account, forceRefresh, "openrouter:credits", "GET", "https://openrouter.ai/api/v1/credits", headers, null),
     ],
     { concurrency: 2 }
   ).pipe(
     Effect.map(([key, credits]) => {
-      if (key.error && credits.error) return errorQuotaInfo(key.error);
-      const keyData = parseQuotaRecord(key.data?.data) ?? {};
-      const creditsData = parseQuotaRecord(credits.data?.data) ?? {};
-      return baseQuotaInfo("success", openRouterGroups(keyData, creditsData));
+      if (key.error && credits.error) return errorInfo(key.error);
+      const keyData = parseRecord(key.data?.data) ?? {};
+      const creditsData = parseRecord(credits.data?.data) ?? {};
+      return baseInfo("success", quotaGroups(keyData, creditsData));
     })
   );
 }
 
-function openRouterGroups(keyData: Json, creditsData: Json): QuotaGroupDisplay[] {
+function quotaGroups(keyData: Json, creditsData: Json): QuotaGroupDisplay[] {
   const groups: QuotaGroupDisplay[] = [];
-  const totalCredits = parseQuotaNumber(creditsData.total_credits);
-  const totalUsage = parseQuotaNumber(creditsData.total_usage);
+  const totalCredits = parseNumber(creditsData.total_credits);
+  const totalUsage = parseNumber(creditsData.total_usage);
   if (totalCredits !== null && totalUsage !== null && totalCredits > 0) {
     const remaining = Math.max(0, totalCredits - totalUsage);
     const fraction = clampFraction(remaining / totalCredits);
@@ -60,9 +60,9 @@ function openRouterGroups(keyData: Json, creditsData: Json): QuotaGroupDisplay[]
       remainingLabel: `$${remaining.toFixed(2)} / $${totalCredits.toFixed(2)}`,
     });
   }
-  const limit = parseQuotaNumber(keyData.limit);
-  const remaining = parseQuotaNumber(keyData.limit_remaining);
-  const hasKeyUsage = parseQuotaNumber(keyData.usage) !== null;
+  const limit = parseNumber(keyData.limit);
+  const remaining = parseNumber(keyData.limit_remaining);
+  const hasKeyUsage = parseNumber(keyData.usage) !== null;
   if (limit !== null && remaining !== null && hasKeyUsage && limit > 0) {
     const fraction = clampFraction(remaining / limit);
     groups.push({
@@ -78,7 +78,7 @@ function openRouterGroups(keyData: Json, creditsData: Json): QuotaGroupDisplay[]
     });
   }
   if (groups.length > 0) return groups;
-  const usageDaily = parseQuotaNumber(keyData.usage_daily);
+  const usageDaily = parseNumber(keyData.usage_daily);
   if (usageDaily !== null) {
     return [{
       name: "daily-usage",

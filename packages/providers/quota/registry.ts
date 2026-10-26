@@ -1,56 +1,56 @@
 import { Effect } from "effect";
 import {
-  fetchAntigravityQuota,
-  fetchCodexQuota,
-  fetchHyperQuota,
-  fetchKiroQuota,
-  fetchOpenRouterQuota,
-  fetchWorkbuddyQuota,
-  fetchZenmuxQuota,
+  antigravityQuota,
+  codexQuota,
+  hyperQuota,
+  kiroQuota,
+  openrouterQuota,
+  workbuddyQuota,
+  zenmuxQuota,
 } from "./fetchers/index.js";
-import { fetchPerchQuota } from "./perch.js";
+import { fetchQuota as perchQuota } from "./perch.js";
 import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaFetcher } from "./types.js";
 
 const FETCHERS: QuotaFetcher[] = [
   {
     provider: "openrouter",
     withoutToken: true,
-    fetch: (ctx, account, _accessToken, forceRefresh) => fetchOpenRouterQuota(ctx, account, forceRefresh),
+    fetch: (ctx, account, _accessToken, forceRefresh) => openrouterQuota(ctx, account, forceRefresh),
   },
   {
     provider: "antigravity",
     withoutToken: false,
-    fetch: (ctx, account, accessToken, forceRefresh) => fetchAntigravityQuota(ctx, account, accessToken, forceRefresh),
+    fetch: (ctx, account, accessToken, forceRefresh) => antigravityQuota(ctx, account, accessToken, forceRefresh),
   },
   {
     provider: "codex",
     withoutToken: false,
-    fetch: (ctx, account, accessToken, forceRefresh) => fetchCodexQuota(ctx, account, accessToken, forceRefresh),
+    fetch: (ctx, account, accessToken, forceRefresh) => codexQuota(ctx, account, accessToken, forceRefresh),
   },
   {
     provider: "kiro",
     withoutToken: false,
-    fetch: (ctx, account, accessToken, forceRefresh) => fetchKiroQuota(ctx, account, accessToken, forceRefresh),
+    fetch: (ctx, account, accessToken, forceRefresh) => kiroQuota(ctx, account, accessToken, forceRefresh),
   },
   {
     provider: "perch",
     withoutToken: false,
-    fetch: (ctx, account, accessToken, forceRefresh) => fetchPerchQuota(ctx, account, accessToken, forceRefresh),
+    fetch: (ctx, account, accessToken, forceRefresh) => perchQuota(ctx, account, accessToken, forceRefresh),
   },
   {
     provider: "zenmux",
     withoutToken: true,
-    fetch: (ctx, account, _accessToken, forceRefresh) => fetchZenmuxQuota(ctx, account, forceRefresh),
+    fetch: (ctx, account, _accessToken, forceRefresh) => zenmuxQuota(ctx, account, forceRefresh),
   },
   {
     provider: "hyper",
     withoutToken: true,
-    fetch: (ctx, account, _accessToken, forceRefresh) => fetchHyperQuota(ctx, account, forceRefresh),
+    fetch: (ctx, account, _accessToken, forceRefresh) => hyperQuota(ctx, account, forceRefresh),
   },
   {
     provider: "workbuddy",
     withoutToken: false,
-    fetch: (ctx, account, accessToken, forceRefresh) => fetchWorkbuddyQuota(ctx, account, accessToken, forceRefresh),
+    fetch: (ctx, account, accessToken, forceRefresh) => workbuddyQuota(ctx, account, accessToken, forceRefresh),
   },
 ];
 

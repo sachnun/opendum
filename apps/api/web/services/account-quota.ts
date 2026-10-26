@@ -1,10 +1,10 @@
 import { Effect } from "effect";
 import { and, eq, inArray } from "drizzle-orm";
 import { db, providerAccount } from "@opendum/database";
-import type { AccountQuotaBatchInput, AccountQuotaInput } from "@opendum/providers/contract";
+import type { QuotaBatchInput, AccountQuotaInput } from "@opendum/providers/contract";
 import { type QuotaProviderKey } from "@opendum/providers/provider-accounts";
-import { getProxyContext } from "../../context.js";
-import { fetchAccountQuota } from "../../core/quota.js";
+import { proxyContext } from "../../context.js";
+import { fetchQuota as coreQuota } from "../../core/quota.js";
 import { fromPromise } from "#web/lib/task.js";
 import { internal } from "#web/errors.js";
 
@@ -30,7 +30,7 @@ interface AccountQuotaInfo {
 }
 
 type AccountQuotaResult = { success: true; data: AccountQuotaInfo } | { success: false; error: string };
-type AccountQuotaFetchOptions = { forceRefresh?: boolean };
+type QuotaOptions = { forceRefresh?: boolean };
 
 const quotaOwnershipColumns = {
   id: providerAccount.id,
@@ -40,7 +40,7 @@ function asRecord(value: unknown): JsonRecord | null {
   return value && typeof value === "object" ? (value as JsonRecord) : null;
 }
 
-function isQuotaGroup(value: unknown): value is QuotaGroupDisplay {
+function isGroup(value: unknown): value is QuotaGroupDisplay {
   const record = asRecord(value);
   return Boolean(
     record &&
@@ -55,17 +55,17 @@ function isQuotaGroup(value: unknown): value is QuotaGroupDisplay {
   );
 }
 
-function isAccountQuotaInfo(value: unknown): value is AccountQuotaInfo {
+function isInfo(value: unknown): value is AccountQuotaInfo {
   const record = asRecord(value);
   return Boolean(
     record &&
     (record.status === "success" || record.status === "error" || record.status === "expired") &&
     Array.isArray(record.groups) &&
-    record.groups.every(isQuotaGroup)
+    record.groups.every(isGroup)
   );
 }
 
-function toPublicQuotaInfo(quota: AccountQuotaInfo): AccountQuotaInfo {
+function toPublic(quota: AccountQuotaInfo): AccountQuotaInfo {
   return {
     status: quota.status,
     ...(quota.error ? { error: quota.error } : {}),
@@ -82,20 +82,20 @@ function toPublicQuotaInfo(quota: AccountQuotaInfo): AccountQuotaInfo {
   };
 }
 
-const fetchQuotaFromCore = Effect.fn("accountQuota.fetchFromCore")(function* (
+const quotaFromCore = Effect.fn("accountQuota.fetchFromCore")(function* (
   userId: string,
   provider: QuotaProviderKey,
   accountId: string,
-  options: AccountQuotaFetchOptions = {}
+  options: QuotaOptions = {}
 ) {
-  const context = yield* fromPromise(() => getProxyContext(), "Failed to start the proxy runtime").pipe(
+  const context = yield* fromPromise(() => proxyContext(), "Failed to start the proxy runtime").pipe(
     Effect.catch(() => Effect.succeed(null))
   );
   if (!context) return { success: false as const, error: "Failed to fetch quota data" };
 
   const outcome = yield* fromPromise(
     () =>
-      fetchAccountQuota(context, {
+      coreQuota(context, {
         userId,
         provider,
         accountId,
@@ -113,23 +113,23 @@ const fetchQuotaFromCore = Effect.fn("accountQuota.fetchFromCore")(function* (
   if (outcome.status === "error") {
     return { success: false as const, error: outcome.message };
   }
-  if (!isAccountQuotaInfo(outcome.data)) {
+  if (!isInfo(outcome.data)) {
     return { success: false as const, error: "Quota provider returned an invalid response" };
   }
-  return { success: true as const, data: toPublicQuotaInfo(outcome.data) };
+  return { success: true as const, data: toPublic(outcome.data) };
 });
 
-const fetchQuota = Effect.fn("accountQuota.fetch")(function* (
+const quotaFor = Effect.fn("accountQuota.fetch")(function* (
   userId: string,
   provider: QuotaProviderKey,
   accountId: string,
-  options: AccountQuotaFetchOptions = {}
+  options: QuotaOptions = {}
 ) {
   const inFlightKey = `${userId}:${provider}:${accountId}:${options.forceRefresh ? "force" : "cache"}`;
   const existing = quotaInFlight.get(inFlightKey);
   if (existing) return yield* existing;
 
-  const pending = Effect.cached(fetchQuotaFromCore(userId, provider, accountId, options)).pipe(
+  const pending = Effect.cached(quotaFromCore(userId, provider, accountId, options)).pipe(
     Effect.flatten
   );
   quotaInFlight.set(inFlightKey, pending);
@@ -164,25 +164,25 @@ export const getAccountQuota = Effect.fn("accountQuota.get")(function* (
 
   const account = accounts[0];
   if (!account) return { success: false as const, error: "Account not found" };
-  return yield* fetchQuota(userId, input.provider, account.id, {
+  return yield* quotaFor(userId, input.provider, account.id, {
     forceRefresh: input.forceRefresh,
   });
 });
 
 export const getAccountQuotas = Effect.fn("accountQuota.list")(function* (
   userId: string,
-  input: AccountQuotaBatchInput
+  input: QuotaBatchInput
 ) {
-  return yield* getAccountQuotasInner(userId, input).pipe(
+  return yield* quotasInner(userId, input).pipe(
     Effect.catch((failure: { message: string }) =>
       Effect.succeed({ success: false as const, error: failure.message })
     )
   );
 });
 
-const getAccountQuotasInner = Effect.fnUntraced(function* (
+const quotasInner = Effect.fnUntraced(function* (
   userId: string,
-  input: AccountQuotaBatchInput
+  input: QuotaBatchInput
 ) {
   const accountIds = [...new Set(input.accountIds)];
   const accounts = yield* fromPromise(
@@ -215,7 +215,7 @@ const getAccountQuotasInner = Effect.fnUntraced(function* (
   const fetched = yield* Effect.forEach(
     accountsToFetch,
     (accountId) =>
-      fetchQuota(userId, input.provider, accountId, { forceRefresh: input.forceRefresh }).pipe(
+      quotaFor(userId, input.provider, accountId, { forceRefresh: input.forceRefresh }).pipe(
         Effect.map((result) => [accountId, result] as const)
       ),
     { concurrency: 4 }

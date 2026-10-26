@@ -1,21 +1,21 @@
-import { inferModelFolder } from "#models/model/families.ts";
-import { buildIndex, persist, renameFiles, generatedDir } from "#models/model-store.ts";
-import { applyCanonicalMerge, planCanonicalization } from "#models/model/canonicalize.ts";
+import { folderOf } from "#models/model/families.ts";
+import { buildIndex, persist, moveFiles, generatedDir } from "#models/model-store.ts";
+import { applyMerge, planCanonicalization } from "#models/model/canonicalize.ts";
 import { modelProbes } from "#models/model/probes.ts";
 import { exists, remove, rename } from "#models/fs.ts";
 import { basename, dirname, join } from "#models/paths.ts";
-import { flags, packageModelsDir, runScript } from "./shared.ts";
+import { flags, dataDir, runScript } from "./shared.ts";
 import type { ModelData } from "#models/types.ts";
 import {
-  buildModelPatch,
-  fetchExternalRegistries,
-  resolveModelMetadata,
+  modelPatch,
+  externalRegistries,
+  modelMetadata,
   type ModelMetadataInput,
   type ModelMetadataPatch,
   type Registries,
 } from "#models/sync/metadata.ts";
 
-const modelsDir = packageModelsDir();
+const modelsDir = dataDir();
 
 const MANAGED_PROVIDER_KEYS = ["contextWindow", "maxOutputTokens"] as const;
 
@@ -135,7 +135,7 @@ function reportStats(stats: Stats, updatedCount: number, dryRun: boolean): void 
 }
 
 function canonicalizeIds(
-  canonical: Awaited<ReturnType<typeof fetchExternalRegistries>>["canonical"],
+  canonical: Awaited<ReturnType<typeof externalRegistries>>["canonical"],
   stats: Stats,
   dryRun: boolean,
 ): void {
@@ -170,7 +170,7 @@ function canonicalizeIds(
       stats.ambiguous.push(`${action.from} (missing merge target ${action.to})`);
       continue;
     }
-    applyCanonicalMerge(target.data as ModelData, action);
+    applyMerge(target.data as ModelData, action);
     stats.canonicalized.push({ from: action.from, to: action.to, tier: `merge:${action.tier}` });
     if (dryRun) continue;
     persist({ modelsDir, relativeId: target.relativeId }, target.data as ModelData);
@@ -190,17 +190,17 @@ function canonicalizeIds(
     persist({ modelsDir, relativeId: target.relativeId }, target.data);
   }
   for (const [nextFileId, target] of targets) {
-    renameFiles({ modelsDir, generatedDir: dir, relativeId: target.relativeId }, nextFileId);
+    moveFiles({ modelsDir, generatedDir: dir, relativeId: target.relativeId }, nextFileId);
   }
 }
 
-function relocateRootFiles(dryRun: boolean): string[] {
+function relocateRoots(dryRun: boolean): string[] {
   const index = buildIndex(modelsDir);
   const moved: string[] = [];
   for (const [fileId, entry] of Object.entries(index)) {
     if (dirname(entry.path) !== modelsDir) continue;
     const id = entry.id || fileId;
-    const folder = inferModelFolder(id);
+    const folder = folderOf(id);
     if (!folder) continue;
     const target = join(modelsDir, folder, basename(entry.path));
     if (exists(target)) continue;
@@ -213,7 +213,7 @@ function relocateRootFiles(dryRun: boolean): string[] {
 async function main(): Promise<void> {
   const { dryRun, verbose } = flags();
 
-  const catalogs = await fetchExternalRegistries({ logger: (message) => console.log(message) });
+  const catalogs = await externalRegistries({ logger: (message) => console.log(message) });
   const registries = catalogs.registries;
   if (Object.values(registries).every((registry) => registry === undefined)) {
     throw new Error("No external registry available, aborting metadata refresh");
@@ -254,8 +254,8 @@ async function main(): Promise<void> {
       providers,
     };
 
-    const resolved = resolveModelMetadata(model, registries);
-    const patch = buildModelPatch(model, resolved);
+    const resolved = modelMetadata(model, registries);
+    const patch = modelPatch(model, resolved);
 
     const hasAnything = patch.reasoning !== null
       || patch.reasoningEffort
@@ -289,7 +289,7 @@ async function main(): Promise<void> {
 
   reportStats(stats, updated.length, dryRun);
 
-  const moved = relocateRootFiles(dryRun);
+  const moved = relocateRoots(dryRun);
   if (moved.length > 0) {
     console.log(`[metadata] relocated ${moved.length} model files into family folders${dryRun ? " (dry run)" : ""}:`);
     for (const item of moved) console.log(`  ${item}`);

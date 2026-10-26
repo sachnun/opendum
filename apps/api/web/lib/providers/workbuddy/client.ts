@@ -2,13 +2,13 @@ import { Effect } from "effect";
 import { fetchExternalEffect } from "#web/lib/external.js";
 import { fromPromise } from "#web/lib/task.js";
 import { unavailable } from "#web/errors.js";
-import { formatProviderHttpError } from "../provider-http-errors.js";
+import { httpError } from "../provider-http-errors.js";
 import type { OAuthResult } from "../types.js";
 import {
   ACCOUNTS_PATH,
   AUTH_STATE_PATH,
   AUTH_TOKEN_PATH,
-  DEVICE_CODE_EXPIRY_SECONDS,
+  DEVICE_EXPIRY,
   LOGIN_ACCOUNT_PATH,
   PENDING_ACCOUNT_CODE,
   PENDING_TOKEN_CODE,
@@ -73,7 +73,7 @@ export interface WorkbuddyInitiateResult {
   interval: number;
 }
 
-function calculateExpiresAt(data: WorkbuddyTokenData, fallbackSeconds: number): Date {
+function expiresAt(data: WorkbuddyTokenData, fallbackSeconds: number): Date {
   if (typeof data.expiresAt === "number" && data.expiresAt > 0) {
     return new Date(data.expiresAt > 10_000_000_000 ? data.expiresAt : data.expiresAt * 1000);
   }
@@ -105,7 +105,7 @@ function firstAccount(value: WorkbuddyAccountResponse["data"]): WorkbuddyAccount
   return value as WorkbuddyAccount;
 }
 
-export const initiateWorkbuddyDeviceCodeFlow = Effect.fn("workbuddy.initiateDeviceCodeFlow")(function* () {
+export const startDeviceFlow = Effect.fn("workbuddy.initiateDeviceCodeFlow")(function* () {
   const url = `${WORKBUDDY_BASE_URL}${AUTH_STATE_PATH}?platform=${encodeURIComponent(WORKBUDDY_PLATFORM)}`;
   const response = yield* fetchExternalEffect(url, {
     method: "POST",
@@ -116,7 +116,7 @@ export const initiateWorkbuddyDeviceCodeFlow = Effect.fn("workbuddy.initiateDevi
 
   if (!response.ok) {
     const body = yield* readText(response);
-    return yield* unavailable(formatProviderHttpError("WorkBuddy", response, body, { endpointLabel: "auth state endpoint" }));
+    return yield* unavailable(httpError("WorkBuddy", response, body, { endpointLabel: "auth state endpoint" }));
   }
 
   const data = yield* readJson<WorkbuddyStateResponse>(response, {});
@@ -131,12 +131,12 @@ export const initiateWorkbuddyDeviceCodeFlow = Effect.fn("workbuddy.initiateDevi
     userCode: "",
     verificationUrl: authUrl,
     verificationUrlComplete: authUrl,
-    expiresIn: DEVICE_CODE_EXPIRY_SECONDS,
+    expiresIn: DEVICE_EXPIRY,
     interval: POLLING_INTERVAL_SECONDS,
   } satisfies WorkbuddyInitiateResult;
 });
 
-export const pollWorkbuddyDeviceCodeAuthorization = Effect.fn("workbuddy.pollDeviceCodeAuthorization")(
+export const pollDeviceAuth = Effect.fn("workbuddy.pollDeviceCodeAuthorization")(
   function* (deviceCode: string) {
     const state = deviceCode.trim();
     if (!state) return { error: "WorkBuddy device code is missing. Please try again." };
@@ -151,7 +151,7 @@ export const pollWorkbuddyDeviceCodeAuthorization = Effect.fn("workbuddy.pollDev
     if (!response.ok) {
       const body = yield* readText(response);
       return {
-        error: formatProviderHttpError("WorkBuddy", response, body, { endpointLabel: "device token polling endpoint" }),
+        error: httpError("WorkBuddy", response, body, { endpointLabel: "device token polling endpoint" }),
       };
     }
 
@@ -172,7 +172,7 @@ export const pollWorkbuddyDeviceCodeAuthorization = Effect.fn("workbuddy.pollDev
     return {
       accessToken,
       refreshToken: data.data.refreshToken?.trim() || accessToken,
-      expiresAt: calculateExpiresAt(data.data, 31536000),
+      expiresAt: expiresAt(data.data, 31536000),
       email: identity.email,
       accountId: identity.uid,
     } satisfies OAuthResult;

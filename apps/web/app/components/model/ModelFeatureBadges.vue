@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { getEffectiveModelCapabilities, type ModelCapabilitiesInput } from "~~/lib/model-capabilities";
+import { capabilitiesOf, type ModelCapabilitiesInput } from "~~/lib/model-capabilities";
 
 const props = defineProps<{
   model?: ModelCapabilitiesInput;
   compact?: boolean;
 }>();
 
-const capabilities = computed(() => getEffectiveModelCapabilities(props.model));
+const capabilities = computed(() => capabilitiesOf(props.model));
 </script>
 
 <template>

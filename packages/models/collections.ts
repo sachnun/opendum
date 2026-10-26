@@ -7,7 +7,7 @@ export function uniqueSorted(values: string[]): string[] {
   return [...new Set(values.filter((value) => value.length > 0))].sort((a, b) => a.localeCompare(b));
 }
 
-export function uniqueSortedStable(values: string[]): string[] {
+export function stableUnique(values: string[]): string[] {
   const seen = new Set<string>();
   const result: string[] = [];
   for (const value of values) {

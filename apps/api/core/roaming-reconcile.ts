@@ -3,7 +3,7 @@ import type { DatabaseFailure } from "@opendum/database";
 import { refundRoamingPoint, type PointReservation } from "./points.js";
 import type { PointPort } from "./repositories.js";
 
-export const ROAMING_ORPHAN_AGE_MS = 15 * 60 * 1000;
+export const ORPHAN_AGE_MS = 15 * 60 * 1000;
 export const ROAMING_RECONCILE_BATCH = 200;
 const ROAMING_RECONCILE_CONCURRENCY = 8;
 
@@ -19,15 +19,15 @@ export type ReconcileResult = {
   failed: number;
 };
 
-export function reconcileOrphanedRoaming(
+export function reconcileOrphans(
   points: PointPort,
   options: ReconcileOptions = {}
 ): Effect.Effect<ReconcileResult, DatabaseFailure> {
   const now = options.now ?? new Date();
-  const olderThanMs = options.olderThanMs ?? ROAMING_ORPHAN_AGE_MS;
+  const olderThanMs = options.olderThanMs ?? ORPHAN_AGE_MS;
   const batchLimit = options.batchLimit ?? ROAMING_RECONCILE_BATCH;
   return Effect.gen(function* () {
-    const orphans = yield* points.listOrphanedRoamingDebits({
+    const orphans = yield* points.listOrphaned({
       olderThan: new Date(now.getTime() - olderThanMs),
       limit: batchLimit,
     });
@@ -57,7 +57,7 @@ export function reconcileOrphanedRoaming(
   });
 }
 
-export function roamingReconcileLoop(
+export function reconcileLoop(
   intervalMs: number,
   run: () => Effect.Effect<ReconcileResult, DatabaseFailure>
 ): Effect.Effect<void, never> {

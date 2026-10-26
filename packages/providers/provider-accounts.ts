@@ -1,8 +1,8 @@
 type ProviderAccountCategory = "oauth" | "api_key";
 
-export type ProviderAuthMethodKey = "oauth_redirect" | "device_code" | "api_key" | "api_key_with_account_id" | "chatgpt_session";
+export type AuthMethodKey = "oauth_redirect" | "device_code" | "api_key" | "api_key_with_account_id" | "chatgpt_session";
 
-const PROVIDER_ACCOUNT_DEFINITIONS_SOURCE = [
+const DEFINITIONS_SOURCE = [
   {
     key: "antigravity",
     slug: "antigravity",
@@ -158,7 +158,7 @@ const PROVIDER_ACCOUNT_DEFINITIONS_SOURCE = [
   label: string;
   category: ProviderAccountCategory;
   showTier: boolean;
-  authMethods: readonly ProviderAuthMethodKey[];
+  authMethods: readonly AuthMethodKey[];
   supportsQuota: boolean;
   displayOrder: number;
   navOrder?: number;
@@ -169,7 +169,7 @@ const PROVIDER_ACCOUNT_DEFINITIONS_SOURCE = [
   callbackPlaceholder?: string;
 }[];
 
-export type ProviderAccountDefinition = (typeof PROVIDER_ACCOUNT_DEFINITIONS_SOURCE)[number] & {
+export type ProviderAccountDefinition = (typeof DEFINITIONS_SOURCE)[number] & {
   navOrder?: number;
   displayOrder?: number;
   apiKeyPortalUrl?: string;
@@ -179,32 +179,32 @@ export type ProviderAccountDefinition = (typeof PROVIDER_ACCOUNT_DEFINITIONS_SOU
   callbackPlaceholder?: string;
 };
 
-export type ProviderAccountKey = (typeof PROVIDER_ACCOUNT_DEFINITIONS_SOURCE)[number]["key"];
+export type ProviderAccountKey = (typeof DEFINITIONS_SOURCE)[number]["key"];
 
-export const PROVIDER_ACCOUNT_DEFINITIONS: readonly ProviderAccountDefinition[] = PROVIDER_ACCOUNT_DEFINITIONS_SOURCE;
+export const PROVIDER_ACCOUNT_DEFINITIONS: readonly ProviderAccountDefinition[] = DEFINITIONS_SOURCE;
 
-export const PROVIDER_ACCOUNT_KEYS: readonly ProviderAccountKey[] = PROVIDER_ACCOUNT_DEFINITIONS_SOURCE.map((definition) => definition.key);
+export const PROVIDER_ACCOUNT_KEYS: readonly ProviderAccountKey[] = DEFINITIONS_SOURCE.map((definition) => definition.key);
 
 export const OAUTH_PROVIDER_KEYS = ["antigravity", "codex", "kiro", "perch"] as const;
 export const DEVICE_PROVIDER_KEYS = ["codex", "cline", "workbuddy"] as const;
-export const API_KEY_PROVIDER_KEYS = ["nvidia_nim", "openrouter", "zenmux", "harbor", "hyper"] as const;
+export const KEY_PROVIDERS = ["nvidia_nim", "openrouter", "zenmux", "harbor", "hyper"] as const;
 export const QUOTA_PROVIDER_KEYS = ["antigravity", "codex", "kiro", "perch", "openrouter", "zenmux", "hyper", "workbuddy"] as const;
 
-export type OAuthProviderKey = (typeof OAUTH_PROVIDER_KEYS)[number];
+export type AuthProvider = (typeof OAUTH_PROVIDER_KEYS)[number];
 export type DeviceProviderKey = (typeof DEVICE_PROVIDER_KEYS)[number];
-export type ApiKeyProviderKey = (typeof API_KEY_PROVIDER_KEYS)[number];
+export type KeyProvider = (typeof KEY_PROVIDERS)[number];
 export type QuotaProviderKey = (typeof QUOTA_PROVIDER_KEYS)[number];
 
 export const BY_KEY: Record<ProviderAccountKey, ProviderAccountDefinition> =
   Object.fromEntries(
-    PROVIDER_ACCOUNT_DEFINITIONS_SOURCE.map((definition) => [definition.key, definition])
+    DEFINITIONS_SOURCE.map((definition) => [definition.key, definition])
   ) as Record<ProviderAccountKey, ProviderAccountDefinition>;
 
 const BY_SLUG: Record<string, ProviderAccountDefinition> = Object.fromEntries(
-  PROVIDER_ACCOUNT_DEFINITIONS_SOURCE.map((definition) => [definition.slug, definition])
+  DEFINITIONS_SOURCE.map((definition) => [definition.slug, definition])
 );
 
-export function getProviderLabel(provider: string): string {
+export function labelOf(provider: string): string {
   if (provider === "opencode") return "Opencode";
   if (provider === "kilo_code") return "Kilo Code";
 
@@ -215,22 +215,22 @@ export function getProviderLabel(provider: string): string {
   return provider;
 }
 
-export function getProviderAccountPath(provider: ProviderAccountKey): string {
+export function accountPath(provider: ProviderAccountKey): string {
   return `/${BY_KEY[provider].slug}`;
 }
 
-export function buildProviderHrefMap<V>(
+export function hrefMap<V>(
   data: Record<string, V>
 ): Record<string, V> {
   return Object.fromEntries(
-    PROVIDER_ACCOUNT_DEFINITIONS_SOURCE.map((definition) => [
-      getProviderAccountPath(definition.key),
+    DEFINITIONS_SOURCE.map((definition) => [
+      accountPath(definition.key),
       data[definition.key],
     ])
   ) as Record<string, V>;
 }
 
-export function getProviderFromSlug(providerSlug: string): ProviderAccountKey | null {
+export function providerOf(providerSlug: string): ProviderAccountKey | null {
   const normalizedSlug = providerSlug.trim().toLowerCase();
   const provider = BY_SLUG[normalizedSlug];
   return provider ? provider.key : null;

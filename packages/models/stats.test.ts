@@ -1,9 +1,9 @@
 import { expect, test } from "bun:test";
 
-import { buildDayKeys, buildEmptyModelStats, buildHourKeys } from "./stats.ts";
+import { dayKeys, emptyStats, hourKeys } from "./stats.ts";
 
-test("buildDayKeys returns ascending UTC day keys ending today", () => {
-  const keys = buildDayKeys(3);
+test("dayKeys returns ascending UTC day keys ending today", () => {
+  const keys = dayKeys(3);
   expect(keys.length).toBe(3);
   expect(keys[0]! < keys[1]! && keys[1]! < keys[2]!).toBeTruthy();
   expect(keys[2]).toBe(new Date().toISOString().split("T")[0]);
@@ -12,13 +12,13 @@ test("buildDayKeys returns ascending UTC day keys ending today", () => {
   }
 });
 
-test("buildDayKeys handles non-positive day counts", () => {
-  expect(buildDayKeys(0)).toEqual([]);
-  expect(buildDayKeys(-1)).toEqual([]);
+test("dayKeys handles non-positive day counts", () => {
+  expect(dayKeys(0)).toEqual([]);
+  expect(dayKeys(-1)).toEqual([]);
 });
 
-test("buildHourKeys returns ascending UTC hour keys ending at the current hour", () => {
-  const keys = buildHourKeys(3);
+test("hourKeys returns ascending UTC hour keys ending at the current hour", () => {
+  const keys = hourKeys(3);
   expect(keys.length).toBe(3);
   expect(keys[0]! < keys[1]! && keys[1]! < keys[2]!).toBeTruthy();
   for (const key of keys) {
@@ -27,8 +27,8 @@ test("buildHourKeys returns ascending UTC hour keys ending at the current hour",
   }
 });
 
-test("buildEmptyModelStats returns a neutral stats object", () => {
-  const stats = buildEmptyModelStats(buildDayKeys(2), buildHourKeys(2));
+test("emptyStats returns a neutral stats object", () => {
+  const stats = emptyStats(dayKeys(2), hourKeys(2));
   expect(stats).toEqual({
     totalRequests: 0,
     totalTokens: 0,

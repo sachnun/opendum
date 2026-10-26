@@ -14,11 +14,11 @@ export function useAudit() {
   const isAuditMode = computed(() => audit.value.active && Boolean(audit.value.user));
   const auditUser = computed(() => audit.value.user);
 
-  async function refreshAfterAuditChange() {
+  async function refreshAfterAudit() {
     auditRefreshVersion.value += 1;
-    useState<Record<string, unknown>>(stateKeys.quotaByAccountId, () => ({})).value = {};
-    useState<Record<string, string>>(stateKeys.quotaErrorByAccountId, () => ({})).value = {};
-    useState<Record<string, boolean>>(stateKeys.quotaLoadingByAccountId, () => ({})).value = {};
+    useState<Record<string, unknown>>(stateKeys.quotaById, () => ({})).value = {};
+    useState<Record<string, string>>(stateKeys.errorById, () => ({})).value = {};
+    useState<Record<string, boolean>>(stateKeys.loadingById, () => ({})).value = {};
     await refreshNuxtData();
   }
 
@@ -28,6 +28,6 @@ export function useAudit() {
     auditUser,
     me,
     isAuditMode,
-    refreshAfterAuditChange,
+    refreshAfterAudit,
   };
 }

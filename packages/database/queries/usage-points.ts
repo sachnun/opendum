@@ -6,7 +6,7 @@ import { db, type DbExecutor } from "../client.js";
 import { tryDb } from "../errors.js";
 import { pointTransaction, usageLog, userPointBalance } from "../schema/usage.js";
 
-export type InsertUsageLogParams = {
+export type UsageLogParams = {
   id?: string;
   userId: string;
   providerAccountId: string | null;
@@ -21,7 +21,7 @@ export type InsertUsageLogParams = {
   createdAt: Date;
 };
 
-export const insertUsageLog = Effect.fn("db.insertUsageLog")(function* (params: InsertUsageLogParams, database: DbExecutor = db) {
+export const insertUsageLog = Effect.fn("db.insertUsageLog")(function* (params: UsageLogParams, database: DbExecutor = db) {
   yield* tryDb("query", () => database.insert(usageLog).values({
     id: params.id ?? createId(),
     userId: params.userId,
@@ -50,7 +50,7 @@ export const debitPointBalance = Effect.fn("db.debitPointBalance")(function* (
   return rows[0]?.balance ?? null;
 });
 
-export const debitPointBalanceAllowNegative = Effect.fn("db.debitPointBalanceAllowNegative")(function* (
+export const debitAllowNegative = Effect.fn("db.debitAllowNegative")(function* (
   params: { userId: string; amount: number; at: Date },
   database: DbExecutor = db
 ) {
@@ -74,7 +74,7 @@ export const creditPointBalance = Effect.fn("db.creditPointBalance")(function* (
   return rows[0]?.balance ?? null;
 });
 
-export type InsertPointTransactionParams = {
+export type TransactionParams = {
   id?: string;
   userId: string;
   amount: number;
@@ -86,7 +86,7 @@ export type InsertPointTransactionParams = {
 };
 
 export const insertPointTransaction = Effect.fn("db.insertPointTransaction")(function* (
-  params: InsertPointTransactionParams,
+  params: TransactionParams,
   database: DbExecutor = db
 ) {
   yield* tryDb("query", () => database.insert(pointTransaction).values({
@@ -101,8 +101,8 @@ export const insertPointTransaction = Effect.fn("db.insertPointTransaction")(fun
   }));
 });
 
-export const insertPointTransactionOnConflictDoNothing = Effect.fn("db.insertPointTransactionOnConflictDoNothing")(function* (
-  params: InsertPointTransactionParams,
+export const insertTransaction = Effect.fn("db.insertTransaction")(function* (
+  params: TransactionParams,
   database: DbExecutor = db
 ) {
   const result = yield* tryDb("query", () => database
@@ -122,7 +122,7 @@ export const insertPointTransactionOnConflictDoNothing = Effect.fn("db.insertPoi
   return result.length;
 });
 
-export const updatePointTransactionBalance = Effect.fn("db.updatePointTransactionBalance")(function* (
+export const updateTransactionBalance = Effect.fn("db.updateTransactionBalance")(function* (
   params: { id: string; balanceAfter: number },
   database: DbExecutor = db
 ) {
@@ -132,7 +132,7 @@ export const updatePointTransactionBalance = Effect.fn("db.updatePointTransactio
     .where(eq(pointTransaction.id, params.id)));
 });
 
-export type OrphanedRoamingDebitParams = {
+export type OrphanParams = {
   olderThan: Date;
   limit: number;
 };
@@ -144,8 +144,8 @@ export type OrphanedRoamingDebit = {
   createdAt: Date;
 };
 
-export const listOrphanedRoamingDebits = Effect.fn("db.listOrphanedRoamingDebits")(function* (
-  params: OrphanedRoamingDebitParams,
+export const listOrphaned = Effect.fn("db.listOrphaned")(function* (
+  params: OrphanParams,
   database: DbExecutor = db
 ) {
   const settlement = alias(pointTransaction, "settlement");
@@ -181,7 +181,7 @@ export const listOrphanedRoamingDebits = Effect.fn("db.listOrphanedRoamingDebits
   }));
 });
 
-export const insertPointBalanceOnConflictDoNothing = Effect.fn("db.insertPointBalanceOnConflictDoNothing")(function* (
+export const insertBalance = Effect.fn("db.insertBalance")(function* (
   params: { userId: string; balance: number; createdAt: Date; updatedAt: Date },
   database: DbExecutor = db
 ) {

@@ -1,8 +1,8 @@
 import { expect, test } from "bun:test";
 
-import { buildCanonicalIndex } from "./canonical.ts";
+import { canonicalIndex } from "./canonical.ts";
 import {
-  applyCanonicalMerge,
+  applyMerge,
   planCanonicalization,
   type CanonicalMerge,
   type CanonicalizationModel,
@@ -10,7 +10,7 @@ import {
 import type { ModelData } from "../types.ts";
 
 function index() {
-  return buildCanonicalIndex({
+  return canonicalIndex({
     models: {
       "deepseek/deepseek-v4-flash": { name: "DeepSeek V4 Flash" },
       "deepseek/deepseek-v4.1-flash": { name: "DeepSeek V4.1 Flash" },
@@ -91,7 +91,7 @@ test("planCanonicalization merges variants onto a shared canonical id that has n
       model("minimax-m2.7", { providers: ["zenmux"] }),
       model("minimax-m2.7-free", { providers: ["opencode"] }),
     ],
-    buildCanonicalIndex({
+    canonicalIndex({
       models: { "minimax/MiniMax-M2.7": { name: "MiniMax M2.7" } },
     }),
   );
@@ -128,7 +128,7 @@ test("planCanonicalization does not rename a model onto an occupied id", () => {
   expect(plan.actions[0].to).toBe("nemotron-3-ultra-550b-a55b");
 });
 
-test("applyCanonicalMerge folds providers, config and aliases", () => {
+test("applyMerge folds providers, config and aliases", () => {
   const target: ModelData = {
     id: "deepseek-v4-flash",
     providers: ["openrouter"],
@@ -150,7 +150,7 @@ test("applyCanonicalMerge folds providers, config and aliases", () => {
     aliases: ["deepseek-v4-flash-fast"],
   };
 
-  applyCanonicalMerge(target, merge);
+  applyMerge(target, merge);
   expect(target.providers).toEqual(["example", "openrouter"]);
   expect(target.aliases).toEqual(["deepseek-v4-flash-fast", "ds-flash"]);
   expect(target.providerConfig?.openrouter?.upstream).toBe("deepseek/deepseek-v4-flash");
@@ -159,13 +159,13 @@ test("applyCanonicalMerge folds providers, config and aliases", () => {
   expect(target.id).toBe("deepseek-v4-flash");
 });
 
-test("applyCanonicalMerge keeps the canonical provider config on conflict", () => {
+test("applyMerge keeps the canonical provider config on conflict", () => {
   const target: ModelData = {
     id: "model",
     providers: ["openrouter"],
     providerConfig: { openrouter: { upstream: "old" } },
   };
-  applyCanonicalMerge(target, {
+  applyMerge(target, {
     kind: "merge",
     relativeId: "variant",
     fileId: "variant",
@@ -179,13 +179,13 @@ test("applyCanonicalMerge keeps the canonical provider config on conflict", () =
   expect(target.providerConfig?.openrouter?.upstream).toBe("old");
 });
 
-test("applyCanonicalMerge carries generated fields the target is missing", () => {
+test("applyMerge carries generated fields the target is missing", () => {
   const target: ModelData = {
     id: "mimo-v2-omni",
     providers: ["openrouter"],
     limit: { context: 200000 },
   };
-  applyCanonicalMerge(target, {
+  applyMerge(target, {
     kind: "merge",
     relativeId: "mimo-omni",
     fileId: "mimo-omni",
@@ -214,12 +214,12 @@ test("applyCanonicalMerge carries generated fields the target is missing", () =>
   expect(target.id).toBe("mimo-v2-omni");
 });
 
-test("applyCanonicalMerge does not let a merged duplicate outrank the target score", () => {
+test("applyMerge does not let a merged duplicate outrank the target score", () => {
   const target: ModelData = {
     id: "model",
     scores: { artificialAnalysis: { index: 40, estimated: false } },
   };
-  applyCanonicalMerge(target, {
+  applyMerge(target, {
     kind: "merge",
     relativeId: "variant",
     fileId: "variant",

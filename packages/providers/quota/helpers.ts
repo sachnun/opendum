@@ -14,7 +14,7 @@ export function formatFloat(value: number): string {
   return value.toFixed(2);
 }
 
-export function formatTimeUntilReset(resetTimestamp: number): string | null {
+export function resetText(resetTimestamp: number): string | null {
   if (resetTimestamp <= 0) return null;
   const diff = resetTimestamp - Date.now();
   if (diff <= 0) return "resetting...";
@@ -29,14 +29,14 @@ export function formatTimeUntilReset(resetTimestamp: number): string | null {
   return `${minutes}m`;
 }
 
-export function formatTimeUntilResetIso(resetIso: string | null | undefined): string | null {
+export function resetIso(resetIso: string | null | undefined): string | null {
   if (!resetIso || !resetIso.trim()) return null;
   const parsed = Date.parse(resetIso);
   if (!Number.isFinite(parsed)) return null;
-  return formatTimeUntilReset(parsed);
+  return resetText(parsed);
 }
 
-export function parseResetIso(value: unknown): string | null {
+export function isoOf(value: unknown): string | null {
   if (typeof value === "string") {
     const parsed = Date.parse(value);
     if (Number.isFinite(parsed)) return new Date(parsed).toISOString();
@@ -47,13 +47,13 @@ export function parseResetIso(value: unknown): string | null {
     return new Date(ms).toISOString();
   }
   if (value !== null && typeof value === "object" && !Array.isArray(value)) {
-    const seconds = parseQuotaNumber((value as Record<string, unknown>).seconds);
+    const seconds = parseNumber((value as Record<string, unknown>).seconds);
     if (seconds !== null) return new Date(Math.trunc(seconds * 1000)).toISOString();
   }
   return null;
 }
 
-export function parseQuotaNumber(value: unknown): number | null {
+export function parseNumber(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string" && value.trim()) {
     const parsed = Number(value.trim());
@@ -62,20 +62,20 @@ export function parseQuotaNumber(value: unknown): number | null {
   return null;
 }
 
-export function parseQuotaString(value: unknown): string {
+export function parseString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-export function parseQuotaRecord(value: unknown): Record<string, unknown> | null {
+export function parseRecord(value: unknown): Record<string, unknown> | null {
   if (value !== null && typeof value === "object" && !Array.isArray(value)) return value as Record<string, unknown>;
   return null;
 }
 
-export function parseQuotaArray(value: unknown): unknown[] {
+export function parseArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
 }
 
-export function baseQuotaInfo(
+export function baseInfo(
   status: string,
   groups: QuotaGroupDisplay[],
   message = ""
@@ -83,15 +83,15 @@ export function baseQuotaInfo(
   return { status, error: message, groups };
 }
 
-export function expiredQuotaInfo(message: string): AccountQuotaInfo {
-  return baseQuotaInfo("expired", [], message);
+export function expiredInfo(message: string): AccountQuotaInfo {
+  return baseInfo("expired", [], message);
 }
 
-export function errorQuotaInfo(message: string): AccountQuotaInfo {
-  return baseQuotaInfo("error", [], message);
+export function errorInfo(message: string): AccountQuotaInfo {
+  return baseInfo("error", [], message);
 }
 
-export function firstNonEmpty(...values: string[]): string {
+export function firstValue(...values: string[]): string {
   for (const value of values) {
     if (value.trim()) return value.trim();
   }

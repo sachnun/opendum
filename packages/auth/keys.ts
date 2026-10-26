@@ -4,8 +4,8 @@ import { hashString } from "@opendum/core/crypto";
 import type { Registry } from "@opendum/models/runtime";
 import {
   deactivateAPIKey,
-  getAPIKeyByHash,
-  listAPIKeyRateLimits,
+  keyByHash,
+  rateLimits,
 } from "@opendum/database/queries";
 import {
   type Cache,
@@ -14,18 +14,18 @@ import {
   VALID_TTL,
 } from "./cache.js";
 import { accessList, accessMode, accountList } from "./normalize.js";
-import { type AuthResult, type RateLimitRule, emptyAuthResult } from "./types.js";
+import { type AuthResult, type RateLimitRule, emptyResult } from "./types.js";
 
 export type Queries = {
-  getAPIKeyByHash: typeof getAPIKeyByHash;
+  keyByHash: typeof keyByHash;
   deactivateAPIKey: typeof deactivateAPIKey;
-  listAPIKeyRateLimits: typeof listAPIKeyRateLimits;
+  rateLimits: typeof rateLimits;
 };
 
 const defaultQueries: Queries = {
-  getAPIKeyByHash,
+  keyByHash,
   deactivateAPIKey,
-  listAPIKeyRateLimits,
+  rateLimits,
 };
 
 export type Options = {
@@ -48,18 +48,18 @@ export class Keys {
   validate(authHeader: string): Effect.Effect<AuthResult, DatabaseFailure> {
     return Effect.gen({ self: this }, function* () {
       if (!authHeader.trim()) {
-        return emptyAuthResult("Missing Authorization header");
+        return emptyResult("Missing Authorization header");
       }
       const token = bearerToken(authHeader);
       if (!token) {
-        return emptyAuthResult("Invalid Authorization header format");
+        return emptyResult("Invalid Authorization header format");
       }
 
       const keyHash = hashString(token);
       const cached = yield* this.keyCache.get(keyHash);
       if (cached) {
         if (!cached.valid) {
-          return emptyAuthResult(defaultString(cached.error ?? "", "Invalid API key"));
+          return emptyResult(defaultString(cached.error ?? "", "Invalid API key"));
         }
         if (cached.expiresAtMs === undefined || cached.expiresAtMs > Date.now()) {
           yield* Effect.forkDetach(this.keyCache.touch(cached.apiKeyId ?? ""));
@@ -68,14 +68,14 @@ export class Keys {
         yield* this.invalidate(keyHash, cached.apiKeyId ?? "");
       }
 
-      const apiKey = yield* this.queries.getAPIKeyByHash(keyHash);
+      const apiKey = yield* this.queries.keyByHash(keyHash);
       if (!apiKey) {
         yield* this.keyCache.set(
           keyHash,
           { valid: false, error: "Invalid API key" },
           INVALID_TTL
         );
-        return emptyAuthResult("Invalid API key");
+        return emptyResult("Invalid API key");
       }
 
       if (!apiKey.isActive) {
@@ -84,7 +84,7 @@ export class Keys {
           { valid: false, apiKeyId: apiKey.id, error: "API key has been revoked" },
           INVALID_TTL
         );
-        return emptyAuthResult("API key has been revoked");
+        return emptyResult("API key has been revoked");
       }
 
       if (apiKey.expiresAt && apiKey.expiresAt.getTime() < Date.now()) {
@@ -94,7 +94,7 @@ export class Keys {
           { valid: false, apiKeyId: apiKey.id, error: "API key has expired" },
           INVALID_TTL
         );
-        return emptyAuthResult("API key has expired");
+        return emptyResult("API key has expired");
       }
 
       const rules = yield* this.rateLimitRules(apiKey.id);
@@ -135,7 +135,7 @@ export class Keys {
   }
 
   private rateLimitRules(apiKeyId: string): Effect.Effect<RateLimitRule[], DatabaseFailure> {
-    return this.queries.listAPIKeyRateLimits(apiKeyId).pipe(
+    return this.queries.rateLimits(apiKeyId).pipe(
       Effect.map((rows) =>
         rows.map((row) => ({
           target: row.target,

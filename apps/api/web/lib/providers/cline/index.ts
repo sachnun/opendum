@@ -1,5 +1,5 @@
 export {
-  initiateClineDeviceCodeFlow,
-  pollClineDeviceCodeAuthorization,
+  startDeviceFlow,
+  pollDeviceAuth,
 } from "./client.js";
 export * from "./constants.js";

@@ -57,7 +57,7 @@ async function createKey() {
   }
 }
 
-async function copyCreatedKey() {
+async function copyKey() {
   if (!createdKey.value) return;
   await navigator.clipboard.writeText(createdKey.value);
   copied.value = true;
@@ -87,7 +87,7 @@ async function copyCreatedKey() {
             <p class="text-xs text-muted-foreground">Your API Key</p>
             <div class="mt-2 flex items-center gap-2">
               <code class="flex-1 break-all rounded bg-background px-2 py-1 font-mono text-xs font-medium">{{ createdKey }}</code>
-              <UiButton type="button" variant="outline" size="sm" class="h-8 shrink-0 px-2" @click="copyCreatedKey">
+              <UiButton type="button" variant="outline" size="sm" class="h-8 shrink-0 px-2" @click="copyKey">
                 <UiIcon :name="copied ? 'i-lucide-check' : 'i-lucide-copy'" class="size-3.5" />
                 {{ copied ? 'Copied' : 'Copy' }}
               </UiButton>

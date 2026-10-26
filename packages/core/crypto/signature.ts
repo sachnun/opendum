@@ -14,7 +14,7 @@ export function playgroundSignature(
   return hmacHex(secret, `${userID}\n${timestamp}\n${method}\n${path}`);
 }
 
-export function timingSafeEqualHex(a: string, b: string): boolean {
+export function equalHex(a: string, b: string): boolean {
   const left = Buffer.from(a, "hex");
   const right = Buffer.from(b, "hex");
   if (left.length === 0 || left.length !== right.length) return false;
@@ -23,7 +23,7 @@ export function timingSafeEqualHex(a: string, b: string): boolean {
 
 export function signaturesMatch(expectedHex: string, providedHex: string): boolean {
   try {
-    return timingSafeEqualHex(expectedHex, providedHex);
+    return equalHex(expectedHex, providedHex);
   } catch {
     return false;
   }

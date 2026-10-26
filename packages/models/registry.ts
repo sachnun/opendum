@@ -1,10 +1,10 @@
 import { Effect } from "effect";
 
-import { inferFamilyFromFolder } from "./model/families.ts";
+import { familyOf } from "./model/families.ts";
 import { ModelParseFailure, ModelReadFailure, ModelsDirectoryFailure, asError } from "./errors.ts";
-import { exists, isDirectory, listJsonFiles, readText } from "./fs.ts";
+import { exists, isDirectory, listJson, readText } from "./fs.ts";
 import { basename, dirname, join } from "./paths.ts";
-import { decodeModelDataSync } from "./schema.ts";
+import { decodeSync } from "./schema.ts";
 import { Catalog } from "./catalog.ts";
 import { Aliases } from "./aliases.ts";
 import { View } from "./view.ts";
@@ -88,7 +88,7 @@ function generatedDir(dir: string): string {
   return join(dirname(dir), "generated");
 }
 
-function readModelEntries(dir: string, required: boolean): ModelEntry[] {
+function readEntries(dir: string, required: boolean): ModelEntry[] {
   if (!exists(dir)) {
     if (required) {
       throw new ModelsDirectoryFailure({
@@ -107,12 +107,12 @@ function readModelEntries(dir: string, required: boolean): ModelEntry[] {
   }
 
   const entries: ModelEntry[] = [];
-  for (const relativePath of listJsonFiles(dir)) {
+  for (const relativePath of listJson(dir)) {
     if (!relativePath.endsWith(".json")) continue;
     const fullPath = join(dir, relativePath);
     let parsed: ModelInfo;
     try {
-      parsed = decodeModelDataSync(readText(fullPath), fullPath) as ModelInfo;
+      parsed = decodeSync(readText(fullPath), fullPath) as ModelInfo;
     } catch (cause) {
       if (cause instanceof ModelParseFailure) throw cause;
       throw new ModelParseFailure({ message: `invalid model JSON: ${fullPath}`, path: fullPath, cause });
@@ -127,7 +127,7 @@ function readModelEntries(dir: string, required: boolean): ModelEntry[] {
   return entries;
 }
 
-function mergeGeneratedInfo(authored: ModelEntry, generated: ModelEntry): void {
+function mergeGenerated(authored: ModelEntry, generated: ModelEntry): void {
   if (!authored.info.id) authored.info.id = generated.info.id;
   if ((authored.info.providers ?? []).length === 0) authored.info.providers = generated.info.providers;
   if ((generated.info.aliases ?? []).length > 0) {
@@ -145,13 +145,13 @@ function mergeGeneratedInfo(authored: ModelEntry, generated: ModelEntry): void {
     for (const [provider, config] of Object.entries(generatedConfig)) {
       const existing = authored.info.providerConfig[provider];
       authored.info.providerConfig[provider] = existing
-        ? mergeProviderConfig(config, existing)
+        ? mergeConfig(config, existing)
         : config;
     }
   }
 }
 
-const KNOWN_PROVIDER_CONFIG_KEYS = new Set([
+const CONFIG_KEYS = new Set([
   "upstream",
   "contextWindow",
   "maxOutputTokens",
@@ -163,7 +163,7 @@ const KNOWN_PROVIDER_CONFIG_KEYS = new Set([
   "custom",
 ]);
 
-function mergeProviderConfig(
+function mergeConfig(
   generated: ProviderModelConfig,
   authored: ProviderModelConfig
 ): ProviderModelConfig {
@@ -179,7 +179,7 @@ function mergeProviderConfig(
 
   const custom: Record<string, unknown> = { ...merged.custom };
   for (const [key, value] of Object.entries(authored)) {
-    if (KNOWN_PROVIDER_CONFIG_KEYS.has(key)) continue;
+    if (CONFIG_KEYS.has(key)) continue;
     delete merged[key];
     custom[key] = value;
   }
@@ -190,37 +190,37 @@ function mergeProviderConfig(
   return merged;
 }
 
-function collectModelEntries(authoredDir: string, generatedDir: string): ModelEntry[] {
-  const authored = readModelEntries(authoredDir, true);
-  const generated = readModelEntries(generatedDir, false);
+function collectEntries(authoredDir: string, generatedDir: string): ModelEntry[] {
+  const authored = readEntries(authoredDir, true);
+  const generated = readEntries(generatedDir, false);
 
-  const byFileId = new Map<string, ModelEntry>();
+  const byFile = new Map<string, ModelEntry>();
   const order: string[] = [];
   for (const entry of authored) {
-    if (!byFileId.has(entry.fileId)) order.push(entry.fileId);
-    byFileId.set(entry.fileId, { ...entry, info: { ...entry.info } });
+    if (!byFile.has(entry.fileId)) order.push(entry.fileId);
+    byFile.set(entry.fileId, { ...entry, info: { ...entry.info } });
   }
   for (const entry of generated) {
-    const existing = byFileId.get(entry.fileId);
+    const existing = byFile.get(entry.fileId);
     if (existing) {
-      mergeGeneratedInfo(existing, entry);
+      mergeGenerated(existing, entry);
       continue;
     }
     order.push(entry.fileId);
-    byFileId.set(entry.fileId, { ...entry, info: { ...entry.info } });
+    byFile.set(entry.fileId, { ...entry, info: { ...entry.info } });
   }
-  return order.map((fileId) => byFileId.get(fileId) as ModelEntry);
+  return order.map((fileId) => byFile.get(fileId) as ModelEntry);
 }
 
-export function loadModelEntries(dir: string): ModelEntry[] {
-  return collectModelEntries(dir, generatedDir(dir));
+export function loadEntries(dir: string): ModelEntry[] {
+  return collectEntries(dir, generatedDir(dir));
 }
 
-export function tryLoadModelEntries(
+export function loadSafe(
   dir: string
 ): Effect.Effect<ModelEntry[], ModelsDirectoryFailure | ModelReadFailure | ModelParseFailure> {
   return Effect.try({
-    try: () => loadModelEntries(dir),
+    try: () => loadEntries(dir),
     catch: (cause) => cause,
   }).pipe(
     Effect.mapError((cause) => {
@@ -236,11 +236,11 @@ export function tryLoadModelEntries(
   );
 }
 
-export function tryLoadRegistry(
+export function tryLoad(
   dir: string,
   options: { familyFromFolder?: boolean } = {}
 ): Effect.Effect<Registry, ModelsDirectoryFailure | ModelReadFailure | ModelParseFailure> {
-  return Effect.map(tryLoadModelEntries(dir), (entries) => Registry.fromEntries(entries, options));
+  return Effect.map(loadSafe(dir), (entries) => Registry.fromEntries(entries, options));
 }
 
 export type FlagshipFamily = {
@@ -249,12 +249,12 @@ export type FlagshipFamily = {
   score: number;
 };
 
-export function flagshipFamilyRanking(entries: ModelEntry[]): FlagshipFamily[] {
+export function flagshipRanking(entries: ModelEntry[]): FlagshipFamily[] {
   const best = new Map<string, FlagshipFamily>();
   for (const entry of entries) {
     const index = entry.info.scores?.artificialAnalysis?.index;
     if (typeof index !== "number" || !Number.isFinite(index)) continue;
-    const family = entry.info.family || inferFamilyFromFolder(entry.owner);
+    const family = entry.info.family || familyOf(entry.owner);
     if (!family) continue;
     const current = best.get(family);
     if (!current || index > current.score) best.set(family, { family, folder: entry.owner || "", score: index });
@@ -295,7 +295,7 @@ export class Registry {
   }
 
   static load(dir: string, options: { familyFromFolder?: boolean } = {}): Registry {
-    return new Registry(loadModelEntries(dir), options);
+    return new Registry(loadEntries(dir), options);
   }
 
   static fromEntries(entries: ModelEntry[], options: { familyFromFolder?: boolean } = {}): Registry {
@@ -318,7 +318,7 @@ export class Registry {
     return this.providers(model).length > 0;
   }
 
-  isSupportedByProvider(model: string, provider: string): boolean {
+  supportsProvider(model: string, provider: string): boolean {
     return this.providers(model).includes(provider);
   }
 
@@ -397,7 +397,7 @@ export class Registry {
     return this.catalog.families();
   }
 
-  formatModelsForOpenAI(): Array<Record<string, unknown>> {
+  openAiModels(): Array<Record<string, unknown>> {
     return this.serializer.format();
   }
 

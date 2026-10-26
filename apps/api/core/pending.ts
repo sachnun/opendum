@@ -21,13 +21,13 @@ export function trackPending(task: Promise<unknown>): void {
   trackWork(Effect.promise(() => task.then(() => undefined, () => undefined)));
 }
 
-export function pendingTaskCount(): number {
+export function pendingCount(): number {
   const set = registry;
   if (!set) return 0;
   return Effect.runSync(FiberSet.size(set));
 }
 
-export async function settlePendingTasks(timeoutMs: number): Promise<boolean> {
+export async function settleTasks(timeoutMs: number): Promise<boolean> {
   const set = registry;
   const scope = registryScope;
   if (!set || !scope) return true;

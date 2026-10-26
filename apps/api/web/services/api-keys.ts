@@ -1,34 +1,34 @@
 import { Effect } from "effect";
 import { and, asc, desc, eq, inArray, lte } from "drizzle-orm";
 
-import { db, providerAccount, proxyApiKey, proxyApiKeyRateLimit } from "@opendum/database";
+import { db, providerAccount, proxyApiKey, keyRateLimit } from "@opendum/database";
 import { fromPromise } from "#web/lib/task.js";
 import { internal, notFound } from "#web/errors.js";
-import { decrypt, encrypt, generateApiKey, getKeyPreview, hashString } from "#web/lib/encryption.js";
-import { getAccountModelAvailability, invalidateApiKeyValidationCache } from "#web/lib/proxy/auth.js";
-import { getAuthlessProviderAccounts, isSyntheticAuthlessAccount } from "#web/lib/proxy/authless-providers.js";
-import { listCustomProviderModels } from "#web/lib/proxy/custom-providers.js";
-import { getAllFamilies, getAllModels, getModelFamily, getProvidersForModel, isModelSupported, resolveModelAlias } from "#web/lib/proxy/models.js";
-import { roamingUsagePointsByApiKey } from "#web/lib/roaming-points.js";
-import { compareModelEntries } from "@opendum/models/sort";
+import { decrypt, encrypt, mintKey, keyPreview, hashString } from "#web/lib/encryption.js";
+import { modelAvailability, invalidateValidation } from "#web/lib/proxy/auth.js";
+import { authlessAccounts, isSynthetic } from "#web/lib/proxy/authless-providers.js";
+import { customModels } from "#web/lib/proxy/custom-providers.js";
+import { allFamilies, allModels, familyOf, providersFor, supportsModel, aliasOf } from "#web/lib/proxy/models.js";
+import { roamingByKey as roamingPoints } from "#web/lib/roaming-points.js";
+import { compareEntries } from "@opendum/models/sort";
 import { PROVIDER_ACCOUNT_KEYS } from "./account-providers.js";
-import { API_KEY_UPDATE_POINT_COST, debitUserPoints } from "./points.js";
-import { apiKeyAccessModeSchema, type ApiKeyAccessMode, type CreateApiKeyInput, type UpdateApiKeyAccountAccessInput, type UpdateApiKeyExpirationInput, type UpdateApiKeyModelAccessInput, type UpdateApiKeyNameInput, type UpdateApiKeyRateLimitsInput, type UpdateApiKeyRoamingInput } from "@opendum/providers/contract";
+import { UPDATE_COST, debitUserPoints } from "./points.js";
+import { accessModeSchema, type AccessMode, type CreateInput, type AccountAccessInput, type ExpirationInput, type ModelAccessInput, type NameInput, type RateLimitsInput, type RoamingInput } from "@opendum/providers/contract";
 
-const API_KEY_MIN_LENGTH = 3;
-const API_KEY_MAX_LENGTH = 100;
-const API_KEY_ALLOWED_PATTERN = /^[A-Za-z0-9_-]+$/;
+const MIN_LENGTH = 3;
+const MAX_LENGTH = 100;
+const ALLOWED_PATTERN = /^[A-Za-z0-9_-]+$/;
 
-interface ApiKeyReadOptions {
+interface ReadOptions {
   expireActiveKeys?: boolean;
 }
 
 function modelList(models: string[]): string[] {
-  return Array.from(new Set(models.map((model) => resolveModelAlias(model.trim())).filter((model) => model.length > 0))).sort(compareKnownModelIds);
+  return Array.from(new Set(models.map((model) => aliasOf(model.trim())).filter((model) => model.length > 0))).sort(compareModels);
 }
 
-const ownedCustomModelIds = Effect.fn("apiKeys.ownedCustomModelIds")(function* (userId: string) {
-  const providers = yield* listCustomProviderModels(userId, { includeInactiveAccounts: true });
+const customModelIds = Effect.fn("apiKeys.customModelIds")(function* (userId: string) {
+  const providers = yield* customModels(userId, { includeInactiveAccounts: true });
   const ids = new Set<string>();
   for (const provider of providers) {
     for (const modelId of provider.standaloneModels) ids.add(`${provider.slug}/${modelId}`);
@@ -36,31 +36,31 @@ const ownedCustomModelIds = Effect.fn("apiKeys.ownedCustomModelIds")(function* (
   return ids;
 });
 
-function compareKnownModelIds(left: string, right: string): number {
-  return compareModelEntries({ id: left, family: getModelFamily(left) }, { id: right, family: getModelFamily(right) });
+function compareModels(left: string, right: string): number {
+  return compareEntries({ id: left, family: familyOf(left) }, { id: right, family: familyOf(right) });
 }
 
-function buildModelAccessModels(models: string[], activeProviders: ReadonlySet<string>): string[] {
+function buildModels(models: string[], activeProviders: ReadonlySet<string>): string[] {
   const result: string[] = [];
   for (const model of models) {
     result.push(model);
-    for (const provider of [...getProvidersForModel(model)].sort()) {
+    for (const provider of [...providersFor(model)].sort()) {
       if (activeProviders.has(provider)) result.push(`${provider}/${model}`);
     }
   }
   return result;
 }
 
-function isKnownModelAccessId(model: string): boolean {
-  if (isModelSupported(model)) return true;
+function knownModel(model: string): boolean {
+  if (supportsModel(model)) return true;
   const slash = model.indexOf("/");
   if (slash <= 0) return false;
   const provider = model.slice(0, slash);
   const base = model.slice(slash + 1);
-  return isModelSupported(base) && getProvidersForModel(base).includes(provider);
+  return supportsModel(base) && providersFor(base).includes(provider);
 }
 
-const getOwnedApiKey = Effect.fn("apiKeys.getOwnedApiKey")(function* (userId: string, id: string) {
+const getOwned = Effect.fn("apiKeys.getOwned")(function* (userId: string, id: string) {
   const rows = yield* fromPromise(
     () =>
       db
@@ -74,27 +74,27 @@ const getOwnedApiKey = Effect.fn("apiKeys.getOwnedApiKey")(function* (userId: st
 });
 
 type OwnedApiKey = NonNullable<
-  import("effect").Effect.Success<ReturnType<typeof getOwnedApiKey>>
+  import("effect").Effect.Success<ReturnType<typeof getOwned>>
 >;
 
-const withOwnedApiKey = Effect.fn("apiKeys.withOwnedApiKey")(function* <T>(
+const withOwned = Effect.fn("apiKeys.withOwned")(function* <T>(
   userId: string,
   id: string,
   failureMessage: string,
   action: (apiKey: OwnedApiKey) => import("effect").Effect.Effect<T, import("#web/errors.js").ServiceFailure>
 ) {
-  const apiKey = yield* getOwnedApiKey(userId, id);
+  const apiKey = yield* getOwned(userId, id);
   if (!apiKey) return yield* notFound("API key not found");
   return yield* action(apiKey);
 });
 
-export const getApiKeyOptions = Effect.fn("apiKeys.getOptions")(function* (userId: string) {
-  return yield* buildApiKeyOptions(userId).pipe(
-    Effect.mapError((failure) => internal("Failed to load API key options", failure.cause ?? failure))
+export const getOptions = Effect.fn("apiKeys.getOptions")(function* (userId: string) {
+  return yield* buildOptions(userId).pipe(
+    Effect.mapError((failure: { cause?: unknown }) => internal("Failed to load API key options", failure.cause ?? failure))
   );
 });
 
-const buildApiKeyOptions = Effect.fnUntraced(function* (userId: string) {
+const buildOptions = Effect.fnUntraced(function* (userId: string) {
   const apiKeys = yield* fromPromise(
     () => db.select({ id: proxyApiKey.id }).from(proxyApiKey).where(eq(proxyApiKey.userId, userId)),
     "Failed to load API key options"
@@ -104,9 +104,9 @@ const buildApiKeyOptions = Effect.fnUntraced(function* (userId: string) {
     ? yield* fromPromise(
         () =>
           db
-            .select({ apiKeyId: proxyApiKeyRateLimit.apiKeyId, target: proxyApiKeyRateLimit.target, targetType: proxyApiKeyRateLimit.targetType, perMinute: proxyApiKeyRateLimit.perMinute, perHour: proxyApiKeyRateLimit.perHour, perDay: proxyApiKeyRateLimit.perDay })
-            .from(proxyApiKeyRateLimit)
-            .where(inArray(proxyApiKeyRateLimit.apiKeyId, apiKeyIds)),
+            .select({ apiKeyId: keyRateLimit.apiKeyId, target: keyRateLimit.target, targetType: keyRateLimit.targetType, perMinute: keyRateLimit.perMinute, perHour: keyRateLimit.perHour, perDay: keyRateLimit.perDay })
+            .from(keyRateLimit)
+            .where(inArray(keyRateLimit.apiKeyId, apiKeyIds)),
         "Failed to load API key options"
       )
     : [];
@@ -121,14 +121,14 @@ const buildApiKeyOptions = Effect.fnUntraced(function* (userId: string) {
   );
 
   {
-    const customModelIds = yield* ownedCustomModelIds(userId);
-    const availableModels = [...getAllModels(), ...customModelIds].sort(compareKnownModelIds);
-    const availability = yield* getAccountModelAvailability(userId);
-    const modelAccessModels = buildModelAccessModels(availableModels, availability.activeProviders);
-    const availableFamilies = getAllFamilies();
-    const authlessProviderAccounts = getAuthlessProviderAccounts().map(({ disabledModels: _disabledModels, ...account }) => account);
+    const customIds = yield* customModelIds(userId);
+    const availableModels = [...allModels(), ...customIds].sort(compareModels);
+    const availability = yield* modelAvailability(userId);
+    const modelAccessModels = buildModels(availableModels, availability.activeProviders);
+    const availableFamilies = allFamilies();
+    const authlessProviderAccounts = authlessAccounts().map(({ disabledModels: _disabledModels, ...account }) => account);
 
-    const rateLimitsByKeyId = rateLimitRows.reduce<Record<string, Array<{ target: string; targetType: "model" | "family"; perMinute: number | null; perHour: number | null; perDay: number | null }>>>((acc, row) => {
+    const limitsByKey = rateLimitRows.reduce<Record<string, Array<{ target: string; targetType: "model" | "family"; perMinute: number | null; perHour: number | null; perDay: number | null }>>>((acc, row) => {
       acc[row.apiKeyId] = [
         ...(acc[row.apiKeyId] ?? []),
         { target: row.target, targetType: row.targetType === "family" ? "family" : "model", perMinute: row.perMinute, perHour: row.perHour, perDay: row.perDay },
@@ -144,23 +144,23 @@ const buildApiKeyOptions = Effect.fnUntraced(function* (userId: string) {
         ...authlessProviderAccounts,
         ...providerAccounts,
       ],
-      rateLimitsByKeyId,
+      limitsByKey,
     };
   }
 });
 
 export const listApiKeys = Effect.fn("apiKeys.list")(function* (
   userId: string,
-  options: ApiKeyReadOptions = {}
+  options: ReadOptions = {}
 ) {
-  return yield* listApiKeysInner(userId, options).pipe(
+  return yield* listInner(userId, options).pipe(
     Effect.mapError((failure) => internal("Failed to list API keys", failure.cause ?? failure))
   );
 });
 
-const listApiKeysInner = Effect.fnUntraced(function* (
+const listInner = Effect.fnUntraced(function* (
   userId: string,
-  options: ApiKeyReadOptions = {}
+  options: ReadOptions = {}
 ) {
   if (options.expireActiveKeys !== false) {
     yield* fromPromise(
@@ -197,38 +197,38 @@ const listApiKeysInner = Effect.fnUntraced(function* (
       "Failed to list API keys"
     );
     const apiKeyIds = apiKeys.map((apiKey) => apiKey.id);
-    const roamingPointsByKeyId = yield* roamingUsagePointsByApiKey(userId, apiKeyIds);
+    const roaming = yield* roamingPoints(userId, apiKeyIds);
 
     return apiKeys.map(({ encryptedKey, ...apiKey }) => ({
       ...apiKey,
-      keyPreview: encryptedKey ? getKeyPreview(decrypt(encryptedKey)) : apiKey.keyPreview,
-      roamingPointsUsed: roamingPointsByKeyId.get(apiKey.id) ?? 0,
+      keyPreview: encryptedKey ? keyPreview(decrypt(encryptedKey)) : apiKey.keyPreview,
+      roamingPointsUsed: roaming.get(apiKey.id) ?? 0,
     }));
   }
 });
 
 export const createApiKey = Effect.fn("apiKeys.create")(function* (
   userId: string,
-  input: CreateApiKeyInput
+  input: CreateInput
 ) {
-  return yield* createApiKeyInner(userId, input).pipe(
+  return yield* createInner(userId, input).pipe(
     Effect.catch((failure: { message: string }) =>
       Effect.succeed({ success: false as const, error: failure.message })
     )
   );
 });
 
-const createApiKeyInner = Effect.fnUntraced(function* (
+const createInner = Effect.fnUntraced(function* (
   userId: string,
-  input: CreateApiKeyInput
+  input: CreateInput
 ) {
-  const key = generateApiKey();
+  const key = mintKey();
   const name = input?.name?.trim() || null;
   const rows = yield* fromPromise(
     () =>
       db
         .insert(proxyApiKey)
-        .values({ userId, keyHash: hashString(key), keyPreview: getKeyPreview(key), encryptedKey: encrypt(key), name, expiresAt: input?.expiresAt ?? null })
+        .values({ userId, keyHash: hashString(key), keyPreview: keyPreview(key), encryptedKey: encrypt(key), name, expiresAt: input?.expiresAt ?? null })
         .returning(),
     "Failed to create API key"
   );
@@ -240,7 +240,7 @@ const createApiKeyInner = Effect.fnUntraced(function* (
 const failWith = (message: string) => Effect.succeed({ success: false as const, error: message });
 
 export const toggleApiKey = Effect.fn("apiKeys.toggle")(function* (userId: string, id: string) {
-  return yield* withOwnedApiKey(userId, id, "Failed to toggle API key", (apiKey) =>
+  return yield* withOwned(userId, id, "Failed to toggle API key", (apiKey) =>
     Effect.gen(function* () {
       const isExpired = apiKey.expiresAt != null && apiKey.expiresAt <= new Date();
       const isActive = !(apiKey.isActive && !isExpired);
@@ -249,27 +249,27 @@ export const toggleApiKey = Effect.fn("apiKeys.toggle")(function* (userId: strin
         () => db.update(proxyApiKey).set({ isActive, expiresAt }).where(eq(proxyApiKey.id, id)),
         "Failed to toggle API key"
       );
-      yield* invalidateApiKeyValidationCache(apiKey.keyHash, apiKey.id);
+      yield* invalidateValidation(apiKey.keyHash, apiKey.id);
       return { success: true as const, data: { id, isActive, expiresAt } };
     })
   ).pipe(Effect.catch(() => failWith("Failed to toggle API key")));
 });
 
 export const deleteApiKey = Effect.fn("apiKeys.delete")(function* (userId: string, id: string) {
-  return yield* withOwnedApiKey(userId, id, "Failed to delete API key", (apiKey) =>
+  return yield* withOwned(userId, id, "Failed to delete API key", (apiKey) =>
     Effect.gen(function* () {
       yield* fromPromise(
         () => db.delete(proxyApiKey).where(eq(proxyApiKey.id, id)),
         "Failed to delete API key"
       );
-      yield* invalidateApiKeyValidationCache(apiKey.keyHash, apiKey.id);
+      yield* invalidateValidation(apiKey.keyHash, apiKey.id);
       return { success: true as const, data: undefined };
     })
   ).pipe(Effect.catch(() => failWith("Failed to delete API key")));
 });
 
 export const revealApiKey = Effect.fn("apiKeys.reveal")(function* (userId: string, id: string) {
-  return yield* withOwnedApiKey<string>(userId, id, "Failed to reveal API key", (apiKey) =>
+  return yield* withOwned<string>(userId, id, "Failed to reveal API key", (apiKey) =>
     apiKey.encryptedKey
       ? Effect.succeed(decrypt(apiKey.encryptedKey))
       : Effect.fail(notFound("This API key was created before the reveal feature. Please generate a new key."))
@@ -279,24 +279,24 @@ export const revealApiKey = Effect.fn("apiKeys.reveal")(function* (userId: strin
   );
 });
 
-export const updateApiKeyName = Effect.fn("apiKeys.updateName")(function* (
+export const updateName = Effect.fn("apiKeys.updateName")(function* (
   userId: string,
-  input: UpdateApiKeyNameInput
+  input: NameInput
 ) {
-  return yield* withOwnedApiKey(userId, input.id, "Failed to update API key", (apiKey) =>
+  return yield* withOwned(userId, input.id, "Failed to update API key", (apiKey) =>
     Effect.gen(function* () {
       const normalizedKey = input.key === undefined ? undefined : input.key.trim();
       const patch: Partial<typeof proxyApiKey.$inferInsert> = { name: input.name.trim() || null };
-      let shouldChargeApiKeyUpdate = false;
+      let shouldCharge = false;
 
       if (normalizedKey !== undefined) {
-        if (normalizedKey.length < API_KEY_MIN_LENGTH) {
-          return yield* failWith(`API key must be at least ${API_KEY_MIN_LENGTH} characters`);
+        if (normalizedKey.length < MIN_LENGTH) {
+          return yield* failWith(`API key must be at least ${MIN_LENGTH} characters`);
         }
-        if (normalizedKey.length > API_KEY_MAX_LENGTH) {
-          return yield* failWith(`API key must be at most ${API_KEY_MAX_LENGTH} characters`);
+        if (normalizedKey.length > MAX_LENGTH) {
+          return yield* failWith(`API key must be at most ${MAX_LENGTH} characters`);
         }
-        if (!API_KEY_ALLOWED_PATTERN.test(normalizedKey)) {
+        if (!ALLOWED_PATTERN.test(normalizedKey)) {
           return yield* failWith("API key can only contain letters, numbers, hyphen, and underscore");
         }
         const keyHash = hashString(normalizedKey);
@@ -308,17 +308,17 @@ export const updateApiKeyName = Effect.fn("apiKeys.updateName")(function* (
           return yield* failWith("Unable to update API key");
         }
         patch.keyHash = keyHash;
-        patch.keyPreview = getKeyPreview(normalizedKey);
+        patch.keyPreview = keyPreview(normalizedKey);
         patch.encryptedKey = encrypt(normalizedKey);
-        shouldChargeApiKeyUpdate = keyHash !== apiKey.keyHash;
+        shouldCharge = keyHash !== apiKey.keyHash;
       }
 
       const updated = yield* fromPromise(
         () =>
           db.transaction(async (tx) => {
-            if (shouldChargeApiKeyUpdate) {
+            if (shouldCharge) {
               const debit = await Effect.runPromise(
-                debitUserPoints(tx, userId, API_KEY_UPDATE_POINT_COST, "api_key_update")
+                debitUserPoints(tx, userId, UPDATE_COST, "api_key_update")
               );
               if (!debit.success) return { insufficientPoints: true, balance: debit.balance } as const;
             }
@@ -336,20 +336,20 @@ export const updateApiKeyName = Effect.fn("apiKeys.updateName")(function* (
 
       if (updated && "insufficientPoints" in updated) return yield* failWith("Not enough points.");
       if (!updated) return yield* failWith("Failed to update API key");
-      if (normalizedKey) yield* invalidateApiKeyValidationCache(apiKey.keyHash, apiKey.id);
+      if (normalizedKey) yield* invalidateValidation(apiKey.keyHash, apiKey.id);
       return { success: true as const, data: { name: updated.row.name, keyPreview: updated.row.keyPreview } };
     })
   ).pipe(Effect.catch(() => failWith("Failed to update API key")));
 });
 
-export const updateApiKeyExpiration = Effect.fn("apiKeys.updateExpiration")(function* (
+export const updateExpiration = Effect.fn("apiKeys.updateExpiration")(function* (
   userId: string,
-  input: UpdateApiKeyExpirationInput
+  input: ExpirationInput
 ) {
   if (input.expiresAt && input.expiresAt <= new Date()) {
     return failWith("Expiration date must be in the future");
   }
-  return yield* withOwnedApiKey(userId, input.id, "Failed to update API key expiration", (apiKey) =>
+  return yield* withOwned(userId, input.id, "Failed to update API key expiration", (apiKey) =>
     Effect.gen(function* () {
       const updated = yield* fromPromise(
         () =>
@@ -361,17 +361,17 @@ export const updateApiKeyExpiration = Effect.fn("apiKeys.updateExpiration")(func
         "Failed to update API key expiration"
       );
       if (!updated[0]) return yield* failWith("Failed to update API key expiration");
-      yield* invalidateApiKeyValidationCache(apiKey.keyHash, apiKey.id);
+      yield* invalidateValidation(apiKey.keyHash, apiKey.id);
       return { success: true as const, data: { expiresAt: updated[0].expiresAt } };
     })
   ).pipe(Effect.catch(() => failWith("Failed to update API key expiration")));
 });
 
-export const updateApiKeyRoaming = Effect.fn("apiKeys.updateRoaming")(function* (
+export const updateRoaming = Effect.fn("apiKeys.updateRoaming")(function* (
   userId: string,
-  input: UpdateApiKeyRoamingInput
+  input: RoamingInput
 ) {
-  return yield* withOwnedApiKey(userId, input.id, "Failed to update API key roaming", (apiKey) =>
+  return yield* withOwned(userId, input.id, "Failed to update API key roaming", (apiKey) =>
     Effect.gen(function* () {
       const updated = yield* fromPromise(
         () =>
@@ -383,25 +383,25 @@ export const updateApiKeyRoaming = Effect.fn("apiKeys.updateRoaming")(function* 
         "Failed to update API key roaming"
       );
       if (!updated[0]) return yield* failWith("Failed to update API key roaming");
-      yield* invalidateApiKeyValidationCache(apiKey.keyHash, apiKey.id);
+      yield* invalidateValidation(apiKey.keyHash, apiKey.id);
       return { success: true as const, data: { roamingEnabled: updated[0].roamingEnabled } };
     })
   ).pipe(Effect.catch(() => failWith("Failed to update API key roaming")));
 });
 
-export const updateApiKeyModelAccess = Effect.fn("apiKeys.updateModelAccess")(function* (
+export const updateModels = Effect.fn("apiKeys.updateModelAccess")(function* (
   userId: string,
-  input: UpdateApiKeyModelAccessInput
+  input: ModelAccessInput
 ) {
-  return yield* withOwnedApiKey(userId, input.id, "Failed to update API key model access", (apiKey) =>
+  return yield* withOwned(userId, input.id, "Failed to update API key model access", (apiKey) =>
     Effect.gen(function* () {
       const normalizedModels = input.mode === "all" ? [] : modelList(input.models);
       if (input.mode !== "all" && normalizedModels.length === 0) {
         return yield* failWith("Select at least one model");
       }
-      const customModelIds = yield* ownedCustomModelIds(userId);
+      const customIds = yield* customModelIds(userId);
       const invalidModel = normalizedModels.find(
-        (model) => !isKnownModelAccessId(model) && !customModelIds.has(model)
+        (model) => !knownModel(model) && !customIds.has(model)
       );
       if (invalidModel) return yield* failWith(`Unknown model: ${invalidModel}`);
       const updated = yield* fromPromise(
@@ -414,12 +414,12 @@ export const updateApiKeyModelAccess = Effect.fn("apiKeys.updateModelAccess")(fu
         "Failed to update API key model access"
       );
       if (!updated[0]) return yield* failWith("Failed to update API key model access");
-      yield* invalidateApiKeyValidationCache(apiKey.keyHash, apiKey.id);
+      yield* invalidateValidation(apiKey.keyHash, apiKey.id);
       return {
         success: true as const,
         data: {
-          mode: apiKeyAccessModeSchema.safeParse(updated[0].modelAccessMode).success
-            ? (updated[0].modelAccessMode as ApiKeyAccessMode)
+          mode: accessModeSchema.safeParse(updated[0].modelAccessMode).success
+            ? (updated[0].modelAccessMode as AccessMode)
             : "all",
           models: updated[0].modelAccessList,
         },
@@ -428,11 +428,11 @@ export const updateApiKeyModelAccess = Effect.fn("apiKeys.updateModelAccess")(fu
   ).pipe(Effect.catch(() => failWith("Failed to update API key model access")));
 });
 
-export const updateApiKeyAccountAccess = Effect.fn("apiKeys.updateAccountAccess")(function* (
+export const updateAccess = Effect.fn("apiKeys.updateAccountAccess")(function* (
   userId: string,
-  input: UpdateApiKeyAccountAccessInput
+  input: AccountAccessInput
 ) {
-  return yield* withOwnedApiKey(userId, input.id, "Failed to update API key account access", (apiKey) =>
+  return yield* withOwned(userId, input.id, "Failed to update API key account access", (apiKey) =>
     Effect.gen(function* () {
       const normalizedAccounts =
         input.mode === "all"
@@ -454,7 +454,7 @@ export const updateApiKeyAccountAccess = Effect.fn("apiKeys.updateAccountAccess"
         );
         const validIds = new Set([
           ...rows.map((row) => row.id),
-          ...normalizedAccounts.filter(isSyntheticAuthlessAccount),
+          ...normalizedAccounts.filter(isSynthetic),
         ]);
         const invalidId = normalizedAccounts.find((id) => !validIds.has(id));
         if (invalidId) return yield* failWith(`Unknown account: ${invalidId}`);
@@ -472,12 +472,12 @@ export const updateApiKeyAccountAccess = Effect.fn("apiKeys.updateAccountAccess"
         "Failed to update API key account access"
       );
       if (!updated[0]) return yield* failWith("Failed to update API key account access");
-      yield* invalidateApiKeyValidationCache(apiKey.keyHash, apiKey.id);
+      yield* invalidateValidation(apiKey.keyHash, apiKey.id);
       return {
         success: true as const,
         data: {
-          mode: apiKeyAccessModeSchema.safeParse(updated[0].accountAccessMode).success
-            ? (updated[0].accountAccessMode as ApiKeyAccessMode)
+          mode: accessModeSchema.safeParse(updated[0].accountAccessMode).success
+            ? (updated[0].accountAccessMode as AccessMode)
             : "all",
           accounts: updated[0].accountAccessList,
         },
@@ -486,14 +486,14 @@ export const updateApiKeyAccountAccess = Effect.fn("apiKeys.updateAccountAccess"
   ).pipe(Effect.catch(() => failWith("Failed to update API key account access")));
 });
 
-export const updateApiKeyRateLimits = Effect.fn("apiKeys.updateRateLimits")(function* (
+export const updateRateLimits = Effect.fn("apiKeys.updateRateLimits")(function* (
   userId: string,
-  input: UpdateApiKeyRateLimitsInput
+  input: RateLimitsInput
 ) {
-  return yield* withOwnedApiKey(userId, input.id, "Failed to update API key rate limits", (apiKey) =>
+  return yield* withOwned(userId, input.id, "Failed to update API key rate limits", (apiKey) =>
     Effect.gen(function* () {
-      const validFamilies = new Set(getAllFamilies());
-      const customModelIds = yield* ownedCustomModelIds(userId);
+      const validFamilies = new Set(allFamilies());
+      const customIds = yield* customModelIds(userId);
       const seenTargets = new Set<string>();
       for (const rule of input.rules) {
         const key = `${rule.targetType}:${rule.target}`;
@@ -501,8 +501,8 @@ export const updateApiKeyRateLimits = Effect.fn("apiKeys.updateRateLimits")(func
         seenTargets.add(key);
         if (
           rule.targetType === "model" &&
-          !isModelSupported(resolveModelAlias(rule.target.trim())) &&
-          !customModelIds.has(rule.target.trim())
+          !supportsModel(aliasOf(rule.target.trim())) &&
+          !customIds.has(rule.target.trim())
         ) {
           return yield* failWith(`Unknown model: ${rule.target}`);
         }
@@ -522,16 +522,16 @@ export const updateApiKeyRateLimits = Effect.fn("apiKeys.updateRateLimits")(func
       }
       const normalizedRules = input.rules.map((rule) => ({
         ...rule,
-        target: rule.targetType === "model" ? resolveModelAlias(rule.target.trim()) : rule.target,
+        target: rule.targetType === "model" ? aliasOf(rule.target.trim()) : rule.target,
       }));
       yield* fromPromise(
-        () => db.delete(proxyApiKeyRateLimit).where(eq(proxyApiKeyRateLimit.apiKeyId, apiKey.id)),
+        () => db.delete(keyRateLimit).where(eq(keyRateLimit.apiKeyId, apiKey.id)),
         "Failed to update API key rate limits"
       );
       if (normalizedRules.length > 0) {
         yield* fromPromise(
           () =>
-            db.insert(proxyApiKeyRateLimit).values(
+            db.insert(keyRateLimit).values(
               normalizedRules.map((rule) => ({
                 apiKeyId: apiKey.id,
                 target: rule.target,
@@ -544,7 +544,7 @@ export const updateApiKeyRateLimits = Effect.fn("apiKeys.updateRateLimits")(func
           "Failed to update API key rate limits"
         );
       }
-      yield* invalidateApiKeyValidationCache(apiKey.keyHash, apiKey.id);
+      yield* invalidateValidation(apiKey.keyHash, apiKey.id);
       return { success: true as const, data: { rules: normalizedRules } };
     })
   ).pipe(Effect.catch(() => failWith("Failed to update API key rate limits")));

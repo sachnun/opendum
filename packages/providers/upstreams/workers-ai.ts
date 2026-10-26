@@ -1,8 +1,8 @@
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
-import { stringValue } from "../core/helpers.js";
-import { convertImageURLsToBase64 } from "../core/images.js";
-import { postJSON, transportFailure, type UpstreamTransport } from "../core/http.js";
+import { Value } from "../core/helpers.js";
+import { ChatImageInliner } from "../core/images.js";
+import { JSONPoster, RequestFailure, type UpstreamTransport } from "../core/http.js";
 import type { Provider, ProviderFailure, ProviderRequest } from "../types.js";
 
 export const SUPPORTED_WORKERS_AI = new Set([
@@ -32,14 +32,14 @@ export class WorkersAiProvider implements Provider {
     const accountId = request.account.accountId;
     if (!accountId || !accountId.trim()) {
       return Effect.fail(
-        transportFailure("workers_ai", new Error("missing Cloudflare Account ID on Cloudflare account"))
+        RequestFailure.transport("workers_ai", new Error("missing Cloudflare Account ID on Cloudflare account"))
       );
     }
     const payload: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(request.body)) {
       if (SUPPORTED_WORKERS_AI.has(key) && value !== undefined && value !== null) payload[key] = value;
     }
-    const model = stringValue(request.body.model);
+    const model = Value.string(request.body.model);
     payload.model = this.registry.upstream(model, "workers_ai");
     payload.stream = request.stream;
     const url = `https://api.cloudflare.com/client/v4/accounts/${accountId.trim()}/ai/v1/chat/completions`;
@@ -47,19 +47,19 @@ export class WorkersAiProvider implements Provider {
     return Effect.gen(function* () {
       if (Array.isArray(payload.messages)) {
         payload.messages = yield* Effect.tryPromise({
-          try: () => convertImageURLsToBase64(direct, payload.messages as unknown[]),
-          catch: (cause) => transportFailure("workers_ai", cause, url),
+          try: () => new ChatImageInliner(direct).run(payload.messages as unknown[]),
+          catch: (cause) => RequestFailure.transport("workers_ai", cause, url),
         });
       }
-      return yield* postJSON(
-        "workers_ai",
-        direct,
+      return yield* JSONPoster.withAuth({
+        provider: "workers_ai",
+        fetchFn: direct,
         url,
-        request.credentials,
+        bearer: request.credentials,
         payload,
-        request.stream,
-        request.onUpstreamResponseStart
-      );
+        stream: request.stream,
+        onStart: request.onResponseStart,
+      });
     });
   }
 }

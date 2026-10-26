@@ -8,11 +8,11 @@ import { fetchExternalEffect } from "#web/lib/external.js";
 import { fromPromise } from "#web/lib/task.js";
 import { badRequest, unavailable } from "#web/errors.js";
 import type { OAuthResult } from "../types.js";
-import { formatProviderHttpError } from "../provider-http-errors.js";
+import { httpError } from "../provider-http-errors.js";
 import {
   BROWSER_REDIRECT_URI,
   CLIENT_ID,
-  CODEX_CHAT_USER_AGENT,
+  USER_AGENT,
   DEVICE_CODE_ENDPOINT,
   DEVICE_REDIRECT_URI,
   DEVICE_TOKEN_ENDPOINT,
@@ -28,35 +28,35 @@ interface CodexTokenResponse {
   id_token?: string;
 }
 
-interface CodexDeviceCodeResponse {
+interface DeviceCodeResponse {
   device_auth_id: string;
   user_code: string;
   interval?: string | number;
   expires_in?: number;
 }
 
-interface CodexDeviceTokenResponse {
+interface DeviceTokenResponse {
   authorization_code: string;
   code_verifier: string;
 }
 
-interface ChatGPTSessionAccount {
+interface SessionAccount {
   id?: string;
   planType?: string;
 }
 
-interface ChatGPTSessionUser {
+interface SessionUser {
   email?: string;
 }
 
-interface ChatGPTSessionPayload {
+interface SessionPayload {
   accessToken?: string;
   expires?: string;
-  account?: ChatGPTSessionAccount;
-  user?: ChatGPTSessionUser;
+  account?: SessionAccount;
+  user?: SessionUser;
 }
 
-export function generateCodeVerifier(): string {
+export function codeVerifier(): string {
   const array = new Uint8Array(32);
   crypto.getRandomValues(array);
   return btoa(String.fromCharCode(...array))
@@ -77,7 +77,7 @@ export const generateCodeChallenge = Effect.fn("codex.generateCodeChallenge")(fu
   return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 });
 
-function toNonEmptyString(value: unknown): string | null {
+function nonEmpty(value: unknown): string | null {
   if (typeof value !== "string") {
     return null;
   }
@@ -94,7 +94,7 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return value as Record<string, unknown>;
 }
 
-function extractOrganizationId(claims: Record<string, unknown> | null): string | null {
+function organizationId(claims: Record<string, unknown> | null): string | null {
   if (!claims) {
     return null;
   }
@@ -113,14 +113,14 @@ function extractOrganizationId(claims: Record<string, unknown> | null): string |
   );
 
   if (defaultOrganization) {
-    const defaultOrganizationId = toNonEmptyString(defaultOrganization.id);
+    const defaultOrganizationId = nonEmpty(defaultOrganization.id);
     if (defaultOrganizationId) {
       return defaultOrganizationId;
     }
   }
 
   for (const organization of normalizedOrganizations) {
-    const organizationId = toNonEmptyString(organization.id);
+    const organizationId = nonEmpty(organization.id);
     if (organizationId) {
       return organizationId;
     }
@@ -129,7 +129,7 @@ function extractOrganizationId(claims: Record<string, unknown> | null): string |
   return null;
 }
 
-function parseJwtClaims(token: string): Record<string, unknown> | null {
+function jwtClaims(token: string): Record<string, unknown> | null {
   try {
     const parts = token.split(".");
     if (parts.length < 2) return null;
@@ -144,11 +144,11 @@ function parseJwtClaims(token: string): Record<string, unknown> | null {
   }
 }
 
-function extractEmailFromClaims(decoded: Record<string, unknown>): string | null {
+function claimsEmail(decoded: Record<string, unknown>): string | null {
   const profileClaims = asRecord(decoded["https://api.openai.com/profile"]);
   const emailCandidates = [
-    toNonEmptyString(profileClaims?.email),
-    toNonEmptyString(decoded.email),
+    nonEmpty(profileClaims?.email),
+    nonEmpty(decoded.email),
   ];
 
   for (const candidate of emailCandidates) {
@@ -160,7 +160,7 @@ function extractEmailFromClaims(decoded: Record<string, unknown>): string | null
   return null;
 }
 
-function extractExpiresAtFromClaims(decoded: Record<string, unknown>): Date | null {
+function claimsExpiry(decoded: Record<string, unknown>): Date | null {
   if (typeof decoded.exp !== "number" || !Number.isFinite(decoded.exp) || decoded.exp <= 0) {
     return null;
   }
@@ -169,18 +169,18 @@ function extractExpiresAtFromClaims(decoded: Record<string, unknown>): Date | nu
   return Number.isNaN(expiresAt.getTime()) ? null : expiresAt;
 }
 
-function extractWorkspaceIdFromClaims(decoded: Record<string, unknown>): string | null {
+function claimsWorkspace(decoded: Record<string, unknown>): string | null {
   const authClaims = asRecord(decoded["https://api.openai.com/auth"]);
 
   const workspaceCandidates = [
-    toNonEmptyString(authClaims?.chatgpt_workspace_id),
-    toNonEmptyString(authClaims?.workspace_id),
-    toNonEmptyString(authClaims?.organization_id),
-    extractOrganizationId(authClaims),
-    toNonEmptyString(decoded.chatgpt_workspace_id),
-    toNonEmptyString(decoded.workspace_id),
-    toNonEmptyString(decoded.organization_id),
-    extractOrganizationId(decoded),
+    nonEmpty(authClaims?.chatgpt_workspace_id),
+    nonEmpty(authClaims?.workspace_id),
+    nonEmpty(authClaims?.organization_id),
+    organizationId(authClaims),
+    nonEmpty(decoded.chatgpt_workspace_id),
+    nonEmpty(decoded.workspace_id),
+    nonEmpty(decoded.organization_id),
+    organizationId(decoded),
   ];
 
   for (const candidate of workspaceCandidates) {
@@ -192,11 +192,11 @@ function extractWorkspaceIdFromClaims(decoded: Record<string, unknown>): string 
   return null;
 }
 
-function extractAccountIdFromClaims(decoded: Record<string, unknown>): string | null {
+function claimsAccount(decoded: Record<string, unknown>): string | null {
   const authClaims = asRecord(decoded["https://api.openai.com/auth"]);
   const accountCandidates = [
-    toNonEmptyString(authClaims?.chatgpt_account_id),
-    toNonEmptyString(decoded.chatgpt_account_id),
+    nonEmpty(authClaims?.chatgpt_account_id),
+    nonEmpty(decoded.chatgpt_account_id),
   ];
 
   for (const candidate of accountCandidates) {
@@ -208,11 +208,11 @@ function extractAccountIdFromClaims(decoded: Record<string, unknown>): string | 
   return null;
 }
 
-function extractTierFromClaims(decoded: Record<string, unknown>): string | null {
+function claimsTier(decoded: Record<string, unknown>): string | null {
   const authClaims = asRecord(decoded["https://api.openai.com/auth"]);
   const tierCandidates = [
-    toNonEmptyString(authClaims?.chatgpt_plan_type),
-    toNonEmptyString(decoded.chatgpt_plan_type),
+    nonEmpty(authClaims?.chatgpt_plan_type),
+    nonEmpty(decoded.chatgpt_plan_type),
   ];
 
   for (const candidate of tierCandidates) {
@@ -224,29 +224,29 @@ function extractTierFromClaims(decoded: Record<string, unknown>): string | null 
   return null;
 }
 
-function extractAccountIdFromJwt(token: string): string | null {
-  const decoded = parseJwtClaims(token);
-  return decoded ? extractAccountIdFromClaims(decoded) : null;
+function jwtAccount(token: string): string | null {
+  const decoded = jwtClaims(token);
+  return decoded ? claimsAccount(decoded) : null;
 }
 
-function extractWorkspaceIdFromJwt(token: string): string | null {
-  const decoded = parseJwtClaims(token);
-  return decoded ? extractWorkspaceIdFromClaims(decoded) : null;
+function jwtWorkspace(token: string): string | null {
+  const decoded = jwtClaims(token);
+  return decoded ? claimsWorkspace(decoded) : null;
 }
 
-function extractTierFromJwt(token: string): string | null {
-  const decoded = parseJwtClaims(token);
-  return decoded ? extractTierFromClaims(decoded) : null;
+function jwtTier(token: string): string | null {
+  const decoded = jwtClaims(token);
+  return decoded ? claimsTier(decoded) : null;
 }
 
-function parseChatGPTSessionPayload(sessionJson: string): ChatGPTSessionPayload {
+function parseSession(sessionJson: string): SessionPayload {
   try {
     const parsed = JSON.parse(sessionJson) as unknown;
     const record = asRecord(parsed);
     if (!record) {
       throw new Error("ChatGPT session payload must be a JSON object");
     }
-    return record as ChatGPTSessionPayload;
+    return record as SessionPayload;
   } catch (error) {
     if (error instanceof SyntaxError) {
       throw new Error("Invalid ChatGPT session JSON. Copy the full response from https://chatgpt.com/api/auth/session.", { cause: error });
@@ -255,24 +255,24 @@ function parseChatGPTSessionPayload(sessionJson: string): ChatGPTSessionPayload 
   }
 }
 
-function isTokenExpired(expiresAt: Date): boolean {
+function tokenExpired(expiresAt: Date): boolean {
   const bufferMs = REFRESH_BUFFER_SECONDS * 1000;
   return Date.now() > expiresAt.getTime() - bufferMs;
 }
 
 type CredentialAccount = Pick<ProviderAccount, "id" | "accessToken" | "refreshToken" | "expiresAt" | "accountId">;
 
-function buildOAuthResult(tokens: CodexTokenResponse, refreshToken?: string): OAuthResult {
+function buildResult(tokens: CodexTokenResponse, refreshToken?: string): OAuthResult {
   const accountId =
-    (tokens.id_token ? extractAccountIdFromJwt(tokens.id_token) : null) ||
-    extractAccountIdFromJwt(tokens.access_token);
+    (tokens.id_token ? jwtAccount(tokens.id_token) : null) ||
+    jwtAccount(tokens.access_token);
   const workspaceId =
-    (tokens.id_token ? extractWorkspaceIdFromJwt(tokens.id_token) : null) ||
-    extractWorkspaceIdFromJwt(tokens.access_token) ||
+    (tokens.id_token ? jwtWorkspace(tokens.id_token) : null) ||
+    jwtWorkspace(tokens.access_token) ||
     accountId;
   const tier =
-    (tokens.id_token ? extractTierFromJwt(tokens.id_token) : null) ||
-    extractTierFromJwt(tokens.access_token);
+    (tokens.id_token ? jwtTier(tokens.id_token) : null) ||
+    jwtTier(tokens.access_token);
 
   return {
     accessToken: tokens.access_token,
@@ -285,30 +285,30 @@ function buildOAuthResult(tokens: CodexTokenResponse, refreshToken?: string): OA
   };
 }
 
-export function buildOAuthResultFromChatGPTSession(sessionJson: string): OAuthResult {
-  const session = parseChatGPTSessionPayload(sessionJson);
-  const accessToken = toNonEmptyString(session.accessToken);
+export function sessionResult(sessionJson: string): OAuthResult {
+  const session = parseSession(sessionJson);
+  const accessToken = nonEmpty(session.accessToken);
   if (!accessToken) {
     throw new Error("ChatGPT session JSON is missing accessToken");
   }
 
-  const jwtClaims = parseJwtClaims(accessToken);
-  if (!jwtClaims) {
+  const claims = jwtClaims(accessToken);
+  if (!claims) {
     throw new Error("ChatGPT session accessToken is not a valid JWT. Copy the full response from https://chatgpt.com/api/auth/session.");
   }
   const accountId =
-    (session.account ? toNonEmptyString(session.account.id) : null) ||
-    extractAccountIdFromClaims(jwtClaims);
-  const workspaceId = extractWorkspaceIdFromClaims(jwtClaims) || accountId;
+    (session.account ? nonEmpty(session.account.id) : null) ||
+    claimsAccount(claims);
+  const workspaceId = claimsWorkspace(claims) || accountId;
   const tier =
-    (session.account ? toNonEmptyString(session.account.planType)?.toLowerCase() ?? null : null) ||
-    extractTierFromClaims(jwtClaims);
+    (session.account ? nonEmpty(session.account.planType)?.toLowerCase() ?? null : null) ||
+    claimsTier(claims);
   const email =
-    (session.user ? toNonEmptyString(session.user.email) : null) ||
-    extractEmailFromClaims(jwtClaims) ||
+    (session.user ? nonEmpty(session.user.email) : null) ||
+    claimsEmail(claims) ||
     "";
 
-  const expiresAt = extractExpiresAtFromClaims(jwtClaims);
+  const expiresAt = claimsExpiry(claims);
   if (!expiresAt || expiresAt <= new Date()) {
     throw new Error("ChatGPT session accessToken is expired or missing an expiry. Please copy a fresh session JSON.");
   }
@@ -352,13 +352,13 @@ const exchangeCodexCode = Effect.fn("codex.exchangeCode")(function* (
   if (!response.ok) {
     const error = yield* readText(response);
     return yield* unavailable(
-      formatProviderHttpError("Codex", response, error, {
+      httpError("Codex", response, error, {
         endpointLabel: "token exchange endpoint",
       })
     );
   }
 
-  return buildOAuthResult(yield* readJson<CodexTokenResponse>(response));
+  return buildResult(yield* readJson<CodexTokenResponse>(response));
 });
 
 const refreshCodexToken = Effect.fn("codex.refreshToken")(function* (refreshToken: string) {
@@ -378,22 +378,22 @@ const refreshCodexToken = Effect.fn("codex.refreshToken")(function* (refreshToke
   if (!response.ok) {
     const error = yield* readText(response);
     return yield* unavailable(
-      formatProviderHttpError("Codex", response, error, {
+      httpError("Codex", response, error, {
         endpointLabel: "token refresh endpoint",
       })
     );
   }
 
-  return buildOAuthResult(yield* readJson<CodexTokenResponse>(response), refreshToken);
+  return buildResult(yield* readJson<CodexTokenResponse>(response), refreshToken);
 });
 
-const getValidCodexCredentials = Effect.fn("codex.getValidCredentials")(function* (
+const validCredentials = Effect.fn("codex.getValidCredentials")(function* (
   account: CredentialAccount
 ) {
   let accessToken = decrypt(account.accessToken);
   const refreshTokenValue = account.refreshToken ? decrypt(account.refreshToken) : "";
 
-  const resolvedAccountId = extractAccountIdFromJwt(accessToken);
+  const resolvedAccountId = jwtAccount(accessToken);
   if (resolvedAccountId && resolvedAccountId !== account.accountId) {
     yield* fromPromise(
       () =>
@@ -412,7 +412,7 @@ const getValidCodexCredentials = Effect.fn("codex.getValidCredentials")(function
     );
   }
 
-  if (!isTokenExpired(account.expiresAt)) return accessToken;
+  if (!tokenExpired(account.expiresAt)) return accessToken;
 
   if (!refreshTokenValue.trim()) {
     return yield* badRequest(
@@ -456,16 +456,16 @@ const getValidCodexCredentials = Effect.fn("codex.getValidCredentials")(function
 export const codexProvider = {
   exchangeCode: exchangeCodexCode,
   refreshToken: refreshCodexToken,
-  getValidCredentials: getValidCodexCredentials,
+  getValidCredentials: validCredentials,
 };
 
-export const initiateCodexDeviceCodeFlow = Effect.fn("codex.initiateDeviceCodeFlow")(function* () {
+export const startDeviceFlow = Effect.fn("codex.initiateDeviceCodeFlow")(function* () {
   const response = yield* fetchExternalEffect(DEVICE_CODE_ENDPOINT, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json",
-      "User-Agent": CODEX_CHAT_USER_AGENT,
+      "User-Agent": USER_AGENT,
     },
     body: JSON.stringify({ client_id: CLIENT_ID }),
   });
@@ -473,13 +473,13 @@ export const initiateCodexDeviceCodeFlow = Effect.fn("codex.initiateDeviceCodeFl
   if (!response.ok) {
     const error = yield* readText(response);
     return yield* unavailable(
-      formatProviderHttpError("Codex", response, error, {
+      httpError("Codex", response, error, {
         endpointLabel: "device code endpoint",
       })
     );
   }
 
-  const data = yield* readJson<CodexDeviceCodeResponse>(response);
+  const data = yield* readJson<DeviceCodeResponse>(response);
   return {
     deviceCode: data.device_auth_id,
     userCode: data.user_code,
@@ -490,20 +490,20 @@ export const initiateCodexDeviceCodeFlow = Effect.fn("codex.initiateDeviceCodeFl
   };
 });
 
-export const pollCodexDeviceCodeAuthorization = Effect.fn("codex.pollDeviceCodeAuthorization")(
+export const pollDeviceAuth = Effect.fn("codex.pollDeviceCodeAuthorization")(
   function* (deviceAuthId: string, userCode: string) {
     const response = yield* fetchExternalEffect(DEVICE_TOKEN_ENDPOINT, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
-        "User-Agent": CODEX_CHAT_USER_AGENT,
+        "User-Agent": USER_AGENT,
       },
       body: JSON.stringify({ device_auth_id: deviceAuthId, user_code: userCode }),
     });
 
     if (response.ok) {
-      const data = yield* readJson<CodexDeviceTokenResponse>(response);
+      const data = yield* readJson<DeviceTokenResponse>(response);
       if (!data.authorization_code || !data.code_verifier) {
         return { error: "Codex device auth polling endpoint returned incomplete authorization data" };
       }
@@ -520,7 +520,7 @@ export const pollCodexDeviceCodeAuthorization = Effect.fn("codex.pollDeviceCodeA
 
     const error = yield* readText(response);
     return {
-      error: formatProviderHttpError("Codex", response, error, {
+      error: httpError("Codex", response, error, {
         endpointLabel: "device auth polling endpoint",
       }),
     };

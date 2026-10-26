@@ -1,19 +1,19 @@
 import { buildIndex, sync } from "#models/model-store.ts";
-import { runFetchText } from "#models/sync/http.ts";
+import { fetchText } from "#models/sync/http.ts";
 import { normalizeKey, normalizeName } from "#models/model/similarity.ts";
-import { syncCliVersion } from "./version-sync.ts";
+import { syncCli as syncTargets } from "./version-sync.ts";
 import { join } from "#models/paths.ts";
-import { latestPackageVersion, packageModelsDir, repoRoot, runScript } from "./shared.ts";
+import { packageVersion, dataDir, repoRoot, runScript } from "./shared.ts";
 import type { ModelIndexEntry } from "#models/types.ts";
 
 const PROVIDER_NAME = "perch";
 
 const PERCH_DOCS_URL = "https://www.perchai.app/docs/concepts/models";
-const PERCH_CLI_NPM_PACKAGE = "perchai-cli";
+const CLI_PACKAGE = "perchai-cli";
 
 const REPO_ROOT = repoRoot();
 
-const PERCH_CLI_VERSION_TARGETS = [
+const CLI_TARGETS = [
   {
     label: "perch provider",
     path: join(REPO_ROOT, "packages/providers/upstreams/perch.ts"),
@@ -26,16 +26,16 @@ interface StarterRow {
   command: string;
 }
 
-async function syncCliVersionFromNpm(): Promise<void> {
-  const latestVersion = await latestPackageVersion(PERCH_CLI_NPM_PACKAGE).catch(() => null);
+async function syncCli(): Promise<void> {
+  const latestVersion = await packageVersion(CLI_PACKAGE).catch(() => null);
   if (!latestVersion || !/^\d+\.\d+\.\d+$/.test(latestVersion)) {
     console.warn("[perch] Could not determine the latest CLI version from unpkg, skipping.");
     return;
   }
-  syncCliVersion("perch", PERCH_CLI_VERSION_TARGETS, latestVersion);
+  syncTargets("perch", CLI_TARGETS, latestVersion);
 }
 
-function decodeHtmlEntities(text: string): string {
+function decodeHtml(text: string): string {
   return text
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
@@ -46,13 +46,13 @@ function decodeHtmlEntities(text: string): string {
 }
 
 function stripHtml(text: string): string {
-  return decodeHtmlEntities(text)
+  return decodeHtml(text)
     .replace(/<[^>]+>/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
 
-function extractStarterPool(html: string): StarterRow[] {
+function extractPool(html: string): StarterRow[] {
   for (const tableMatch of html.matchAll(/<table[^>]*>([\s\S]*?)<\/table>/g)) {
     const table = tableMatch[1] ?? "";
     const headerEnd = table.indexOf("</thead>");
@@ -79,12 +79,12 @@ function extractStarterPool(html: string): StarterRow[] {
   throw new Error("Unable to locate the Perch Starter model table in the docs page");
 }
 
-async function fetchStarterPool(): Promise<StarterRow[]> {
-  const html = await runFetchText(PERCH_DOCS_URL, {
+async function fetchPool(): Promise<StarterRow[]> {
+  const html = await fetchText(PERCH_DOCS_URL, {
     label: "Perch models docs",
     headers: { "User-Agent": "Mozilla/5.0 (compatible; opendum-model-sync)" },
   });
-  const rows = extractStarterPool(html);
+  const rows = extractPool(html);
   if (rows.length === 0) {
     throw new Error("Perch Starter model table is empty");
   }
@@ -100,7 +100,7 @@ function compactName(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-function stripTrailingDate(value: string): string {
+function stripDate(value: string): string {
   return value.replace(/[\s_-]+\d{4,8}$/, "").trim();
 }
 
@@ -133,7 +133,7 @@ function buildLookup(modelsDir: string): { byCompact: Lookup; byNormalized: Look
   return { byCompact, byNormalized };
 }
 
-function resolveStarterPool(
+function starterPool(
   modelsDir: string,
   rows: StarterRow[]
 ): { modelMap: Map<string, string>; unresolved: string[] } {
@@ -143,7 +143,7 @@ function resolveStarterPool(
   const unresolved: string[] = [];
 
   for (const row of rows) {
-    const candidates = [row.command, row.name, stripTrailingDate(row.name)];
+    const candidates = [row.command, row.name, stripDate(row.name)];
     let entry: ModelIndexEntry | null = null;
     for (const candidate of candidates) {
       entry =
@@ -171,10 +171,10 @@ function resolveStarterPool(
 }
 
 async function main(): Promise<void> {
-  const modelsDir = packageModelsDir();
+  const modelsDir = dataDir();
 
-  const rows = await fetchStarterPool();
-  const { modelMap, unresolved } = resolveStarterPool(modelsDir, rows);
+  const rows = await fetchPool();
+  const { modelMap, unresolved } = starterPool(modelsDir, rows);
   if (unresolved.length > 0) {
     console.warn(`[perch] Skipped Starter model(s) absent from the registry: ${unresolved.join(", ")}`);
   }
@@ -189,7 +189,7 @@ async function main(): Promise<void> {
     );
   }
 
-  await syncCliVersionFromNpm().catch((error: unknown) => {
+  await syncCli().catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
     console.warn(`[perch] CLI version sync failed (${message})`);
   });

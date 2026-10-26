@@ -58,12 +58,12 @@ function queriesOf(options: QueryOptions = {}): {
 } {
   const calls = { disabledByUser: 0, byAccounts: 0 };
   const queries = {
-    listDisabledModelsByUser: () => {
+    disabledByUser: () => {
       calls.disabledByUser += 1;
       return Effect.succeed(options.disabledByUser ?? []);
     },
-    listActiveAccountTiers: () => Effect.succeed(options.accounts ?? []),
-    listDisabledModelsByAccounts: () => {
+    activeTiers: () => Effect.succeed(options.accounts ?? []),
+    disabledByAccounts: () => {
       calls.byAccounts += 1;
       return Effect.succeed(
         calls.byAccounts === 1 ? (options.byAccounts ?? []) : (options.byShared ?? [])
@@ -74,7 +74,7 @@ function queriesOf(options: QueryOptions = {}): {
   return { queries, calls };
 }
 
-function customModelsOf(
+function customModels(
   aliased: Map<string, Set<string>> = new Map(),
   standalone: Map<string, string[]> = new Map()
 ): CustomModels {
@@ -93,7 +93,7 @@ function serviceOf(options: {
   return new Availability({
     registry,
     redis: options.redis,
-    customModels: options.customModels ?? customModelsOf(),
+    customModels: options.customModels ?? customModels(),
     accessPolicy: new Policy(registry),
     queries: options.queries,
   });
@@ -165,7 +165,7 @@ describe("Availability", () => {
       registry,
       redis,
       queries,
-      customModels: customModelsOf(new Map([["mine", new Set(["canonical-fast"])]]), new Map([["other", ["x"]]])),
+      customModels: customModels(new Map([["mine", new Set(["canonical-fast"])]]), new Map([["other", ["x"]]])),
     });
 
     const availability = await Effect.runPromise(service.availability("u1", true));

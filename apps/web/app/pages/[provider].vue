@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import type { ActionResult, CustomProviderListItem, CustomProviderModelRow, ErrorHistoryResult, ProviderAccountUpdateData, ProviderDetailData, ProviderStats, QuotaGroupDisplay, QuotaProviderKey } from "../../lib/api-types";
+import type { ActionResult, CustomListItem, CustomModelRow, ErrorHistoryResult, AccountUpdateData, ProviderDetailData, ProviderStats, QuotaGroupDisplay, QuotaProviderKey } from "../../lib/api-types";
 import type { AccountsData, UsageData } from "@opendum/providers/contract";
-import { BY_KEY, getProviderFromSlug, QUOTA_PROVIDER_KEYS, type ProviderAccountKey } from "@opendum/providers/provider-accounts";
+import { BY_KEY, providerOf, QUOTA_PROVIDER_KEYS, type ProviderAccountKey } from "@opendum/providers/provider-accounts";
 import { COMMON_HEADER_NAMES } from "../../lib/headers";
-import { requestErrorMessage } from "../../lib/utils";
+import { messageOf } from "../../lib/utils";
 
 definePageMeta({
   middleware: ["provider", "auth"],
@@ -41,9 +41,9 @@ const api = useApi();
 const { isAuditMode } = useAudit();
 const invalidation = useInvalidate();
 const routeProvider = computed(() => String("provider" in route.params ? route.params.provider : ""));
-const selectedProvider = computed<string>(() => getProviderFromSlug(routeProvider.value) ?? routeProvider.value);
+const selectedProvider = computed<string>(() => providerOf(routeProvider.value) ?? routeProvider.value);
 const { data: customProvidersData, refresh: refreshCustomProviders } = useAsyncData(dataKeys.customProviders, () => api.customProviders.list());
-const customProvider = computed<CustomProviderListItem | null>(() => (customProvidersData.value ?? []).find((row) => row.slug === selectedProvider.value) ?? null);
+const customProvider = computed<CustomListItem | null>(() => (customProvidersData.value ?? []).find((row) => row.slug === selectedProvider.value) ?? null);
 const providerMeta = computed<ProviderMeta | null>(() => {
   const builtin = BY_KEY[selectedProvider.value as ProviderAccountKey];
   if (builtin) return { key: builtin.key, slug: builtin.slug, label: builtin.label, showTier: builtin.showTier };
@@ -70,10 +70,10 @@ type QuotaSummaryGroup = Pick<QuotaGroupDisplay, "name" | "displayName"> & {
 };
 
 const QUOTA_PROVIDERS = new Set<string>(QUOTA_PROVIDER_KEYS);
-const ACCOUNT_STATS_BATCH_SIZE = 24;
-const ERROR_HISTORY_BATCH_SIZE = 20;
-const ACCOUNT_STATS_ROOT_MARGIN = "600px 0px";
-const QUOTA_AUTO_LOAD_DELAY_MS = 400;
+const STATS_BATCH_SIZE = 24;
+const HISTORY_BATCH_SIZE = 20;
+const STATS_ROOT_MARGIN = "600px 0px";
+const QUOTA_DELAY_MS = 400;
 const HIGHLIGHT_DURATION_MS = 2500;
 
 const { data, error, pending, refresh } = useAsyncData(
@@ -90,36 +90,36 @@ const accountCardRefs = ref<Array<{ accountId?: string; $el?: Element } | Elemen
 const providerRoot = ref<HTMLElement | null>(null);
 const visibleAccountIds = reactive(new Set<string>());
 const intersectingAccountIds = new Set<string>();
-const accountStatsById = shallowReactive<Record<string, ProviderStats>>({});
-const accountStatsDeltaReadyById = ref<Record<string, boolean>>({});
-const accountStatsFetchedById = ref<Record<string, boolean>>({});
-const errorHistoryByAccountId = ref<Record<string, ErrorHistoryEntry[] | null>>({});
-const errorHistoryErrorByAccountId = ref<Record<string, string | null>>({});
-const errorHistoryFetchedById = ref<Record<string, boolean>>({});
+const statsById = shallowReactive<Record<string, ProviderStats>>({});
+const deltaReady = ref<Record<string, boolean>>({});
+const statsFetched = ref<Record<string, boolean>>({});
+const historyById = ref<Record<string, ErrorHistoryEntry[] | null>>({});
+const historyError = ref<Record<string, string | null>>({});
+const historyFetched = ref<Record<string, boolean>>({});
 let highlightTimer: ReturnType<typeof setTimeout> | null = null;
-let accountStatsQueueTimer: ReturnType<typeof setTimeout> | null = null;
-let errorHistoryQueueTimer: ReturnType<typeof setTimeout> | null = null;
+let statsTimer: ReturnType<typeof setTimeout> | null = null;
+let historyTimer: ReturnType<typeof setTimeout> | null = null;
 let accountsObserver: IntersectionObserver | null = null;
-let providerQuotaRefreshInFlight: Promise<void> | null = null;
-let shouldPromoteNextNewAccount = false;
-const queuedAccountStatsIds = new Set<string>();
-const forceQueuedAccountStatsIds = new Set<string>();
-const loadingAccountStatsIds = new Set<string>();
-const queuedErrorHistoryIds = new Set<string>();
-const loadingErrorHistoryIds = new Set<string>();
+let quotaRefreshing: Promise<void> | null = null;
+let shouldPromoteNew = false;
+const queuedStatsIds = new Set<string>();
+const forceStatsIds = new Set<string>();
+const loadingStatsIds = new Set<string>();
+const queuedHistoryIds = new Set<string>();
+const loadingHistoryIds = new Set<string>();
 const accounts = computed(() => {
   const currentAccounts = detailData.value?.accounts ?? [];
-  return [...currentAccounts].sort(compareDisplayAccounts);
+  return [...currentAccounts].sort(compareAccounts);
 });
 const activeAccountCount = computed(() => accounts.value.filter((account) => account.isActive).length);
 const isLoadingAccounts = computed(() => pending.value || (!detailData.value && !error.value));
 const pinnedProviders = computed(() => new Set(detailData.value?.pinnedProviders ?? []));
 const supportedModels = computed(() => detailData.value?.supportedModels ?? []);
-const supportedModelsByAccountId = computed(() => detailData.value?.supportedModelsByAccountId ?? {});
+const supportedByAccount = computed(() => detailData.value?.supportedByAccount ?? {});
 const freeSupportedModels = computed(() => detailData.value?.freeSupportedModels ?? []);
-const freeSupportedModelIds = computed<Set<string> | null>(() => (detailData.value ? new Set(freeSupportedModels.value) : null));
+const freeModels = computed<Set<string> | null>(() => (detailData.value ? new Set(freeSupportedModels.value) : null));
 const orderedSupportedModels = computed(() => {
-  const freeIds = freeSupportedModelIds.value;
+  const freeIds = freeModels.value;
   if (!freeIds) return supportedModels.value;
 
   const free: string[] = [];
@@ -129,25 +129,25 @@ const orderedSupportedModels = computed(() => {
   }
   return [...free, ...restricted];
 });
-const disabledModelsByAccountId = computed(() => detailData.value?.disabledModelsByAccountId ?? {});
-const modelHealthByAccountId = computed(() => detailData.value?.modelHealthByAccountId ?? {});
+const disabledModels = computed(() => detailData.value?.disabledModelsByAccountId ?? {});
+const healthByAccount = computed(() => detailData.value?.modelHealthByAccountId ?? {});
 const supportsProviderQuota = computed(() => QUOTA_PROVIDERS.has(selectedProvider.value));
-const selectedAccountId = computed(() => decodeAccountHash(route.hash));
+const selectedAccountId = computed(() => hashAccount(route.hash));
 type QuotaAccountState = { provider: string; isActive: boolean };
 
-async function refreshProviderQuotaAfterAccountPoll() {
-  if (!supportsProviderQuota.value || providerQuotaRefreshInFlight) return;
+async function refreshQuota() {
+  if (!supportsProviderQuota.value || quotaRefreshing) return;
 
-  providerQuotaRefreshInFlight = (async () => {
-    await waitForQuotaQueue();
-    const accountsToRefresh = quotaCapableAccounts.value.filter((account) => account.isActive || quotaByAccountId.value[account.id]);
+  quotaRefreshing = (async () => {
+    await waitForQueue();
+    const accountsToRefresh = quotaCapableAccounts.value.filter((account) => account.isActive || quotaById.value[account.id]);
     if (accountsToRefresh.length > 0) await runQuotaQueue(accountsToRefresh, { refreshExisting: true });
   })().catch(() => undefined);
 
   try {
-    await providerQuotaRefreshInFlight;
+    await quotaRefreshing;
   } finally {
-    providerQuotaRefreshInFlight = null;
+    quotaRefreshing = null;
   }
 }
 
@@ -169,7 +169,7 @@ watch(
       accountDisplayOrder.value = Object.fromEntries(sortedAccounts.map((account, index) => [account.id, index]));
       highlightedAccountIds.value = new Set();
       promotedAccountIds.value = new Set();
-      shouldPromoteNextNewAccount = false;
+      shouldPromoteNew = false;
       if (highlightTimer) {
         clearTimeout(highlightTimer);
         highlightTimer = null;
@@ -178,7 +178,7 @@ watch(
     }
 
     highlightedAccountIds.value = new Set(newAccounts.map((account) => account.id));
-    if (shouldPromoteNextNewAccount) {
+    if (shouldPromoteNew) {
       promotedAccountIds.value = new Set([...promotedAccountIds.value, ...newAccounts.map((account) => account.id)]);
     }
 
@@ -191,7 +191,7 @@ watch(
         .map(([accountId, order]) => [accountId, order + orderedNewAccounts.length] as const),
     ]);
 
-    shouldPromoteNextNewAccount = false;
+    shouldPromoteNew = false;
     if (highlightTimer) clearTimeout(highlightTimer);
     highlightTimer = setTimeout(() => {
       highlightedAccountIds.value = new Set();
@@ -205,50 +205,50 @@ watch(selectedProvider, () => {
   accountDisplayOrder.value = {};
   highlightedAccountIds.value = new Set();
   promotedAccountIds.value = new Set();
-  for (const accountId of Object.keys(accountStatsById)) Reflect.deleteProperty(accountStatsById, accountId);
+  for (const accountId of Object.keys(statsById)) Reflect.deleteProperty(statsById, accountId);
   visibleAccountIds.clear();
   intersectingAccountIds.clear();
-  accountStatsDeltaReadyById.value = {};
-  accountStatsFetchedById.value = {};
-  errorHistoryByAccountId.value = {};
-  errorHistoryErrorByAccountId.value = {};
-  errorHistoryFetchedById.value = {};
-  previousLastErrorAtById.value = {};
-  queuedAccountStatsIds.clear();
-  forceQueuedAccountStatsIds.clear();
-  loadingAccountStatsIds.clear();
-  queuedErrorHistoryIds.clear();
-  loadingErrorHistoryIds.clear();
-  if (accountStatsQueueTimer) {
-    clearTimeout(accountStatsQueueTimer);
-    accountStatsQueueTimer = null;
+  deltaReady.value = {};
+  statsFetched.value = {};
+  historyById.value = {};
+  historyError.value = {};
+  historyFetched.value = {};
+  prevErrorAt.value = {};
+  queuedStatsIds.clear();
+  forceStatsIds.clear();
+  loadingStatsIds.clear();
+  queuedHistoryIds.clear();
+  loadingHistoryIds.clear();
+  if (statsTimer) {
+    clearTimeout(statsTimer);
+    statsTimer = null;
   }
-  if (errorHistoryQueueTimer) {
-    clearTimeout(errorHistoryQueueTimer);
-    errorHistoryQueueTimer = null;
+  if (historyTimer) {
+    clearTimeout(historyTimer);
+    historyTimer = null;
   }
   if (highlightTimer) {
     clearTimeout(highlightTimer);
     highlightTimer = null;
   }
-  shouldPromoteNextNewAccount = false;
+  shouldPromoteNew = false;
 });
 
-function applyAccountsSnapshot(snapshot: AccountsData): void {
+function applyAccounts(snapshot: AccountsData): void {
   const detail = snapshot.providers[selectedProvider.value];
   if (!detail) return;
 
   data.value = detail;
-  queueAccountStatsLoad(Array.from(intersectingAccountIds), { force: true });
-  void refreshProviderQuotaAfterAccountPoll();
+  queueStats(Array.from(intersectingAccountIds), { force: true });
+  void refreshQuota();
 }
 
-function applyUsageSnapshot(snapshot: UsageData): void {
-  for (const [accountId, stats] of Object.entries(snapshot.accountStats)) accountStatsById[accountId] = stats;
+function applyUsage(snapshot: UsageData): void {
+  for (const [accountId, stats] of Object.entries(snapshot.accountStats)) statsById[accountId] = stats;
 }
 
-useLiveEvent("usage", applyUsageSnapshot);
-useLiveEvent("accounts", applyAccountsSnapshot);
+useLiveEvent("usage", applyUsage);
+useLiveEvent("accounts", applyAccounts);
 
 watch(
   [accounts, selectedAccountId],
@@ -271,7 +271,7 @@ watch(
     accountElement?.scrollIntoView({ block: "center", behavior: "smooth" });
 
     setTimeout(() => {
-      if (route.path === `/${providerSlug.value}` && decodeAccountHash(route.hash) === accountId) {
+      if (route.path === `/${providerSlug.value}` && hashAccount(route.hash) === accountId) {
         if (typeof window !== "undefined") {
           window.history.replaceState(window.history.state, "", route.path);
         }
@@ -281,28 +281,28 @@ watch(
   { immediate: true }
 );
 
-const quotaCapableAccounts = computed(() => accounts.value.filter((account) => account.provider === selectedProvider.value && toQuotaProvider(account.provider)));
+const quotaCapableAccounts = computed(() => accounts.value.filter((account) => account.provider === selectedProvider.value && quotaOf(account.provider)));
 const activeQuotaAccounts = computed(() => quotaCapableAccounts.value.filter((account) => account.isActive));
-let previousQuotaAccountKeys = new Set<string>();
-let previousQuotaAccountStates = new Map<string, QuotaAccountState>();
+let prevQuotaKeys = new Set<string>();
+let prevQuotaStates = new Map<string, QuotaAccountState>();
 let previousQuotaProvider: string | null = null;
 const {
-  quotaByAccountId,
-  quotaErrorByAccountId,
+  quotaById,
+  errorById,
   cancelQuotaQueue,
   pruneQuotaState,
   runQuotaQueue,
-  waitForQuotaQueue,
+  waitForQueue,
 } = useQuotaMonitor({
   accounts,
   quotaCapableAccounts,
-  toQuotaProvider,
+  toQuotaProvider: quotaOf,
 });
 
 onBeforeUnmount(() => {
   if (highlightTimer) clearTimeout(highlightTimer);
-  if (accountStatsQueueTimer) clearTimeout(accountStatsQueueTimer);
-  if (errorHistoryQueueTimer) clearTimeout(errorHistoryQueueTimer);
+  if (statsTimer) clearTimeout(statsTimer);
+  if (historyTimer) clearTimeout(historyTimer);
   accountsObserver?.disconnect();
   accountsObserver = null;
   cancelQuotaQueue();
@@ -327,17 +327,17 @@ onMounted(() => {
     }
 
     if (visibleIds.length > 0) {
-      queueAccountStatsLoad(visibleIds);
-      queueErrorHistoryLoad(visibleIds);
+      queueStats(visibleIds);
+      queueHistory(visibleIds);
     }
-  }, { rootMargin: ACCOUNT_STATS_ROOT_MARGIN });
-  observeAccountCards();
+  }, { rootMargin: STATS_ROOT_MARGIN });
+  observeCards();
 });
 const quotaSummaryGroups = computed<QuotaSummaryGroup[]>(() => {
   const groups = new Map<string, QuotaSummaryGroup>();
 
   for (const account of activeQuotaAccounts.value) {
-    const quota = quotaByAccountId.value[account.id];
+    const quota = quotaById.value[account.id];
     if (quota?.status !== "success") continue;
 
     for (const group of quota.groups) {
@@ -370,11 +370,11 @@ const quotaSummaryGroups = computed<QuotaSummaryGroup[]>(() => {
       percentUsed: group.maxRequests > 0 ? Math.round(Math.max(0, Math.min(100, (group.usedRequests / group.maxRequests) * 100))) : 0,
     }));
 });
-function toQuotaProvider(provider: string): QuotaProviderKey | null {
+function quotaOf(provider: string): QuotaProviderKey | null {
   return QUOTA_PROVIDERS.has(provider) ? provider as QuotaProviderKey : null;
 }
 
-function toTimeMs(value: string | Date | null | undefined): number {
+function timeOf(value: string | Date | null | undefined): number {
   if (!value) return 0;
 
   const timeMs = new Date(value).getTime();
@@ -387,12 +387,12 @@ function compareAccounts(a: Account, b: Account): number {
 
   return bPromoted - aPromoted
     || Number(b.isActive) - Number(a.isActive)
-    || toTimeMs(b.lastUsedAt) - toTimeMs(a.lastUsedAt)
-    || toTimeMs(b.createdAt) - toTimeMs(a.createdAt)
+    || timeOf(b.lastUsedAt) - timeOf(a.lastUsedAt)
+    || timeOf(b.createdAt) - timeOf(a.createdAt)
     || b.id.localeCompare(a.id);
 }
 
-function compareDisplayAccounts(a: Account, b: Account): number {
+function byOrder(a: Account, b: Account): number {
   const aOrder = accountDisplayOrder.value[a.id];
   const bOrder = accountDisplayOrder.value[b.id];
 
@@ -402,87 +402,87 @@ function compareDisplayAccounts(a: Account, b: Account): number {
   return compareAccounts(a, b);
 }
 
-function quotaPercentRemaining(group: QuotaSummaryGroup): number {
+function percentLeft(group: QuotaSummaryGroup): number {
   return Math.max(0, Math.min(100, Math.round(group.remainingFraction * 100)));
 }
 
-function quotaBarColor(group: QuotaSummaryGroup): string {
-  const percentRemaining = quotaPercentRemaining(group);
+function barColor(group: QuotaSummaryGroup): string {
+  const percentRemaining = percentLeft(group);
   if (percentRemaining <= 10) return "bg-red-500";
   if (percentRemaining <= 25) return "bg-orange-500";
   if (percentRemaining <= 50) return "bg-yellow-500";
   return "bg-green-500";
 }
 
-function getAccountWithStats(account: Account): Account {
-  const stats = accountStatsById[account.id] ?? account.stats;
+function withStats(account: Account): Account {
+  const stats = statsById[account.id] ?? account.stats;
   return stats === account.stats ? account : { ...account, stats };
 }
 
-function queueAccountStatsLoad(accountIds: Iterable<string>, options: { force?: boolean } = {}) {
+function queueStats(accountIds: Iterable<string>, options: { force?: boolean } = {}) {
   if (!import.meta.client) return;
 
   for (const accountId of accountIds) {
-    if (!options.force && accountStatsFetchedById.value[accountId]) continue;
-    if (loadingAccountStatsIds.has(accountId)) continue;
-    queuedAccountStatsIds.add(accountId);
-    if (options.force) forceQueuedAccountStatsIds.add(accountId);
+    if (!options.force && statsFetched.value[accountId]) continue;
+    if (loadingStatsIds.has(accountId)) continue;
+    queuedStatsIds.add(accountId);
+    if (options.force) forceStatsIds.add(accountId);
   }
 
-  if (queuedAccountStatsIds.size === 0 || accountStatsQueueTimer) return;
-  accountStatsQueueTimer = setTimeout(() => {
-    accountStatsQueueTimer = null;
-    void flushQueuedAccountStats();
+  if (queuedStatsIds.size === 0 || statsTimer) return;
+  statsTimer = setTimeout(() => {
+    statsTimer = null;
+    void flushStats();
   }, 80);
 }
 
-function queueErrorHistoryLoad(accountIds: Iterable<string>, options: { force?: boolean } = {}) {
+function queueHistory(accountIds: Iterable<string>, options: { force?: boolean } = {}) {
   if (!import.meta.client) return;
 
   for (const accountId of accountIds) {
-    if (!options.force && errorHistoryFetchedById.value[accountId]) continue;
-    if (loadingErrorHistoryIds.has(accountId)) continue;
-    queuedErrorHistoryIds.add(accountId);
+    if (!options.force && historyFetched.value[accountId]) continue;
+    if (loadingHistoryIds.has(accountId)) continue;
+    queuedHistoryIds.add(accountId);
   }
 
-  if (queuedErrorHistoryIds.size === 0 || errorHistoryQueueTimer) return;
-  errorHistoryQueueTimer = setTimeout(() => {
-    errorHistoryQueueTimer = null;
-    void flushQueuedErrorHistory();
+  if (queuedHistoryIds.size === 0 || historyTimer) return;
+  historyTimer = setTimeout(() => {
+    historyTimer = null;
+    void flushHistory();
   }, 80);
 }
 
-async function flushQueuedErrorHistory() {
-  const accountIds = Array.from(queuedErrorHistoryIds).slice(0, ERROR_HISTORY_BATCH_SIZE);
-  for (const accountId of accountIds) queuedErrorHistoryIds.delete(accountId);
+async function flushHistory() {
+  const accountIds = Array.from(queuedHistoryIds).slice(0, HISTORY_BATCH_SIZE);
+  for (const accountId of accountIds) queuedHistoryIds.delete(accountId);
 
-  await loadErrorHistories(accountIds);
+  await loadHistories(accountIds);
 
-  if (queuedErrorHistoryIds.size > 0) {
-    errorHistoryQueueTimer = setTimeout(() => {
-      errorHistoryQueueTimer = null;
-      void flushQueuedErrorHistory();
+  if (queuedHistoryIds.size > 0) {
+    historyTimer = setTimeout(() => {
+      historyTimer = null;
+      void flushHistory();
     }, 80);
   }
 }
 
-async function flushQueuedAccountStats() {
-  const accountIds = Array.from(queuedAccountStatsIds).slice(0, ACCOUNT_STATS_BATCH_SIZE);
-  for (const accountId of accountIds) queuedAccountStatsIds.delete(accountId);
-  const force = accountIds.some((accountId) => forceQueuedAccountStatsIds.has(accountId));
-  for (const accountId of accountIds) forceQueuedAccountStatsIds.delete(accountId);
+async function flushStats() {
+  const accountIds = Array.from(queuedStatsIds).slice(0, STATS_BATCH_SIZE);
+  for (const accountId of accountIds) queuedStatsIds.delete(accountId);
+  const force = accountIds.some((accountId) => forceStatsIds.has(accountId));
+  for (const accountId of accountIds) forceStatsIds.delete(accountId);
 
-  await loadAccountStats(accountIds, { force });
+  await loadStats(accountIds, { force });
 
-  if (queuedAccountStatsIds.size > 0) {
-    accountStatsQueueTimer = setTimeout(() => {
-      accountStatsQueueTimer = null;
-      void flushQueuedAccountStats();
+  if (queuedStatsIds.size > 0) {
+    statsTimer = setTimeout(() => {
+      statsTimer = null;
+      void flushStats();
     }, 80);
   }
 }
 
-function observeAccountCards() {
+function observeCards() {
   if (!import.meta.client || !accountsObserver) return;
   const root = providerRoot.value;
   if (!root) return;
@@ -495,90 +495,90 @@ function observeAccountCards() {
   }
 }
 
-async function loadAccountStats(accountIds: string[], options: { force?: boolean } = {}) {
+async function loadStats(accountIds: string[], options: { force?: boolean } = {}) {
   const availableAccountIds = new Set(accounts.value.map((account) => account.id));
   const requestedAccountIds = Array.from(new Set(accountIds))
     .filter((accountId) => availableAccountIds.has(accountId))
-    .filter((accountId) => !loadingAccountStatsIds.has(accountId))
-    .filter((accountId) => options.force || !accountStatsFetchedById.value[accountId]);
+    .filter((accountId) => !loadingStatsIds.has(accountId))
+    .filter((accountId) => options.force || !statsFetched.value[accountId]);
 
   if (requestedAccountIds.length === 0) return;
 
-  for (const accountId of requestedAccountIds) loadingAccountStatsIds.add(accountId);
+  for (const accountId of requestedAccountIds) loadingStatsIds.add(accountId);
 
   try {
     const stats = await api.accounts.stats({ accountIds: requestedAccountIds });
-    const nextDeltaReadyById = { ...accountStatsDeltaReadyById.value };
-    const nextFetchedById = { ...accountStatsFetchedById.value };
+    const nextDelta = { ...deltaReady.value };
+    const nextFetched = { ...statsFetched.value };
 
     for (const accountId of requestedAccountIds) {
-      nextDeltaReadyById[accountId] = Boolean(accountStatsById[accountId] || accountStatsDeltaReadyById.value[accountId]);
-      nextFetchedById[accountId] = true;
+      nextDelta[accountId] = Boolean(statsById[accountId] || deltaReady.value[accountId]);
+      nextFetched[accountId] = true;
     }
 
-    for (const [accountId, stat] of Object.entries(stats)) accountStatsById[accountId] = stat;
-    accountStatsDeltaReadyById.value = nextDeltaReadyById;
-    accountStatsFetchedById.value = nextFetchedById;
+    for (const [accountId, stat] of Object.entries(stats)) statsById[accountId] = stat;
+    deltaReady.value = nextDelta;
+    statsFetched.value = nextFetched;
   } catch (error) {
     console.error("Failed to load account stats:", error);
   } finally {
-    for (const accountId of requestedAccountIds) loadingAccountStatsIds.delete(accountId);
+    for (const accountId of requestedAccountIds) loadingStatsIds.delete(accountId);
   }
 }
 
-async function loadErrorHistories(accountIds: string[]) {
+async function loadHistories(accountIds: string[]) {
   const availableAccountIds = new Set(accounts.value.map((account) => account.id));
   const requestedAccountIds = Array.from(new Set(accountIds))
     .filter((accountId) => availableAccountIds.has(accountId))
-    .filter((accountId) => !loadingErrorHistoryIds.has(accountId));
+    .filter((accountId) => !loadingHistoryIds.has(accountId));
 
   if (requestedAccountIds.length === 0) return;
 
-  for (const accountId of requestedAccountIds) loadingErrorHistoryIds.add(accountId);
+  for (const accountId of requestedAccountIds) loadingHistoryIds.add(accountId);
 
   try {
     const response = await api.accounts.errorHistories({ accountIds: requestedAccountIds, limit: 100 });
-    const nextHistoryById = { ...errorHistoryByAccountId.value };
-    const nextErrorById = { ...errorHistoryErrorByAccountId.value };
-    const nextFetchedById = { ...errorHistoryFetchedById.value };
+    const nextHistory = { ...historyById.value };
+    const nextError = { ...historyError.value };
+    const nextFetched = { ...historyFetched.value };
 
     if (!response.success) throw new Error(response.error);
 
     for (const accountId of requestedAccountIds) {
       const result = response.data[accountId];
-      nextFetchedById[accountId] = true;
+      nextFetched[accountId] = true;
       if (!result?.success) {
-        nextHistoryById[accountId] = [];
-        nextErrorById[accountId] = null;
+        nextHistory[accountId] = [];
+        nextError[accountId] = null;
         continue;
       }
 
-      nextHistoryById[accountId] = result.data.entries;
-      nextErrorById[accountId] = null;
+      nextHistory[accountId] = result.data.entries;
+      nextError[accountId] = null;
     }
 
-    errorHistoryByAccountId.value = nextHistoryById;
-    errorHistoryErrorByAccountId.value = nextErrorById;
-    errorHistoryFetchedById.value = nextFetchedById;
+    historyById.value = nextHistory;
+    historyError.value = nextError;
+    historyFetched.value = nextFetched;
   } catch (error) {
     console.error("Failed to load account error histories:", error);
-    errorHistoryByAccountId.value = { ...errorHistoryByAccountId.value, ...Object.fromEntries(requestedAccountIds.map((accountId) => [accountId, []])) };
-    errorHistoryErrorByAccountId.value = { ...errorHistoryErrorByAccountId.value, ...Object.fromEntries(requestedAccountIds.map((accountId) => [accountId, null])) };
-    errorHistoryFetchedById.value = { ...errorHistoryFetchedById.value, ...Object.fromEntries(requestedAccountIds.map((accountId) => [accountId, true])) };
+    historyById.value = { ...historyById.value, ...Object.fromEntries(requestedAccountIds.map((accountId) => [accountId, []])) };
+    historyError.value = { ...historyError.value, ...Object.fromEntries(requestedAccountIds.map((accountId) => [accountId, null])) };
+    historyFetched.value = { ...historyFetched.value, ...Object.fromEntries(requestedAccountIds.map((accountId) => [accountId, true])) };
   } finally {
-    for (const accountId of requestedAccountIds) loadingErrorHistoryIds.delete(accountId);
+    for (const accountId of requestedAccountIds) loadingHistoryIds.delete(accountId);
   }
 }
 
-function pruneAccountStats() {
+function pruneStats() {
   const availableAccountIds = new Set(accounts.value.map((account) => account.id));
-  for (const accountId of Object.keys(accountStatsById)) {
-    if (!availableAccountIds.has(accountId)) Reflect.deleteProperty(accountStatsById, accountId);
+  for (const accountId of Object.keys(statsById)) {
+    if (!availableAccountIds.has(accountId)) Reflect.deleteProperty(statsById, accountId);
   }
-  accountStatsDeltaReadyById.value = Object.fromEntries(Object.entries(accountStatsDeltaReadyById.value).filter(([accountId]) => availableAccountIds.has(accountId)));
-  accountStatsFetchedById.value = Object.fromEntries(Object.entries(accountStatsFetchedById.value).filter(([accountId]) => availableAccountIds.has(accountId)));
-  for (const accountId of forceQueuedAccountStatsIds) {
-    if (!availableAccountIds.has(accountId)) forceQueuedAccountStatsIds.delete(accountId);
+  deltaReady.value = Object.fromEntries(Object.entries(deltaReady.value).filter(([accountId]) => availableAccountIds.has(accountId)));
+  statsFetched.value = Object.fromEntries(Object.entries(statsFetched.value).filter(([accountId]) => availableAccountIds.has(accountId)));
+  for (const accountId of forceStatsIds) {
+    if (!availableAccountIds.has(accountId)) forceStatsIds.delete(accountId);
   }
   for (const accountId of visibleAccountIds) {
     if (!availableAccountIds.has(accountId)) visibleAccountIds.delete(accountId);
@@ -588,18 +588,18 @@ function pruneAccountStats() {
   }
 }
 
-function pruneErrorHistories() {
+function pruneHistories() {
   const availableAccountIds = new Set(accounts.value.map((account) => account.id));
-  errorHistoryByAccountId.value = Object.fromEntries(Object.entries(errorHistoryByAccountId.value).filter(([accountId]) => availableAccountIds.has(accountId)));
-  errorHistoryErrorByAccountId.value = Object.fromEntries(Object.entries(errorHistoryErrorByAccountId.value).filter(([accountId]) => availableAccountIds.has(accountId)));
-  errorHistoryFetchedById.value = Object.fromEntries(Object.entries(errorHistoryFetchedById.value).filter(([accountId]) => availableAccountIds.has(accountId)));
+  historyById.value = Object.fromEntries(Object.entries(historyById.value).filter(([accountId]) => availableAccountIds.has(accountId)));
+  historyError.value = Object.fromEntries(Object.entries(historyError.value).filter(([accountId]) => availableAccountIds.has(accountId)));
+  historyFetched.value = Object.fromEntries(Object.entries(historyFetched.value).filter(([accountId]) => availableAccountIds.has(accountId)));
 }
 
 watch(
   accounts,
   () => {
-    pruneAccountStats();
-    pruneErrorHistories();
+    pruneStats();
+    pruneHistories();
   },
   { immediate: true }
 );
@@ -608,34 +608,34 @@ watch(
   () => accounts.value.map((account) => account.id).sort().join("|"),
   async () => {
     await nextTick();
-    observeAccountCards();
+    observeCards();
   },
   { immediate: true }
 );
 
-const previousLastErrorAtById = ref<Record<string, number>>({});
+const prevErrorAt = ref<Record<string, number>>({});
 
 watch(
-  () => accounts.value.map((account) => `${account.id}:${toTimeMs(account.lastErrorAt)}`).join("|"),
+  () => accounts.value.map((account) => `${account.id}:${timeOf(account.lastErrorAt)}`).join("|"),
   () => {
-    const previousByAccountId = previousLastErrorAtById.value;
+    const previousById = prevErrorAt.value;
     const changedAccountIds: string[] = [];
-    const nextByAccountId: Record<string, number> = {};
+    const nextById: Record<string, number> = {};
 
     for (const account of accounts.value) {
-      const lastErrorMs = toTimeMs(account.lastErrorAt);
-      nextByAccountId[account.id] = lastErrorMs;
+      const lastErrorMs = timeOf(account.lastErrorAt);
+      nextById[account.id] = lastErrorMs;
 
-      const previousMs = previousByAccountId[account.id];
+      const previousMs = previousById[account.id];
       if (previousMs === undefined || lastErrorMs > previousMs) {
         changedAccountIds.push(account.id);
       }
     }
 
-    previousLastErrorAtById.value = nextByAccountId;
+    prevErrorAt.value = nextById;
 
     if (changedAccountIds.length > 0) {
-      queueErrorHistoryLoad(changedAccountIds, { force: true });
+      queueHistory(changedAccountIds, { force: true });
     }
   }
 );
@@ -644,24 +644,24 @@ watch(
   () => `${selectedProvider.value}|${accounts.value.map((account) => `${account.id}:${account.provider}:${account.isActive}`).join("|")}`,
   (_, __, onCleanup) => {
     const providerChanged = previousQuotaProvider !== selectedProvider.value;
-    const currentQuotaAccountKeys = new Set(quotaCapableAccounts.value.map((account) => `${account.id}:${account.provider}`));
-    const currentQuotaAccountStates = new Map(quotaCapableAccounts.value.map((account) => [account.id, { provider: account.provider, isActive: account.isActive }]));
-    const newQuotaAccounts = quotaCapableAccounts.value.filter((account) => !previousQuotaAccountKeys.has(`${account.id}:${account.provider}`));
-    const reenabledAccountsWithoutQuota = quotaCapableAccounts.value.filter((account) => {
-      const previousState = previousQuotaAccountStates.get(account.id);
-      return previousState?.provider === account.provider && previousState.isActive === false && account.isActive && !quotaByAccountId.value[account.id];
+    const quotaKeys = new Set(quotaCapableAccounts.value.map((account) => `${account.id}:${account.provider}`));
+    const quotaStates = new Map(quotaCapableAccounts.value.map((account) => [account.id, { provider: account.provider, isActive: account.isActive }]));
+    const newQuotaAccounts = quotaCapableAccounts.value.filter((account) => !prevQuotaKeys.has(`${account.id}:${account.provider}`));
+    const reenabledWithoutQuota = quotaCapableAccounts.value.filter((account) => {
+      const previousState = prevQuotaStates.get(account.id);
+      return previousState?.provider === account.provider && previousState.isActive === false && account.isActive && !quotaById.value[account.id];
     });
-    const shouldRefreshExisting = previousQuotaAccountKeys.size === 0 || providerChanged;
+    const shouldRefreshExisting = prevQuotaKeys.size === 0 || providerChanged;
     const accountsToFetch = shouldRefreshExisting
       ? quotaCapableAccounts.value
       : newQuotaAccounts.length > 0
         ? newQuotaAccounts
-        : reenabledAccountsWithoutQuota;
+        : reenabledWithoutQuota;
 
     pruneQuotaState();
     cancelQuotaQueue();
-    previousQuotaAccountKeys = currentQuotaAccountKeys;
-    previousQuotaAccountStates = currentQuotaAccountStates;
+    prevQuotaKeys = quotaKeys;
+    prevQuotaStates = quotaStates;
     previousQuotaProvider = selectedProvider.value;
 
     if (accountsToFetch.length === 0) return;
@@ -669,7 +669,7 @@ watch(
     let cancelled = false;
     const quotaLoadTimer = setTimeout(() => {
       if (!cancelled) void runQuotaQueue(accountsToFetch, { refreshExisting: shouldRefreshExisting });
-    }, QUOTA_AUTO_LOAD_DELAY_MS);
+    }, QUOTA_DELAY_MS);
 
     onCleanup(() => {
       cancelled = true;
@@ -680,51 +680,51 @@ watch(
   { immediate: true }
 );
 
-function handleAccountRenamed(account: ProviderAccountUpdateData) {
+function onRenamed(account: AccountUpdateData) {
   invalidation.patchProviderAccount(selectedProvider.value, account.id, { name: account.name });
-  invalidation.patchAccountNameInOptions(account.id, account.name);
+  invalidation.patchName(account.id, account.name);
 }
 
-function handleAccountActiveUpdated(account: ProviderAccountUpdateData) {
+function onActive(account: AccountUpdateData) {
   invalidation.patchProviderAccount(selectedProvider.value, account.id, account);
   void invalidation.invalidateAccountOverview();
-  invalidation.clearAccountDependentOptions();
+  invalidation.clearOptions();
   invalidation.clearModelAvailability();
 }
 
-function handleAccountDeleted(accountId: string) {
+function onDeleted(accountId: string) {
   invalidation.removeProviderAccount(selectedProvider.value, accountId);
   void invalidation.invalidateAccountOverview();
-  invalidation.clearAccountDependentOptions();
+  invalidation.clearOptions();
   invalidation.clearModelAvailability();
 }
 
-function handleAccountErrorsResolved(accountId: string) {
-  errorHistoryByAccountId.value = { ...errorHistoryByAccountId.value, [accountId]: [] };
-  errorHistoryErrorByAccountId.value = { ...errorHistoryErrorByAccountId.value, [accountId]: null };
-  errorHistoryFetchedById.value = { ...errorHistoryFetchedById.value, [accountId]: true };
+function onResolved(accountId: string) {
+  historyById.value = { ...historyById.value, [accountId]: [] };
+  historyError.value = { ...historyError.value, [accountId]: null };
+  historyFetched.value = { ...historyFetched.value, [accountId]: true };
   void refresh();
   void invalidation.invalidateAccountOverview();
 }
 
-function handleAccountConnected(result: { provider: string; isUpdate: boolean }) {
-  if (result.provider === selectedProvider.value && !result.isUpdate) shouldPromoteNextNewAccount = true;
+function onConnected(result: { provider: string; isUpdate: boolean }) {
+  if (result.provider === selectedProvider.value && !result.isUpdate) shouldPromoteNew = true;
 }
 
 const settingsOpen = ref(false);
 const settingsForm = ref<SettingsForm | null>(null);
 const settingsBusy = ref("");
 const settingsError = ref("");
-const customModels = computed<CustomProviderModelRow[]>(() => customProvider.value?.models ?? []);
+const customModels = computed<CustomModelRow[]>(() => customProvider.value?.models ?? []);
 const filledSettingsModels = computed(() => (settingsForm.value?.models ?? []).filter((row) => row.model.trim() !== ""));
 
-function modelRowFromCustom(model: CustomProviderModelRow): ModelRow {
+function customRow(model: CustomModelRow): ModelRow {
   const upstream = model.upstream ?? "";
   const source = upstream || model.modelId;
   return { model: source, alias: model.modelId === source ? "" : model.modelId, aliased: model.aliased || model.modelId !== source };
 }
 
-function setRowAlias(row: ModelRow, value: string) {
+function setAlias(row: ModelRow, value: string) {
   row.alias = value;
   row.aliased = value !== "";
 }
@@ -736,7 +736,7 @@ function openSettings() {
     name: custom.name,
     baseUrl: custom.baseUrl,
     headers: Object.entries(custom.extraHeaders ?? {}).map(([key, value]) => ({ key, value })),
-    models: custom.models.map(modelRowFromCustom),
+    models: custom.models.map(customRow),
     enabled: custom.enabled,
   };
   settingsError.value = "";
@@ -773,7 +773,7 @@ function headersPayload(form: SettingsForm): Record<string, string> {
   return headers;
 }
 
-function runSettingsAction(action: () => Promise<ActionResult<unknown>>, key: string) {
+function runAction(action: () => Promise<ActionResult<unknown>>, key: string) {
   settingsBusy.value = key;
   settingsError.value = "";
   return action()
@@ -786,7 +786,7 @@ function runSettingsAction(action: () => Promise<ActionResult<unknown>>, key: st
       return true;
     })
     .catch((error) => {
-      settingsError.value = requestErrorMessage(error);
+      settingsError.value = messageOf(error);
       return false;
     })
     .finally(() => {
@@ -826,7 +826,7 @@ async function saveSettings() {
     await refreshCustomProviders();
     settingsOpen.value = false;
   } catch (error) {
-    settingsError.value = requestErrorMessage(error);
+    settingsError.value = messageOf(error);
   } finally {
     settingsBusy.value = "";
   }
@@ -835,8 +835,8 @@ async function saveSettings() {
 async function syncModels() {
   const key = providerMeta.value?.key;
   if (!key || !settingsForm.value) return;
-  const ok = await runSettingsAction(() => api.customProviders.syncModels({ slug: key }), "model-sync");
-  if (ok && settingsForm.value) settingsForm.value.models = customModels.value.map(modelRowFromCustom);
+  const ok = await runAction(() => api.customProviders.syncModels({ slug: key }), "model-sync");
+  if (ok && settingsForm.value) settingsForm.value.models = customModels.value.map(customRow);
 }
 
 const deleteOpen = ref(false);
@@ -856,13 +856,13 @@ async function deleteProvider() {
     await refreshCustomProviders();
     await navigateTo("/");
   } catch (error) {
-    deleteError.value = requestErrorMessage(error);
+    deleteError.value = messageOf(error);
   } finally {
     deleteBusy.value = false;
   }
 }
 
-function decodeAccountHash(hash: string): string | null {
+function hashAccount(hash: string): string | null {
   const accountId = hash.startsWith("#") ? hash.slice(1) : hash;
   if (!accountId) return null;
 
@@ -897,7 +897,7 @@ function decodeAccountHash(hash: string): string | null {
             :initial-provider="providerMeta.key"
             :readonly="isAuditMode"
             trigger-class="flex-1 sm:w-auto sm:flex-none"
-            @connected="handleAccountConnected"
+            @connected="onConnected"
           />
         </div>
       </div>
@@ -912,7 +912,7 @@ function decodeAccountHash(hash: string): string | null {
             v-for="model in orderedSupportedModels"
             :key="model"
             variant="secondary"
-            :class="freeSupportedModelIds === null || freeSupportedModelIds.has(model) ? 'text-xs font-normal' : 'text-xs font-normal opacity-40'"
+            :class="freeModels === null || freeModels.has(model) ? 'text-xs font-normal' : 'text-xs font-normal opacity-40'"
           >
             {{ model }}
           </UiBadge>
@@ -928,10 +928,10 @@ function decodeAccountHash(hash: string): string | null {
                 <p class="truncate font-medium text-foreground">{{ group.displayName }}</p>
                 <span class="shrink-0 text-[10px] text-muted-foreground">{{ group.accounts }} account{{ group.accounts === 1 ? '' : 's' }}</span>
               </div>
-              <span class="font-mono text-xs text-muted-foreground">{{ quotaPercentRemaining(group) }}%</span>
+              <span class="font-mono text-xs text-muted-foreground">{{ percentLeft(group) }}%</span>
             </div>
             <div class="h-1.5 overflow-hidden rounded-full bg-muted">
-              <div class="h-full transition-all duration-300" :class="quotaBarColor(group)" :style="{ width: `${quotaPercentRemaining(group)}%` }" />
+              <div class="h-full transition-all duration-300" :class="barColor(group)" :style="{ width: `${percentLeft(group)}%` }" />
             </div>
           </div>
         </div>
@@ -943,26 +943,26 @@ function decodeAccountHash(hash: string): string | null {
           :id="account.id"
           :key="account.id"
           ref="accountCardRefs"
-          :account="getAccountWithStats(account)"
+          :account="withStats(account)"
           :data-account-id="account.id"
           class="[contain-intrinsic-size:auto_30rem] [content-visibility:auto]"
           :visible="visibleAccountIds.has(account.id)"
           :show-tier="providerMeta?.showTier"
-          :supported-models="supportedModelsByAccountId[account.id] ?? supportedModels"
-          :disabled-models="disabledModelsByAccountId[account.id] ?? []"
-          :model-health="modelHealthByAccountId[account.id] ?? {}"
-          :error-history="errorHistoryByAccountId[account.id] ?? null"
-          :error-history-error="errorHistoryErrorByAccountId[account.id] ?? null"
-          :quota-info="quotaByAccountId[account.id] ?? null"
-          :quota-error="quotaErrorByAccountId[account.id] ?? null"
+          :supported-models="supportedByAccount[account.id] ?? supportedModels"
+          :disabled-models="disabledModels[account.id] ?? []"
+          :model-health="healthByAccount[account.id] ?? {}"
+          :error-history="historyById[account.id] ?? null"
+          :error-history-error="historyError[account.id] ?? null"
+          :quota-info="quotaById[account.id] ?? null"
+          :quota-error="errorById[account.id] ?? null"
           :highlight="highlightedAccountIds.has(account.id)"
-          :animate-deltas="accountStatsDeltaReadyById[account.id] === true"
+          :animate-deltas="deltaReady[account.id] === true"
           :readonly="isAuditMode"
-          @renamed="handleAccountRenamed"
-          @active-updated="handleAccountActiveUpdated"
-          @temporarily-disabled="handleAccountActiveUpdated"
-          @deleted="handleAccountDeleted"
-          @errors-resolved="handleAccountErrorsResolved"
+          @renamed="onRenamed"
+          @active-updated="onActive"
+          @temporarily-disabled="onActive"
+          @deleted="onDeleted"
+          @errors-resolved="onResolved"
         />
       </div>
     </section>
@@ -1008,7 +1008,7 @@ function decodeAccountHash(hash: string): string | null {
           <div v-for="(row, index) in settingsForm.models" :key="index" class="flex items-center gap-2">
             <input v-model="row.model" class="h-9 flex-1 rounded-md border border-input bg-background px-3 font-mono text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50" placeholder="model">
             <div class="min-w-0 flex-1">
-              <ModelAliasSelect :model-value="row.alias" :default-id="row.model" @update:model-value="(value: string) => setRowAlias(row, value)" />
+              <ModelAliasSelect :model-value="row.alias" :default-id="row.model" @update:model-value="(value: string) => setAlias(row, value)" />
             </div>
           </div>
         </div>

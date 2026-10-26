@@ -1,5 +1,5 @@
 import { idMap, sync } from "#models/model-store.ts";
-import { runFetchText } from "#models/sync/http.ts";
+import { fetchText } from "#models/sync/http.ts";
 import { packageModelsDir, runScript } from "./shared.ts";
 
 const PROVIDER_NAME = "harbor";
@@ -11,12 +11,12 @@ interface HarborEntry {
   inputModalities: string | null;
 }
 
-function unescapeFlightPayload(html: string): string {
+function unescapeFlight(html: string): string {
   return html.replace(/\\"/g, '"');
 }
 
-function parseModelEntries(html: string): HarborEntry[] {
-  const unescaped = unescapeFlightPayload(html);
+function parseEntries(html: string): HarborEntry[] {
+  const unescaped = unescapeFlight(html);
   const entries: HarborEntry[] = [];
   const seen = new Set<string>();
 
@@ -42,11 +42,11 @@ function parseModelEntries(html: string): HarborEntry[] {
   return entries;
 }
 
-function isFreeModel(entry: HarborEntry): boolean {
+function isFree(entry: HarborEntry): boolean {
   return entry.isFree || entry.surface.endsWith(":free");
 }
 
-function supportsTextOutput(entry: HarborEntry): boolean {
+function textOutput(entry: HarborEntry): boolean {
   if (!entry.inputModalities) return true;
   try {
     const parsed: unknown = JSON.parse(entry.inputModalities);
@@ -57,7 +57,7 @@ function supportsTextOutput(entry: HarborEntry): boolean {
   }
 }
 
-function toModelKey(modelId: string): string {
+function modelKey(modelId: string): string {
   const modelKey = modelId
     .replace(/[:/]/g, "-")
     .replace(/[^a-zA-Z0-9._-]/g, "-")
@@ -66,10 +66,10 @@ function toModelKey(modelId: string): string {
   return modelKey.endsWith("-free") ? modelKey.slice(0, -"-free".length) : modelKey;
 }
 
-async function fetchHarborFreeModelIds(): Promise<string[]> {
-  const html = await runFetchText(HARBOR_MODELS_URL, { label: "Harbor /models catalog page" });
-  const ids = parseModelEntries(html)
-    .filter((entry) => isFreeModel(entry) && supportsTextOutput(entry))
+async function docsFree(): Promise<string[]> {
+  const html = await fetchText(HARBOR_MODELS_URL, { label: "Harbor /models catalog page" });
+  const ids = parseEntries(html)
+    .filter((entry) => isFree(entry) && textOutput(entry))
     .map((entry) => entry.surface.trim())
     .filter((id) => id.length > 0);
 
@@ -79,8 +79,8 @@ async function fetchHarborFreeModelIds(): Promise<string[]> {
 async function main(): Promise<void> {
   const modelsDir = packageModelsDir();
 
-  const modelIds = await fetchHarborFreeModelIds();
-  const modelMap = idMap(modelIds, toModelKey);
+  const modelIds = await docsFree();
+  const modelMap = idMap(modelIds, modelKey);
 
   const result = await sync(modelsDir, PROVIDER_NAME, modelMap);
 

@@ -32,11 +32,11 @@ const topicSignals = Effect.runSync(Queue.unbounded<TopicSignal>());
 const usageSignals = Effect.runSync(Queue.unbounded<UsageSignal>());
 const pointsSignals = Effect.runSync(Queue.unbounded<PointsSignal>());
 
-const usageLastPublishedAt = Effect.runSync(Ref.make(new Map<string, number>()));
+const usagePublishedAt = Effect.runSync(Ref.make(new Map<string, number>()));
 
 let buildSnapshots: SnapshotBuilder = () => Effect.succeed({});
 
-export function configureEventSnapshots(builder: SnapshotBuilder): void {
+export function configureSnapshots(builder: SnapshotBuilder): void {
   buildSnapshots = builder;
 }
 
@@ -44,11 +44,11 @@ function now(): string {
   return new Date().toISOString();
 }
 
-export function publishToUser(userId: string, event: ServerEvent): void {
+export function publishUser(userId: string, event: ServerEvent): void {
   publisher.publish(userId, event);
 }
 
-function toUpdateEvent(topic: LiveTopic, snapshots: Partial<EventSnapshots>): ServerEvent | null {
+function updateEvent(topic: LiveTopic, snapshots: Partial<EventSnapshots>): ServerEvent | null {
   return Match.value(topic).pipe(
     Match.when("accounts", () => (snapshots.accounts ? { type: "update" as const, topic: "accounts" as const, at: now(), data: snapshots.accounts } : null)),
     Match.when("models", () => (snapshots.models ? { type: "update" as const, topic: "models" as const, at: now(), data: snapshots.models } : null)),
@@ -60,13 +60,13 @@ function toUpdateEvent(topic: LiveTopic, snapshots: Partial<EventSnapshots>): Se
 const publishTopic = Effect.fn("events.publishTopic")(function* (userId: string, topic: LiveTopic) {
   if (!activeUserIds.has(userId)) return;
   const snapshots = yield* buildSnapshots(userId, [topic]);
-  const event = toUpdateEvent(topic, snapshots);
-  if (event) publishToUser(userId, event);
+  const event = updateEvent(topic, snapshots);
+  if (event) publishUser(userId, event);
 });
 
-const publishUsage = Effect.fn("events.publishUsage")(function* (userId: string) {
+const publishUsageEvent = Effect.fn("events.publishUsage")(function* (userId: string) {
   if (!activeUserIds.has(userId)) return;
-  yield* Ref.update(usageLastPublishedAt, (current) => {
+  yield* Ref.update(usagePublishedAt, (current) => {
     const next = new Map(current);
     next.set(userId, Date.now());
     return next;
@@ -74,10 +74,10 @@ const publishUsage = Effect.fn("events.publishUsage")(function* (userId: string)
   yield* publishTopic(userId, "usage");
 });
 
-const publishPoints = Effect.fn("events.publishPoints")(function* (userId: string, balance: number) {
+const publishPointsEvent = Effect.fn("events.publishPoints")(function* (userId: string, balance: number) {
   if (!activeUserIds.has(userId)) return;
   yield* Effect.sync(() => {
-    publishToUser(userId, { type: "update", topic: "points", at: now(), data: { balance } });
+    publishUser(userId, { type: "update", topic: "points", at: now(), data: { balance } });
   });
 });
 
@@ -85,7 +85,7 @@ function runBackground(effect: Effect.Effect<unknown>): void {
   Effect.runFork(Effect.ignore(effect));
 }
 
-function runTopicStream(): void {
+function topicStream(): void {
   runBackground(
     Stream.fromQueue(topicSignals).pipe(
       Stream.groupByKey((signal) => `${signal.userId}:${signal.topic}`, {
@@ -106,7 +106,7 @@ function runTopicStream(): void {
   );
 }
 
-function runUsageStream(): void {
+function usageStream(): void {
   runBackground(
     Stream.fromQueue(usageSignals).pipe(
       Stream.groupByKey((signal) => signal.userId, { idleTimeToLive: Duration.seconds(30) }),
@@ -119,7 +119,7 @@ function runUsageStream(): void {
             strategy: "enforce",
           }),
           Stream.debounce(USAGE_THROTTLE),
-          Stream.runForEach(() => publishUsage(userId)),
+          Stream.runForEach(() => publishUsageEvent(userId)),
           Effect.catchCause((cause) => Effect.logError(`Failed to publish usage for ${userId}`, cause))
         )
       ),
@@ -129,14 +129,14 @@ function runUsageStream(): void {
   );
 }
 
-function runPointsStream(): void {
+function pointsStream(): void {
   runBackground(
     Stream.fromQueue(pointsSignals).pipe(
       Stream.groupByKey((signal) => signal.userId, { idleTimeToLive: Duration.seconds(30) }),
       Stream.map(([userId, stream]) =>
         stream.pipe(
           Stream.debounce(POINTS_DEBOUNCE),
-          Stream.runForEach((signal) => publishPoints(userId, signal.balance)),
+          Stream.runForEach((signal) => publishPointsEvent(userId, signal.balance)),
           Effect.catchCause((cause) => Effect.logError(`Failed to publish points for ${userId}`, cause))
         )
       ),
@@ -151,7 +151,7 @@ function runHeartbeat(): void {
     Stream.tick(HEARTBEAT_INTERVAL).pipe(
       Stream.runForEach(() =>
         Effect.sync(() => {
-          for (const userId of activeUserIds) publishToUser(userId, { type: "ping", at: now() });
+          for (const userId of activeUserIds) publishUser(userId, { type: "ping", at: now() });
         })
       ),
       Effect.catchCause(() => Effect.void)
@@ -164,18 +164,18 @@ let workersStarted = false;
 function startWorkers(): void {
   if (workersStarted) return;
   workersStarted = true;
-  runTopicStream();
-  runUsageStream();
-  runPointsStream();
+  topicStream();
+  usageStream();
+  pointsStream();
 }
 
 runHeartbeat();
 
-export function publishModelsChanged(userId: string): void {
+export function publishModels(userId: string): void {
   scheduleTopic(userId, "models");
 }
 
-export function publishAccountsChanged(userId: string): void {
+export function publishAccounts(userId: string): void {
   scheduleTopic(userId, "accounts");
 }
 
@@ -184,24 +184,24 @@ function scheduleTopic(userId: string, topic: LiveTopic): void {
   Effect.runSync(Queue.offer(topicSignals, { userId, topic }));
 }
 
-export function publishUsageChanged(userId: string): void {
+export function publishUsage(userId: string): void {
   if (!activeUserIds.has(userId)) return;
   Effect.runSync(Queue.offer(usageSignals, { userId }));
 }
 
-export function publishPointsBalance(userId: string, balance: number): void {
+export function publishPoints(userId: string, balance: number): void {
   Effect.runSync(Queue.offer(pointsSignals, { userId, balance }));
 }
 
 async function* initialEvents(userId: string, topics: LiveTopic[]): AsyncGenerator<ServerEvent, void> {
   const snapshots = await Effect.runPromise(buildSnapshots(userId, topics));
   for (const topic of topics) {
-    const event = toUpdateEvent(topic, snapshots);
+    const event = updateEvent(topic, snapshots);
     if (event) yield event;
   }
 }
 
-export async function* subscribeUserEvents(userId: string, topics: LiveTopic[], signal?: AbortSignal): AsyncGenerator<ServerEvent, void> {
+export async function* subscribeEvents(userId: string, topics: LiveTopic[], signal?: AbortSignal): AsyncGenerator<ServerEvent, void> {
   const wanted = new Set<LiveTopic>(topics);
   activeUserIds.add(userId);
   startWorkers();
@@ -214,7 +214,7 @@ export async function* subscribeUserEvents(userId: string, topics: LiveTopic[], 
     }
   } finally {
     activeUserIds.delete(userId);
-    await Effect.runPromise(Ref.update(usageLastPublishedAt, (current) => {
+    await Effect.runPromise(Ref.update(usagePublishedAt, (current) => {
       const next = new Map(current);
       next.delete(userId);
       return next;
@@ -222,4 +222,4 @@ export async function* subscribeUserEvents(userId: string, topics: LiveTopic[], 
   }
 }
 
-proxyEvents.onUsageLogged((userId) => publishUsageChanged(userId));
+proxyEvents.onUsageLogged((userId) => publishUsage(userId));

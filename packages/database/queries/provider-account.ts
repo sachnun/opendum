@@ -4,7 +4,7 @@ import { db, type DbExecutor } from "../client.js";
 import { tryDb } from "../errors.js";
 import {
   providerAccount,
-  providerAccountDisabledModel,
+  accountDisabledModel,
 } from "../schema/accounts.js";
 import { userSharingSetting } from "../schema/usage.js";
 
@@ -64,7 +64,7 @@ export const listEligibleAccounts = Effect.fn("db.listEligibleAccounts")(functio
   return rows.filter((row) => !excluded.has(row.id));
 });
 
-export const listSharedEligibleAccounts = Effect.fn("db.listSharedEligibleAccounts")(function* (
+export const sharedAccounts = Effect.fn("db.sharedAccounts")(function* (
   params: Omit<EligibleAccountParams, "useWhitelist" | "useBlacklist" | "accountIds">,
   database: DbExecutor = db
 ) {
@@ -140,7 +140,7 @@ export const getQuotaAccount = Effect.fn("db.getQuotaAccount")(function* (
   return rows[0] ?? null;
 });
 
-export const listExpiringRefreshableAccounts = Effect.fn("db.listExpiringRefreshableAccounts")(function* (
+export const expiringAccounts = Effect.fn("db.expiringAccounts")(function* (
   params: { provider: string; now: Date; expiresBefore: Date; batchLimit: number },
   database: DbExecutor = db
 ) {
@@ -174,7 +174,7 @@ export const listExpiringRefreshableAccounts = Effect.fn("db.listExpiringRefresh
   );
 });
 
-export const getAccountCredentialsByID = Effect.fn("db.getAccountCredentialsByID")(function* (id: string, database: DbExecutor = db) {
+export const credentialsById = Effect.fn("db.credentialsById")(function* (id: string, database: DbExecutor = db) {
   const rows = yield* tryDb("query", () => database
     .select({
       id: providerAccount.id,
@@ -195,7 +195,7 @@ export const getAccountCredentialsByID = Effect.fn("db.getAccountCredentialsByID
   return rows[0] ?? null;
 });
 
-export const getAccountOwnerUserID = Effect.fn("db.getAccountOwnerUserID")(function* (id: string, database: DbExecutor = db) {
+export const ownerId = Effect.fn("db.ownerId")(function* (id: string, database: DbExecutor = db) {
   const rows = yield* tryDb("query", () => database
     .select({ userId: providerAccount.userId })
     .from(providerAccount)
@@ -261,7 +261,7 @@ export const disableFailedAccount = Effect.fn("db.disableFailedAccount")(functio
   return result.length;
 });
 
-export const updateCodexAccountID = Effect.fn("db.updateCodexAccountID")(function* (
+export const updateCodexId = Effect.fn("db.updateCodexId")(function* (
   params: { id: string; accountId: string | null },
   database: DbExecutor = db
 ) {
@@ -271,7 +271,7 @@ export const updateCodexAccountID = Effect.fn("db.updateCodexAccountID")(functio
     .where(eq(providerAccount.id, params.id)));
 });
 
-export const updateAntigravityAccountInfo = Effect.fn("db.updateAntigravityAccountInfo")(function* (
+export const updateAntigravity = Effect.fn("db.updateAntigravity")(function* (
   params: { id: string; projectId: string | null; tier: string | null; email: string | null },
   database: DbExecutor = db
 ) {
@@ -301,7 +301,7 @@ export const getForcedAccount = Effect.fn("db.getForcedAccount")(function* (id: 
   return rows[0] ?? null;
 });
 
-export const listDisabledAccountIDs = Effect.fn("db.listDisabledAccountIDs")(function* (
+export const disabledIds = Effect.fn("db.disabledIds")(function* (
   params: { accountIds: string[]; models: string[] },
   database: DbExecutor = db
 ) {
@@ -309,14 +309,14 @@ export const listDisabledAccountIDs = Effect.fn("db.listDisabledAccountIDs")(fun
   return yield* tryDb("query", () =>
     database
       .select({
-        providerAccountId: providerAccountDisabledModel.providerAccountId,
-        model: providerAccountDisabledModel.model,
+        providerAccountId: accountDisabledModel.providerAccountId,
+        model: accountDisabledModel.model,
       })
-      .from(providerAccountDisabledModel)
+      .from(accountDisabledModel)
       .where(
         and(
-          inArray(providerAccountDisabledModel.providerAccountId, params.accountIds),
-          inArray(providerAccountDisabledModel.model, params.models)
+          inArray(accountDisabledModel.providerAccountId, params.accountIds),
+          inArray(accountDisabledModel.model, params.models)
         )
       )
   );

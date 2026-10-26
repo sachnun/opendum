@@ -1,6 +1,6 @@
 import { Effect } from "effect";
-import { apiKeyLastUsedKey, apiKeyValidationKey, type OpendumRedis } from "@opendum/core/redis";
-import { touchAPIKeyLastUsed } from "@opendum/database/queries";
+import { lastUsed, validationKey, type OpendumRedis } from "@opendum/core/redis";
+import { touchLastUsed } from "@opendum/database/queries";
 import { ignore, tryAsync } from "@opendum/core/best-effort";
 import type { RateLimitRule } from "./types.js";
 
@@ -27,7 +27,7 @@ export class Cache {
 
   get(keyHash: string): Effect.Effect<Cached | null> {
     return tryAsync(async () => {
-      const raw = await this.redis.get(apiKeyValidationKey(keyHash));
+      const raw = await this.redis.get(validationKey(keyHash));
       if (!raw) return null;
       return JSON.parse(raw) as Cached;
     }, null);
@@ -35,7 +35,7 @@ export class Cache {
 
   set(keyHash: string, value: Cached, ttlSeconds: number): Effect.Effect<void> {
     return ignore(() =>
-      this.redis.set(apiKeyValidationKey(keyHash), JSON.stringify(value), {
+      this.redis.set(validationKey(keyHash), JSON.stringify(value), {
         EX: Math.max(1, Math.round(ttlSeconds)),
       })
     );
@@ -44,18 +44,18 @@ export class Cache {
   touch(apiKeyId: string): Effect.Effect<void> {
     if (!apiKeyId) return Effect.void;
     return ignore(async () => {
-      const updated = await this.redis.set(apiKeyLastUsedKey(apiKeyId), "1", {
+      const updated = await this.redis.set(lastUsed(apiKeyId), "1", {
         NX: true,
         EX: TOUCH_TTL,
       });
       if (!updated) return;
-      await touchAPIKeyLastUsed(apiKeyId);
+      await touchLastUsed(apiKeyId);
     });
   }
 
   invalidate(keyHash: string, apiKeyId: string): Effect.Effect<void> {
-    const keys = [apiKeyValidationKey(keyHash)];
-    if (apiKeyId) keys.push(apiKeyLastUsedKey(apiKeyId));
+    const keys = [validationKey(keyHash)];
+    if (apiKeyId) keys.push(lastUsed(apiKeyId));
     return ignore(() => this.redis.del(keys));
   }
 }

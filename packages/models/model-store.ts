@@ -1,16 +1,16 @@
 import { Effect } from "effect";
 
-import { aliasesFromUpstream, isDateToken } from "./model/clean-key.ts";
-import { inferModelFolder } from "./model/families.ts";
-import { mergeModelData, splitModelData } from "./model/merge.ts";
+import { aliasesOf, isDate } from "./model/clean-key.ts";
+import { folderOf } from "./model/families.ts";
+import { mergeData, splitData } from "./model/merge.ts";
 import { ModelParseFailure, ModelWriteFailure, asError } from "./errors.ts";
 import {
   exists,
-  listJsonFiles,
+  listJson,
   readJson,
   tryRemove,
   tryRename,
-  tryWriteText,
+  saveText,
 } from "./fs.ts";
 import { basename, dirname, join, relative, sep } from "./paths.ts";
 import type { JsonValue, ModelData, ModelIndex, ModelIndexEntry } from "./types.ts";
@@ -130,14 +130,7 @@ export function tryWrite(
   data: ModelData
 ): Effect.Effect<void, ModelWriteFailure> {
   const content = JSON.stringify(normalizeData(data), null, 2);
-  return tryWriteText(filePath, `${content}\n`);
-}
-
-export function tryWriteGenerated(
-  filePath: string,
-  data: ModelData
-): Effect.Effect<void, ModelWriteFailure> {
-  return tryWrite(filePath, data);
+  return saveText(filePath, `${content}\n`);
 }
 
 export function write(filePath: string, data: ModelData): Promise<void> {
@@ -145,10 +138,10 @@ export function write(filePath: string, data: ModelData): Promise<void> {
 }
 
 export function writeGenerated(filePath: string, data: ModelData): Promise<void> {
-  return Effect.runPromise(tryWriteGenerated(filePath, data));
+  return Effect.runPromise(tryWrite(filePath, data));
 }
 
-export function tryWriteSplit(
+export function writeSplit(
   modelsDir: string,
   fileId: string,
   data: ModelData,
@@ -156,7 +149,7 @@ export function tryWriteSplit(
 ): Effect.Effect<{ authoredPath: string; generatedPath: string }, ModelWriteFailure> {
   return Effect.gen(function* () {
     const dir = options.generatedDir ?? generatedDir(modelsDir);
-    const { generated, authored } = splitModelData(data);
+    const { generated, authored } = splitData(data);
     const authoredPath = join(modelsDir, fileId + MODEL_EXT);
     const generatedPath = join(dir, fileId + MODEL_EXT);
 
@@ -167,7 +160,7 @@ export function tryWriteSplit(
     }
 
     if (Object.keys(generated).length > 0) {
-      yield* tryWriteGenerated(generatedPath, generated);
+      yield* tryWrite(generatedPath, generated);
     } else if (exists(generatedPath)) {
       yield* tryRemove(generatedPath);
     }
@@ -176,17 +169,17 @@ export function tryWriteSplit(
   });
 }
 
-export function writeSplit(
+export function saveSplit(
   modelsDir: string,
   fileId: string,
   data: ModelData,
   options: { generatedDir?: string } = {},
 ): Promise<{ authoredPath: string; generatedPath: string }> {
-  return Effect.runPromise(tryWriteSplit(modelsDir, fileId, data, options));
+  return Effect.runPromise(writeSplit(modelsDir, fileId, data, options));
 }
 
 export function collectFiles(modelsDir: string): string[] {
-  return listJsonFiles(modelsDir)
+  return listJson(modelsDir)
     .filter((relativePath) => relativePath.split("/").length <= 2)
     .map((relativePath) => join(modelsDir, relativePath));
 }
@@ -199,22 +192,22 @@ function readData(filePath: string): ModelData {
   return readJson(filePath) as ModelData;
 }
 
-function byFileId(modelsDir: string): Map<string, string> {
-  const byFileId = new Map<string, string>();
+function byFile(modelsDir: string): Map<string, string> {
+  const byFile = new Map<string, string>();
   for (const filePath of collectFiles(modelsDir)) {
     const relativePath = relative(modelsDir, filePath);
-    byFileId.set(
+    byFile.set(
       relativePath.replace(/\.json$/, "").split(sep).join("/"),
       filePath,
     );
   }
-  return byFileId;
+  return byFile;
 }
 
 export function buildIndex(modelsDir: string, options: { generatedDir?: string } = {}): ModelIndex {
   const dir = options.generatedDir ?? generatedDir(modelsDir);
-  const authoredFiles = byFileId(modelsDir);
-  const generatedFiles = byFileId(dir);
+  const authoredFiles = byFile(modelsDir);
+  const generatedFiles = byFile(dir);
   const index: ModelIndex = {};
 
   for (const relativeId of new Set([...authoredFiles.keys(), ...generatedFiles.keys()])) {
@@ -222,7 +215,7 @@ export function buildIndex(modelsDir: string, options: { generatedDir?: string }
     const generatedPath = generatedFiles.get(relativeId);
     const authored = authoredPath ? readData(authoredPath) : undefined;
     const generated = generatedPath ? readData(generatedPath) : undefined;
-    const data = mergeModelData(generated, authored);
+    const data = mergeData(generated, authored);
     index[relativeId] = {
       id: publicId(data, basename(relativeId)),
       fileId: basename(relativeId),
@@ -245,7 +238,7 @@ function dateToken(modelId: string): string | null {
   const segment = modelId.slice(modelId.lastIndexOf("/") + 1);
   const tokens = segment.split(/[-_]/);
   const tail = (tokens[tokens.length - 1] ?? "").split(":")[0] ?? "";
-  return isDateToken(tail) ? tail : null;
+  return isDate(tail) ? tail : null;
 }
 
 function compare(left: { dateToken: string | null }, right: { dateToken: string | null }): number {
@@ -255,11 +248,11 @@ function compare(left: { dateToken: string | null }, right: { dateToken: string 
   return Number.parseInt(right.dateToken, 10) - Number.parseInt(left.dateToken, 10);
 }
 
-export function idMap(modelIds: string[], toModelKey: (modelId: string) => string): Map<string, string> {
+export function idMap(modelIds: string[], modelKey: (modelId: string) => string): Map<string, string> {
   const groups = new Map<string, Array<{ modelId: string; key: string; dateToken: string | null }>>();
 
   for (const modelId of modelIds) {
-    const key = toModelKey(modelId);
+    const key = modelKey(modelId);
     if (!key) continue;
 
     const token = dateToken(modelId);
@@ -300,10 +293,10 @@ export function persist(
   entry: Pick<ModelIndexEntry, "modelsDir" | "relativeId">,
   data: ModelData,
 ): Promise<{ authoredPath: string; generatedPath: string }> {
-  return writeSplit(entry.modelsDir, entry.relativeId, data);
+  return saveSplit(entry.modelsDir, entry.relativeId, data);
 }
 
-export function tryRenameFiles(
+export function renameFiles(
   entry: Pick<ModelIndexEntry, "modelsDir" | "generatedDir" | "relativeId">,
   nextFileId: string,
 ): Effect.Effect<string, ModelWriteFailure> {
@@ -332,15 +325,15 @@ export function tryRenameFiles(
   });
 }
 
-export function renameFiles(
+export function moveFiles(
   entry: Pick<ModelIndexEntry, "modelsDir" | "generatedDir" | "relativeId">,
   nextFileId: string,
 ): Promise<string> {
-  return Effect.runPromise(tryRenameFiles(entry, nextFileId));
+  return Effect.runPromise(renameFiles(entry, nextFileId));
 }
 
 function isCurated(data: ModelData): boolean {
-  const authored = splitModelData(data).authored as Record<string, unknown>;
+  const authored = splitData(data).authored as Record<string, unknown>;
   delete authored.ignored;
   return Object.keys(authored).length > 0;
 }
@@ -353,7 +346,7 @@ export function tryPrune(modelsDir: string): Effect.Effect<string[], ModelWriteF
     for (const entry of Object.values(index)) {
       if ((entry.data.providers ?? []).length > 0) continue;
       if (isCurated(entry.data)) continue;
-      yield* tryWriteSplit(entry.modelsDir, entry.relativeId, {});
+      yield* writeSplit(entry.modelsDir, entry.relativeId, {});
       removed.push(entry.id);
     }
 
@@ -366,7 +359,7 @@ export function prune(modelsDir: string): Promise<string[]> {
 }
 
 export interface Options {
-  providerConfigByModel?: Map<string, Record<string, JsonValue>>;
+  providerConfig?: Map<string, Record<string, JsonValue>>;
   managedProviderConfigKeys?: string[];
 }
 
@@ -388,11 +381,11 @@ export async function sync(
   const removed: string[] = [];
   const updated: string[] = [];
 
-  function extraProviderConfig(modelKey: string): Record<string, JsonValue> {
-    return options.providerConfigByModel?.get(modelKey) ?? {};
+  function extraConfig(modelKey: string): Record<string, JsonValue> {
+    return options.providerConfig?.get(modelKey) ?? {};
   }
 
-  function findParentForCollision(modelKey: string, upstreamName: string): { baseKey: string; entry: ModelIndexEntry } | null {
+  function findParent(modelKey: string, upstreamName: string): { baseKey: string; entry: ModelIndexEntry } | null {
     const entries = Object.values(index);
     if (index[modelKey]) return null;
 
@@ -427,12 +420,12 @@ export async function sync(
     return null;
   }
   for (const [modelKey, upstreamName] of modelMap.entries()) {
-    const parent = findParentForCollision(modelKey, upstreamName);
+    const parent = findParent(modelKey, upstreamName);
     if (!parent) continue;
 
     const existingAliases = new Set(parent.entry.data.aliases || []);
     let changed = false;
-    for (const alias of aliasesFromUpstream([upstreamName])) {
+    for (const alias of aliasesOf([upstreamName])) {
       if (!existingAliases.has(alias)) {
         existingAliases.add(alias);
         changed = true;
@@ -446,13 +439,13 @@ export async function sync(
     modelMap.delete(modelKey);
   }
 
-  function applyManagedProviderConfig(providerConfig: Record<string, JsonValue>, modelKey: string): boolean {
+  function applyManaged(providerConfig: Record<string, JsonValue>, modelKey: string): boolean {
     let changed = false;
-    const extraConfig = extraProviderConfig(modelKey);
-    const managedKeys = options.managedProviderConfigKeys ?? Object.keys(extraConfig);
+    const extras = extraConfig(modelKey);
+    const managedKeys = options.managedProviderConfigKeys ?? Object.keys(extras);
 
     for (const key of managedKeys) {
-      const nextValue = extraConfig[key];
+      const nextValue = extras[key];
       if (nextValue === undefined) {
         if (providerConfig[key] !== undefined) {
           delete providerConfig[key];
@@ -469,7 +462,7 @@ export async function sync(
     return changed;
   }
 
-  function entryMatchesProviderMap(entry: ModelIndexEntry): boolean {
+  function matchesProvider(entry: ModelIndexEntry): boolean {
     if (modelMap.has(entry.fileId) || modelMap.has(entry.id)) return true;
     const name = upstream(entry.data, providerName, entry.id);
     if (name && modelUpstreams.has(name)) return true;
@@ -477,7 +470,7 @@ export async function sync(
     return aliases.some((alias) => modelMap.has(alias) || modelUpstreams.has(alias));
   }
 
-  function findExistingEntry(modelKey: string, upstreamName: string): ModelIndexEntry | null {
+  function findEntry(modelKey: string, upstreamName: string): ModelIndexEntry | null {
     if (index[modelKey]) return index[modelKey];
 
     const entries = Object.values(index);
@@ -490,7 +483,7 @@ export async function sync(
   for (const [modelId, entry] of Object.entries(index)) {
     const providers = entry.data.providers || [];
     if (!providers.includes(providerName)) continue;
-    if (entryMatchesProviderMap(entry)) continue;
+    if (matchesProvider(entry)) continue;
 
     entry.data.providers = providers.filter((provider) => provider !== providerName);
 
@@ -506,7 +499,7 @@ export async function sync(
   }
 
   for (const [modelKey, upstreamName] of modelMap.entries()) {
-    const existing = findExistingEntry(modelKey, upstreamName);
+    const existing = findEntry(modelKey, upstreamName);
 
     if (existing) {
       const providers = existing.data.providers || [];
@@ -518,16 +511,16 @@ export async function sync(
         changed = true;
       }
 
-      const extraConfig = extraProviderConfig(modelKey);
-      const managedKeys = options.managedProviderConfigKeys ?? Object.keys(extraConfig);
+      const extras = extraConfig(modelKey);
+      const managedKeys = options.managedProviderConfigKeys ?? Object.keys(extras);
       const providerConfig = existing.data.providerConfig?.[providerName] || {};
-      const hasManagedProviderConfig = managedKeys.some((key) => providerConfig[key] !== undefined);
+      const hasManaged = managedKeys.some((key) => providerConfig[key] !== undefined);
 
-      if (upstreamName !== existing.id || Object.keys(extraConfig).length > 0 || hasManagedProviderConfig || providerConfig.upstream !== undefined) {
+      if (upstreamName !== existing.id || Object.keys(extras).length > 0 || hasManaged || providerConfig.upstream !== undefined) {
         if (!existing.data.providerConfig) existing.data.providerConfig = {};
         if (!existing.data.providerConfig[providerName]) existing.data.providerConfig[providerName] = {};
         const nextProviderConfig = existing.data.providerConfig[providerName] as Record<string, JsonValue>;
-        if (applyManagedProviderConfig(nextProviderConfig, modelKey)) {
+        if (applyManaged(nextProviderConfig, modelKey)) {
           changed = true;
         }
         if (upstreamName !== existing.id && nextProviderConfig.upstream !== upstreamName) {
@@ -547,7 +540,7 @@ export async function sync(
         updated.push(modelKey);
       }
     } else {
-      const folder = inferModelFolder(modelKey);
+      const folder = folderOf(modelKey);
       const relativeId = folder ? `${folder}/${modelKey}` : modelKey;
       const filePath = join(modelsDir, `${relativeId}${MODEL_EXT}`);
 
@@ -561,7 +554,7 @@ export async function sync(
           touched = true;
         }
 
-        const extra = extraProviderConfig(modelKey);
+        const extra = extraConfig(modelKey);
         const wantsProviderConfig = Object.keys(extra).length > 0
           || upstreamName !== (existing.id || modelKey)
           || (existing.providerConfig && existing.providerConfig[providerName]);
@@ -599,7 +592,7 @@ export async function sync(
         providers: [providerName],
       };
 
-      const providerConfig = { ...extraProviderConfig(modelKey) };
+      const providerConfig = { ...extraConfig(modelKey) };
       if (upstreamName !== modelKey) {
         providerConfig.upstream = upstreamName;
       }

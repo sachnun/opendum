@@ -4,7 +4,7 @@ import { and, asc, eq, ilike, inArray, ne, or, sql } from "drizzle-orm";
 import { db, providerAccount, proxyApiKey, user } from "@opendum/database";
 import { fromPromise } from "#web/lib/task.js";
 import { PROVIDER_ACCOUNT_KEYS } from "./account-providers.js";
-import { getAccountIndicator } from "./account-stats.js";
+import { indicatorOf } from "./account-stats.js";
 
 interface UserSearchInput {
   q?: string;
@@ -12,7 +12,7 @@ interface UserSearchInput {
   limit: number;
 }
 
-function accountIsEffectivelyActive(account: { isActive: boolean; disabledUntil: Date | string | null }, now = new Date()) {
+function isActive(account: { isActive: boolean; disabledUntil: Date | string | null }, now = new Date()) {
   if (!account.isActive) return false;
   if (!account.disabledUntil) return true;
 
@@ -54,7 +54,7 @@ export const searchAuditUsers = Effect.fn("maintainer.searchAuditUsers")(functio
 
   const users = rows.slice(0, limit);
   const userIds = users.map((item) => item.id);
-  const providerIssueUserIds = new Set<string>();
+  const issueUserIds = new Set<string>();
 
   if (userIds.length > 0) {
     const now = new Date();
@@ -68,7 +68,7 @@ export const searchAuditUsers = Effect.fn("maintainer.searchAuditUsers")(functio
         lastUsedAt: providerAccount.lastUsedAt,
         lastErrorAt: providerAccount.lastErrorAt,
         lastSuccessAt: providerAccount.lastSuccessAt,
-        lastRecoveredByRotationAt: providerAccount.lastRecoveredByRotationAt,
+        lastRecoveredAt: providerAccount.lastRecoveredAt,
       })
       .from(providerAccount)
       .where(and(
@@ -81,15 +81,15 @@ export const searchAuditUsers = Effect.fn("maintainer.searchAuditUsers")(functio
     );
 
     for (const account of accountRows) {
-      if (!accountIsEffectivelyActive(account, now)) continue;
+      if (!isActive(account, now)) continue;
 
-      const indicator = getAccountIndicator(account.lastErrorAt, account.lastSuccessAt, account.lastRecoveredByRotationAt, account.lastUsedAt);
-      if (indicator === "error") providerIssueUserIds.add(account.userId);
+      const indicator = indicatorOf(account.lastErrorAt, account.lastSuccessAt, account.lastRecoveredAt, account.lastUsedAt);
+      if (indicator === "error") issueUserIds.add(account.userId);
     }
   }
 
   return {
-    users: users.map((item) => ({ ...item, hasProviderIssue: providerIssueUserIds.has(item.id) })),
+    users: users.map((item) => ({ ...item, hasProviderIssue: issueUserIds.has(item.id) })),
     hasMore: rows.length > limit,
     nextOffset: offset + users.length,
   };

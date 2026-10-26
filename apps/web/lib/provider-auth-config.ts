@@ -4,9 +4,9 @@ import {
   OAUTH_PROVIDER_KEYS,
   PROVIDER_ACCOUNT_DEFINITIONS,
   type DeviceProviderKey,
-  type OAuthProviderKey,
+  type AuthProvider,
   type ProviderAccountKey,
-  type ProviderAuthMethodKey,
+  type AuthMethodKey,
 } from "@opendum/providers/provider-accounts";
 
 export type Provider = string;
@@ -32,7 +32,7 @@ export interface ProviderConfig {
   accountIdLabel?: string;
 }
 
-export const providerMethodLabels: Record<ProviderAuthMethodKey, { name: string; disabled?: boolean }> = {
+export const providerMethodLabels: Record<AuthMethodKey, { name: string; disabled?: boolean }> = {
   oauth_redirect: { name: "Browser OAuth" },
   device_code: { name: "Device Code" },
   api_key: { name: "API Key" },
@@ -76,11 +76,11 @@ export const providerOptions: Provider[] = [...PROVIDER_ACCOUNT_DEFINITIONS]
   .sort((a, b) => (a.displayOrder ?? Number.MAX_SAFE_INTEGER) - (b.displayOrder ?? Number.MAX_SAFE_INTEGER))
   .map((definition) => definition.key);
 
-export function isOAuthProvider(provider: Provider): provider is OAuthProviderKey {
+export function oauthCheck(provider: Provider): provider is AuthProvider {
   return (OAUTH_PROVIDER_KEYS as readonly Provider[]).includes(provider);
 }
 
-export function isDeviceProvider(provider: Provider): provider is DeviceProviderKey {
+export function isDevice(provider: Provider): provider is DeviceProviderKey {
   return (DEVICE_PROVIDER_KEYS as readonly Provider[]).includes(provider);
 }
 

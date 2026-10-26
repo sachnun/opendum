@@ -2,12 +2,12 @@ import type { AccountsData, LiveTopic, ModelsData, ServerEvent, UsageData } from
 import { consumeEventIterator } from "@orpc/client";
 import { Duration, Effect, Match, Schedule } from "effect";
 
-import { resolveApiUrl } from "../../lib/api-url";
-import { createApiClient } from "../../lib/orpc";
+import { apiUrl } from "../../lib/api-url";
+import { apiClient } from "../../lib/orpc";
 import { liveEventKey } from "./useLiveEvent";
 
 const SUBSCRIBED_TOPICS: LiveTopic[] = ["points", "accounts", "models", "usage"];
-const STREAM_IDLE_TIMEOUT_MS = 45_000;
+const IDLE_TIMEOUT_MS = 45_000;
 const STREAM_WATCHDOG_MS = 15_000;
 const RECONNECT_SCHEDULE = Schedule.min([
   Schedule.exponential(Duration.seconds(1)),
@@ -37,7 +37,7 @@ export function useEventStream(handlers: EventStreamHandlers = {}) {
     return false;
   };
 
-  const baseUrl = resolveApiUrl(config.public.apiUrl);
+  const baseUrl = apiUrl(config.public.apiUrl);
   let cancel: (() => Promise<void>) | undefined;
   let release: (() => void) | undefined;
   let stopped = false;
@@ -85,7 +85,7 @@ export function useEventStream(handlers: EventStreamHandlers = {}) {
   function startWatchdog() {
     if (watchdog) return;
     watchdog = setInterval(() => {
-      if (Date.now() - lastEventAt <= STREAM_IDLE_TIMEOUT_MS) return;
+      if (Date.now() - lastEventAt <= IDLE_TIMEOUT_MS) return;
       restart();
     }, STREAM_WATCHDOG_MS);
   }
@@ -98,7 +98,7 @@ export function useEventStream(handlers: EventStreamHandlers = {}) {
 
   async function runStream(): Promise<void> {
     lastEventAt = Date.now();
-    const client = createApiClient({ baseUrl, refresh: refreshAuth });
+    const client = apiClient({ baseUrl, refresh: refreshAuth });
     const iterator = client.events.subscribe({ topics: SUBSCRIBED_TOPICS });
 
     await new Promise<void>((resolve) => {

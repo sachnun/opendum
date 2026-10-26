@@ -8,7 +8,7 @@ import {
 } from "../core/tiers.js";
 import type { ProviderRoutingOptions, ProviderScore } from "../core/provider-performance.js";
 import { Priority, Sticky, compose } from "../core/routing.js";
-import { isPaidAccountTier } from "../core/service-helpers.js";
+import { paidTier } from "../core/service-helpers.js";
 
 function account(id: string, provider: string, extra: Partial<ProviderAccount> = {}): ProviderAccount {
   return { id, userId: "u", provider, status: "active", lastUsedAt: null, ...extra } as unknown as ProviderAccount;
@@ -18,7 +18,7 @@ function scores(entries: Record<string, number>): Map<string, ProviderScore> {
   return new Map(
     Object.entries(entries).map(([provider, score]) => [
       provider,
-      { provider, score, ttftMs: score, tokensPerSecond: 0, samples: 5 },
+      { provider, score, ttftMs: score, tokenRate: 0, samples: 5 },
     ])
   );
 }
@@ -56,10 +56,10 @@ describe("account tier policies", () => {
   });
 
   it("keeps the service-helpers wrapper behavior", () => {
-    expect(isPaidAccountTier("antigravity", "g1-pro")).toBe(true);
-    expect(isPaidAccountTier("antigravity", "pro")).toBe(false);
-    expect(isPaidAccountTier("kiro", "power")).toBe(true);
-    expect(isPaidAccountTier("opencode", "free")).toBe(false);
+    expect(paidTier("antigravity", "g1-pro")).toBe(true);
+    expect(paidTier("antigravity", "pro")).toBe(false);
+    expect(paidTier("kiro", "power")).toBe(true);
+    expect(paidTier("opencode", "free")).toBe(false);
   });
 });
 

@@ -1,7 +1,7 @@
 import { Effect } from "effect";
 import { type H3Event } from "h3";
 import type { ProxyContext } from "../core/context.js";
-import { internalErrorResponse, jsonResponse } from "./errors.js";
+import { internalResponse, jsonResponse } from "./errors.js";
 
 export async function handleModels(event: H3Event, context: ProxyContext): Promise<Response> {
   return Effect.runPromise(
@@ -9,9 +9,9 @@ export async function handleModels(event: H3Event, context: ProxyContext): Promi
       const authHeader = event.req.headers.get("authorization") ?? event.req.headers.get("x-api-key") ?? "";
 
       let userId = "";
-      let apiKeyModelAccessMode = "all";
+      let keyAccessMode = "all";
       let roamingEnabled = false;
-      const apiKeyModelSet = new Set<string>();
+      const keyModelSet = new Set<string>();
 
       if (authHeader) {
         const result = yield* context.auth.validateKey(authHeader);
@@ -22,14 +22,14 @@ export async function handleModels(event: H3Event, context: ProxyContext): Promi
           );
         }
         userId = result.userId;
-        apiKeyModelAccessMode = result.modelAccessMode;
+        keyAccessMode = result.modelAccessMode;
         roamingEnabled = result.roamingEnabled;
         for (const model of result.modelAccessList) {
-          apiKeyModelSet.add(context.models.resolveAlias(model));
+          keyModelSet.add(context.models.resolveAlias(model));
         }
       }
 
-      const allModels = context.models.formatModelsForOpenAI();
+      const allModels = context.models.openAiModels();
       if (!userId) {
         return jsonResponse({ object: "list", data: allModels });
       }
@@ -47,18 +47,18 @@ export async function handleModels(event: H3Event, context: ProxyContext): Promi
           (roamingEnabled && context.auth.usableShared(canonical, availability));
         if (!usable) continue;
         const providers = Array.isArray(item.providers) ? (item.providers as string[]) : [];
-        if (apiKeyModelAccessMode === "whitelist") {
-          if (apiKeyModelSet.has(canonical)) enabled.push(item);
+        if (keyAccessMode === "whitelist") {
+          if (keyModelSet.has(canonical)) enabled.push(item);
           for (const provider of providers) {
-            if (apiKeyModelSet.has(`${provider}/${canonical}`)) {
+            if (keyModelSet.has(`${provider}/${canonical}`)) {
               enabled.push({ ...item, id: `${provider}/${canonical}` });
             }
           }
           continue;
         }
-        if (apiKeyModelAccessMode === "blacklist") {
-          if (apiKeyModelSet.has(canonical)) continue;
-          const remaining = providers.filter((provider) => !apiKeyModelSet.has(`${provider}/${canonical}`));
+        if (keyAccessMode === "blacklist") {
+          if (keyModelSet.has(canonical)) continue;
+          const remaining = providers.filter((provider) => !keyModelSet.has(`${provider}/${canonical}`));
           enabled.push(remaining.length === providers.length ? item : { ...item, providers: remaining });
           continue;
         }
@@ -74,8 +74,8 @@ export async function handleModels(event: H3Event, context: ProxyContext): Promi
         const index = slug.indexOf("/");
         if (index > 0) slug = slug.slice(0, index);
         if (!availability.accountCountByProvider.has(slug)) continue;
-        if (apiKeyModelAccessMode === "whitelist" && !apiKeyModelSet.has(id)) continue;
-        if (apiKeyModelAccessMode === "blacklist" && apiKeyModelSet.has(id)) continue;
+        if (keyAccessMode === "whitelist" && !keyModelSet.has(id)) continue;
+        if (keyAccessMode === "blacklist" && keyModelSet.has(id)) continue;
         enabled.push(item);
       }
 
@@ -84,7 +84,7 @@ export async function handleModels(event: H3Event, context: ProxyContext): Promi
       Effect.catchCause((cause) =>
         Effect.sync(() => {
           void Effect.runFork(Effect.logError("model listing failed", { cause: String(cause) }));
-          return internalErrorResponse("openai", "Failed to list models");
+          return internalResponse("openai", "Failed to list models");
         })
       ),
       Effect.withSpan("handleModels")

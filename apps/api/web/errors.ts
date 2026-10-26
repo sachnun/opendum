@@ -37,7 +37,7 @@ export function internal(message: string, cause?: unknown): ServiceFailure {
   return new ServiceFailure({ message, status: 500, cause });
 }
 
-export function asServiceFailure(cause: unknown, message = "Request failed"): ServiceFailure {
+export function asFailure(cause: unknown, message = "Request failed"): ServiceFailure {
   if (cause instanceof ServiceFailure) return cause;
   if (cause === undefined || cause === null) return new ServiceFailure({ message, status: 500, cause });
   const text = cause instanceof Error ? cause.message : String(cause);

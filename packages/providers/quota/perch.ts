@@ -1,16 +1,16 @@
 import { Effect } from "effect";
-import { putQuotaCache } from "./cache.js";
+import { putQuota } from "./cache.js";
 import {
-  baseQuotaInfo,
+  baseInfo,
   clampFraction,
   displayNumber,
-  errorQuotaInfo,
-  expiredQuotaInfo,
+  errorInfo,
+  expiredInfo,
   formatFloat,
-  formatTimeUntilResetIso,
-  parseQuotaNumber,
-  parseQuotaRecord,
-  parseResetIso,
+  resetIso,
+  parseNumber,
+  parseRecord,
+  isoOf,
 } from "./helpers.js";
 import { quotaAttempt } from "./fetchers/shared.js";
 import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay } from "./types.js";
@@ -18,10 +18,10 @@ import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay } 
 type Json = Record<string, unknown>;
 
 const PERCH_ACCOUNT_URL = "https://app.perchai.app/api/perchai/account";
-const PERCH_MONTHLY_PT_FALLBACK = 20000;
-const PERCH_PT_PER_USD = 1000;
+const MONTHLY_FALLBACK = 20000;
+const PT_PER_USD = 1000;
 
-export function fetchPerchQuota(
+export function fetchQuota(
   ctx: QuotaContext,
   account: QuotaAccount,
   accessToken: string,
@@ -29,21 +29,21 @@ export function fetchPerchQuota(
 ): Effect.Effect<AccountQuotaInfo> {
   const token = accessToken.trim();
   if (!token) {
-    return Effect.succeed(expiredQuotaInfo("Perch access token is missing. Re-authenticate this account."));
+    return Effect.succeed(expiredInfo("Perch access token is missing. Re-authenticate this account."));
   }
   const headers = { Authorization: `Bearer ${token}`, Accept: "application/json" };
   return quotaAttempt(ctx, account, forceRefresh, "perch:account", "GET", PERCH_ACCOUNT_URL, headers, null).pipe(
     Effect.flatMap((attempt) => {
-      if (!attempt.ok) return Effect.succeed(errorQuotaInfo(attempt.message));
+      if (!attempt.ok) return Effect.succeed(errorInfo(attempt.message));
       const { result } = attempt;
       if (result.statusCode === 401 || result.statusCode === 403) {
         return Effect.succeed(
-          expiredQuotaInfo("Perch session is invalid or expired. Re-authenticate this account.")
+          expiredInfo("Perch session is invalid or expired. Re-authenticate this account.")
         );
       }
       if (result.statusCode < 200 || result.statusCode >= 300) {
         return Effect.succeed(
-          errorQuotaInfo(`Perch account quota endpoint failed: HTTP ${result.statusCode} ${result.raw}`)
+          errorInfo(`Perch account quota endpoint failed: HTTP ${result.statusCode} ${result.raw}`)
         );
       }
       const payload = (() => {
@@ -53,50 +53,50 @@ export function fetchPerchQuota(
           return null;
         }
       })();
-      if (!payload) return Effect.succeed(errorQuotaInfo("Perch account response was not valid JSON"));
+      if (!payload) return Effect.succeed(errorInfo("Perch account response was not valid JSON"));
       if (payload.ok !== true) {
         return Effect.succeed(
-          errorQuotaInfo("Perch account request was rejected. Re-authenticate this account.")
+          errorInfo("Perch account request was rejected. Re-authenticate this account.")
         );
       }
-      const session = parseQuotaRecord(payload.session) ?? {};
+      const session = parseRecord(payload.session) ?? {};
       if (session.tierSelectionRequired === true) {
         return Effect.succeed(
-          expiredQuotaInfo("Perch account has no active plan yet. Re-authenticate to select the Starter plan.")
+          expiredInfo("Perch account has no active plan yet. Re-authenticate to select the Starter plan.")
         );
       }
-      const groups = perchQuotaGroups(payload, session);
+      const groups = quotaGroups(payload, session);
       if (groups.length === 0) {
-        return Effect.succeed(errorQuotaInfo("Perch account has no usage or allowance data"));
+        return Effect.succeed(errorInfo("Perch account has no usage or allowance data"));
       }
-      return putQuotaCache(ctx, result).pipe(Effect.as(baseQuotaInfo("success", groups)));
+      return putQuota(ctx, result).pipe(Effect.as(baseInfo("success", groups)));
     })
   );
 }
 
-function perchMonthlyPtLimit(session: Json): number {
+function monthlyLimit(session: Json): number {
   const entitlements = Array.isArray(session.entitlements) ? session.entitlements : [];
   for (const raw of entitlements) {
     const entry = (raw ?? {}) as Json;
     if (entry.key !== "usage.monthly_pt") continue;
     const valueJson = (entry.value_json ?? {}) as Json;
-    const limit = parseQuotaNumber(valueJson.limit);
+    const limit = parseNumber(valueJson.limit);
     if (limit !== null && limit > 0) return limit;
   }
-  return PERCH_MONTHLY_PT_FALLBACK;
+  return MONTHLY_FALLBACK;
 }
 
 function perchPt(usd: number | null): number {
   if (usd === null) return 0;
-  return Math.max(0, usd * PERCH_PT_PER_USD);
+  return Math.max(0, usd * PT_PER_USD);
 }
 
-function perchQuotaGroups(payload: Json, session: Json): QuotaGroupDisplay[] {
+function quotaGroups(payload: Json, session: Json): QuotaGroupDisplay[] {
   const groups: QuotaGroupDisplay[] = [];
-  const meter = parseQuotaRecord(payload.usageMeter) ?? {};
-  const limit = perchMonthlyPtLimit(session);
-  const monthlyPt = parseQuotaNumber(meter.monthlyPt);
-  const monthlyUsd = parseQuotaNumber(meter.monthlyUsd);
+  const meter = parseRecord(payload.usageMeter) ?? {};
+  const limit = monthlyLimit(session);
+  const monthlyPt = parseNumber(meter.monthlyPt);
+  const monthlyUsd = parseNumber(meter.monthlyUsd);
   let monthlyUsed = Math.max(0, monthlyPt ?? 0);
   if (monthlyPt === null) monthlyUsed = Math.max(0, perchPt(monthlyUsd));
   const used = Math.min(monthlyUsed, limit);
@@ -114,19 +114,19 @@ function perchQuotaGroups(payload: Json, session: Json): QuotaGroupDisplay[] {
     remainingLabel: `${formatFloat(remaining)} / ${formatFloat(limit)} PT`,
   });
 
-  const rolling = parseQuotaRecord(meter.roostRolling);
+  const rolling = parseRecord(meter.roostRolling);
   if (rolling && rolling.enabled === true) {
-    const cap7d = parseQuotaNumber(rolling.window7dCapUsd);
+    const cap7d = parseNumber(rolling.window7dCapUsd);
     if (cap7d !== null && cap7d > 0) {
-      groups.push(perchWindowGroup("fair-use-7d", "7-day fair use", parseQuotaNumber(rolling.window7dUsd), cap7d, parseResetIso(rolling.window7dNextFreedAt)));
+      groups.push(windowGroup("fair-use-7d", "7-day fair use", parseNumber(rolling.window7dUsd), cap7d, isoOf(rolling.window7dNextFreedAt)));
     }
-    const cap5h = parseQuotaNumber(rolling.window5hCapUsd);
+    const cap5h = parseNumber(rolling.window5hCapUsd);
     if (cap5h !== null && cap5h > 0) {
-      groups.push(perchWindowGroup("fair-use-5h", "5-hour fair use", parseQuotaNumber(rolling.window5hUsd), cap5h, parseResetIso(rolling.window5hNextFreedAt)));
+      groups.push(windowGroup("fair-use-5h", "5-hour fair use", parseNumber(rolling.window5hUsd), cap5h, isoOf(rolling.window5hNextFreedAt)));
     }
   }
 
-  const credits = parseQuotaNumber(payload.creditBalancePt);
+  const credits = parseNumber(payload.creditBalancePt);
   if (credits !== null && credits > 0) {
     const balance = Math.floor(credits);
     groups.push({
@@ -144,12 +144,12 @@ function perchQuotaGroups(payload: Json, session: Json): QuotaGroupDisplay[] {
   return groups;
 }
 
-function perchWindowGroup(
+function windowGroup(
   name: string,
   display: string,
   usedUsd: number | null,
   capUsd: number,
-  resetIso: string | null
+  resetValue: string | null
 ): QuotaGroupDisplay {
   const used = Math.max(0, usedUsd ?? 0);
   const cap = Math.max(0, capUsd);
@@ -161,8 +161,8 @@ function perchWindowGroup(
     remainingRequests: displayNumber(remaining),
     maxRequests: displayNumber(cap),
     usedRequests: displayNumber(used),
-    resetTimeIso: resetIso,
-    resetInHuman: formatTimeUntilResetIso(resetIso),
+    resetTimeIso: resetValue,
+    resetInHuman: resetIso(resetValue),
     remainingLabel: `$${formatFloat(remaining)} / $${formatFloat(cap)}`,
   };
 }

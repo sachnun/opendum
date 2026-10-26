@@ -6,7 +6,7 @@ const CLOUDFLARE_CHALLENGE_MARKERS = [
   "Just a moment",
 ];
 
-export function isLikelyCloudflareChallenge(
+export function isChallenge(
   response: Response,
   body: string
 ): boolean {
@@ -20,7 +20,7 @@ export function isLikelyCloudflareChallenge(
   );
 }
 
-export function formatProviderHttpError(
+export function httpError(
   providerLabel: string,
   response: Response,
   body: string,
@@ -30,7 +30,7 @@ export function formatProviderHttpError(
   const cfRay = response.headers.get("cf-ray");
   const cfRaySuffix = cfRay ? ` (cf-ray: ${cfRay})` : "";
 
-  if (isLikelyCloudflareChallenge(response, body)) {
+  if (isChallenge(response, body)) {
     return `${providerLabel} ${endpointLabel} returned HTTP ${response.status} from Cloudflare${cfRaySuffix}`;
   }
 

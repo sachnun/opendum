@@ -1,10 +1,10 @@
-export type ModelFamilyRankingEntry = {
+export type RankingEntry = {
   name: string;
   anchorId: string;
   score: number;
 };
 
-export const MODEL_FAMILY_RANKING: readonly ModelFamilyRankingEntry[] = [
+export const MODEL_FAMILY_RANKING: readonly RankingEntry[] = [
   { name: "Anthropic", anchorId: "anthropic-models", score: 57.6 },
   { name: "OpenAI", anchorId: "openai-models", score: 52.7 },
   { name: "Google", anchorId: "google-models", score: 52.6 },

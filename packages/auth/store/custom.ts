@@ -2,7 +2,7 @@ import { Effect } from "effect";
 import type { DatabaseFailure } from "@opendum/database";
 import {
   getCustomProvider,
-  listCustomProviderModels,
+  customModels,
   listCustomProviders,
 } from "@opendum/database/queries";
 
@@ -16,7 +16,7 @@ export type CustomProviderRecord = {
   enabled: boolean;
 };
 
-export type CustomProviderModelRecord = {
+export type ModelRecord = {
   id: string;
   providerId: string;
   modelId: string;
@@ -35,13 +35,13 @@ export type CustomProviderModelRecord = {
 export interface CustomProviderReader {
   listProviders(userId: string): Effect.Effect<CustomProviderRecord[], DatabaseFailure>;
   getProvider(userId: string, slug: string): Effect.Effect<CustomProviderRecord | null, DatabaseFailure>;
-  listModels(providerId: string): Effect.Effect<CustomProviderModelRecord[], DatabaseFailure>;
+  listModels(providerId: string): Effect.Effect<ModelRecord[], DatabaseFailure>;
 }
 
-export function createCustomStore(): CustomProviderReader {
+export function customStore(): CustomProviderReader {
   return {
     listProviders: (userId) => listCustomProviders(userId),
     getProvider: (userId, slug) => getCustomProvider(userId, slug),
-    listModels: (providerId) => listCustomProviderModels(providerId),
+    listModels: (providerId) => customModels(providerId),
   };
 }

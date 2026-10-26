@@ -4,11 +4,11 @@ import { playgroundSignature } from "@opendum/core/crypto";
 import { implement } from "@orpc/server";
 import { Effect } from "effect";
 
-import { getProxyContext } from "../../context.js";
+import { proxyContext } from "../../context.js";
 import { runOrpc } from "./run.js";
-import { publishModelsChanged, subscribeUserEvents } from "#web/events/bus.js";
+import { publishModels, subscribeEvents } from "#web/events/bus.js";
 import "#web/events/snapshots.js";
-import { requestOriginFromHeaders } from "#web/lib/request-origin.js";
+import { originOf } from "#web/lib/request-origin.js";
 import * as accountAuth from "#web/services/account-auth.js";
 import * as accountQuota from "#web/services/account-quota.js";
 import * as accounts from "#web/services/accounts.js";
@@ -19,14 +19,14 @@ import * as maintainer from "#web/services/maintainer.js";
 import * as models from "#web/services/models.js";
 import * as ops from "#web/services/ops.js";
 import { getPlaygroundOptions } from "#web/services/playground.js";
-import { claimDailyAccessPoints, getUserPointStatus } from "#web/services/points.js";
-import { getUserSharingEnabled, setUserSharingEnabled } from "#web/services/sharing.js";
-import { requireMaintainer, requireWritable, resolveRequestContext, type OrpcInitialContext } from "./context.js";
+import { claimDaily, pointStatus } from "#web/services/points.js";
+import { sharingEnabled, setSharing } from "#web/services/sharing.js";
+import { requireMaintainer, requireWritable, resolveContext, type OrpcInitialContext } from "./context.js";
 
 const base = implement(contract).$context<OrpcInitialContext>();
 
 const authed = base.use(async ({ context, next }) => {
-  const requestContext = await Effect.runPromise(resolveRequestContext(context.headers));
+  const requestContext = await Effect.runPromise(resolveContext(context.headers));
   return next({ context: { ...context, requestContext } });
 });
 
@@ -40,7 +40,7 @@ const maintainerOnly = authed.use(async ({ context, next }) => {
   return next({ context });
 });
 
-function playgroundEndpointPath(endpoint: "chat_completions" | "messages" | "responses"): string {
+function endpointPath(endpoint: "chat_completions" | "messages" | "responses"): string {
   if (endpoint === "messages") return "/v1/messages";
   if (endpoint === "responses") return "/v1/responses";
   return "/v1/chat/completions";
@@ -54,17 +54,17 @@ export const router = authed.router({
     search: authed.models.search.handler(({ context }) =>
       runOrpc(models.searchModels(context.requestContext.userId))
     ),
-    catalog: authed.models.catalog.handler(() => models.listKnownModels()),
-    families: authed.models.families.handler(() => models.getModelFamilyCounts()),
+    catalog: authed.models.catalog.handler(() => models.knownModels()),
+    families: authed.models.families.handler(() => models.familyCounts()),
     stats: authed.models.stats.handler(({ context, input }) =>
       runOrpc(models.getModelStats(context.requestContext.userId, input))
     ),
     enable: writable.models.enable.handler(({ context, input }) =>
       runOrpc(
-        models.setModelEnabled(context.requestContext.userId, input).pipe(
+        models.enableModel(context.requestContext.userId, input).pipe(
           Effect.tap((result) =>
             Effect.sync(() => {
-              if (result.success) publishModelsChanged(context.requestContext.userId);
+              if (result.success) publishModels(context.requestContext.userId);
             })
           )
         )
@@ -73,7 +73,7 @@ export const router = authed.router({
   },
   events: {
     subscribe: authed.events.subscribe.handler(({ context, input, signal }) =>
-      subscribeUserEvents(context.requestContext.userId, input.topics, signal)
+      subscribeEvents(context.requestContext.userId, input.topics, signal)
     ),
   },
   admin: {
@@ -81,10 +81,10 @@ export const router = authed.router({
       Effect.runPromise(
         Effect.flatMap(
           Effect.tryPromise({
-            try: () => getProxyContext(),
+            try: () => proxyContext(),
             catch: (cause) => new ORPCError("INTERNAL_SERVER_ERROR", { message: String(cause) }),
           }),
-          (context) => ops.runOpsAccountQuota(context, input)
+          (context) => ops.opsQuota(context, input)
         )
       )
     ),
@@ -92,7 +92,7 @@ export const router = authed.router({
       Effect.runPromise(
         Effect.flatMap(
           Effect.tryPromise({
-            try: () => getProxyContext(),
+            try: () => proxyContext(),
             catch: (cause) => new ORPCError("INTERNAL_SERVER_ERROR", { message: String(cause) }),
           }),
           (context) => ops.runOpsRelay(context, input)
@@ -122,10 +122,10 @@ export const router = authed.router({
       )
     ),
     provider: authed.accounts.provider.handler(({ context, input }) =>
-      runOrpc(accounts.listAccountsByProvider(context.requestContext.userId, input))
+      runOrpc(accounts.listByProvider(context.requestContext.userId, input))
     ),
     detail: authed.accounts.detail.handler(({ context, input }) =>
-      runOrpc(accounts.getAccountsByProviderDetailed(context.requestContext.userId, input))
+      runOrpc(accounts.accountsDetailed(context.requestContext.userId, input))
     ),
     stats: authed.accounts.stats.handler(({ context, input }) =>
       runOrpc(accounts.getAccountStats(context.requestContext.userId, { accountIds: input.accountIds }))
@@ -143,13 +143,13 @@ export const router = authed.router({
       runOrpc(accounts.togglePinnedProvider(context.requestContext.userId, input))
     ),
     enable: writable.accounts.enable.handler(({ context, input }) =>
-      runOrpc(accounts.setAccountModelEnabled(context.requestContext.userId, input))
+      runOrpc(accounts.enableModel(context.requestContext.userId, input))
     ),
     error: authed.accounts.error.handler(({ context, input }) =>
-      runOrpc(accounts.getAccountErrorHistory(context.requestContext.userId, input))
+      runOrpc(accounts.errorHistory(context.requestContext.userId, input))
     ),
     errors: authed.accounts.errors.handler(({ context, input }) =>
-      runOrpc(accounts.getAccountErrorHistories(context.requestContext.userId, input))
+      runOrpc(accounts.errorHistories(context.requestContext.userId, input))
     ),
     resolve: authed.accounts.resolve.handler(({ context, input }) =>
       runOrpc(accounts.resolveAccountErrors(context.requestContext.userId, input))
@@ -160,18 +160,18 @@ export const router = authed.router({
       }
       return runOrpc(accounts.getAccountSession(context.requestContext.userId, input));
     }),
-    auth: writable.accounts.auth.handler(({ input }) => runOrpc(accountAuth.getAccountAuthUrl(input))),
+    auth: writable.accounts.auth.handler(({ input }) => runOrpc(accountAuth.authUrlFor(input))),
     exchange: writable.accounts.exchange.handler(({ context, input }) =>
-      runOrpc(accountAuth.exchangeOAuthAccount(context.requestContext.userId, input))
+      runOrpc(accountAuth.exchangeAccount(context.requestContext.userId, input))
     ),
     initiate: writable.accounts.initiate.handler(({ input }) =>
       runOrpc(accountAuth.initiateDeviceAuth(input))
     ),
     poll: writable.accounts.poll.handler(({ context, input }) =>
-      runOrpc(accountAuth.pollDeviceAuth(context.requestContext.userId, input))
+      runOrpc(accountAuth.pollAuth(context.requestContext.userId, input))
     ),
     codex: writable.accounts.codex.handler(({ context, input }) =>
-      runOrpc(accountAuth.connectCodexSessionAccount(context.requestContext.userId, input))
+      runOrpc(accountAuth.connectCodex(context.requestContext.userId, input))
     ),
     quota: authed.accounts.quota.handler(({ context, input }) =>
       runOrpc(
@@ -199,7 +199,7 @@ export const router = authed.router({
       )
     ),
     options: authed.keys.options.handler(({ context }) =>
-      runOrpc(apiKeys.getApiKeyOptions(context.requestContext.userId))
+      runOrpc(apiKeys.getOptions(context.requestContext.userId))
     ),
     create: writable.keys.create.handler(({ context, input }) =>
       runOrpc(apiKeys.createApiKey(context.requestContext.userId, input))
@@ -208,22 +208,22 @@ export const router = authed.router({
       runOrpc(apiKeys.deleteApiKey(context.requestContext.userId, input.id))
     ),
     rename: writable.keys.rename.handler(({ context, input }) =>
-      runOrpc(apiKeys.updateApiKeyName(context.requestContext.userId, input))
+      runOrpc(apiKeys.updateName(context.requestContext.userId, input))
     ),
     expire: writable.keys.expire.handler(({ context, input }) =>
-      runOrpc(apiKeys.updateApiKeyExpiration(context.requestContext.userId, input))
+      runOrpc(apiKeys.updateExpiration(context.requestContext.userId, input))
     ),
     roaming: writable.keys.roaming.handler(({ context, input }) =>
-      runOrpc(apiKeys.updateApiKeyRoaming(context.requestContext.userId, input))
+      runOrpc(apiKeys.updateRoaming(context.requestContext.userId, input))
     ),
     models: writable.keys.models.handler(({ context, input }) =>
-      runOrpc(apiKeys.updateApiKeyModelAccess(context.requestContext.userId, input))
+      runOrpc(apiKeys.updateModels(context.requestContext.userId, input))
     ),
     accounts: writable.keys.accounts.handler(({ context, input }) =>
-      runOrpc(apiKeys.updateApiKeyAccountAccess(context.requestContext.userId, input))
+      runOrpc(apiKeys.updateAccess(context.requestContext.userId, input))
     ),
     limits: writable.keys.limits.handler(({ context, input }) =>
-      runOrpc(apiKeys.updateApiKeyRateLimits(context.requestContext.userId, input))
+      runOrpc(apiKeys.updateRateLimits(context.requestContext.userId, input))
     ),
     reveal: writable.keys.reveal.handler(({ context, input }) =>
       runOrpc(apiKeys.revealApiKey(context.requestContext.userId, input.id))
@@ -247,7 +247,7 @@ export const router = authed.router({
     ),
     connect: writable.providers.connect.handler(({ context, input }) =>
       runOrpc(
-        customProviders.connectCustomProviderAccount(
+        customProviders.connectCustom(
           context.requestContext.userId,
           input.slug,
           input.token,
@@ -287,10 +287,10 @@ export const router = authed.router({
       runOrpc(
         Effect.gen(function* () {
           const requestContext = context.requestContext;
-          const [pointStatus, sharingEnabled] = yield* Effect.all(
+          const [points, sharing] = yield* Effect.all(
             [
-              getUserPointStatus(requestContext.userId),
-              getUserSharingEnabled(requestContext.userId),
+              pointStatus(requestContext.userId),
+              sharingEnabled(requestContext.userId),
             ],
             { concurrency: "unbounded" }
           );
@@ -299,10 +299,10 @@ export const router = authed.router({
             role: requestContext.role,
             isMaintainer: requestContext.isMaintainer,
             points: {
-              balance: pointStatus.balance,
-              roamingPointsByApiKeyId: pointStatus.roamingPointsByApiKeyId,
+              balance: points.balance,
+              roamingByKey: points.roamingByKey,
             },
-            sharing: { enabled: sharingEnabled },
+            sharing: { enabled: sharing },
             actor: requestContext.actor,
             audit: {
               active: requestContext.isAuditMode,
@@ -319,18 +319,18 @@ export const router = authed.router({
       runOrpc(
         Effect.gen(function* () {
           const requestContext = context.requestContext;
-          yield* claimDailyAccessPoints(requestContext.actor.id).pipe(Effect.ignore);
-          return yield* getUserPointStatus(requestContext.userId);
+          yield* claimDaily(requestContext.actor.id).pipe(Effect.ignore);
+          return yield* pointStatus(requestContext.userId);
         })
       )
     ),
   },
   sharing: {
     get: authed.sharing.get.handler(({ context }) =>
-      runOrpc(getUserSharingEnabled(context.requestContext.userId))
+      runOrpc(sharingEnabled(context.requestContext.userId))
     ),
     update: writable.sharing.update.handler(({ context, input }) =>
-      runOrpc(setUserSharingEnabled(context.requestContext.userId, input.enabled))
+      runOrpc(setSharing(context.requestContext.userId, input.enabled))
     ),
   },
   playground: {
@@ -338,7 +338,7 @@ export const router = authed.router({
       runOrpc(
         getPlaygroundOptions(
           context.requestContext.userId,
-          requestOriginFromHeaders(context.headers, context.url)
+          originOf(context.headers, context.url)
         )
       )
     ),
@@ -346,7 +346,7 @@ export const router = authed.router({
       const requestContext = context.requestContext;
       const timestamp = String(Math.floor(Date.now() / 1000));
       const method = "POST";
-      const path = playgroundEndpointPath(input.endpoint);
+      const path = endpointPath(input.endpoint);
       const secret = process.env.BETTER_AUTH_SECRET;
       if (!secret) throw new ORPCError("INTERNAL_SERVER_ERROR", { message: "BETTER_AUTH_SECRET is required" });
 

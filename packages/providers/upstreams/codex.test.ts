@@ -4,7 +4,7 @@ import type { Registry } from "@opendum/models/runtime";
 import { CODEX_CLIENT_ID, CODEX_TOKEN_ENDPOINT } from "../endpoints.js";
 import type { UpstreamTransport } from "../core/http.js";
 import type { ProviderAccount } from "../types.js";
-import { CodexProvider, responsesStreamToCompletion } from "./codex.js";
+import { CodexProvider, fromResponses } from "./codex.js";
 
 const account = { id: "acc-1" } as unknown as ProviderAccount;
 
@@ -107,9 +107,9 @@ function choiceOf(completion: Record<string, unknown>): { message: Record<string
   return { message: choice.message as Record<string, unknown>, finishReason: choice.finish_reason as string };
 }
 
-describe("responsesStreamToCompletion", () => {
+describe("fromResponses", () => {
   it("aggregates text, reasoning, tool calls and usage", () => {
-    const completion = responsesStreamToCompletion(
+    const completion = fromResponses(
       sse(
         { type: "response.output_text.delta", delta: "he" },
         { type: "response.output_text.delta", delta: "llo" },
@@ -139,7 +139,7 @@ describe("responsesStreamToCompletion", () => {
   });
 
   it("maps an incomplete response without tools to a length finish reason", () => {
-    const completion = responsesStreamToCompletion(
+    const completion = fromResponses(
       sse({ type: "response.completed", response: { status: "incomplete" } }),
       "m"
     );
@@ -151,7 +151,7 @@ describe("responsesStreamToCompletion", () => {
   });
 
   it("prefers tool calls over a length finish reason", () => {
-    const completion = responsesStreamToCompletion(
+    const completion = fromResponses(
       sse(
         { type: "response.output_item.added", item: { type: "function_call", id: "fc_2", name: "f" } },
         { type: "response.function_call_arguments.done" },

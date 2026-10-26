@@ -1,9 +1,9 @@
 import { Effect } from "effect";
 import type { OpendumRedis } from "./client.js";
-import { accountAffinityKey } from "./keys.js";
+import { affinityKey } from "./keys.js";
 
 const DEFAULT_TTL_SECONDS = 24 * 60 * 60;
-const FAILURE_LOG_INTERVAL_MS = 30_000;
+const LOG_INTERVAL_MS = 30_000;
 
 export const OWN_ACCOUNT_SCOPE = "";
 export const SHARED_ACCOUNT_SCOPE = "shared";
@@ -12,7 +12,7 @@ export class AccountAffinity {
   private readonly redis: OpendumRedis;
   private readonly providers: Set<string>;
   private readonly ttlSeconds: number;
-  private lastFailureLogAt = 0;
+  private lastLogAt = 0;
 
   constructor(redis: OpendumRedis, providers: Iterable<string>, ttlSeconds = DEFAULT_TTL_SECONDS) {
     this.redis = redis;
@@ -31,7 +31,7 @@ export class AccountAffinity {
   lookup(userId: string, scope = OWN_ACCOUNT_SCOPE): Effect.Effect<string> {
     if (userId.trim() === "") return Effect.succeed("");
     return Effect.tryPromise({
-      try: async () => (await this.redis.get(accountAffinityKey(userId, scope))) ?? "",
+      try: async () => (await this.redis.get(affinityKey(userId, scope))) ?? "",
       catch: (error) => (error instanceof Error ? error : new Error(String(error))),
     }).pipe(
       Effect.tapError((error) => this.logFailure("lookup", error, scope)),
@@ -43,7 +43,7 @@ export class AccountAffinity {
     if (userId.trim() === "" || accountId.trim() === "") return Effect.void;
     return Effect.tryPromise({
       try: async () => {
-        await this.redis.set(accountAffinityKey(userId, scope), accountId, { EX: this.ttlSeconds });
+        await this.redis.set(affinityKey(userId, scope), accountId, { EX: this.ttlSeconds });
       },
       catch: (error) => (error instanceof Error ? error : new Error(String(error))),
     }).pipe(
@@ -54,8 +54,8 @@ export class AccountAffinity {
 
   private logFailure(action: string, error: Error, scope: string): Effect.Effect<void> {
     const now = Date.now();
-    if (now - this.lastFailureLogAt < FAILURE_LOG_INTERVAL_MS) return Effect.void;
-    this.lastFailureLogAt = now;
+    if (now - this.lastLogAt < LOG_INTERVAL_MS) return Effect.void;
+    this.lastLogAt = now;
     return Effect.logWarning("account affinity unavailable, routing without it", {
       action,
       scope,

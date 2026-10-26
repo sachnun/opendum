@@ -1,7 +1,7 @@
 import { Effect } from "effect";
 
 import { ModelDecodeFailure, asError } from "../errors.ts";
-import { aesGcmDecrypt, decodeText, fromHex, gunzip, sha256Bytes } from "../fs.ts";
+import { decryptAes, decodeText, fromHex, gunzip, sha256Bytes } from "../fs.ts";
 
 export interface AaEntry {
   slug: string;
@@ -27,7 +27,7 @@ const LAB_TOKENS: ReadonlySet<string> = new Set([
   "thinkingmachines", "upstage", "xiaomi", "xai", "zhipuai",
 ]);
 
-export function normalizeAaSlug(value: unknown): string {
+export function normalizeSlug(value: unknown): string {
   return String(value ?? "")
     .toLowerCase()
     .replace(/^[^/]*\//, "")
@@ -38,7 +38,7 @@ export function normalizeAaSlug(value: unknown): string {
     .replace(/^-|-$/g, "");
 }
 
-export function stripEffortSuffix(slug: string): string {
+export function stripEffort(slug: string): string {
   let current = slug;
   for (;;) {
     const next = current.replace(EFFORT_SUFFIX, "");
@@ -130,7 +130,7 @@ export interface AaManifest {
 
 const MANIFEST_PATTERN = /"manifest":\{"path":"([^"]+)","key":"([0-9a-fA-F]+)"\}/;
 
-function recordsToEntries(records: readonly Record<string, unknown>[]): AaEntry[] {
+function recordEntries(records: readonly Record<string, unknown>[]): AaEntry[] {
   const models: AaEntry[] = [];
   for (const record of records) {
     const slug = typeof record.slug === "string" ? record.slug.trim() : "";
@@ -146,16 +146,16 @@ function recordsToEntries(records: readonly Record<string, unknown>[]): AaEntry[
 }
 
 export function parseLeaderboard(html: string): AaEntry[] {
-  return recordsToEntries(scoredModels(flightPayload(html)));
+  return recordEntries(scoredModels(flightPayload(html)));
 }
 
-export function parseLeaderboardManifest(html: string): AaManifest | null {
+export function parseManifest(html: string): AaManifest | null {
   const match = MANIFEST_PATTERN.exec(flightPayload(html));
   if (!match) return null;
   return { path: match[1]!, key: match[2]! };
 }
 
-function sealWithTag(payload: Uint8Array): Uint8Array | null {
+function seal(payload: Uint8Array): Uint8Array | null {
   const tagLength = 16;
   if (payload.length <= tagLength) return null;
   const body = payload.subarray(0, payload.length - tagLength);
@@ -166,10 +166,10 @@ function sealWithTag(payload: Uint8Array): Uint8Array | null {
   return sealed;
 }
 
-function entriesFromPlain(plain: Uint8Array): AaEntry[] {
+function plainEntries(plain: Uint8Array): AaEntry[] {
   const records = JSON.parse(decodeText(gunzip(plain))) as unknown;
   if (!Array.isArray(records)) return [];
-  return recordsToEntries(
+  return recordEntries(
     records.filter(
       (record): record is Record<string, unknown> =>
         record !== null && typeof record === "object" && typeof (record as Record<string, unknown>).intelligenceIndex === "number",
@@ -177,23 +177,23 @@ function entriesFromPlain(plain: Uint8Array): AaEntry[] {
   );
 }
 
-export async function decodeLeaderboardManifest(
+export async function decodeManifest(
   payload: Uint8Array,
   keyHex: string
 ): Promise<AaEntry[]> {
   const key = fromHex(keyHex);
   const iv = sha256Bytes(key).subarray(0, 12);
-  const sealed = sealWithTag(payload);
+  const sealed = seal(payload);
   if (!sealed) return [];
-  return entriesFromPlain(await aesGcmDecrypt(key, iv, sealed));
+  return plainEntries(await decryptAes(key, iv, sealed));
 }
 
-export function tryDecodeLeaderboardManifest(
+export function tryDecode(
   payload: Uint8Array,
   keyHex: string
 ): Effect.Effect<AaEntry[], ModelDecodeFailure> {
   return Effect.tryPromise({
-    try: () => decodeLeaderboardManifest(payload, keyHex),
+    try: () => decodeManifest(payload, keyHex),
     catch: (cause) =>
       new ModelDecodeFailure({
         message: `invalid Artificial Analysis manifest: ${asError(cause).message}`,
@@ -203,10 +203,10 @@ export function tryDecodeLeaderboardManifest(
   });
 }
 
-export function buildAaIndex(models: readonly AaEntry[]): AaIndex {
+export function aaIndex(models: readonly AaEntry[]): AaIndex {
   const bySlug = new Map<string, AaEntry>();
   for (const model of models) {
-    const key = normalizeAaSlug(model.slug);
+    const key = normalizeSlug(model.slug);
     if (!key) continue;
     const existing = bySlug.get(key);
     if (!existing || model.index > existing.index) bySlug.set(key, model);
@@ -214,7 +214,7 @@ export function buildAaIndex(models: readonly AaEntry[]): AaIndex {
 
   const byEffortlessSlug = new Map<string, AaEntry>();
   for (const entry of bySlug.values()) {
-    const base = stripEffortSuffix(normalizeAaSlug(entry.slug));
+    const base = stripEffort(normalizeSlug(entry.slug));
     if (!bySlug.has(base)) continue;
     const existing = byEffortlessSlug.get(base);
     if (!existing || entry.index > existing.index) byEffortlessSlug.set(base, entry);
@@ -222,10 +222,10 @@ export function buildAaIndex(models: readonly AaEntry[]): AaIndex {
 
   const byShape = new Map<string, Map<string, AaEntry>>();
   for (const entry of bySlug.values()) {
-    const key = canonicalShape(normalizeAaSlug(entry.slug));
+    const key = canonicalShape(normalizeSlug(entry.slug));
     if (!key) continue;
     const sizes = byShape.get(key) ?? new Map<string, AaEntry>();
-    const size = sizeSignature(normalizeAaSlug(entry.slug));
+    const size = sizeSignature(normalizeSlug(entry.slug));
     const existing = sizes.get(size);
     if (!existing || entry.index > existing.index) sizes.set(size, entry);
     byShape.set(key, sizes);
@@ -234,10 +234,10 @@ export function buildAaIndex(models: readonly AaEntry[]): AaIndex {
   return { bySlug, byEffortlessSlug, byShape };
 }
 
-export function resolveAaScore(probes: Iterable<string | null | undefined>, index: AaIndex): AaEntry | null {
+export function aaScore(probes: Iterable<string | null | undefined>, index: AaIndex): AaEntry | null {
   const keys = new Set<string>();
   for (const probe of probes) {
-    const key = normalizeAaSlug(probe);
+    const key = normalizeSlug(probe);
     if (key) keys.add(key);
   }
 
@@ -246,7 +246,7 @@ export function resolveAaScore(probes: Iterable<string | null | undefined>, inde
     if (hit) return hit;
   }
   for (const key of keys) {
-    const hit = index.byEffortlessSlug.get(stripEffortSuffix(key));
+    const hit = index.byEffortlessSlug.get(stripEffort(key));
     if (hit) return hit;
   }
 

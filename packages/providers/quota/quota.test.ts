@@ -5,11 +5,11 @@ import {
   clampFraction,
   displayNumber,
   formatFloat,
-  formatTimeUntilReset,
+  resetText,
   isQuota,
-  parseQuotaNumber,
-  parseResetIso,
-  quotaFallbackTier,
+  parseNumber,
+  isoOf,
+  fallbackTier,
   withoutToken,
 } from "./index.js";
 import type { AccountQuotaInfo, QuotaContext, QuotaFetcher } from "./index.js";
@@ -29,29 +29,29 @@ describe("quota helpers", () => {
   });
 
   it("parses quota numbers", () => {
-    expect(parseQuotaNumber("12.5")).toBe(12.5);
-    expect(parseQuotaNumber(7)).toBe(7);
-    expect(parseQuotaNumber("nope")).toBe(null);
+    expect(parseNumber("12.5")).toBe(12.5);
+    expect(parseNumber(7)).toBe(7);
+    expect(parseNumber("nope")).toBe(null);
   });
 
   it("normalizes reset ISO values", () => {
-    expect(parseResetIso("2026-01-01T00:00:00Z")).toBe("2026-01-01T00:00:00.000Z");
-    expect(parseResetIso(1_700_000_000)).toBe("2023-11-14T22:13:20.000Z");
-    expect(parseResetIso("not-a-date")).toBe(null);
+    expect(isoOf("2026-01-01T00:00:00Z")).toBe("2026-01-01T00:00:00.000Z");
+    expect(isoOf(1_700_000_000)).toBe("2023-11-14T22:13:20.000Z");
+    expect(isoOf("not-a-date")).toBe(null);
   });
 
   it("formats time until reset", () => {
     setSystemTime(new Date(1_000_000));
-    expect(formatTimeUntilReset(1_000_000 + 90 * 60 * 1000)).toBe("1h 30m");
-    expect(formatTimeUntilReset(1_000_000 + 25 * 60 * 1000)).toBe("25m");
+    expect(resetText(1_000_000 + 90 * 60 * 1000)).toBe("1h 30m");
+    expect(resetText(1_000_000 + 25 * 60 * 1000)).toBe("25m");
     setSystemTime();
-    expect(formatTimeUntilReset(1)).toBe("resetting...");
-    expect(formatTimeUntilReset(0)).toBe(null);
+    expect(resetText(1)).toBe("resetting...");
+    expect(resetText(0)).toBe(null);
   });
 
   it("falls back to free tier", () => {
-    expect(quotaFallbackTier({ id: "1", userId: "u", provider: "kiro", tier: "pro" })).toBe("pro");
-    expect(quotaFallbackTier({ id: "1", userId: "u", provider: "kiro", tier: null })).toBe("free");
+    expect(fallbackTier({ id: "1", userId: "u", provider: "kiro", tier: "pro" })).toBe("pro");
+    expect(fallbackTier({ id: "1", userId: "u", provider: "kiro", tier: null })).toBe("free");
   });
 });
 

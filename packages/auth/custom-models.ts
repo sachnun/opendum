@@ -2,7 +2,7 @@ import { Effect } from "effect";
 import type { DatabaseFailure } from "@opendum/database";
 import type { Registry } from "@opendum/models/runtime";
 import { invalid, valid } from "./results.js";
-import type { CustomProviderModelRecord, CustomProviderReader } from "./store/custom.js";
+import type { ModelRecord, CustomProviderReader } from "./store/custom.js";
 import type { ModelValidationResult } from "./types.js";
 
 export class CustomModels {
@@ -88,7 +88,7 @@ export class CustomModels {
 
 function vision(
   registry: Registry,
-  row: CustomProviderModelRecord
+  row: ModelRecord
 ): boolean {
   const candidates = [row.upstream, row.modelId].filter(
     (value): value is string => Boolean(value && value.length > 0)

@@ -7,7 +7,7 @@ import {
   normalizeName,
   resolveCandidates,
   similarityScore,
-  stripDateSuffix,
+  stripDate,
 } from "./similarity.ts";
 
 test("normalizeName strips provider prefix, suffixes and separators", () => {
@@ -23,11 +23,11 @@ test("normalizeName strips batch and thinking suffixes", () => {
   expect(normalizeName("vendor/mock-model:thinking")).toBe("mock-model");
 });
 
-test("stripDateSuffix only removes 4-8 digit trailing tokens", () => {
-  expect(stripDateSuffix("mock-model-20250514")).toBe("mock-model");
-  expect(stripDateSuffix("mock-model-0813")).toBe("mock-model");
-  expect(stripDateSuffix("mock-model-4")).toBe("mock-model-4");
-  expect(stripDateSuffix("20250514")).toBe("20250514");
+test("stripDate only removes 4-8 digit trailing tokens", () => {
+  expect(stripDate("mock-model-20250514")).toBe("mock-model");
+  expect(stripDate("mock-model-0813")).toBe("mock-model");
+  expect(stripDate("mock-model-4")).toBe("mock-model-4");
+  expect(stripDate("20250514")).toBe("20250514");
 });
 
 test("normalizeKey combines normalization and date stripping", () => {

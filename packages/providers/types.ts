@@ -40,7 +40,7 @@ export type ProviderRequest = {
   credentials: string;
   body: Record<string, unknown>;
   stream: boolean;
-  onUpstreamResponseStart?: () => void;
+  onResponseStart?: () => void;
   sessionId?: string;
   requestId?: string;
   projectId?: string;
@@ -66,4 +66,4 @@ export interface RefreshBufferProvider {
   refreshBuffer(): number;
 }
 
-export const OAUTH_REFRESH_BUFFER_MS = 3 * 60 * 60 * 1000;
+export const REFRESH_BUFFER_MS = 3 * 60 * 60 * 1000;

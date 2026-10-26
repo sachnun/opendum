@@ -83,7 +83,7 @@ function decodeFailure(path: string, message: string, cause: unknown): ModelPars
   return new ModelParseFailure({ message, path, cause });
 }
 
-export function decodeModelData(
+export function decodeModel(
   content: string,
   path: string
 ): Effect.Effect<ModelData, ModelParseFailure> {
@@ -93,7 +93,7 @@ export function decodeModelData(
   );
 }
 
-export function decodeModelDataSync(content: string, path: string): ModelData {
+export function decodeSync(content: string, path: string): ModelData {
   try {
     return Schema.decodeUnknownSync(JsonFromString)(content) as ModelData;
   } catch (cause) {
@@ -101,7 +101,7 @@ export function decodeModelDataSync(content: string, path: string): ModelData {
   }
 }
 
-export function validateModelData(
+export function validateModel(
   data: ModelData,
   path: string
 ): Effect.Effect<ModelData, ModelParseFailure> {
@@ -111,7 +111,7 @@ export function validateModelData(
   );
 }
 
-export function validateProviderConfig(value: unknown): ProviderModelConfig | null {
+export function validateConfig(value: unknown): ProviderModelConfig | null {
   const decoded = Schema.decodeUnknownOption(ProviderConfigSchema)(value);
   return decoded._tag === "Some" ? (decoded.value as ProviderModelConfig) : null;
 }

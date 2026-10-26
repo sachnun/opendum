@@ -1,19 +1,11 @@
-import {
-  contentToText,
-  defaultStringValue,
-  isTruthful,
-  numberFromAny,
-  parseJsonRecord,
-  randomId,
-  stringValue,
-} from "../core/helpers.js";
-import { convertImageURLsToBase64, type ImageFetch } from "../core/images.js";
+import { Value, Payload, Ids, JSONText } from "../core/helpers.js";
+import { ChatImageInliner, type ImageFetch } from "../core/images.js";
 
 type Json = Record<string, unknown>;
 
 const DEFAULT_MAX_TOKENS = 4096;
 
-export async function buildAnthropicMessagesPayload(
+export async function payloadFor(
   body: Json,
   modelName: string,
   stream: boolean,
@@ -21,45 +13,45 @@ export async function buildAnthropicMessagesPayload(
 ): Promise<Json> {
   const messagesInput = Array.isArray(body.messages) ? body.messages : [];
   const messages = imageFetch
-    ? await convertImageURLsToBase64(imageFetch, messagesInput)
+    ? await new ChatImageInliner(imageFetch).run(messagesInput)
     : messagesInput;
   const payload: Json = {
     model: modelName,
     stream,
-    max_tokens: anthropicMaxTokens(body),
+    max_tokens: maxTokens(body),
   };
-  const { system, messages: converted } = anthropicMessagesFromChat(messages);
+  const { system, messages: converted } = fromChat(messages);
   if (system) payload.system = system;
   payload.messages = converted;
   if (body.temperature !== undefined && body.temperature !== null) payload.temperature = body.temperature;
   if (body.top_p !== undefined && body.top_p !== null) payload.top_p = body.top_p;
-  const stop = anthropicStopSequences(body.stop);
+  const stop = stopSequences(body.stop);
   if (stop.length > 0) payload.stop_sequences = stop;
-  const tools = anthropicToolsFromChat(body.tools);
+  const tools = toolsOf(body.tools);
   if (tools.length > 0) {
     payload.tools = tools;
-    const choice = anthropicToolChoiceFromChat(body.tool_choice);
+    const choice = choiceOf(body.tool_choice);
     if (choice) payload.tool_choice = choice;
   }
-  applyAnthropicThinking(payload, body);
+  applyThinking(payload, body);
   return payload;
 }
 
-function anthropicMaxTokens(body: Json): number {
+function maxTokens(body: Json): number {
   for (const key of ["max_tokens", "max_completion_tokens", "max_output_tokens"]) {
-    const value = numberFromAny(body[key]);
+    const value = Value.number(body[key]);
     if (value > 0) return value;
   }
   return DEFAULT_MAX_TOKENS;
 }
 
-function anthropicStopSequences(value: unknown): unknown[] {
+function stopSequences(value: unknown): unknown[] {
   if (typeof value === "string") return value ? [value] : [];
   if (Array.isArray(value)) return value;
   return [];
 }
 
-function anthropicMessagesFromChat(messages: unknown[]): { system: string; messages: unknown[] } {
+function fromChat(messages: unknown[]): { system: string; messages: unknown[] } {
   const system: string[] = [];
   const out: unknown[] = [];
   let toolResults: unknown[] = [];
@@ -71,31 +63,31 @@ function anthropicMessagesFromChat(messages: unknown[]): { system: string; messa
   };
   for (const raw of messages) {
     const msg = (raw ?? {}) as Json;
-    switch (stringValue(msg.role)) {
+    switch (Value.string(msg.role)) {
       case "system":
       case "developer": {
         flush();
-        const text = contentToText(msg.content);
+        const text = Payload.text(msg.content);
         if (text) system.push(text);
         break;
       }
       case "user": {
         flush();
-        const blocks = anthropicContentBlocks(msg.content);
+        const blocks = blocksOf(msg.content);
         if (blocks.length > 0) out.push({ role: "user", content: blocks });
         break;
       }
       case "assistant": {
         flush();
-        const blocks = anthropicAssistantBlocks(msg);
+        const blocks = assistantParts(msg);
         if (blocks.length > 0) out.push({ role: "assistant", content: blocks });
         break;
       }
       case "tool":
         toolResults.push({
           type: "tool_result",
-          tool_use_id: stringValue(msg.tool_call_id),
-          content: anthropicToolResultContent(msg.content),
+          tool_use_id: Value.string(msg.tool_call_id),
+          content: resultContent(msg.content),
         });
         break;
       default:
@@ -106,31 +98,31 @@ function anthropicMessagesFromChat(messages: unknown[]): { system: string; messa
   return { system: system.join("\n\n"), messages: out };
 }
 
-function anthropicContentBlocks(content: unknown): unknown[] {
+function blocksOf(content: unknown): unknown[] {
   if (typeof content === "string") return [{ type: "text", text: content }];
   if (!Array.isArray(content)) {
     if (content === null || content === undefined) return [];
-    const text = contentToText(content);
+    const text = Payload.text(content);
     return text ? [{ type: "text", text }] : [];
   }
   const blocks: unknown[] = [];
   for (const raw of content) {
     const part = (raw ?? {}) as Json;
-    switch (stringValue(part.type)) {
+    switch (Value.string(part.type)) {
       case "text":
       case "input_text":
       case "output_text": {
-        const text = stringValue(part.text);
+        const text = Value.string(part.text);
         if (text) blocks.push({ type: "text", text });
         break;
       }
       case "image_url": {
-        const block = anthropicImageBlock(part.image_url);
+        const block = imageOf(part.image_url);
         if (block) blocks.push(block);
         break;
       }
       case "image": {
-        const block = anthropicImageBlock(part.source);
+        const block = imageOf(part.source);
         if (block) blocks.push(block);
         break;
       }
@@ -141,21 +133,21 @@ function anthropicContentBlocks(content: unknown): unknown[] {
   return blocks;
 }
 
-function anthropicAssistantBlocks(msg: Json): unknown[] {
+function assistantParts(msg: Json): unknown[] {
   const blocks: unknown[] = [];
-  const text = contentToText(msg.content);
+  const text = Payload.text(msg.content);
   if (text) blocks.push({ type: "text", text });
   const calls = Array.isArray(msg.tool_calls) ? msg.tool_calls : [];
   for (const raw of calls) {
     const call = (raw ?? {}) as Json;
     const fn = (call.function ?? {}) as Json;
-    const name = stringValue(fn.name);
+    const name = Value.string(fn.name);
     if (!name) continue;
-    const args = stringValue(fn.arguments);
-    const input: unknown = args ? (parseJsonRecord(args) ?? {}) : {};
+    const args = Value.string(fn.arguments);
+    const input: unknown = args ? (JSONText.record(args) ?? {}) : {};
     blocks.push({
       type: "tool_use",
-      id: defaultStringValue(stringValue(call.id), randomId("toolu")),
+      id: Value.stringOr(Value.string(call.id), Ids.random("toolu")),
       name,
       input,
     });
@@ -163,15 +155,15 @@ function anthropicAssistantBlocks(msg: Json): unknown[] {
   return blocks;
 }
 
-function anthropicImageBlock(value: unknown): Json | null {
+function imageOf(value: unknown): Json | null {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
   const source = value as Json;
-  if (stringValue(source.type) === "base64" && stringValue(source.data)) {
+  if (Value.string(source.type) === "base64" && Value.string(source.data)) {
     return { type: "image", source };
   }
-  const url = stringValue(source.url);
+  const url = Value.string(source.url);
   if (!url) return null;
-  const parsed = parseDataUri(url);
+  const parsed = dataUri(url);
   if (parsed) {
     return {
       type: "image",
@@ -181,7 +173,7 @@ function anthropicImageBlock(value: unknown): Json | null {
   return { type: "image", source: { type: "url", url } };
 }
 
-function parseDataUri(value: string): { mediaType: string; data: string } | null {
+function dataUri(value: string): { mediaType: string; data: string } | null {
   if (!value.startsWith("data:")) return null;
   const trimmed = value.slice("data:".length);
   const comma = trimmed.indexOf(",");
@@ -193,22 +185,22 @@ function parseDataUri(value: string): { mediaType: string; data: string } | null
   return { mediaType: mediaType || "image/png", data };
 }
 
-function anthropicToolResultContent(content: unknown): unknown {
+function resultContent(content: unknown): unknown {
   if (typeof content === "string") return content;
-  const text = contentToText(content);
+  const text = Payload.text(content);
   if (text) return text;
   return "";
 }
 
-function anthropicToolsFromChat(raw: unknown): unknown[] {
+function toolsOf(raw: unknown): unknown[] {
   if (!Array.isArray(raw)) return [];
   const out: unknown[] = [];
   for (const item of raw) {
     const tool = (item ?? {}) as Json;
     let fn = (tool.function ?? {}) as Json;
-    let name = stringValue(fn.name);
+    let name = Value.string(fn.name);
     if (!name) {
-      name = stringValue(tool.name);
+      name = Value.string(tool.name);
       fn = tool;
     }
     if (!name) continue;
@@ -217,14 +209,14 @@ function anthropicToolsFromChat(raw: unknown): unknown[] {
         ? fn.parameters
         : { type: "object", properties: {} };
     const converted: Json = { name, input_schema: params };
-    const description = stringValue(fn.description);
+    const description = Value.string(fn.description);
     if (description) converted.description = description;
     out.push(converted);
   }
   return out;
 }
 
-function anthropicToolChoiceFromChat(raw: unknown): Json | null {
+function choiceOf(raw: unknown): Json | null {
   if (typeof raw === "string") {
     switch (raw) {
       case "auto":
@@ -240,13 +232,13 @@ function anthropicToolChoiceFromChat(raw: unknown): Json | null {
   }
   if (raw !== null && typeof raw === "object" && !Array.isArray(raw)) {
     const typed = raw as Json;
-    let name = stringValue(typed.name);
+    let name = Value.string(typed.name);
     const fn = typed.function;
     if (fn !== null && typeof fn === "object" && !Array.isArray(fn)) {
-      name = stringValue((fn as Json).name);
+      name = Value.string((fn as Json).name);
     }
     if (name) return { type: "tool", name };
-    switch (stringValue(typed.type)) {
+    switch (Value.string(typed.type)) {
       case "auto":
         return { type: "auto" };
       case "required":
@@ -261,21 +253,21 @@ function anthropicToolChoiceFromChat(raw: unknown): Json | null {
   return null;
 }
 
-function applyAnthropicThinking(payload: Json, body: Json): void {
-  let budget = numberFromAny(body.thinking_budget);
-  if (budget === 0) budget = anthropicEffortBudget(body);
+function applyThinking(payload: Json, body: Json): void {
+  let budget = Value.number(body.thinking_budget);
+  if (budget === 0) budget = budgetFor(body);
   if (budget <= 0) return;
-  const maxTokens = numberFromAny(payload.max_tokens);
+  const maxTokens = Value.number(payload.max_tokens);
   if (maxTokens <= budget) payload.max_tokens = budget + 1024;
   payload.thinking = { type: "enabled", budget_tokens: budget };
 }
 
-function anthropicEffortBudget(body: Json): number {
-  if (!isTruthful(body._includeReasoning)) return 0;
-  let effort = stringValue(body.reasoning_effort).toLowerCase();
+function budgetFor(body: Json): number {
+  if (!Value.bool(body._includeReasoning)) return 0;
+  let effort = Value.string(body.reasoning_effort).toLowerCase();
   const reasoning = body.reasoning;
   if (!effort && reasoning !== null && typeof reasoning === "object" && !Array.isArray(reasoning)) {
-    effort = stringValue((reasoning as Json).effort).toLowerCase();
+    effort = Value.string((reasoning as Json).effort).toLowerCase();
   }
   switch (effort) {
     case "minimal":
@@ -291,19 +283,19 @@ function anthropicEffortBudget(body: Json): number {
   }
 }
 
-export function anthropicMessagesToChatCompletion(data: Json, model: string): Json {
+export function fromMessages(data: Json, model: string): Json {
   let content = "";
   let reasoning = "";
   const toolCalls: unknown[] = [];
   const blocks = Array.isArray(data.content) ? data.content : [];
   for (const raw of blocks) {
     const block = (raw ?? {}) as Json;
-    switch (stringValue(block.type)) {
+    switch (Value.string(block.type)) {
       case "text":
-        content += stringValue(block.text);
+        content += Value.string(block.text);
         break;
       case "thinking":
-        reasoning += stringValue(block.thinking);
+        reasoning += Value.string(block.thinking);
         break;
       case "tool_use": {
         let args = "{}";
@@ -311,9 +303,9 @@ export function anthropicMessagesToChatCompletion(data: Json, model: string): Js
           args = JSON.stringify(block.input);
         }
         toolCalls.push({
-          id: defaultStringValue(stringValue(block.id), randomId("call")),
+          id: Value.stringOr(Value.string(block.id), Ids.random("call")),
           type: "function",
-          function: { name: stringValue(block.name), arguments: args },
+          function: { name: Value.string(block.name), arguments: args },
         });
         break;
       }
@@ -325,18 +317,18 @@ export function anthropicMessagesToChatCompletion(data: Json, model: string): Js
   if (content) message.content = content;
   if (reasoning) message.reasoning_content = reasoning;
   if (toolCalls.length > 0) message.tool_calls = toolCalls;
-  const finish = anthropicStopReasonToFinish(stringValue(data.stop_reason), toolCalls.length > 0);
+  const finish = finishOf(Value.string(data.stop_reason), toolCalls.length > 0);
   return {
-    id: defaultStringValue(stringValue(data.id), randomId("chatcmpl")),
+    id: Value.stringOr(Value.string(data.id), Ids.random("chatcmpl")),
     object: "chat.completion",
     created: Math.floor(Date.now() / 1000),
-    model: defaultStringValue(model, stringValue(data.model)),
+    model: Value.stringOr(model, Value.string(data.model)),
     choices: [{ index: 0, message, finish_reason: finish }],
-    usage: anthropicUsageToChatUsage(data.usage),
+    usage: anthropicUsage(data.usage),
   };
 }
 
-function anthropicStopReasonToFinish(reason: string, hasToolCalls: boolean): string {
+function finishOf(reason: string, hasToolCalls: boolean): string {
   switch (reason) {
     case "max_tokens":
       return "length";
@@ -350,20 +342,20 @@ function anthropicStopReasonToFinish(reason: string, hasToolCalls: boolean): str
   return hasToolCalls ? "tool_calls" : "stop";
 }
 
-export function anthropicUsageToChatUsage(raw: unknown): Json {
+export function anthropicUsage(raw: unknown): Json {
   const usage = (raw ?? {}) as Json;
-  const input = numberFromAny(usage.input_tokens);
-  const output = numberFromAny(usage.output_tokens);
+  const input = Value.number(usage.input_tokens);
+  const output = Value.number(usage.output_tokens);
   const out: Json = { prompt_tokens: input, completion_tokens: output, total_tokens: input + output };
-  const cached = numberFromAny(usage.cache_read_input_tokens);
-  const write = numberFromAny(usage.cache_creation_input_tokens);
+  const cached = Value.number(usage.cache_read_input_tokens);
+  const write = Value.number(usage.cache_creation_input_tokens);
   if (cached > 0 || write > 0) {
     out.prompt_tokens_details = { cached_tokens: cached, cache_write_tokens: write };
   }
   return out;
 }
 
-async function* sseDataLines(source: ReadableStream<Uint8Array>): AsyncGenerator<string> {
+async function* dataLines(source: ReadableStream<Uint8Array>): AsyncGenerator<string> {
   const reader = source.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -391,15 +383,15 @@ async function* sseDataLines(source: ReadableStream<Uint8Array>): AsyncGenerator
   }
 }
 
-async function* transformAnthropicMessagesSseToChat(
+async function* chatStream(
   source: ReadableStream<Uint8Array>,
   model: string
 ): AsyncGenerator<string> {
-  let completionId = randomId("chatcmpl");
+  let completionId = Ids.random("chatcmpl");
   let modelName = model;
   let sentRole = false;
   let toolIndex = -1;
-  const toolIndexByBlock = new Map<number, number>();
+  const indexByBlock = new Map<number, number>();
   let finish = "stop";
   let usage: Json | null = null;
 
@@ -420,37 +412,37 @@ async function* transformAnthropicMessagesSseToChat(
     return writeChunk({ role: "assistant", content: "" }, null);
   };
 
-  for await (const data of sseDataLines(source)) {
+  for await (const data of dataLines(source)) {
     if (!data || data === "[DONE]") continue;
-    const event = parseJsonRecord(data);
+    const event = JSONText.record(data);
     if (!event) continue;
-    switch (stringValue(event.type)) {
+    switch (Value.string(event.type)) {
       case "message_start": {
         const message = event.message;
         if (message !== null && typeof message === "object") {
           const msg = message as Json;
-          const id = stringValue(msg.id);
+          const id = Value.string(msg.id);
           if (id) completionId = id;
-          const name = stringValue(msg.model);
+          const name = Value.string(msg.model);
           if (name) modelName = name;
         }
         break;
       }
       case "content_block_start": {
         const block = (event.content_block ?? {}) as Json;
-        if (stringValue(block.type) !== "tool_use") break;
+        if (Value.string(block.type) !== "tool_use") break;
         const role = ensureRole();
         if (role) yield role;
         toolIndex += 1;
-        toolIndexByBlock.set(numberFromAny(event.index), toolIndex);
+        indexByBlock.set(Value.number(event.index), toolIndex);
         yield writeChunk(
           {
             tool_calls: [
               {
                 index: toolIndex,
-                id: defaultStringValue(stringValue(block.id), randomId("call")),
+                id: Value.stringOr(Value.string(block.id), Ids.random("call")),
                 type: "function",
-                function: { name: stringValue(block.name), arguments: "" },
+                function: { name: Value.string(block.name), arguments: "" },
               },
             ],
           },
@@ -460,9 +452,9 @@ async function* transformAnthropicMessagesSseToChat(
       }
       case "content_block_delta": {
         const delta = (event.delta ?? {}) as Json;
-        switch (stringValue(delta.type)) {
+        switch (Value.string(delta.type)) {
           case "text_delta": {
-            const text = stringValue(delta.text);
+            const text = Value.string(delta.text);
             if (text) {
               const role = ensureRole();
               if (role) yield role;
@@ -471,7 +463,7 @@ async function* transformAnthropicMessagesSseToChat(
             break;
           }
           case "thinking_delta": {
-            const text = stringValue(delta.thinking);
+            const text = Value.string(delta.thinking);
             if (text) {
               const role = ensureRole();
               if (role) yield role;
@@ -480,14 +472,14 @@ async function* transformAnthropicMessagesSseToChat(
             break;
           }
           case "input_json_delta": {
-            const partial = stringValue(delta.partial_json);
+            const partial = Value.string(delta.partial_json);
             if (!partial) break;
-            const blockIndex = numberFromAny(event.index);
-            let index = toolIndexByBlock.get(blockIndex);
+            const blockIndex = Value.number(event.index);
+            let index = indexByBlock.get(blockIndex);
             if (index === undefined) {
               toolIndex += 1;
               index = toolIndex;
-              toolIndexByBlock.set(blockIndex, index);
+              indexByBlock.set(blockIndex, index);
               const role = ensureRole();
               if (role) yield role;
               yield writeChunk(
@@ -495,7 +487,7 @@ async function* transformAnthropicMessagesSseToChat(
                   tool_calls: [
                     {
                       index,
-                      id: randomId("call"),
+                      id: Ids.random("call"),
                       type: "function",
                       function: { name: "", arguments: "" },
                     },
@@ -515,10 +507,10 @@ async function* transformAnthropicMessagesSseToChat(
       case "message_delta": {
         const delta = event.delta;
         if (delta !== null && typeof delta === "object") {
-          finish = anthropicStopReasonToFinish(stringValue((delta as Json).stop_reason), toolIndex >= 0);
+          finish = finishOf(Value.string((delta as Json).stop_reason), toolIndex >= 0);
         }
         if (event.usage !== undefined && event.usage !== null) {
-          usage = anthropicUsageToChatUsage(event.usage);
+          usage = anthropicUsage(event.usage);
         }
         break;
       }
@@ -539,12 +531,12 @@ async function* transformAnthropicMessagesSseToChat(
   yield "data: [DONE]\n\n";
 }
 
-export function anthropicMessagesSseToChatStream(
+export function messagesStream(
   source: ReadableStream<Uint8Array>,
   model: string
 ): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
-  const iterator = transformAnthropicMessagesSseToChat(source, model)[Symbol.asyncIterator]();
+  const iterator = chatStream(source, model)[Symbol.asyncIterator]();
   return new ReadableStream<Uint8Array>({
     async pull(controller) {
       const { done, value } = await iterator.next();

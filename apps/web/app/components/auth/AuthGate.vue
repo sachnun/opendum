@@ -2,11 +2,11 @@
 const route = useRoute();
 const { isAuthenticated } = useAuth();
 
-const isSignInCallback = computed(() => route.path === "/auth/callback");
+const isCallback = computed(() => route.path === "/auth/callback");
 </script>
 
 <template>
-  <slot v-if="isSignInCallback" />
+  <slot v-if="isCallback" />
   <LoginScreen v-else-if="!isAuthenticated" />
   <NuxtLayout v-else>
     <slot />

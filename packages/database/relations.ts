@@ -6,11 +6,11 @@ import {
   session,
   account,
   providerAccount,
-  providerAccountModelHealth,
-  providerAccountDisabledModel,
+  accountModelHealth,
+  accountDisabledModel,
   pinnedProvider,
   proxyApiKey,
-  proxyApiKeyRateLimit,
+  keyRateLimit,
   usageLog,
   pointTransaction,
   disabledModel,
@@ -38,7 +38,7 @@ export const userRelations = relations(user, ({ one, many }) => ({
   customProviders: many(customProvider),
 }));
 
-export const userPointBalanceRelations = relations(
+export const balanceRelations = relations(
   userPointBalance,
   ({ one }) => ({
     user: one(user, {
@@ -48,7 +48,7 @@ export const userPointBalanceRelations = relations(
   }),
 );
 
-export const userSharingSettingRelations = relations(
+export const sharingRelations = relations(
   userSharingSetting,
   ({ one }) => ({
     user: one(user, {
@@ -79,13 +79,13 @@ export const providerAccountRelations = relations(
       fields: [providerAccount.userId],
       references: [user.id],
     }),
-    modelHealth: many(providerAccountModelHealth),
+    modelHealth: many(accountModelHealth),
     usageLogs: many(usageLog),
-    disabledModels: many(providerAccountDisabledModel),
+    disabledModels: many(accountDisabledModel),
   }),
 );
 
-export const proxyApiKeyRelations = relations(
+export const keyRelations = relations(
   proxyApiKey,
   ({ one, many }) => ({
     user: one(user, {
@@ -93,15 +93,15 @@ export const proxyApiKeyRelations = relations(
       references: [user.id],
     }),
     usageLogs: many(usageLog),
-    rateLimits: many(proxyApiKeyRateLimit),
+    rateLimits: many(keyRateLimit),
   }),
 );
 
-export const proxyApiKeyRateLimitRelations = relations(
-  proxyApiKeyRateLimit,
+export const rateLimitRelations = relations(
+  keyRateLimit,
   ({ one }) => ({
     apiKey: one(proxyApiKey, {
-      fields: [proxyApiKeyRateLimit.apiKeyId],
+      fields: [keyRateLimit.apiKeyId],
       references: [proxyApiKey.id],
     }),
   }),
@@ -139,11 +139,11 @@ export const disabledModelRelations = relations(disabledModel, ({ one }) => ({
   }),
 }));
 
-export const providerAccountDisabledModelRelations = relations(
-  providerAccountDisabledModel,
+export const accountDisabledRelations = relations(
+  accountDisabledModel,
   ({ one }) => ({
     providerAccount: one(providerAccount, {
-      fields: [providerAccountDisabledModel.providerAccountId],
+      fields: [accountDisabledModel.providerAccountId],
       references: [providerAccount.id],
     }),
   }),
@@ -156,11 +156,11 @@ export const pinnedProviderRelations = relations(pinnedProvider, ({ one }) => ({
   }),
 }));
 
-export const providerAccountModelHealthRelations = relations(
-  providerAccountModelHealth,
+export const modelHealthRelations = relations(
+  accountModelHealth,
   ({ one }) => ({
     providerAccount: one(providerAccount, {
-      fields: [providerAccountModelHealth.providerAccountId],
+      fields: [accountModelHealth.providerAccountId],
       references: [providerAccount.id],
     }),
   }),
@@ -177,7 +177,7 @@ export const customProviderRelations = relations(
   }),
 );
 
-export const customProviderModelRelations = relations(
+export const customModelRelations = relations(
   customProviderModel,
   ({ one }) => ({
     provider: one(customProvider, {

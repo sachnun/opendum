@@ -7,43 +7,28 @@ import type { OpendumRedis } from "@opendum/core/redis";
 import { AccountAffinity } from "@opendum/core/redis";
 import type { AuthResult, AuthService, ModelValidationResult } from "@opendum/auth";
 import {
-  adaptForResponsesClient,
-  compileCustomProvider,
-  isCredentialRefresher,
-  randomUuidV7Hex,
+  adapt,
+  compileProvider,
+  Ids,
+  isRefresher,
   type CredentialRefresher,
   type Provider,
   type ProviderAccount,
   type ProviderRegistry,
   type RefreshedCredentials,
 } from "@opendum/providers";
-import { cloneMap, numberAsInt, sleep, tryAsync, trySync, trySyncResult } from "./helpers.js";
+import { Delay, Safe } from "./helpers.js";
 import { HeadersTimeout, HEADERS_TIMEOUT_MESSAGE } from "./upstream-timeout.js";
 import {
-  accountAccessDenial,
-  accountNeedsCredentialRefresh,
-  isSyntheticProviderAccountId,
-  parseRefreshErrorStatusCode,
-  refreshBufferFor,
+  accessDenial,
+  needsRefresh,
+  isSynthetic,
+  refreshStatus,
+  bufferFor,
 } from "./service-helpers.js";
 import { ProviderPerformance } from "./provider-performance.js";
-import {
-  buildAccountErrorMessage,
-  codexUsageLimitDisabledUntil,
-  endpointPath,
-  isAntigravityResourceExhausted,
-  isTransientUpstreamStatus,
-  isUpstreamTimeout,
-  isWorkbuddyRequestFault,
-  prefixWithProvider,
-  retryMetadata,
-  routeErrorResponse,
-  sanitizedProxyError,
-  shouldRotate,
-  workbuddyRestrictionDisabledUntil,
-  workbuddyUsageLimitResetAt,
-} from "./errors.js";
-import { upsertErrorHistory } from "./error-history.js";
+import { AccountError, FailureMap, ProviderError, ProviderQuota, Workbuddy } from "./errors.js";
+import { upsertHistory } from "./error-history.js";
 import {
   accountRotations,
   modelSaturationHolds,
@@ -56,8 +41,8 @@ import {
   upstreamErrors,
   upstreamTtft,
 } from "./metrics.js";
-import { checkAndIncrementAPIKeyRateLimit } from "./ratelimit.js";
-import { stripImageContent } from "./content.js";
+import { checkAndIncrement } from "./ratelimit.js";
+import { stripImages } from "./content.js";
 import {
   adjustRoamingPoints,
   creditSharingPoint,
@@ -68,8 +53,8 @@ import { Health, MAX_ERROR_LEN } from "./health.js";
 import {
   ModelSaturation,
   SATURATION_MAX_RETRIES,
-  SATURATION_MAX_WAIT_MS,
-  isModelSaturated,
+  MAX_WAIT_MS,
+  isSaturated,
   type ModelSaturationOptions,
 } from "./model-saturation.js";
 import { Rotation } from "./rotation.js";
@@ -90,16 +75,16 @@ import type {
   SuccessRecord,
   UsageCounts,
 } from "./types.js";
-import { isRouteError } from "./types.js";
+import { routeFailure } from "./types.js";
 
-const TOKEN_REFRESH_LOCK_PREFIX = "opendum:provider-account:refresh-lock:";
-const TOKEN_REFRESH_LOCK_TTL_SECONDS = 120;
-const REFRESH_FAIL_COUNT_PREFIX = "opendum:provider-account:refresh-fail-count:";
-const REFRESH_FAIL_COUNT_TTL_SECONDS = 30 * 24 * 60 * 60;
-const REFRESH_MAX_CONSECUTIVE_FAILURES = 5;
-const RELEASE_REFRESH_LOCK_SCRIPT = `if redis.call("GET", KEYS[1]) == ARGV[1] then return redis.call("DEL", KEYS[1]) end return 0`;
+const LOCK_PREFIX = "opendum:provider-account:refresh-lock:";
+const LOCK_TTL_SECONDS = 120;
+const FAIL_PREFIX = "opendum:provider-account:refresh-fail-count:";
+const FAIL_TTL_SECONDS = 30 * 24 * 60 * 60;
+const MAX_FAILURES = 5;
+const RELEASE_SCRIPT = `if redis.call("GET", KEYS[1]) == ARGV[1] then return redis.call("DEL", KEYS[1]) end return 0`;
 const TRANSIENT_MAX_RETRIES = 2;
-const TRANSIENT_RETRY_DELAY_MS = 1500;
+const RETRY_DELAY_MS = 1500;
 
 export type TransientRetryOptions = { maxRetries: number; delayMs: number };
 
@@ -195,7 +180,7 @@ export class ProxyService implements StreamRecorder {
     });
     this.playground = new Playground(options.betterAuthSecret);
     this.saturation = new ModelSaturation(options.redis, options.saturation);
-    this.retry = { maxRetries: TRANSIENT_MAX_RETRIES, delayMs: TRANSIENT_RETRY_DELAY_MS, ...options.retry };
+    this.retry = { maxRetries: TRANSIENT_MAX_RETRIES, delayMs: RETRY_DELAY_MS, ...options.retry };
   }
 
   get points(): PointPort {
@@ -231,7 +216,7 @@ export class ProxyService implements StreamRecorder {
       }
 
       const parsed = yield* Effect.sync(() => cfg.parse(body));
-      if (isRouteError(parsed)) {
+      if (routeFailure(parsed)) {
         return this.routeError(cfg, parsed);
       }
       const parsedRequest = parsed;
@@ -259,7 +244,7 @@ export class ProxyService implements StreamRecorder {
       }
 
       if (authResult.apiKeyId && authResult.rateLimitRules.length > 0) {
-        const rl = yield* checkAndIncrementAPIKeyRateLimit(
+        const rl = yield* checkAndIncrement(
           this.redis,
           this.models,
           authResult.apiKeyId,
@@ -268,13 +253,13 @@ export class ProxyService implements StreamRecorder {
           authResult.rateLimitRules
         );
         if (!rl.allowed) {
-          const retry = retryMetadata(rl.retryAfterSeconds * 1000);
+          const retry = ProviderError.retryMetadata(rl.retryAfterSeconds * 1000);
           return this.routeError(cfg, {
-            status: cfg.rateLimitStatusCode,
+            status: cfg.rateLimitStatus,
             message: `Rate limit exceeded for ${validation.model}: ${rl.current}/${rl.limit} requests per ${rl.exceededWindow}. Retry after ${rl.retryAfterSeconds}s.`,
             type: "rate_limit_error",
             retryAfter: retry.retryAfter,
-            retryAfterMs: retry.retryAfterMs,
+            afterMs: retry.afterMs,
           });
         }
       }
@@ -288,11 +273,11 @@ export class ProxyService implements StreamRecorder {
           playground.handled
         )
       );
-      if (forced && isRouteError(forced)) {
+      if (forced && routeFailure(forced)) {
         return this.routeError(cfg, forced);
       }
 
-      const attempt = yield* this.executeWithAccountRotation(
+      const attempt = yield* this.executeRotation(
         cfg,
         parsedRequest,
         authResult,
@@ -309,18 +294,18 @@ export class ProxyService implements StreamRecorder {
           })
         )
       );
-      if (isRouteError(attempt)) {
+      if (routeFailure(attempt)) {
         return this.routeError(cfg, attempt);
       }
 
-      const { account, response, requestStartMs, upstreamFirstResponseMs, rotationFailures, roaming } = attempt;
+      const { account, response, requestStartMs, firstResponseMs, rotationFailures, roaming } = attempt;
 
       const responseCtx: ResponseContext = {
         response,
         accountId: account.id,
         provider: account.provider,
         requestStartMs,
-        upstreamFirstResponseMs,
+        firstResponseMs,
         startMs,
         userId: authResult.userId,
         apiKeyId: authResult.apiKeyId,
@@ -362,7 +347,7 @@ export class ProxyService implements StreamRecorder {
         Effect.catch((failure) =>
           Effect.tryPromise({
             try: () =>
-              this.handleNonStreamFailure(cfg, failure.cause, {
+              this.nonStreamFailure(cfg, failure.cause, {
                 account,
                 authResult,
                 validation,
@@ -371,7 +356,7 @@ export class ProxyService implements StreamRecorder {
                 usage: responseCtx.usage,
                 startMs,
               }),
-            catch: (error) => databaseFailure("handleNonStreamFailure", error),
+            catch: (error) => databaseFailure("nonStreamFailure", error),
           })
         )
       );
@@ -400,7 +385,7 @@ export class ProxyService implements StreamRecorder {
     }
     if (reason === "error") {
       trackPending(
-        this.recordResponseHandlerFailure(account, authResult, validation, 500, "upstream stream failed", startMs)
+        this.recordHandlerFailure(account, authResult, validation, 500, "upstream stream failed", startMs)
       );
     }
     if (reason !== "cancel") {
@@ -408,7 +393,7 @@ export class ProxyService implements StreamRecorder {
     }
   }
 
-  private async handleNonStreamFailure(
+  private async nonStreamFailure(
     cfg: Adapter,
     error: unknown,
     context: RoamingCompletionContext
@@ -416,17 +401,17 @@ export class ProxyService implements StreamRecorder {
     const { account, authResult, validation, roaming, rotationFailures, startMs } = context;
     const message = error instanceof Error ? error.message : String(error);
     if (roaming) await Effect.runPromise(Effect.ignore(this.roaming.refund(roaming)));
-    await this.recordResponseHandlerFailure(account, authResult, validation, 500, message, startMs);
+    await this.recordHandlerFailure(account, authResult, validation, 500, message, startMs);
     trackWork(Effect.ignore(this.health.markRecovered(rotationFailures)));
     return this.routeError(cfg, {
       status: 500,
-      message: prefixWithProvider(account.provider, message),
+      message: ProviderError.prefix(account.provider, message),
       type: "api_error",
       accountId: account.id,
     });
   }
 
-  private async recordResponseHandlerFailure(
+  private async recordHandlerFailure(
     account: ProviderAccount,
     authResult: AuthResult,
     validation: ModelValidationResult,
@@ -448,7 +433,7 @@ export class ProxyService implements StreamRecorder {
 
   routeError(cfg: Adapter, error: RouteError): Response {
     void Effect.runFork(Metric.update(proxyRequestFailures, 1));
-    return routeErrorResponse(error, cfg.format);
+    return FailureMap.response(error, cfg.format);
   }
 
   private async modelAccountSelector(
@@ -459,7 +444,7 @@ export class ProxyService implements StreamRecorder {
     if (index < 0) return null;
     const prefix = modelParam.slice(0, index).trim();
     const model = modelParam.slice(index + 1).trim();
-    if (!prefix || !model || this.isKnownModelProviderPrefix(prefix)) return null;
+    if (!prefix || !model || this.isKnownPrefix(prefix)) return null;
     if (userId) {
       const custom = await this.repositories.customProviders.getCustomProvider(userId, prefix.toLowerCase());
       if (custom) return null;
@@ -467,7 +452,7 @@ export class ProxyService implements StreamRecorder {
     return { accountId: prefix, model };
   }
 
-  private isKnownModelProviderPrefix(prefix: string): boolean {
+  private isKnownPrefix(prefix: string): boolean {
     const provider = prefix.toLowerCase();
     if (this.providers.has(provider)) return true;
     return this.models.models(provider).length > 0;
@@ -492,13 +477,13 @@ export class ProxyService implements StreamRecorder {
       };
     }
 
-    const synthetic = this.syntheticAccountFromId(id, userId, validation.model);
-    const denial = accountAccessDenial(id, accountAccess);
+    const synthetic = this.syntheticAccount(id, userId, validation.model);
+    const denial = accessDenial(id, accountAccess);
     if (denial) {
       return { status: 403, message: denial.message, type: "invalid_request_error", param: "model", code: denial.code };
     }
     if (synthetic) {
-      const modelErr = await this.validateSelectedAccountModel(synthetic, validation, "model");
+      const modelErr = await this.validateAccountModel(synthetic, validation, "model");
       if (modelErr) return modelErr;
       return synthetic;
     }
@@ -555,12 +540,12 @@ export class ProxyService implements StreamRecorder {
         };
       }
     }
-    const modelErr = await this.validateSelectedAccountModel(account, validation, "model");
+    const modelErr = await this.validateAccountModel(account, validation, "model");
     if (modelErr) return modelErr;
     return account;
   }
 
-  private syntheticAccountFromId(id: string, userId: string, model: string): ProviderAccount | null {
+  private syntheticAccount(id: string, userId: string, model: string): ProviderAccount | null {
     if (this.providers.isAuthless(id)) {
       return { id, userId, provider: id, isActive: true, status: "active" };
     }
@@ -573,13 +558,13 @@ export class ProxyService implements StreamRecorder {
     return null;
   }
 
-  private async isCustomAccountModel(account: ProviderAccount, model: string): Promise<boolean> {
+  private async isCustomModel(account: ProviderAccount, model: string): Promise<boolean> {
     const custom = await Effect.runPromise(
       this.repositories.customProviders.getCustomProvider(account.userId, account.provider)
     );
     if (!custom) return false;
     const rows = await Effect.runPromise(
-      this.repositories.customProviders.listCustomProviderModels(custom.id)
+      this.repositories.customProviders.customModels(custom.id)
     );
     const target = model.startsWith(`${account.provider}/`)
       ? model.slice(account.provider.length + 1)
@@ -587,13 +572,13 @@ export class ProxyService implements StreamRecorder {
     return rows.some((row) => row.modelId === model || row.modelId === target);
   }
 
-  private async validateSelectedAccountModel(
+  private async validateAccountModel(
     account: ProviderAccount,
     validation: ModelValidationResult,
     param: string
   ): Promise<RouteError | null> {
-    if (await this.isCustomAccountModel(account, validation.model)) return null;
-    if (!this.models.isSupportedByProvider(validation.model, account.provider)) {
+    if (await this.isCustomModel(account, validation.model)) return null;
+    if (!this.models.supportsProvider(validation.model, account.provider)) {
       return {
         status: 400,
         message: `Selected account provider "${account.provider}" does not support model "${validation.model}"`,
@@ -623,7 +608,7 @@ export class ProxyService implements StreamRecorder {
     return null;
   }
 
-  private executeWithAccountRotation(
+  private executeRotation(
     cfg: Adapter,
     parsed: ParsedEndpointRequest,
     authResult: AuthResult,
@@ -636,7 +621,7 @@ export class ProxyService implements StreamRecorder {
         account: ProviderAccount;
         response: Response;
         requestStartMs: number;
-        upstreamFirstResponseMs: number;
+        firstResponseMs: number;
         rotationFailures: Failure[];
         roaming: PointReservation | null;
       }
@@ -647,7 +632,7 @@ export class ProxyService implements StreamRecorder {
       const tried: string[] = [];
       const sharedTried: string[] = [];
       const excludedProviders: string[] = [];
-      const turnId = randomUuidV7Hex();
+      const turnId = Ids.uuidV7();
       let useShared = false;
       const recoverableFailures: Failure[] = [];
       let lastFailure: RouteError | null = null;
@@ -701,7 +686,7 @@ export class ProxyService implements StreamRecorder {
               };
             }
             return {
-              status: cfg.noAccountsStatusCode,
+              status: cfg.noAccountsStatus,
               message: "No active accounts available for this model. Please add an account in the web UI.",
               type: "configuration_error",
             };
@@ -731,27 +716,27 @@ export class ProxyService implements StreamRecorder {
 
         const payload = cfg.build(parsed, validation.model, parsed.stream, sessionId);
         if (validation.vision === null || validation.vision === undefined) {
-          if (!this.models.isVisionModel(validation.model)) stripImageContent(payload);
+          if (!this.models.isVisionModel(validation.model)) stripImages(payload);
         } else if (!validation.vision) {
-          stripImageContent(payload);
+          stripImages(payload);
         }
 
         const requestStartMs = Date.now();
-        let upstreamFirstResponseMs = 0;
+        let firstResponseMs = 0;
         const gateMs = yield* this.saturation.remaining(account.provider, validation.model);
         if (gateMs > 0) {
-          if (gateMs <= SATURATION_MAX_WAIT_MS) {
+          if (gateMs <= MAX_WAIT_MS) {
             yield* Metric.update(modelSaturationWaits, 1);
-            yield* Effect.promise(() => sleep(gateMs));
+            yield* Effect.promise(() => Delay.sleep(gateMs));
           } else {
-            const retry = retryMetadata(gateMs);
+            const retry = ProviderError.retryMetadata(gateMs);
             if (roaming) yield* Effect.ignore(this.roaming.refund(roaming));
             return {
               status: 429,
               message: `${account.provider} reports model ${validation.model} as saturated. Retry after ${retry.retryAfter ?? "a moment"}.`,
               type: "rate_limit_error",
               retryAfter: retry.retryAfter,
-              retryAfterMs: retry.retryAfterMs,
+              afterMs: retry.afterMs,
               accountId: account.id,
             };
           }
@@ -763,7 +748,7 @@ export class ProxyService implements StreamRecorder {
               payload,
               parsed.stream,
               () => {
-                if (upstreamFirstResponseMs === 0) upstreamFirstResponseMs = Date.now();
+                if (firstResponseMs === 0) firstResponseMs = Date.now();
               },
               sessionId,
               turnId
@@ -775,13 +760,13 @@ export class ProxyService implements StreamRecorder {
           delayedFinalFailure = null;
           const status = 500;
           const message = request.failure.message;
-          const detailed = buildAccountErrorMessage(
+          const detailed = AccountError.build(
             message,
             this.errorContext(cfg, validation, parsed, account.provider)
           );
           if (
             !forced &&
-            !isUpstreamTimeout(message) &&
+            !ProviderError.timeout(message) &&
             (transientRetryAccount !== account.id || transientRetries < this.retry.maxRetries)
           ) {
             if (transientRetryAccount !== account.id) {
@@ -797,11 +782,11 @@ export class ProxyService implements StreamRecorder {
             yield* Metric.update(upstreamErrors, 1);
             lastFailure = {
               status,
-              message: prefixWithProvider(account.provider, message),
+              message: ProviderError.prefix(account.provider, message),
               type: "api_error",
               accountId: account.id,
             };
-            yield* Effect.promise(() => sleep(this.retry.delayMs * transientRetries));
+            yield* Effect.promise(() => Delay.sleep(this.retry.delayMs * transientRetries));
             retryAccount = account;
             pendingReservation = roaming;
             continue;
@@ -819,7 +804,7 @@ export class ProxyService implements StreamRecorder {
           );
           lastFailure = {
             status,
-            message: prefixWithProvider(account.provider, message),
+            message: ProviderError.prefix(account.provider, message),
             type: "api_error",
             accountId: account.id,
           };
@@ -834,32 +819,32 @@ export class ProxyService implements StreamRecorder {
         }
 
         const response = request.success;
-        if (upstreamFirstResponseMs === 0) upstreamFirstResponseMs = Date.now();
+        if (firstResponseMs === 0) firstResponseMs = Date.now();
 
         if (response.status < 200 || response.status >= 300) {
           const bodyText = (yield* Effect.promise(() => response.text())).slice(0, 1 << 20);
           let failedAt: Date | null = null;
           delayedFinalFailure = null;
-          const badRequestFromProvider = response.status === 400;
-          const fallbackAcrossProviders = badRequestFromProvider && !forced && validation.provider === null;
-          const restrictedUntil = workbuddyRestrictionDisabledUntil(account.provider, bodyText, new Date());
-          const usageLimitedUntil = workbuddyUsageLimitResetAt(account.provider, bodyText, new Date());
-          const detailed = buildAccountErrorMessage(
+          const providerBadRequest = response.status === 400;
+          const fallbackAcrossProviders = providerBadRequest && !forced && validation.provider === null;
+          const restrictedUntil = Workbuddy.restrictionUntil(account.provider, bodyText, new Date());
+          const usageLimitedUntil = Workbuddy.usageLimitReset(account.provider, bodyText, new Date());
+          const detailed = AccountError.build(
             bodyText,
             this.errorContext(cfg, validation, parsed, account.provider)
           );
           const accountFault =
             restrictedUntil !== null ||
-            codexUsageLimitDisabledUntil(account.provider, response.status, bodyText, new Date()) !== null ||
-            isAntigravityResourceExhausted(account.provider, response.status, bodyText);
+            ProviderQuota.codexDisabledUntil(account.provider, response.status, bodyText, new Date()) !== null ||
+            ProviderQuota.antigravityExhausted(account.provider, response.status, bodyText);
           const transient =
             !accountFault &&
-            (isTransientUpstreamStatus(response.status) || isWorkbuddyRequestFault(account.provider, bodyText));
+            (ProviderError.transient(response.status) || Workbuddy.requestFault(account.provider, bodyText));
           const retryable =
             transient &&
             !forced &&
             (transientRetryAccount !== account.id || transientRetries < this.retry.maxRetries);
-          if (isModelSaturated(response.status, bodyText)) {
+          if (isSaturated(response.status, bodyText)) {
             yield* Effect.ignore(
               Effect.promise(() =>
                 this.usage.logUsage(authResult, account, validation, response.status, Date.now() - startMs)
@@ -870,24 +855,24 @@ export class ProxyService implements StreamRecorder {
             yield* Metric.update(modelSaturationHolds, 1);
             if (!forced && saturationRetries < SATURATION_MAX_RETRIES) {
               saturationRetries += 1;
-              yield* Effect.promise(() => sleep(holdMs));
+              yield* Effect.promise(() => Delay.sleep(holdMs));
               retryAccount = account;
               pendingReservation = roaming;
               continue;
             }
             if (roaming) yield* Effect.ignore(this.roaming.refund(roaming));
-            const retry = retryMetadata(holdMs);
+            const retry = ProviderError.retryMetadata(holdMs);
             return {
               status: 429,
               message: `${account.provider} reports model ${validation.model} as saturated. Retry after ${retry.retryAfter ?? "a moment"}.`,
               type: "rate_limit_error",
               retryAfter: retry.retryAfter,
-              retryAfterMs: retry.retryAfterMs,
+              afterMs: retry.afterMs,
               accountId: account.id,
             };
           }
-          if (!transient && response.status !== 408 && !badRequestFromProvider) {
-            if (!forced && isAntigravityResourceExhausted(account.provider, response.status, bodyText)) {
+          if (!transient && response.status !== 408 && !providerBadRequest) {
+            if (!forced && ProviderQuota.antigravityExhausted(account.provider, response.status, bodyText)) {
               delayedFinalFailure = { account, statusCode: response.status, message: detailed };
               yield* this.health.logAccountError(
                 account.id,
@@ -911,14 +896,14 @@ export class ProxyService implements StreamRecorder {
                 response.status,
                 detailed
               );
-              const disabledUntil = codexUsageLimitDisabledUntil(
+              const disabledUntil = ProviderQuota.codexDisabledUntil(
                 account.provider,
                 response.status,
                 bodyText,
                 failedAt
               );
               if (disabledUntil) {
-                yield* this.health.markAccountUsageLimited(
+                yield* this.health.markUsageLimited(
                   account.id,
                   validation.model,
                   disabledUntil,
@@ -936,7 +921,7 @@ export class ProxyService implements StreamRecorder {
             );
           }
           if (restrictedUntil) {
-            yield* this.health.markAccountUsageLimited(
+            yield* this.health.markUsageLimited(
               account.id,
               validation.model,
               restrictedUntil,
@@ -944,7 +929,7 @@ export class ProxyService implements StreamRecorder {
             );
           }
           if (usageLimitedUntil) {
-            yield* this.health.markAccountUsageLimited(
+            yield* this.health.markUsageLimited(
               account.id,
               validation.model,
               usageLimitedUntil,
@@ -956,22 +941,22 @@ export class ProxyService implements StreamRecorder {
               this.usage.logUsage(authResult, account, validation, response.status, Date.now() - startMs)
             )
           );
-          const sanitized = sanitizedProxyError(response.status, bodyText);
+          const sanitized = ProviderError.sanitize(response.status, bodyText);
           lastFailure = {
             status: response.status,
-            message: prefixWithProvider(account.provider, sanitized.message),
+            message: ProviderError.prefix(account.provider, sanitized.message),
             type: sanitized.type,
             accountId: account.id,
           };
           yield* Metric.update(upstreamErrors, 1);
-          yield* Metric.update(upstreamTtft, upstreamFirstResponseMs - requestStartMs);
+          yield* Metric.update(upstreamTtft, firstResponseMs - requestStartMs);
           if (retryable) {
             if (transientRetryAccount !== account.id) {
               transientRetryAccount = account.id;
               transientRetries = 0;
             }
             transientRetries += 1;
-            yield* Effect.promise(() => sleep(this.retry.delayMs * transientRetries));
+            yield* Effect.promise(() => Delay.sleep(this.retry.delayMs * transientRetries));
             retryAccount = account;
             pendingReservation = roaming;
             continue;
@@ -981,7 +966,7 @@ export class ProxyService implements StreamRecorder {
             if (!excludedProviders.includes(account.provider)) excludedProviders.push(account.provider);
             continue;
           }
-          if ((shouldRotate(response.status) || restrictedUntil !== null) && !forced) {
+          if ((ProviderError.shouldRotate(response.status) || restrictedUntil !== null) && !forced) {
             if (failedAt) recoverableFailures.push({ accountId: account.id, failedAt });
             yield* Metric.update(accountRotations, 1);
             continue;
@@ -995,7 +980,7 @@ export class ProxyService implements StreamRecorder {
           account,
           response,
           requestStartMs,
-          upstreamFirstResponseMs,
+          firstResponseMs,
           rotationFailures: recoverableFailures,
           roaming,
         };
@@ -1022,7 +1007,7 @@ export class ProxyService implements StreamRecorder {
     return {
       model: validation.model,
       provider,
-      endpoint: endpointPath(cfg.endpoint),
+      endpoint: ProviderError.path(cfg.endpoint),
       messages: parsed.messagesForError,
       parameters: parsed.paramsForError,
     };
@@ -1039,7 +1024,7 @@ export class ProxyService implements StreamRecorder {
   async quotaCredentials(account: ProviderAccount): Promise<string> {
     const providerImpl = this.providers.get(account.provider);
     if (!providerImpl) {
-      const loaded = await this.loadProviderAccountCredentials(account);
+      const loaded = await this.loadCredentials(account);
       return decrypt(this.secret, loaded.accessToken ?? "");
     }
     const resolved = await this.credentialsForAccount(account, providerImpl);
@@ -1054,13 +1039,13 @@ export class ProxyService implements StreamRecorder {
     account: ProviderAccount,
     payload: Record<string, unknown>,
     stream: boolean,
-    onUpstreamResponseStart: () => void,
+    onResponseStart: () => void,
     sessionId: string,
     requestId: string
   ): Promise<Response> {
     let providerImpl = this.providers.get(account.provider);
     if (!providerImpl) {
-      providerImpl = (await this.customProviderForAccount(account.userId, account.provider)) ?? undefined;
+      providerImpl = (await this.customForAccount(account.userId, account.provider)) ?? undefined;
     }
     if (!providerImpl) {
       return new Response(
@@ -1068,7 +1053,7 @@ export class ProxyService implements StreamRecorder {
         { status: 501, headers: { "Content-Type": "application/json" } }
       );
     }
-    const authless = isSyntheticProviderAccountId(account.id);
+    const authless = isSynthetic(account.id);
     let credentials = "";
     let requestAccount = account;
     if (!authless) {
@@ -1081,7 +1066,7 @@ export class ProxyService implements StreamRecorder {
       credentials,
       body: payload,
       stream,
-      onUpstreamResponseStart,
+      onResponseStart,
       sessionId,
       requestId,
     });
@@ -1089,7 +1074,7 @@ export class ProxyService implements StreamRecorder {
       ? await this.runStreamRequest(account, request)
       : await this.runBufferedRequest(account, request);
     if (response.status >= 200 && response.status < 300) {
-      return adaptForResponsesClient(providerImpl as unknown as { responsesNative?(model: string): boolean }, response, payload, stream);
+      return adapt(providerImpl as unknown as { responsesNative?(model: string): boolean }, response, payload, stream);
     }
     return response;
   }
@@ -1153,10 +1138,10 @@ export class ProxyService implements StreamRecorder {
     account: ProviderAccount,
     providerImpl: Provider
   ): Promise<{ credentials: string; account: ProviderAccount }> {
-    const requestAccount = await this.loadProviderAccountCredentials(account);
+    const requestAccount = await this.loadCredentials(account);
     const rawAccessToken = requestAccount.accessToken ?? "";
-    const credentials = trySync(() => decrypt(this.secret, rawAccessToken), rawAccessToken);
-    const refreshed = await this.refreshAccountCredentialsIfDue(requestAccount, providerImpl, true);
+    const credentials = Safe.sync(() => decrypt(this.secret, rawAccessToken), rawAccessToken);
+    const refreshed = await this.refreshIfDue(requestAccount, providerImpl, true);
     if (refreshed.error) {
       if (requestAccount.expiresAt && requestAccount.expiresAt.getTime() < Date.now()) {
         throw refreshed.error;
@@ -1167,10 +1152,10 @@ export class ProxyService implements StreamRecorder {
     return { credentials, account: requestAccount };
   }
 
-  private async loadProviderAccountCredentials(account: ProviderAccount): Promise<ProviderAccount> {
+  private async loadCredentials(account: ProviderAccount): Promise<ProviderAccount> {
     if (account.accessToken && account.refreshToken) return account;
     const row = await Effect.runPromise(
-      this.repositories.accounts.getAccountCredentialsByID(account.id)
+      this.repositories.accounts.credentialsById(account.id)
     );
     if (!row) return account;
     return {
@@ -1188,21 +1173,21 @@ export class ProxyService implements StreamRecorder {
     };
   }
 
-  private async refreshAccountCredentialsIfDue(
+  private async refreshIfDue(
     account: ProviderAccount,
     providerImpl: Provider,
     waitForLock: boolean
   ): Promise<{ credentials: string | null; account: ProviderAccount; error: Error | null }> {
-    if (!isCredentialRefresher(providerImpl)) return { credentials: null, account, error: null };
+    if (!isRefresher(providerImpl)) return { credentials: null, account, error: null };
     const refresher: CredentialRefresher = providerImpl;
-    if (!accountNeedsCredentialRefresh(account, providerImpl)) return { credentials: null, account, error: null };
+    if (!needsRefresh(account, providerImpl)) return { credentials: null, account, error: null };
     if (!account.refreshToken) {
       if (waitForLock && account.expiresAt && account.expiresAt.getTime() < Date.now()) {
         return { credentials: null, account, error: new Error("provider account token has expired and cannot be refreshed") };
       }
       return { credentials: null, account, error: null };
     }
-    const decodedRefreshToken = trySyncResult(() => decrypt(this.secret, account.refreshToken as string));
+    const decodedRefreshToken = Safe.result(() => decrypt(this.secret, account.refreshToken as string));
     if (Result.isFailure(decodedRefreshToken)) {
       return { credentials: null, account, error: new Error("failed to decrypt refresh token") };
     }
@@ -1211,7 +1196,7 @@ export class ProxyService implements StreamRecorder {
     const lock = await this.acquireRefreshLock(account.id);
     if (!lock.acquired) {
       if (waitForLock && account.expiresAt && account.expiresAt.getTime() < Date.now()) {
-        const waited = await this.waitForRefreshedAccount(account);
+        const waited = await this.waitForRefresh(account);
         return waited;
       }
       return { credentials: null, account, error: null };
@@ -1219,11 +1204,11 @@ export class ProxyService implements StreamRecorder {
     return await Effect.runPromise(
       Effect.tryPromise({
         try: async () => {
-          const current = await this.loadProviderAccountCredentialsByID(account.id);
-          if (!accountNeedsCredentialRefresh(current, providerImpl)) {
+          const current = await this.credentialsById(account.id);
+          if (!needsRefresh(current, providerImpl)) {
             const rawAccessToken = current.accessToken ?? "";
             return {
-              credentials: trySync<string | null>(() => decrypt(this.secret, rawAccessToken), null),
+              credentials: Safe.sync<string | null>(() => decrypt(this.secret, rawAccessToken), null),
               account: current,
               error: null,
             };
@@ -1250,9 +1235,9 @@ export class ProxyService implements StreamRecorder {
     );
   }
 
-  private async loadProviderAccountCredentialsByID(accountId: string): Promise<ProviderAccount> {
+  private async credentialsById(accountId: string): Promise<ProviderAccount> {
     const row = await Effect.runPromise(
-      this.repositories.accounts.getAccountCredentialsByID(accountId)
+      this.repositories.accounts.credentialsById(accountId)
     );
     if (!row) throw new Error("provider account not found");
     return {
@@ -1312,10 +1297,10 @@ export class ProxyService implements StreamRecorder {
 
   private async acquireRefreshLock(accountId: string): Promise<{ value: string; acquired: boolean }> {
     const value = crypto.randomUUID();
-    const acquired = await tryAsync(async () => {
-      const result = await this.redis.set(`${TOKEN_REFRESH_LOCK_PREFIX}${accountId}`, value, {
+    const acquired = await Safe.async(async () => {
+      const result = await this.redis.set(`${LOCK_PREFIX}${accountId}`, value, {
         NX: true,
-        EX: TOKEN_REFRESH_LOCK_TTL_SECONDS,
+        EX: LOCK_TTL_SECONDS,
       });
       return Boolean(result);
     }, true);
@@ -1328,8 +1313,8 @@ export class ProxyService implements StreamRecorder {
       Effect.ignore(
         Effect.tryPromise({
           try: () =>
-            this.redis.eval(RELEASE_REFRESH_LOCK_SCRIPT, {
-              keys: [`${TOKEN_REFRESH_LOCK_PREFIX}${accountId}`],
+            this.redis.eval(RELEASE_SCRIPT, {
+              keys: [`${LOCK_PREFIX}${accountId}`],
               arguments: [value],
             }),
           catch: (cause) => cause,
@@ -1338,13 +1323,13 @@ export class ProxyService implements StreamRecorder {
     );
   }
 
-  private async waitForRefreshedAccount(
+  private async waitForRefresh(
     previous: ProviderAccount
   ): Promise<{ credentials: string | null; account: ProviderAccount; error: Error | null }> {
     const deadline = Date.now() + 3000;
     while (Date.now() < deadline) {
-      await sleep(250);
-      const current = await this.loadProviderAccountCredentialsByID(previous.id);
+      await Delay.sleep(250);
+      const current = await this.credentialsById(previous.id);
       if (
         current.expiresAt &&
         current.expiresAt.getTime() > Date.now() &&
@@ -1352,7 +1337,7 @@ export class ProxyService implements StreamRecorder {
       ) {
         const rawAccessToken = current.accessToken ?? "";
         return {
-          credentials: trySync<string | null>(() => decrypt(this.secret, rawAccessToken), null),
+          credentials: Safe.sync<string | null>(() => decrypt(this.secret, rawAccessToken), null),
           account: current,
           error: null,
         };
@@ -1365,10 +1350,10 @@ export class ProxyService implements StreamRecorder {
     if (!account.isActive) return;
     const now = new Date();
     const message = error.message.length > MAX_ERROR_LEN ? error.message.slice(0, MAX_ERROR_LEN) : error.message;
-    const statusCode = parseRefreshErrorStatusCode(error);
-    const failCount = await tryAsync(async () => {
-      const count = await this.redis.incr(`${REFRESH_FAIL_COUNT_PREFIX}${account.id}`);
-      await this.redis.expire(`${REFRESH_FAIL_COUNT_PREFIX}${account.id}`, REFRESH_FAIL_COUNT_TTL_SECONDS);
+    const statusCode = refreshStatus(error);
+    const failCount = await Safe.async(async () => {
+      const count = await this.redis.incr(`${FAIL_PREFIX}${account.id}`);
+      await this.redis.expire(`${FAIL_PREFIX}${account.id}`, FAIL_TTL_SECONDS);
       return count;
     }, 1);
     await Effect.runPromise(
@@ -1376,14 +1361,14 @@ export class ProxyService implements StreamRecorder {
     );
     const ownerUserId =
       account.userId ||
-      (await Effect.runPromise(this.repositories.accounts.getAccountOwnerUserID(account.id))) ||
+      (await Effect.runPromise(this.repositories.accounts.ownerId(account.id))) ||
       "";
     if (ownerUserId) {
       await Effect.runPromise(
-        upsertErrorHistory(this.redis, account.id, ownerUserId, null, statusCode, `Token refresh failed: ${message}`, now)
+        upsertHistory(this.redis, account.id, ownerUserId, null, statusCode, `Token refresh failed: ${message}`, now)
       );
     }
-    if (failCount >= REFRESH_MAX_CONSECUTIVE_FAILURES) {
+    if (failCount >= MAX_FAILURES) {
       await Effect.runPromise(
         this.repositories.accounts.disableFailedAccount({ id: account.id, status: "failed", at: now })
       );
@@ -1394,7 +1379,7 @@ export class ProxyService implements StreamRecorder {
     await Effect.runPromise(
       Effect.ignore(
         Effect.tryPromise({
-          try: () => this.redis.del(`${REFRESH_FAIL_COUNT_PREFIX}${accountId}`),
+          try: () => this.redis.del(`${FAIL_PREFIX}${accountId}`),
           catch: (cause) => cause,
         })
       )
@@ -1434,9 +1419,9 @@ export class ProxyService implements StreamRecorder {
           Effect.gen({ self: this }, function* () {
             const providerImpl = this.providers.get(name);
             if (!providerImpl) return;
-            const buffer = refreshBufferFor(providerImpl);
+            const buffer = bufferFor(providerImpl);
             const accounts = yield* this.repositories.accounts
-              .listExpiringRefreshableAccounts({
+              .expiringAccounts({
                 provider: name,
                 now,
                 expiresBefore: new Date(now.getTime() + buffer),
@@ -1467,7 +1452,7 @@ export class ProxyService implements StreamRecorder {
                     isActive: row.isActive,
                   };
                   yield* Effect.tryPromise({
-                    try: () => this.refreshAccountCredentialsIfDue(account, providerImpl, false),
+                    try: () => this.refreshIfDue(account, providerImpl, false),
                     catch: () => new Error("token refresh failed"),
                   }).pipe(Effect.ignore);
                 }),
@@ -1479,15 +1464,15 @@ export class ProxyService implements StreamRecorder {
     );
   }
 
-  async customProviderForAccount(userId: string, provider: string): Promise<Provider | null> {
+  async customForAccount(userId: string, provider: string): Promise<Provider | null> {
     const custom = await Effect.runPromise(
       this.repositories.customProviders.getCustomProvider(userId, provider)
     );
     if (!custom) return null;
     const rows = await Effect.runPromise(
-      this.repositories.customProviders.listCustomProviderModels(custom.id)
+      this.repositories.customProviders.customModels(custom.id)
     );
-    return compileCustomProvider({
+    return compileProvider({
       provider: { slug: custom.slug, baseUrl: custom.baseUrl, extraHeaders: custom.extraHeaders ?? null },
       models: rows.map((row) => ({
         modelId: row.modelId,
@@ -1502,6 +1487,6 @@ export class ProxyService implements StreamRecorder {
 }
 
 
-export { extractSessionId } from "./service-helpers.js";
+export { sessionKey } from "./service-helpers.js";
 
-export { cloneMap, numberAsInt, creditSharingPoint, adjustRoamingPoints, roamingPoints };
+export { creditSharingPoint, adjustRoamingPoints, roamingPoints };

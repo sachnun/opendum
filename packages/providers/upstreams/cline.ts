@@ -1,7 +1,7 @@
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
-import { stringValue } from "../core/helpers.js";
-import { postJSONWithHeaders, type UpstreamTransport } from "../core/http.js";
+import { Value } from "../core/helpers.js";
+import { JSONPoster, type UpstreamTransport } from "../core/http.js";
 import { ProviderCredentialFailure } from "../core/errors.js";
 import { OAuth } from "../core/oauth.js";
 import type {
@@ -19,8 +19,8 @@ import { CLINE_BASE_URL } from "../endpoints.js";
 const CLINE_API_BASE = CLINE_BASE_URL;
 const CLINE_REFRESH_PATH = "/auth/refresh";
 const CLINE_CHAT_PATH = "/chat/completions";
-const CLINE_ACCESS_TTL_MS = 60 * 60 * 1000;
-const CLINE_REFRESH_BUFFER_MS = 5 * 60 * 1000;
+const ACCESS_TTL_MS = 60 * 60 * 1000;
+const REFRESH_BUFFER_MS = 5 * 60 * 1000;
 
 const CLINE_REQUEST_HEADERS: Record<string, string> = {
   "HTTP-Referer": "https://cline.bot",
@@ -66,14 +66,14 @@ export class ClineProvider implements Provider, CredentialRefresher, RefreshBuff
         return {
           accessToken: `workos:${accessToken}`,
           refreshToken: data?.refreshToken || refreshToken,
-          expiresAt: new Date(Date.now() + CLINE_ACCESS_TTL_MS),
+          expiresAt: new Date(Date.now() + ACCESS_TTL_MS),
         };
       },
     });
   }
 
   refreshBuffer(): number {
-    return CLINE_REFRESH_BUFFER_MS;
+    return REFRESH_BUFFER_MS;
   }
 
   refreshCredentials(
@@ -88,19 +88,19 @@ export class ClineProvider implements Provider, CredentialRefresher, RefreshBuff
     for (const [key, value] of Object.entries(request.body)) {
       if (SUPPORTED_CLINE.has(key) && value !== undefined && value !== null) payload[key] = value;
     }
-    let model = stringValue(request.body.model);
+    let model = Value.string(request.body.model);
     if (model.startsWith("cline/")) model = model.slice("cline/".length);
     payload.model = this.registry.upstream(model, "cline");
     payload.stream = request.stream;
-    return postJSONWithHeaders(
-      "cline",
-      this.transport.direct,
-      `${CLINE_API_BASE}${CLINE_CHAT_PATH}`,
-      request.credentials,
+    return JSONPoster.withAuth({
+      provider: "cline",
+      fetchFn: this.transport.direct,
+      url: `${CLINE_API_BASE}${CLINE_CHAT_PATH}`,
+      bearer: request.credentials,
       payload,
-      request.stream,
-      CLINE_REQUEST_HEADERS,
-      request.onUpstreamResponseStart
-    );
+      stream: request.stream,
+      headers: CLINE_REQUEST_HEADERS,
+      onStart: request.onResponseStart,
+    });
   }
 }

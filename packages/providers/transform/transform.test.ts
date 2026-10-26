@@ -1,16 +1,16 @@
 import { describe, expect, it } from "bun:test";
 import {
-  chatCompletionToResponsesJson,
-  chatSseToChatCompletion,
-  convertToolsForResponses,
-  messagesToResponsesInput,
-  normalizeResponsesInput,
-  responsesJsonToChatCompletion,
-  clampPromptCacheKey,
-  responsesUsageFromChat,
+  toJson,
+  sseCompletion,
+  toolsFor,
+  toInput,
+  inputOf,
+  toChat,
+  cacheKey,
+  usageOf,
 } from "./responses.js";
-import { normalizeToolChoice } from "../core/helpers.js";
-import { anthropicMessagesToChatCompletion, buildAnthropicMessagesPayload } from "./anthropic.js";
+import { Payload } from "../core/helpers.js";
+import { fromMessages, payloadFor } from "./anthropic.js";
 
 function streamOf(text: string): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
@@ -24,7 +24,7 @@ function streamOf(text: string): ReadableStream<Uint8Array> {
 
 describe("responses transform", () => {
   it("converts chat messages to responses input", () => {
-    const input = messagesToResponsesInput([
+    const input = toInput([
       { role: "system", content: "sys" },
       { role: "user", content: "hi" },
       {
@@ -42,7 +42,7 @@ describe("responses transform", () => {
   });
 
   it("normalizes shorthand responses input", () => {
-    const input = normalizeResponsesInput([
+    const input = inputOf([
       { role: "user", content: [{ type: "input_text", text: "hey" }] },
       { call_id: "fc_1", name: "do", arguments: "{}" },
     ]) as Array<Record<string, unknown>>;
@@ -51,7 +51,7 @@ describe("responses transform", () => {
   });
 
   it("converts chat tools to responses tools", () => {
-    const tools = convertToolsForResponses([
+    const tools = toolsFor([
       { type: "function", function: { name: "x", description: "d", parameters: { type: "object" } } },
     ]) as Array<Record<string, unknown>>;
     expect(tools[0].type).toBe("function");
@@ -59,12 +59,12 @@ describe("responses transform", () => {
   });
 
   it("normalizes function tool choice", () => {
-    expect(normalizeToolChoice({ type: "function", function: { name: "x" } })).toEqual({ type: "function", name: "x" });
-    expect(normalizeToolChoice("auto")).toBe("auto");
+    expect(Payload.toolChoice({ type: "function", function: { name: "x" } })).toEqual({ type: "function", name: "x" });
+    expect(Payload.toolChoice("auto")).toBe("auto");
   });
 
   it("converts responses json to chat completion", () => {
-    const completion = responsesJsonToChatCompletion(
+    const completion = toChat(
       {
         status: "completed",
         output: [
@@ -84,7 +84,7 @@ describe("responses transform", () => {
   });
 
   it("converts chat completion to responses json", () => {
-    const response = chatCompletionToResponsesJson(
+    const response = toJson(
       {
         choices: [{ message: { content: "hi", tool_calls: [{ id: "call_1", function: { name: "do", arguments: "{}" } }] }, finish_reason: "tool_calls" }],
         usage: { prompt_tokens: 4, completion_tokens: 1 },
@@ -98,7 +98,7 @@ describe("responses transform", () => {
   });
 
   it("rebuilds a chat completion from an sse stream", async () => {
-    const completion = await chatSseToChatCompletion(
+    const completion = await sseCompletion(
       streamOf(
         'data: {"choices":[{"delta":{"content":"a"}}]}\n\n' +
           'data: {"choices":[{"delta":{"content":"b"}}],"usage":{"prompt_tokens":1,"completion_tokens":2}}\n\n' +
@@ -112,12 +112,12 @@ describe("responses transform", () => {
   });
 
   it("clamps prompt cache keys", () => {
-    expect(clampPromptCacheKey("abc")).toBe("abc");
-    expect(clampPromptCacheKey("x".repeat(100)).length).toBe(64);
+    expect(cacheKey("abc")).toBe("abc");
+    expect(cacheKey("x".repeat(100)).length).toBe(64);
   });
 
   it("maps responses usage from chat usage", () => {
-    const usage = responsesUsageFromChat({ prompt_tokens: 10, completion_tokens: 5, prompt_tokens_details: { cached_tokens: 2 } });
+    const usage = usageOf({ prompt_tokens: 10, completion_tokens: 5, prompt_tokens_details: { cached_tokens: 2 } });
     expect(usage.input_tokens).toBe(10);
     expect((usage.input_tokens_details as Record<string, number>).cached_tokens).toBe(2);
     expect(usage.total_tokens).toBe(15);
@@ -126,7 +126,7 @@ describe("responses transform", () => {
 
 describe("anthropic transform", () => {
   it("builds a messages payload", async () => {
-    const payload = await buildAnthropicMessagesPayload(
+    const payload = await payloadFor(
       {
         model: "claude",
         max_tokens: 100,
@@ -147,7 +147,7 @@ describe("anthropic transform", () => {
   });
 
   it("converts messages response to chat completion", () => {
-    const completion = anthropicMessagesToChatCompletion(
+    const completion = fromMessages(
       {
         id: "msg_1",
         stop_reason: "tool_use",

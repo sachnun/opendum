@@ -2,8 +2,8 @@ import { defineHandler } from "nitro";
 import { getQuery, HTTPError } from "h3";
 import { Effect } from "effect";
 
-import { resolveWebOrigin, sanitizeRedirectPath, signInRedirectUrl } from "#web/lib/handoff.js";
-import { getSessionFromEvent, mintAccessToken } from "#web/utils/session.js";
+import { webOrigin, safePath, loginUrl } from "#web/lib/handoff.js";
+import { sessionOf, mintAccessToken } from "#web/utils/session.js";
 
 function redirectTo(location: string): Response {
   return new Response(null, { status: 302, headers: { location } });
@@ -11,22 +11,22 @@ function redirectTo(location: string): Response {
 
 export default defineHandler(async (event) => {
   const query = getQuery(event);
-  const webOrigin = resolveWebOrigin(query.to);
-  if (!webOrigin) throw new HTTPError({ status: 400, statusText: "Invalid web origin" });
+  const origin = webOrigin(query.to);
+  if (!origin) throw new HTTPError({ status: 400, statusText: "Invalid web origin" });
 
-  const redirect = sanitizeRedirectPath(query.redirect);
+  const redirect = safePath(query.redirect);
   const error = typeof query.error === "string" ? query.error.trim() : "";
 
-  if (error) return redirectTo(signInRedirectUrl(webOrigin, { error, redirect }));
+  if (error) return redirectTo(loginUrl(origin, { error, redirect }));
 
   const session = await Effect.runPromise(
-    getSessionFromEvent(event).pipe(Effect.catch(() => Effect.succeed(null)))
+    sessionOf(event).pipe(Effect.catch(() => Effect.succeed(null)))
   );
   const sessionToken = session?.session?.token;
-  if (!session?.user?.id || !sessionToken) return redirectTo(signInRedirectUrl(webOrigin, { error: "SessionExpired", redirect }));
+  if (!session?.user?.id || !sessionToken) return redirectTo(loginUrl(origin, { error: "SessionExpired", redirect }));
 
   const token = await Effect.runPromise(mintAccessToken(event));
-  if (!token) return redirectTo(signInRedirectUrl(webOrigin, { error: "SessionExpired", redirect }));
+  if (!token) return redirectTo(loginUrl(origin, { error: "SessionExpired", redirect }));
 
-  return redirectTo(signInRedirectUrl(webOrigin, { token, session: sessionToken, redirect }));
+  return redirectTo(loginUrl(origin, { token, session: sessionToken, redirect }));
 });

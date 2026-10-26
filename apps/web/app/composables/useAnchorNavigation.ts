@@ -3,9 +3,9 @@ import type { Ref } from "vue";
 import type { NavItem, NavSubItem } from "~~/lib/navigation";
 
 const HEADER_OFFSET = 112;
-const PENDING_NAV_ANCHOR_KEY = "opendum:pending-nav-anchor";
+const PENDING_KEY = "opendum:pending-nav-anchor";
 const PENDING_SCROLL_RETRIES = 20;
-const PENDING_SCROLL_DELAY_MS = 60;
+const SCROLL_DELAY_MS = 60;
 
 export function useAnchorNavigation(options: { anchorIds: Ref<string[]>; onNavigate?: () => void }) {
   const route = useRoute();
@@ -13,21 +13,21 @@ export function useAnchorNavigation(options: { anchorIds: Ref<string[]>; onNavig
   const activeAnchorId = ref<string | null>(null);
 
   function setPendingAnchor(path: string, anchorId: string) {
-    window.sessionStorage.setItem(PENDING_NAV_ANCHOR_KEY, JSON.stringify({ path, anchorId }));
+    window.sessionStorage.setItem(PENDING_KEY, JSON.stringify({ path, anchorId }));
   }
 
   function consumePendingAnchor(pathname: string) {
-    const rawValue = window.sessionStorage.getItem(PENDING_NAV_ANCHOR_KEY);
+    const rawValue = window.sessionStorage.getItem(PENDING_KEY);
     if (!rawValue) return null;
 
     try {
       const pendingAnchor = JSON.parse(rawValue) as { path?: string; anchorId?: string };
       if (pendingAnchor.path !== pathname || !pendingAnchor.anchorId) return null;
 
-      window.sessionStorage.removeItem(PENDING_NAV_ANCHOR_KEY);
+      window.sessionStorage.removeItem(PENDING_KEY);
       return pendingAnchor.anchorId;
     } catch {
-      window.sessionStorage.removeItem(PENDING_NAV_ANCHOR_KEY);
+      window.sessionStorage.removeItem(PENDING_KEY);
       return null;
     }
   }
@@ -41,22 +41,22 @@ export function useAnchorNavigation(options: { anchorIds: Ref<string[]>; onNavig
     return true;
   }
 
-  function getAnchorIdFromViewport(anchorIds: string[]) {
-    let firstAvailableAnchorId: string | null = null;
-    let lastPassedAnchorId: string | null = null;
+  function anchorAt(anchorIds: string[]) {
+    let firstAnchor: string | null = null;
+    let lastAnchor: string | null = null;
 
     for (const anchorId of anchorIds) {
       const section = document.getElementById(anchorId);
       if (!section) continue;
 
-      firstAvailableAnchorId ??= anchorId;
+      firstAnchor ??= anchorId;
 
       if (section.getBoundingClientRect().top <= HEADER_OFFSET) {
-        lastPassedAnchorId = anchorId;
+        lastAnchor = anchorId;
       }
     }
 
-    return lastPassedAnchorId ?? firstAvailableAnchorId;
+    return lastAnchor ?? firstAnchor;
   }
 
   function handleNavClick(item?: NavItem | NavSubItem, event?: MouseEvent) {
@@ -87,7 +87,7 @@ export function useAnchorNavigation(options: { anchorIds: Ref<string[]>; onNavig
     const scrollTarget = mainContent.value;
 
     const syncActiveAnchor = () => {
-      activeAnchorId.value = getAnchorIdFromViewport(anchorIds);
+      activeAnchorId.value = anchorAt(anchorIds);
     };
 
     const scheduleSync = () => {
@@ -138,7 +138,7 @@ export function useAnchorNavigation(options: { anchorIds: Ref<string[]>; onNavig
       retriesLeft -= 1;
       if (retriesLeft <= 0) return;
 
-      window.setTimeout(tryScroll, PENDING_SCROLL_DELAY_MS);
+      window.setTimeout(tryScroll, SCROLL_DELAY_MS);
     };
 
     tryScroll();

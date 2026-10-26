@@ -1,9 +1,9 @@
 import { Effect } from "effect";
 
-import { requireSessionFromHeaders } from "./session.js";
-import { roleForEmail, type UserRole } from "./maintainers.js";
+import { sessionFrom } from "./session.js";
+import { roleOf, type UserRole } from "./maintainers.js";
 import type { AuthUser } from "#web/lib/claims.js";
-import { findUserById } from "#web/services/users.js";
+import { findUser } from "#web/services/users.js";
 
 export type ActorUser = AuthUser;
 
@@ -26,18 +26,18 @@ export const resolveActor = Effect.fn("resolveActor")(function* (
 ) {
   if (!impersonatedBy) return claims;
 
-  const found = yield* findUserById(impersonatedBy);
+  const found = yield* findUser(impersonatedBy);
   return found ?? claims;
 });
 
-export const requireContextFromHeaders = Effect.fn("requireContextFromHeaders")(function* (
+export const contextOf = Effect.fn("contextOf")(function* (
   headers: Headers
 ) {
-  const claims = yield* requireSessionFromHeaders(headers);
+  const claims = yield* sessionFrom(headers);
   const impersonatedBy =
     claims.impersonatedBy && claims.impersonatedBy !== claims.user.id ? claims.impersonatedBy : null;
   const actor = yield* resolveActor(claims.user, impersonatedBy);
-  const role = roleForEmail(actor.email);
+  const role = roleOf(actor.email);
   const isMaintainer = role === "maintainer";
 
   return {

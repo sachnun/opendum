@@ -1,5 +1,5 @@
 import type { FallbackState } from "../core/fallback.js";
-import { OpenAICompatibleProvider } from "./openai-compatible.js";
+import { CompatProvider } from "./openai-compatible.js";
 import type { Logger, UpstreamTransport } from "../core/http.js";
 import type { Provider } from "../types.js";
 
@@ -9,7 +9,7 @@ export type CustomProviderRecord = {
   extraHeaders: Record<string, string> | null;
 };
 
-export type CustomProviderModelRecord = {
+export type ModelRecord = {
   modelId: string;
   upstream: string | null;
   authless: boolean;
@@ -20,22 +20,22 @@ export type CustomProviderModelRecord = {
   } | null;
 };
 
-export const DEFAULT_CUSTOM_SUPPORTED_PARAMS = new Set([
+export const SUPPORTED_PARAMS = new Set([
   "model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream",
   "stream_options", "tools", "tool_choice", "parallel_tool_calls", "presence_penalty",
   "frequency_penalty", "n", "stop", "seed", "response_format", "reasoning", "reasoning_effort",
 ]);
 
-export type CompileCustomProviderOptions = {
+export type CompileOptions = {
   provider: CustomProviderRecord;
-  models: CustomProviderModelRecord[];
+  models: ModelRecord[];
   transport: UpstreamTransport;
   fallback: FallbackState | null;
   logger?: Logger;
 };
 
-export function compileCustomProvider(options: CompileCustomProviderOptions): Provider {
-  const byModel = new Map<string, CustomProviderModelRecord>();
+export function compileProvider(options: CompileOptions): Provider {
+  const byModel = new Map<string, ModelRecord>();
   for (const row of options.models) byModel.set(row.modelId, row);
 
   const upstream = (model: string): string => {
@@ -58,10 +58,10 @@ export function compileCustomProvider(options: CompileCustomProviderOptions): Pr
   };
   const authless = (model: string): boolean => byModel.get(model)?.authless === true;
 
-  return new OpenAICompatibleProvider({
+  return new CompatProvider({
     name: options.provider.slug,
     baseUrl: options.provider.baseUrl,
-    supportedParams: DEFAULT_CUSTOM_SUPPORTED_PARAMS,
+    supportedParams: SUPPORTED_PARAMS,
     trimPrefix: `${options.provider.slug}/`,
     extraHeaders: options.provider.extraHeaders ?? undefined,
     upstreamName: upstream,

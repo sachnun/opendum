@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import {
-  aesGcmDecrypt,
+  decryptAes,
   decodeText,
   encodeText,
   exists,
@@ -12,26 +12,26 @@ import {
   isDirectory,
   isFile,
   listFiles,
-  listJsonFiles,
+  listJson,
   readBytes,
   readJson,
   readText,
   remove,
   rename,
   sha256Hex,
-  tryReadJson,
-  tryReadText,
-  tryWriteText,
+  loadJson,
+  loadText,
+  saveText,
   writeBytes,
   writeText,
 } from "./fs.ts";
 import { join } from "./paths.ts";
-import { makeTempDir, removeDir } from "./test-support.ts";
+import { makeDir, removeDir } from "./test-support.ts";
 import { Effect, Exit } from "effect";
 
 describe("bun fs primitives", () => {
   test("distinguishes files, directories, and missing paths", async () => {
-    const root = makeTempDir("fs-");
+    const root = makeDir("fs-");
     try {
       await writeText(join(root, "nested", "a.json"), '{"a":1}');
       expect(exists(root)).toBe(true);
@@ -46,7 +46,7 @@ describe("bun fs primitives", () => {
   });
 
   test("reads text, bytes, and JSON", async () => {
-    const root = makeTempDir("fs-");
+    const root = makeDir("fs-");
     try {
       await writeText(join(root, "a.json"), '{"a":1}');
       await writeText(join(root, "empty.txt"), "");
@@ -61,7 +61,7 @@ describe("bun fs primitives", () => {
   });
 
   test("reports a missing file as ENOENT and a directory as EISDIR", async () => {
-    const root = makeTempDir("fs-");
+    const root = makeDir("fs-");
     try {
       expect(() => readText(join(root, "absent.json"))).toThrow(/ENOENT/);
       expect(() => readText(root)).toThrow(/EISDIR/);
@@ -71,7 +71,7 @@ describe("bun fs primitives", () => {
   });
 
   test("reports invalid JSON as a SyntaxError", async () => {
-    const root = makeTempDir("fs-");
+    const root = makeDir("fs-");
     try {
       await writeText(join(root, "bad.json"), "{ oops");
       expect(() => readJson(join(root, "bad.json"))).toThrow(SyntaxError);
@@ -83,7 +83,7 @@ describe("bun fs primitives", () => {
   });
 
   test("writes create parent directories and truncate the target", async () => {
-    const root = makeTempDir("fs-");
+    const root = makeDir("fs-");
     try {
       await writeText(join(root, "deep", "nested", "a.json"), '{"a":1}');
       expect(readText(join(root, "deep", "nested", "a.json"))).toBe('{"a":1}');
@@ -100,7 +100,7 @@ describe("bun fs primitives", () => {
   });
 
   test("keeps UTF-8 intact for multibyte content", async () => {
-    const root = makeTempDir("fs-");
+    const root = makeDir("fs-");
     try {
       const content = '{"k":"日本語 ✓ 🎉"}';
       await writeText(join(root, "unicode.json"), content);
@@ -113,7 +113,7 @@ describe("bun fs primitives", () => {
   });
 
   test("remove is idempotent and leaves directories alone", async () => {
-    const root = makeTempDir("fs-");
+    const root = makeDir("fs-");
     try {
       await writeText(join(root, "a.json"), "{}");
       await remove(join(root, "a.json"));
@@ -128,7 +128,7 @@ describe("bun fs primitives", () => {
   });
 
   test("rename moves content and drops the source", async () => {
-    const root = makeTempDir("fs-");
+    const root = makeDir("fs-");
     try {
       await writeText(join(root, "from.json"), '{"a":1}');
       await rename(join(root, "from.json"), join(root, "nested", "to.json"));
@@ -140,14 +140,14 @@ describe("bun fs primitives", () => {
   });
 
   test("lists JSON files recursively and tolerates missing roots", async () => {
-    const root = makeTempDir("fs-");
+    const root = makeDir("fs-");
     try {
       await writeText(join(root, "a.json"), "{}");
       await writeText(join(root, "nested", "b.json"), "{}");
       await writeText(join(root, "nested", "note.txt"), "");
-      expect(listJsonFiles(root)).toEqual(["a.json", "nested/b.json"]);
-      expect(listJsonFiles(join(root, "absent"))).toEqual([]);
-      expect(listJsonFiles(join(root, "a.json"))).toEqual([]);
+      expect(listJson(root)).toEqual(["a.json", "nested/b.json"]);
+      expect(listJson(join(root, "absent"))).toEqual([]);
+      expect(listJson(join(root, "a.json"))).toEqual([]);
       expect(listFiles(root, "*.txt")).toEqual([]);
       expect(listFiles(join(root, "nested"), "*.txt")).toEqual(["note.txt"]);
     } finally {
@@ -156,18 +156,18 @@ describe("bun fs primitives", () => {
   });
 
   test("exposes typed read and write effects", async () => {
-    const root = makeTempDir("fs-");
+    const root = makeDir("fs-");
     try {
-      const written = await Effect.runPromise(tryWriteText(join(root, "a.json"), '{"a":1}'));
+      const written = await Effect.runPromise(saveText(join(root, "a.json"), '{"a":1}'));
       expect(written).toBeUndefined();
-      expect(await Effect.runPromise(tryReadText(join(root, "a.json")))).toBe('{"a":1}');
-      expect(await Effect.runPromise(tryReadJson(join(root, "a.json")))).toEqual({ a: 1 });
+      expect(await Effect.runPromise(loadText(join(root, "a.json")))).toBe('{"a":1}');
+      expect(await Effect.runPromise(loadJson(join(root, "a.json")))).toEqual({ a: 1 });
 
-      const missing = await Effect.runPromise(Effect.exit(tryReadText(join(root, "absent.json"))));
+      const missing = await Effect.runPromise(Effect.exit(loadText(join(root, "absent.json"))));
       expect(Exit.isFailure(missing)).toBe(true);
 
       await writeText(join(root, "bad.json"), "{ oops");
-      const invalid = await Effect.runPromise(Effect.exit(tryReadJson(join(root, "bad.json"))));
+      const invalid = await Effect.runPromise(Effect.exit(loadJson(join(root, "bad.json"))));
       expect(Exit.isFailure(invalid)).toBe(true);
     } finally {
       removeDir(root);
@@ -194,6 +194,6 @@ describe("bun fs primitives", () => {
         plain as unknown as ArrayBuffer
       )
     );
-    expect(decodeText(await aesGcmDecrypt(key, iv, sealed))).toBe("secret");
+    expect(decodeText(await decryptAes(key, iv, sealed))).toBe("secret");
   });
 });

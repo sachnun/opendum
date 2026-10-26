@@ -50,7 +50,7 @@ describe("ProxyService full flow", () => {
       resolveAlias: (model: string) => model,
       lookupKeys: (model: string) => [model],
       isVisionModel: () => true,
-      isSupportedByProvider: () => true,
+      supportsProvider: () => true,
       rule: () => null,
       modelCost: () => null,
       models: () => [],
@@ -109,7 +109,7 @@ describe("ProxyService full flow", () => {
       resolveAlias: (model: string) => model,
       lookupKeys: (model: string) => [model],
       isVisionModel: () => true,
-      isSupportedByProvider: () => true,
+      supportsProvider: () => true,
       isAuthless: () => false,
       rule: () => null,
       modelCost: () => null,
@@ -157,8 +157,8 @@ describe("ProxyService full flow", () => {
       ""
     );
     expect(response.status).toBe(403);
-    expect(repositories.health.markUsageLimitedHealth.mock.calls.length).toBe(1);
-    const limited = repositories.health.setAccountUsageLimited.mock.calls[0]?.[0];
+    expect(repositories.health.markUsageLimited.mock.calls.length).toBe(1);
+    const limited = repositories.health.markLimited.mock.calls[0]?.[0];
     expect(limited?.id).toBe("acc-1");
     expect(limited?.status).toBe("failed");
     expect(limited?.disabledUntil.getTime()).toBeGreaterThan(Date.now() + 29 * 60 * 1000);

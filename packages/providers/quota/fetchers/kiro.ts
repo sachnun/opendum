@@ -1,22 +1,22 @@
 import { Effect } from "effect";
-import { putQuotaCache, encodeQuery } from "../cache.js";
+import { putQuota, encodeQuery } from "../cache.js";
 import {
-  baseQuotaInfo,
+  baseInfo,
   clampFraction,
   displayNumber,
-  errorQuotaInfo,
-  firstNonEmpty,
-  formatTimeUntilResetIso,
-  parseQuotaArray,
-  parseQuotaNumber,
-  parseQuotaRecord,
-  parseQuotaString,
-  parseResetIso,
+  errorInfo,
+  firstValue,
+  resetIso,
+  parseArray,
+  parseNumber,
+  parseRecord,
+  parseString,
+  isoOf,
 } from "../helpers.js";
 import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay } from "../types.js";
 import { quotaAttempt, type Json } from "./shared.js";
 
-export function fetchKiroQuota(
+export function kiroQuota(
   ctx: QuotaContext,
   account: QuotaAccount,
   accessToken: string,
@@ -43,11 +43,11 @@ export function fetchKiroQuota(
 
   return quotaAttempt(ctx, account, forceRefresh, "kiro:GetUsageLimits", "POST", target, headers, body).pipe(
     Effect.flatMap((attempt) => {
-      if (!attempt.ok) return Effect.succeed(errorQuotaInfo(attempt.message));
+      if (!attempt.ok) return Effect.succeed(errorInfo(attempt.message));
       const { result } = attempt;
       if (result.statusCode < 200 || result.statusCode >= 300) {
         return Effect.succeed(
-          errorQuotaInfo(`Kiro usage limits quota endpoint failed: HTTP ${result.statusCode} ${result.raw}`)
+          errorInfo(`Kiro usage limits quota endpoint failed: HTTP ${result.statusCode} ${result.raw}`)
         );
       }
       const parsed = (() => {
@@ -57,13 +57,13 @@ export function fetchKiroQuota(
           return null;
         }
       })();
-      if (!parsed) return Effect.succeed(errorQuotaInfo("Kiro usage limits response was not valid JSON"));
-      const record = parseQuotaRecord(parsed.data) ?? parsed;
+      if (!parsed) return Effect.succeed(errorInfo("Kiro usage limits response was not valid JSON"));
+      const record = parseRecord(parsed.data) ?? parsed;
       const groups = kiroGroups(record);
       if (groups.length === 0) {
-        return Effect.succeed(errorQuotaInfo("Kiro usage limits are unavailable for this account"));
+        return Effect.succeed(errorInfo("Kiro usage limits are unavailable for this account"));
       }
-      return putQuotaCache(ctx, result).pipe(Effect.as(baseQuotaInfo("success", groups)));
+      return putQuota(ctx, result).pipe(Effect.as(baseInfo("success", groups)));
     })
   );
 }
@@ -78,20 +78,20 @@ function kiroGroups(record: Json): QuotaGroupDisplay[] {
     TRANSFORM: "Transform", CREDIT: "Credits", VIBE: "Vibe usage", SPEC: "Spec usage",
   };
   const metrics: Json[] = [];
-  for (const raw of parseQuotaArray(record.limits)) {
-    const metric = parseQuotaRecord(raw);
+  for (const raw of parseArray(record.limits)) {
+    const metric = parseRecord(raw);
     if (metric) metrics.push(metric);
   }
-  for (const raw of parseQuotaArray(record.usageBreakdownList)) {
-    const metric = parseQuotaRecord(raw);
+  for (const raw of parseArray(record.usageBreakdownList)) {
+    const metric = parseRecord(raw);
     if (metric) metrics.push(metric);
   }
   const groups: QuotaGroupDisplay[] = [];
   for (const metric of metrics) {
-    const name = firstNonEmpty(
-      parseQuotaString(metric.type),
-      parseQuotaString(metric.resourceType),
-      parseQuotaString(metric.displayName)
+    const name = firstValue(
+      parseString(metric.type),
+      parseString(metric.resourceType),
+      parseString(metric.displayName)
     ).toUpperCase();
     if (!name) continue;
     const current = firstNumber(metric.currentUsage, metric.currentUsageWithPrecision);
@@ -99,7 +99,7 @@ function kiroGroups(record: Json): QuotaGroupDisplay[] {
     if (current === null || limit === null || limit <= 0) continue;
     const remaining = Math.max(0, limit - current);
     const fraction = clampFraction(remaining / limit);
-    const resetIso = parseResetIso(firstNonNull(metric.nextDateReset, record.nextDateReset));
+    const resetValue = isoOf(firstDefined(metric.nextDateReset, record.nextDateReset));
     const display = labels[name] ?? titleWords(name.replace(/_/g, " ").toLowerCase());
     groups.push({
       name: name.toLowerCase(),
@@ -108,8 +108,8 @@ function kiroGroups(record: Json): QuotaGroupDisplay[] {
       remainingRequests: displayNumber(remaining),
       maxRequests: displayNumber(limit),
       usedRequests: displayNumber(current),
-      resetTimeIso: resetIso,
-      resetInHuman: formatTimeUntilResetIso(resetIso),
+      resetTimeIso: resetValue,
+      resetInHuman: resetIso(resetValue),
     });
   }
   return groups;
@@ -117,13 +117,13 @@ function kiroGroups(record: Json): QuotaGroupDisplay[] {
 
 function firstNumber(...values: unknown[]): number | null {
   for (const value of values) {
-    const parsed = parseQuotaNumber(value);
+    const parsed = parseNumber(value);
     if (parsed !== null) return parsed;
   }
   return null;
 }
 
-function firstNonNull(...values: unknown[]): unknown {
+function firstDefined(...values: unknown[]): unknown {
   for (const value of values) {
     if (value !== null && value !== undefined) return value;
   }

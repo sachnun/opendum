@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { Effect } from "effect";
-import { postWithEgressFallback, type EgressFetch, type FetchLike, type UpstreamTransport } from "./http.js";
+import { EgressPoster, type EgressFetch, type FetchLike, type UpstreamTransport } from "./http.js";
 
 type Harness = { transport: UpstreamTransport; egressCalls: () => number; directCalls: () => number };
 
@@ -26,7 +26,7 @@ describe("egress retry policy", () => {
   it("retries a 429 through the egress address", async () => {
     const harness = harnessOf(429, (attempt) => (attempt < 3 ? 429 : 200));
     const response = await Effect.runPromise(
-      postWithEgressFallback({ transport: harness.transport, state: null, provider: "p", primary: "u", execute: execute() })
+      new EgressPoster({ transport: harness.transport, state: null, provider: "p", primary: "u", execute: execute() }).send()
     );
     expect(response.status).toBe(200);
     expect(harness.egressCalls()).toBe(3);
@@ -36,14 +36,14 @@ describe("egress retry policy", () => {
   it("honours a per provider limited retry budget", async () => {
     const harness = harnessOf(429);
     const response = await Effect.runPromise(
-      postWithEgressFallback({
+      new EgressPoster({
         transport: harness.transport,
         state: null,
         provider: "p",
         primary: "u",
         execute: execute(),
         retry: { limited: 5 },
-      })
+      }).send()
     );
     expect(response.status).toBe(429);
     expect(harness.egressCalls()).toBe(5);
@@ -52,14 +52,14 @@ describe("egress retry policy", () => {
   it("stops at one egress attempt when the forbidden budget is one", async () => {
     const harness = harnessOf(403);
     const response = await Effect.runPromise(
-      postWithEgressFallback({
+      new EgressPoster({
         transport: harness.transport,
         state: null,
         provider: "p",
         primary: "u",
         execute: execute(),
         retry: { forbidden: 1 },
-      })
+      }).send()
     );
     expect(response.status).toBe(403);
     expect(harness.egressCalls()).toBe(1);

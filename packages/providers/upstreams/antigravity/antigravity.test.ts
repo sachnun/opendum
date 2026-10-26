@@ -3,7 +3,7 @@ import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
 
 import { AntigravityProvider } from "./index.js";
-import { peekRetiredNotice } from "./transform.js";
+import { GeminiResponse } from "./transform.js";
 
 const STREAM = [
   'data: {"candidates":[{"content":{"parts":[{"text":"hello"}]},"finishReason":"STOP"}]}',
@@ -54,7 +54,7 @@ function antigravityProvider(transport: unknown): AntigravityProvider {
 
 describe("antigravity retired notice", () => {
   it("preserves the response stream when no notice is found", async () => {
-    const peeked = await peekRetiredNotice(new Response(STREAM, { status: 200 }));
+    const peeked = await GeminiResponse.peekNotice(new Response(STREAM, { status: 200 }));
     expect(peeked.retired).toBe(false);
     expect(peeked.body).toBeTruthy();
     if (!peeked.body) return;
@@ -62,7 +62,7 @@ describe("antigravity retired notice", () => {
   });
 
   it("detects a retired notice without passing the stream through", async () => {
-    const peeked = await peekRetiredNotice(new Response(RETIRED_STREAM, { status: 200 }));
+    const peeked = await GeminiResponse.peekNotice(new Response(RETIRED_STREAM, { status: 200 }));
     expect(peeked.retired).toBe(true);
     expect(peeked.body).toBe(null);
     expect(peeked.notice ?? "").toMatch(/no longer available/);

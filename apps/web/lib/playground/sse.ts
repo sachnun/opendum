@@ -1,0 +1,70 @@
+import { createParser, type EventSourceMessage } from "eventsource-parser";
+import { Completion, Tokens } from "./parsing";
+import type { ParsedCompletionData, PlaygroundEndpoint } from "./types";
+
+export class Sse {
+  static handle(
+    message: EventSourceMessage,
+    onChunk: (chunk: ParsedCompletionData) => void,
+    endpoint: PlaygroundEndpoint
+  ): boolean {
+    const data = message.data.trim();
+    if (!data || data === "[DONE]") return false;
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(data);
+    } catch {
+      return false;
+    }
+
+    const errorMessage = Completion.error(parsed);
+    if (errorMessage) throw new Error(errorMessage);
+
+    const eventName =
+      message.event ??
+      (parsed && typeof parsed === "object" && typeof (parsed as { type?: unknown }).type === "string"
+        ? (parsed as { type: string }).type
+        : "");
+    const chunk =
+      endpoint === "messages"
+        ? Completion.anthropicStream(eventName, parsed)
+        : endpoint === "responses"
+          ? Completion.responsesStream(parsed)
+          : Completion.streamChunk(parsed);
+    if (!chunk.content && !chunk.reasoning && chunk.toolCalls.length === 0 && !chunk.usage) return false;
+
+    onChunk(chunk);
+    return true;
+  }
+
+  static processor(endpoint: PlaygroundEndpoint, onChunk: (chunk: ParsedCompletionData) => void) {
+    let emitted = 0;
+    const parser = createParser({
+      onEvent: (message) => {
+        if (Sse.handle(message, onChunk, endpoint)) emitted += 1;
+      },
+    });
+
+    return {
+      feed(chunk: string) {
+        emitted = 0;
+        parser.feed(chunk);
+        return emitted;
+      },
+      flush() {
+        emitted = 0;
+        parser.reset({ consume: true });
+        return emitted;
+      },
+    };
+  }
+
+  static ok(status: number): boolean {
+    return status >= 200 && status < 300;
+  }
+
+  static usage(payload: unknown) {
+    return Tokens.usage(payload);
+  }
+}

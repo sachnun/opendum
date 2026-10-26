@@ -5,7 +5,7 @@ import { emptyInputSchema } from "./common.js";
 
 const SLUG_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/;
 
-const customModelInputSchema = z.object({
+const modelInputSchema = z.object({
   modelId: z.string().trim().min(1).max(120),
   upstream: z.string().trim().max(200).optional(),
   aliased: z.boolean().optional(),
@@ -21,58 +21,58 @@ const customModelInputSchema = z.object({
     .optional(),
 });
 
-const createCustomProviderSchema = z.object({
+const customCreateSchema = z.object({
   slug: z.string().trim().toLowerCase().regex(SLUG_PATTERN, "Slug must match [a-z][a-z0-9_-]{0,31}"),
   name: z.string().trim().min(1).max(120),
   baseUrl: z.string().trim().min(1).max(500),
   extraHeaders: z.record(z.string(), z.string()).optional(),
 });
-const previewCustomModelsSchema = z.object({
+const modelsPreviewSchema = z.object({
   baseUrl: z.string().trim().min(1).max(500),
   extraHeaders: z.record(z.string(), z.string()).optional(),
   token: z.string().trim().optional(),
 });
-const updateCustomProviderSchema = z.object({
+const customUpdateSchema = z.object({
   slug: z.string().trim().toLowerCase().regex(SLUG_PATTERN, "Invalid slug"),
   name: z.string().trim().min(1).max(120).optional(),
   baseUrl: z.string().trim().min(1).max(500).optional(),
   extraHeaders: z.record(z.string(), z.string()).optional(),
   enabled: z.boolean().optional(),
 });
-const deleteCustomProviderSchema = z.object({ slug: z.string().trim().toLowerCase().regex(SLUG_PATTERN, "Invalid slug") });
-const connectCustomProviderAccountSchema = z.object({
+const customDeleteSchema = z.object({ slug: z.string().trim().toLowerCase().regex(SLUG_PATTERN, "Invalid slug") });
+const customConnectSchema = z.object({
   slug: z.string().trim().toLowerCase().regex(SLUG_PATTERN, "Invalid slug"),
   token: z.string().trim().min(1),
   name: z.string().trim().max(120).optional(),
 });
-const upsertCustomModelsSchema = z.object({
+const modelsUpsertSchema = z.object({
   slug: z.string().trim().toLowerCase().regex(SLUG_PATTERN, "Invalid slug"),
-  models: z.array(customModelInputSchema).min(1).max(500),
+  models: z.array(modelInputSchema).min(1).max(500),
 });
-const deleteCustomModelSchema = z.object({
+const modelDeleteSchema = z.object({
   slug: z.string().trim().toLowerCase().regex(SLUG_PATTERN, "Invalid slug"),
   modelId: z.string().trim().min(1).max(120),
 });
-const syncCustomModelsSchema = z.object({ slug: z.string().trim().toLowerCase().regex(SLUG_PATTERN, "Invalid slug"), token: z.string().trim().optional() });
+const modelsSyncSchema = z.object({ slug: z.string().trim().toLowerCase().regex(SLUG_PATTERN, "Invalid slug"), token: z.string().trim().optional() });
 
 export const providersContract = {
   list: oc.input(emptyInputSchema),
-  create: oc.input(createCustomProviderSchema),
-  update: oc.input(updateCustomProviderSchema),
-  delete: oc.input(deleteCustomProviderSchema),
-  connect: oc.input(connectCustomProviderAccountSchema),
-  sync: oc.input(syncCustomModelsSchema),
-  preview: oc.input(previewCustomModelsSchema),
-  models: oc.input(upsertCustomModelsSchema),
-  model: oc.input(deleteCustomModelSchema),
+  create: oc.input(customCreateSchema),
+  update: oc.input(customUpdateSchema),
+  delete: oc.input(customDeleteSchema),
+  connect: oc.input(customConnectSchema),
+  sync: oc.input(modelsSyncSchema),
+  preview: oc.input(modelsPreviewSchema),
+  models: oc.input(modelsUpsertSchema),
+  model: oc.input(modelDeleteSchema),
 };
 
-export type CreateCustomProviderInput = z.infer<typeof createCustomProviderSchema>;
-export type UpdateCustomProviderInput = z.infer<typeof updateCustomProviderSchema>;
-export type DeleteCustomProviderInput = z.infer<typeof deleteCustomProviderSchema>;
-export type ConnectCustomProviderInput = z.infer<typeof connectCustomProviderAccountSchema>;
-export type SyncCustomModelsInput = z.infer<typeof syncCustomModelsSchema>;
-export type PreviewCustomModelsInput = z.infer<typeof previewCustomModelsSchema>;
-export type UpsertCustomModelsInput = z.infer<typeof upsertCustomModelsSchema>;
-export type DeleteCustomModelInput = z.infer<typeof deleteCustomModelSchema>;
-export type CustomModelInput = z.infer<typeof customModelInputSchema>;
+export type CustomCreateInput = z.infer<typeof customCreateSchema>;
+export type CustomUpdateInput = z.infer<typeof customUpdateSchema>;
+export type CustomDeleteInput = z.infer<typeof customDeleteSchema>;
+export type CustomConnectInput = z.infer<typeof customConnectSchema>;
+export type ModelsSyncInput = z.infer<typeof modelsSyncSchema>;
+export type ModelsPreviewInput = z.infer<typeof modelsPreviewSchema>;
+export type ModelsUpsertInput = z.infer<typeof modelsUpsertSchema>;
+export type ModelDeleteInput = z.infer<typeof modelDeleteSchema>;
+export type CustomModelInput = z.infer<typeof modelInputSchema>;

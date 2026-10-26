@@ -2,25 +2,25 @@ import { mkdirSync, rmSync } from "node:fs";
 
 import { Effect } from "effect";
 
-import { listJsonFiles, readText, remove, writeText } from "./fs.ts";
+import { listJson, readText, remove, writeText } from "./fs.ts";
 import { join } from "./paths.ts";
 
-export function tempDir(): string {
+export function tmpRoot(): string {
   return Bun.env["TMPDIR"] ?? Bun.env["TMP"] ?? Bun.env["TEMP"] ?? "/tmp";
 }
 
 let counter = 0;
 
-export function makeTempDir(prefix = "opendum-models-"): string {
+export function makeDir(prefix = "opendum-models-"): string {
   counter += 1;
-  const dir = join(tempDir(), `${prefix}${process.pid}-${counter}-${Date.now().toString(36)}`);
+  const dir = join(tmpRoot(), `${prefix}${process.pid}-${counter}-${Date.now().toString(36)}`);
 
   mkdirSync(dir, { recursive: true });
   return dir;
 }
 
-export async function withTempDir<A>(run: (dir: string) => A | Promise<A>): Promise<A> {
-  const dir = makeTempDir();
+export async function inTemp<A>(run: (dir: string) => A | Promise<A>): Promise<A> {
+  const dir = makeDir();
   try {
     return await run(dir);
   } finally {
@@ -46,7 +46,7 @@ export function json<T>(path: string): T {
 }
 
 export function jsonFiles(dir: string): string[] {
-  return listJsonFiles(dir);
+  return listJson(dir);
 }
 
 export function removeFile(path: string): Promise<void> {

@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { buildModelPatch, type ModelMetadataInput, type ResolvedMetadata } from "./metadata.ts";
+import { modelPatch, type ModelMetadataInput, type ResolvedMetadata } from "./metadata.ts";
 
 function efforts(values: string[]): unknown {
   return { reasoning_options: [{ type: "effort", values }] };
@@ -19,7 +19,7 @@ test("reasoning effort unions provider declarations instead of taking the first"
     global: {},
   };
 
-  const patch = buildModelPatch(input(["hyper", "zenmux"]), resolved);
+  const patch = modelPatch(input(["hyper", "zenmux"]), resolved);
   expect(patch.reasoningEffort).toEqual(["low", "high", "xhigh", "max"]);
 });
 
@@ -32,7 +32,7 @@ test("reasoning effort keeps canonical order across overlapping providers", () =
     global: {},
   };
 
-  const patch = buildModelPatch(input(["opencode", "zenmux"]), resolved);
+  const patch = modelPatch(input(["opencode", "zenmux"]), resolved);
   expect(patch.reasoningEffort).toEqual(["low", "medium", "high", "max"]);
 });
 
@@ -48,7 +48,7 @@ test("reasoning effort falls back to a global hit when no provider declares one"
     },
   };
 
-  const patch = buildModelPatch(input(["hyper"]), resolved);
+  const patch = modelPatch(input(["hyper"]), resolved);
   expect(patch.reasoningEffort).toEqual(["low", "high", "max"]);
 });
 
@@ -58,6 +58,6 @@ test("reasoning effort stays null when no source declares efforts", () => {
     global: {},
   };
 
-  const patch = buildModelPatch(input(["hyper"]), resolved);
+  const patch = modelPatch(input(["hyper"]), resolved);
   expect(patch.reasoningEffort).toBeNull();
 });

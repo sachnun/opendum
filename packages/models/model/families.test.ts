@@ -1,8 +1,8 @@
 import { expect, test } from "bun:test";
 
-import { FAMILY_RULES, inferFamilyFromFolder, inferModelFolder } from "./families.ts";
+import { FAMILY_RULES, familyOf, folderOf } from "./families.ts";
 
-test("inferModelFolder maps mocked prefix names to rule folders", () => {
+test("folderOf maps mocked prefix names to rule folders", () => {
   const cases: Array<[string, string]> = [
     ["claude-mock", "anthropic"],
     ["gpt-mock", "openai"],
@@ -19,21 +19,21 @@ test("inferModelFolder maps mocked prefix names to rule folders", () => {
     ["granite-mock", "ibm"],
   ];
   for (const [model, folder] of cases) {
-    expect(inferModelFolder(model), `inferModelFolder(${model})`).toBe(folder);
+    expect(folderOf(model), `folderOf(${model})`).toBe(folder);
   }
 });
 
-test("inferModelFolder is case-insensitive and returns null when unknown", () => {
-  expect(inferModelFolder("CLAUDE-MOCK")).toBe("anthropic");
-  expect(inferModelFolder("mock-unknown-model")).toBe(null);
+test("folderOf is case-insensitive and returns null when unknown", () => {
+  expect(folderOf("CLAUDE-MOCK")).toBe("anthropic");
+  expect(folderOf("mock-unknown-model")).toBe(null);
 });
 
-test("inferFamilyFromFolder resolves folders declared by rules", () => {
-  expect(inferFamilyFromFolder("anthropic")).toBe("Anthropic");
-  expect(inferFamilyFromFolder("google")).toBe("Google");
-  expect(inferFamilyFromFolder("does-not-exist")).toBe(null);
-  expect(inferFamilyFromFolder(null)).toBe(null);
-  expect(inferFamilyFromFolder(undefined)).toBe(null);
+test("familyOf resolves folders declared by rules", () => {
+  expect(familyOf("anthropic")).toBe("Anthropic");
+  expect(familyOf("google")).toBe("Google");
+  expect(familyOf("does-not-exist")).toBe(null);
+  expect(familyOf(null)).toBe(null);
+  expect(familyOf(undefined)).toBe(null);
 });
 
 test("FAMILY_RULES folders are unique enough to map deterministically", () => {

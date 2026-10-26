@@ -22,7 +22,7 @@ export const modelStatsSchema = z.object({
   durationLast24Hours: z.array(z.object({ time: z.string(), avgDuration: z.number() })),
 });
 
-export const modelListItemSchema = z.object({
+export const modelItem = z.object({
   id: z.string(),
   name: z.string(),
   family: z.string(),
@@ -36,38 +36,38 @@ export const modelListItemSchema = z.object({
   stats: modelStatsSchema.optional(),
 });
 
-export const modelSearchItemSchema = modelListItemSchema.omit({ name: true, family: true, stats: true });
+export const searchItem = modelItem.omit({ name: true, family: true, stats: true });
 
-export const modelStatsDataSchema = z.record(z.string(), modelStatsSchema);
+export const statsData = z.record(z.string(), modelStatsSchema);
 
-export const modelFamilyCountsSchema = z.record(z.string(), z.number());
+export const familyCounts = z.record(z.string(), z.number());
 export const modelCatalogSchema = z.array(z.string());
 
-export const setModelEnabledResultSchema = z.discriminatedUnion("success", [
+export const enableModelResult = z.discriminatedUnion("success", [
   z.object({ success: z.literal(true), data: z.object({ model: z.string(), enabled: z.boolean() }) }),
   z.object({ success: z.literal(false), error: z.string() }),
 ]);
 
-export const listModelsInputSchema = z.object({ includeStats: z.boolean().optional() });
-export const modelStatsInputSchema = z.object({
+export const modelsInput = z.object({ includeStats: z.boolean().optional() });
+export const statsInput = z.object({
   models: z.array(z.string()),
 });
-export const setModelEnabledInputSchema = z.object({ modelId: z.string(), enabled: z.boolean() });
+export const enableModelInput = z.object({ modelId: z.string(), enabled: z.boolean() });
 
 export const modelsContract = {
-  list: oc.input(listModelsInputSchema.optional()).output(z.array(modelListItemSchema)),
-  search: oc.output(z.array(modelSearchItemSchema)),
+  list: oc.input(modelsInput.optional()).output(z.array(modelItem)),
+  search: oc.output(z.array(searchItem)),
   catalog: oc.output(modelCatalogSchema),
-  stats: oc.input(modelStatsInputSchema).output(modelStatsDataSchema),
-  families: oc.output(modelFamilyCountsSchema),
-  enable: oc.input(setModelEnabledInputSchema).output(setModelEnabledResultSchema),
+  stats: oc.input(statsInput).output(statsData),
+  families: oc.output(familyCounts),
+  enable: oc.input(enableModelInput).output(enableModelResult),
 };
 
-export type ModelListItem = z.infer<typeof modelListItemSchema>;
-export type ModelSearchItem = z.infer<typeof modelSearchItemSchema>;
+export type ModelListItem = z.infer<typeof modelItem>;
+export type ModelSearchItem = z.infer<typeof searchItem>;
 export type ModelStats = z.infer<typeof modelStatsSchema>;
-export type ModelStatsData = z.infer<typeof modelStatsDataSchema>;
-export type SetModelEnabledResult = z.infer<typeof setModelEnabledResultSchema>;
-export type SetModelEnabledInput = z.infer<typeof setModelEnabledInputSchema>;
-export type ListModelsInput = z.infer<typeof listModelsInputSchema>;
-export type ModelStatsInput = z.infer<typeof modelStatsInputSchema>;
+export type ModelStatsData = z.infer<typeof statsData>;
+export type EnableModelResult = z.infer<typeof enableModelResult>;
+export type EnableModelInput = z.infer<typeof enableModelInput>;
+export type ListModelsInput = z.infer<typeof modelsInput>;
+export type ModelStatsInput = z.infer<typeof statsInput>;

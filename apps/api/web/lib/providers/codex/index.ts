@@ -1,6 +1,6 @@
-export { buildOAuthResultFromChatGPTSession, codexProvider, initiateCodexDeviceCodeFlow, pollCodexDeviceCodeAuthorization } from "./client.js";
+export { sessionResult, codexProvider, startDeviceFlow, pollDeviceAuth } from "./client.js";
 export {
-  generateCodeVerifier,
+  codeVerifier,
   generateCodeChallenge,
 } from "./client.js";
 export * from "./constants.js";

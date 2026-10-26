@@ -1,5 +1,5 @@
 import { buildIndex, persist, sync } from "#models/model-store.ts";
-import { arrayAt, asTrimmedString, booleanAt, stringAt } from "#models/json.ts";
+import { arrayAt, trimmed, booleanAt, stringAt } from "#models/json.ts";
 import { exists, readText } from "#models/fs.ts";
 import { join } from "#models/paths.ts";
 import { env, fetchPackageJson, packageModelsDir, runScript } from "./shared.ts";
@@ -19,19 +19,19 @@ interface CatalogEntry {
   reasoning: boolean;
 }
 
-function isExcludedId(id: string): boolean {
+function isExcluded(id: string): boolean {
   if (id.includes("image")) return true;
   if (id.startsWith("hunyuan-video")) return true;
   return false;
 }
 
-function toCatalogEntry(value: unknown): CatalogEntry | null {
-  const id = asTrimmedString(stringAt(value, "id"));
-  if (!id || isExcludedId(id)) return null;
+function catalogEntry(value: unknown): CatalogEntry | null {
+  const id = trimmed(stringAt(value, "id"));
+  if (!id || isExcluded(id)) return null;
   return { id, reasoning: booleanAt(value, "supportsReasoning") === true };
 }
 
-async function fetchWorkbuddyCatalog(): Promise<CatalogEntry[]> {
+async function fetchCatalog(): Promise<CatalogEntry[]> {
   const { version, payload } = await fetchPackageJson(
     WORKBUDDY_NPM_PACKAGE,
     WORKBUDDY_PRODUCT_FILE,
@@ -43,12 +43,12 @@ async function fetchWorkbuddyCatalog(): Promise<CatalogEntry[]> {
     throw new Error(`Unexpected models payload in ${WORKBUDDY_NPM_PACKAGE}@${version}`);
   }
   return models.flatMap((item) => {
-    const entry = toCatalogEntry(item);
+    const entry = catalogEntry(item);
     return entry ? [entry] : [];
   });
 }
 
-function readLocalCatalog(): CatalogEntry[] {
+function localCatalog(): CatalogEntry[] {
   const home = env("HOME");
   if (!home) return [];
 
@@ -59,7 +59,7 @@ function readLocalCatalog(): CatalogEntry[] {
     const payload: unknown = JSON.parse(readText(candidate));
     const models = Array.isArray(payload) ? payload : arrayAt(payload, "models");
     return models.flatMap((item) => {
-      const entry = toCatalogEntry(item);
+      const entry = catalogEntry(item);
       return entry ? [entry] : [];
     });
   } catch {
@@ -67,7 +67,7 @@ function readLocalCatalog(): CatalogEntry[] {
   }
 }
 
-function buildModelMap(catalog: CatalogEntry[]): {
+function modelIndex(catalog: CatalogEntry[]): {
   modelMap: Map<string, string>;
   metadataLookup: Map<string, CatalogEntry>;
 } {
@@ -81,7 +81,7 @@ function buildModelMap(catalog: CatalogEntry[]): {
   };
 
   for (const entry of catalog) register(entry);
-  for (const entry of readLocalCatalog()) register(entry);
+  for (const entry of localCatalog()) register(entry);
 
   if (modelMap.size === 0) {
     throw new Error("WorkBuddy catalog produced no models");
@@ -98,7 +98,7 @@ function buildModelMap(catalog: CatalogEntry[]): {
   };
 }
 
-function enrichNewModels(
+function enrichModels(
   modelsDir: string,
   addedKeys: string[],
   modelMap: Map<string, string>,
@@ -122,7 +122,7 @@ function enrichNewModels(
   }
 }
 
-function enforceHouseIgnored(modelsDir: string): string[] {
+function enforceIgnored(modelsDir: string): string[] {
   const index = buildIndex(modelsDir);
   const changed: string[] = [];
 
@@ -145,14 +145,14 @@ function enforceHouseIgnored(modelsDir: string): string[] {
 async function main(): Promise<void> {
   const modelsDir = packageModelsDir();
 
-  const catalog = await fetchWorkbuddyCatalog();
-  const { modelMap, metadataLookup } = buildModelMap(catalog);
+  const catalog = await fetchCatalog();
+  const { modelMap, metadataLookup } = modelIndex(catalog);
 
   const result = await sync(modelsDir, PROVIDER_NAME, modelMap);
-  const ignored = enforceHouseIgnored(modelsDir);
+  const ignored = enforceIgnored(modelsDir);
 
   if (result.added.length > 0) {
-    enrichNewModels(modelsDir, result.added, modelMap, metadataLookup);
+    enrichModels(modelsDir, result.added, modelMap, metadataLookup);
   }
 
   if (

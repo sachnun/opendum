@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { MAX_FETCH_ATTEMPTS, runFetchJson, runFetchText, sleep } from "./http.ts";
+import { MAX_FETCH_ATTEMPTS, runJson, runText, sleep } from "./http.ts";
 
 type Stub = (url: string, init?: RequestInit) => Promise<Response>;
 
@@ -18,23 +18,23 @@ test("sleep resolves after the requested delay", async () => {
   expect(Date.now() - start >= 5).toBeTruthy();
 });
 
-test("runFetchJson returns the parsed JSON body", async () => {
+test("runJson returns the parsed JSON body", async () => {
   const payload = await withFetch(
     async () => new Response(JSON.stringify({ ok: true }), { status: 200 }),
-    () => runFetchJson("https://example.test/data"),
+    () => runJson("https://example.test/data"),
   );
   expect(payload).toEqual({ ok: true });
 });
 
-test("runFetchText returns the raw text body", async () => {
+test("runText returns the raw text body", async () => {
   const payload = await withFetch(
     async () => new Response("hello", { status: 200 }),
-    () => runFetchText("https://example.test/data"),
+    () => runText("https://example.test/data"),
   );
   expect(payload).toBe("hello");
 });
 
-test("runFetchJson retries after a transient failure", async () => {
+test("fetchJson retries after a transient failure", async () => {
   let calls = 0;
   const payload = await withFetch(
     async () => {
@@ -42,13 +42,13 @@ test("runFetchJson retries after a transient failure", async () => {
       if (calls === 1) throw new Error("network down");
       return new Response(JSON.stringify({ retried: true }), { status: 200 });
     },
-    () => runFetchJson("https://example.test/data", { attempts: 2 }),
+    () => runJson("https://example.test/data", { attempts: 2 }),
   );
   expect(calls).toBe(2);
   expect(payload).toEqual({ retried: true });
 });
 
-test("runFetchJson rejects after exhausting attempts", async () => {
+test("fetchJson rejects after exhausting attempts", async () => {
   let calls = 0;
   await expect(
     withFetch(
@@ -56,22 +56,22 @@ test("runFetchJson rejects after exhausting attempts", async () => {
         calls += 1;
         throw new Error("still down");
       },
-      () => runFetchJson("https://example.test/data", { attempts: 1 }),
+      () => runJson("https://example.test/data", { attempts: 1 }),
     ),
   ).rejects.toThrow(/still down/);
   expect(calls).toBe(1);
 });
 
-test("runFetchJson rejects on non-ok responses without retrying by default label", async () => {
+test("fetchJson rejects on non-ok responses without retrying by default label", async () => {
   await expect(
     withFetch(
       async () => new Response("boom", { status: 500, statusText: "Server Error" }),
-      () => runFetchJson("https://example.test/data", { attempts: 1, label: "example" }),
+      () => runJson("https://example.test/data", { attempts: 1, label: "example" }),
     ),
   ).rejects.toThrow(/Failed to fetch example \(500 Server Error\)/);
 });
 
-test("runFetchJson retries rate limited responses and reports the status", async () => {
+test("fetchJson retries rate limited responses and reports the status", async () => {
   let calls = 0;
   const payload = await withFetch(
     async () => {
@@ -85,13 +85,13 @@ test("runFetchJson retries rate limited responses and reports the status", async
       }
       return new Response(JSON.stringify({ retried: true }), { status: 200 });
     },
-    () => runFetchJson("https://example.test/data", { attempts: 2 }),
+    () => runJson("https://example.test/data", { attempts: 2 }),
   );
   expect(calls).toBe(2);
   expect(payload).toEqual({ retried: true });
 });
 
-test("runFetchJson exposes the status on exhausted rate limits", async () => {
+test("fetchJson exposes the status on exhausted rate limits", async () => {
   await expect(
     withFetch(
       async () =>
@@ -100,12 +100,12 @@ test("runFetchJson exposes the status on exhausted rate limits", async () => {
           statusText: "Too Many Requests",
           headers: { "retry-after": "0" },
         }),
-      () => runFetchJson("https://example.test/data", { attempts: 1, label: "example" }),
+      () => runJson("https://example.test/data", { attempts: 1, label: "example" }),
     ),
   ).rejects.toThrow(/Failed to fetch example \(429 Too Many Requests\)/);
 });
 
-test("runFetchText retries a body read timeout instead of failing on the status", async () => {
+test("fetchText retries a body read timeout instead of failing on the status", async () => {
   let calls = 0;
   const payload = await withFetch(
     async () => {
@@ -121,7 +121,7 @@ test("runFetchText retries a body read timeout instead of failing on the status"
       }
       return new Response("complete", { status: 200 });
     },
-    () => runFetchText("https://example.test/page", { attempts: 2, timeout: 5_000 }),
+    () => runText("https://example.test/page", { attempts: 2, timeout: 5_000 }),
   );
   expect(calls).toBe(2);
   expect(payload).toBe("complete");

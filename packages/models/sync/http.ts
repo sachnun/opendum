@@ -4,31 +4,31 @@ import {
   ModelFetchFailure,
   ModelTimeoutFailure,
   asError,
-  isRetryableStatus,
-  modelFailureMessage,
+  isRetryable as retryableStatus,
+  failureMessage,
 } from "../errors.ts";
 
 export const MAX_FETCH_ATTEMPTS = 3;
 export const FETCH_TIMEOUT_MS = 20_000;
-export const FETCH_TIMEOUT_GRACE_MS = 1_000;
-export const FETCH_RETRY_BASE_DELAY_MS = 1_000;
-export const FETCH_RETRY_AFTER_CAP_MS = 30_000;
+export const TIMEOUT_GRACE_MS = 1_000;
+export const RETRY_DELAY_MS = 1_000;
+export const RETRY_CAP_MS = 30_000;
 
 const retryDelayHint = new Map<string, number>();
 
-function retryAfterMs(response: Response): number {
+function afterMs(response: Response): number {
   const header = response.headers.get("retry-after");
   if (!header) return 0;
 
   const seconds = Number(header);
   if (Number.isFinite(seconds) && seconds >= 0) {
-    return Math.min(seconds * 1_000, FETCH_RETRY_AFTER_CAP_MS);
+    return Math.min(seconds * 1_000, RETRY_CAP_MS);
   }
 
   const date = Date.parse(header);
   if (Number.isNaN(date)) return 0;
 
-  return Math.min(Math.max(date - Date.now(), 0), FETCH_RETRY_AFTER_CAP_MS);
+  return Math.min(Math.max(date - Date.now(), 0), RETRY_CAP_MS);
 }
 
 export function sleep(ms: number): Promise<void> {
@@ -54,14 +54,14 @@ export function retryTransient<A, E, R>(
 ): Effect.Effect<A, E, R> {
   const retries = Math.max(0, Math.trunc(attempts) - 1);
   if (retries === 0) return self;
-  const policy = Schedule.exponential(Duration.millis(FETCH_RETRY_BASE_DELAY_MS)).pipe(
+  const policy = Schedule.exponential(Duration.millis(RETRY_DELAY_MS)).pipe(
     Schedule.jittered,
     Schedule.upTo({ times: retries })
   );
   return Effect.retry(self, policy);
 }
 
-export function retryFetchLabeled<A>(
+export function fetchLabeled<A>(
   label: string,
   self: Effect.Effect<A, ModelFetchFailure | ModelTimeoutFailure>,
   attempts: number
@@ -71,14 +71,14 @@ export function retryFetchLabeled<A>(
 
 function isRetryable(cause: ModelFetchFailure | ModelTimeoutFailure): boolean {
   if (cause._tag === "ModelTimeoutFailure") return true;
-  return isRetryableStatus(cause.status);
+  return retryableStatus(cause.status);
 }
 
 function fetchSchedule(
   label: string,
   retries: number
 ): Schedule.Schedule<unknown, ModelFetchFailure | ModelTimeoutFailure> {
-  return Schedule.exponential(Duration.millis(FETCH_RETRY_BASE_DELAY_MS)).pipe(
+  return Schedule.exponential(Duration.millis(RETRY_DELAY_MS)).pipe(
     Schedule.jittered,
     Schedule.upTo({ times: retries }),
     Schedule.while(({ input }) => isRetryable(input as ModelFetchFailure | ModelTimeoutFailure)),
@@ -103,7 +103,7 @@ function retryFetch<A>(
   );
 }
 
-export function runOrThrow<A>(effect: Effect.Effect<A, unknown>): Promise<A> {
+export function orThrow<A>(effect: Effect.Effect<A, unknown>): Promise<A> {
   return Effect.runPromise(effect).catch((cause: unknown) => {
     throw asError(cause);
   });
@@ -116,14 +116,14 @@ export function runTyped<A, E>(effect: Effect.Effect<A, E>): Promise<A> {
 function requestFailure(label: string, cause: unknown, status?: number): ModelFetchFailure {
   if (cause instanceof ModelFetchFailure) return cause;
   return new ModelFetchFailure({
-    message: modelFailureMessage(cause),
+    message: failureMessage(cause),
     label,
     status,
     cause,
   });
 }
 
-function isTimeoutCause(cause: unknown): boolean {
+function timeoutCause(cause: unknown): boolean {
   const name = (cause as { name?: string } | null)?.name;
   return name === "TimeoutError" || name === "AbortError";
 }
@@ -160,11 +160,11 @@ export function request<T>(
           signal: AbortSignal.timeout(timeout),
         }),
       catch: (cause) =>
-        isTimeoutCause(cause) ? timeoutFailure(label, timeout, "fetching") : requestFailure(label, cause),
+        timeoutCause(cause) ? timeoutFailure(label, timeout, "fetching") : requestFailure(label, cause),
     });
 
     if (!response.ok) {
-      const wait = retryAfterMs(response);
+      const wait = afterMs(response);
       if (wait > 0) retryDelayHint.set(label, wait);
       return yield* Effect.fail(
         new ModelFetchFailure({
@@ -178,7 +178,7 @@ export function request<T>(
     return yield* Effect.tryPromise({
       try: () => Promise.resolve(decode(response)),
       catch: (cause) =>
-        isTimeoutCause(cause)
+        timeoutCause(cause)
           ? timeoutFailure(label, timeout, "reading")
           : requestFailure(label, cause, response.status),
     });
@@ -186,7 +186,7 @@ export function request<T>(
 
   const bounded = attempt.pipe(
     Effect.timeoutOrElse({
-      duration: Duration.millis(timeout + FETCH_TIMEOUT_GRACE_MS),
+      duration: Duration.millis(timeout + TIMEOUT_GRACE_MS),
       orElse: () => Effect.fail(timeoutFailure(label, timeout, "reading")),
     })
   );
@@ -206,7 +206,7 @@ async function decodeResponse(response: Response, responseType: FetchResponseTyp
   return response.json();
 }
 
-export function fetchWithRetry(
+export function fetchRetry(
   url: string,
   options: FetchOptions & { responseType?: FetchResponseType } = {}
 ): Effect.Effect<unknown, ModelFetchFailure | ModelTimeoutFailure> {
@@ -222,14 +222,14 @@ export function fetchJson(
   url: string,
   options: FetchOptions = {}
 ): Effect.Effect<unknown, ModelFetchFailure | ModelTimeoutFailure> {
-  return fetchWithRetry(url, { ...options, responseType: "json" });
+  return fetchRetry(url, { ...options, responseType: "json" });
 }
 
 export function fetchText(
   url: string,
   options: FetchOptions = {}
 ): Effect.Effect<string, ModelFetchFailure | ModelTimeoutFailure> {
-  return fetchWithRetry(url, { ...options, responseType: "text" }) as Effect.Effect<
+  return fetchRetry(url, { ...options, responseType: "text" }) as Effect.Effect<
     string,
     ModelFetchFailure | ModelTimeoutFailure
   >;
@@ -239,7 +239,7 @@ export function fetchBytes(
   url: string,
   options: FetchOptions = {}
 ): Effect.Effect<Uint8Array, ModelFetchFailure | ModelTimeoutFailure> {
-  return fetchWithRetry(url, { ...options, responseType: "bytes" }) as Effect.Effect<
+  return fetchRetry(url, { ...options, responseType: "bytes" }) as Effect.Effect<
     Uint8Array,
     ModelFetchFailure | ModelTimeoutFailure
   >;
@@ -253,23 +253,16 @@ export function fetchDecoded<T>(
   return request(url, options, decode);
 }
 
-export function runFetchJson(url: string, options: FetchOptions = {}): Promise<unknown> {
-  return runOrThrow(fetchJson(url, options));
+export function runJson(url: string, options: FetchOptions = {}): Promise<unknown> {
+  return orThrow(fetchJson(url, options));
 }
 
-export function runFetchJsonEffect(
-  url: string,
-  options: FetchOptions = {}
-): Effect.Effect<unknown, ModelFetchFailure | ModelTimeoutFailure> {
-  return fetchJson(url, options);
+export function runText(url: string, options: FetchOptions = {}): Promise<string> {
+  return orThrow(fetchText(url, options));
 }
 
-export function runFetchText(url: string, options: FetchOptions = {}): Promise<string> {
-  return runOrThrow(fetchText(url, options));
-}
-
-export function runFetchBytes(url: string, options: FetchOptions = {}): Promise<Uint8Array> {
-  return runOrThrow(fetchBytes(url, options));
+export function runBytes(url: string, options: FetchOptions = {}): Promise<Uint8Array> {
+  return orThrow(fetchBytes(url, options));
 }
 
 export function fetchAll<A, E, R>(

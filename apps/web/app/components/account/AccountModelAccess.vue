@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { compareModelIds } from "@opendum/models/sort";
-import type { ProviderAccountModelHealthItem } from "~~/lib/api-types";
+import { compareIds } from "@opendum/models/sort";
+import type { AccountHealthItem } from "~~/lib/api-types";
 
 const props = defineProps<{
   accountId: string;
   provider: string;
   supportedModels: string[];
   initialDisabledModels: string[];
-  modelHealth: Record<string, ProviderAccountModelHealthItem>;
+  modelHealth: Record<string, AccountHealthItem>;
   activeModel?: string | null;
   readonly?: boolean;
 }>();
@@ -28,17 +28,17 @@ watch(
 
 const enabledCount = computed(() => props.supportedModels.length - disabledModels.value.size);
 const hasMore = computed(() => props.supportedModels.length > visibleCount);
-const sortedModels = computed(() => [...props.supportedModels].sort((a, b) => modelSortWeight(a) - modelSortWeight(b) || compareModelIds(a, b)));
+const sortedModels = computed(() => [...props.supportedModels].sort((a, b) => sortWeight(a) - sortWeight(b) || compareIds(a, b)));
 const visibleModels = computed(() => (expanded.value ? sortedModels.value : sortedModels.value.slice(0, visibleCount)));
 const hiddenCount = computed(() => props.supportedModels.length - visibleCount);
 
-function modelSortWeight(model: string): number {
+function sortWeight(model: string): number {
   const status = props.modelHealth[model]?.status;
   if (status === "degraded") return 0;
   return 1;
 }
 
-function modelButtonClass(model: string): string {
+function buttonClass(model: string): string {
   if (disabledModels.value.has(model)) return "border border-border/60 bg-transparent text-muted-foreground/60 line-through";
   if (props.activeModel === model) return "border border-green-500 bg-green-500/10 text-green-700";
   const status = props.modelHealth[model]?.status;
@@ -46,7 +46,7 @@ function modelButtonClass(model: string): string {
   return "border border-border bg-transparent text-foreground hover:bg-muted/30";
 }
 
-function modelButtonTitle(model: string): string {
+function buttonTitle(model: string): string {
   if (props.activeModel === model) return "Active session";
   return disabledModels.value.has(model) ? "Enable" : "Disable";
 }
@@ -65,10 +65,10 @@ async function toggleModel(model: string) {
   togglingModels.value = new Set(togglingModels.value).add(model);
 
   try {
-    const result = await api.accounts.setAccountModelEnabled({ accountId: props.accountId, modelId: model, enabled });
+    const result = await api.accounts.enableModel({ accountId: props.accountId, modelId: model, enabled });
     if (!result.success) throw new Error(result.error);
     invalidation.patchDisabledModels(props.provider, props.accountId, Array.from(disabledModels.value));
-    invalidation.clearAccountDependentOptions();
+    invalidation.clearOptions();
   } catch {
     disabledModels.value = previous;
   } finally {
@@ -89,7 +89,7 @@ async function toggleModel(model: string) {
       <UiTooltip
         v-for="model in visibleModels"
         :key="model"
-        :text="modelButtonTitle(model)"
+        :text="buttonTitle(model)"
         :disabled="readonly"
       >
         <button
@@ -97,7 +97,7 @@ async function toggleModel(model: string) {
           :disabled="togglingModels.has(model) || readonly"
           :class="[
             'inline-flex cursor-pointer items-center rounded-md px-2 py-0.5 font-mono text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default disabled:opacity-50',
-            modelButtonClass(model),
+            buttonClass(model),
           ]"
           @click="toggleModel(model)"
         >

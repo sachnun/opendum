@@ -1,10 +1,10 @@
 import { expect, test } from "bun:test";
 
-import { mergeModelData, splitModelData } from "./merge.ts";
+import { mergeData, splitData } from "./merge.ts";
 import type { ModelData } from "../types.ts";
 
-test("mergeModelData lets authored fields win over generated", () => {
-  const merged = mergeModelData(
+test("mergeData lets authored fields win over generated", () => {
+  const merged = mergeData(
     { id: "model", reasoning: true, ignored: true, providers: ["a"] },
     { ignored: false, aliases: ["alias"] },
   );
@@ -14,8 +14,8 @@ test("mergeModelData lets authored fields win over generated", () => {
   expect(merged.providers).toEqual(["a"]);
 });
 
-test("mergeModelData deep merges provider config with authored winning", () => {
-  const merged = mergeModelData(
+test("mergeData deep merges provider config with authored winning", () => {
+  const merged = mergeData(
     { providerConfig: { kiro: { upstream: "claude", contextWindow: 200000 } } },
     { providerConfig: { kiro: { authless: true }, openrouter: { free: true } } },
   );
@@ -25,26 +25,26 @@ test("mergeModelData deep merges provider config with authored winning", () => {
   });
 });
 
-test("mergeModelData unions aliases across halves", () => {
-  const merged = mergeModelData({ aliases: ["auto"] }, { aliases: ["curated"] });
+test("mergeData unions aliases across halves", () => {
+  const merged = mergeData({ aliases: ["auto"] }, { aliases: ["curated"] });
   expect(merged.aliases).toEqual(["auto", "curated"]);
 });
 
-test("mergeModelData handles one-sided and empty input", () => {
-  expect(mergeModelData({ id: "a" }, undefined)).toEqual({ id: "a" });
-  expect(mergeModelData(undefined, { ignored: true })).toEqual({ ignored: true });
-  expect(mergeModelData(undefined, undefined)).toEqual({});
-  expect(mergeModelData({ providerConfig: {} }, { providerConfig: {} })).toEqual({});
+test("mergeData handles one-sided and empty input", () => {
+  expect(mergeData({ id: "a" }, undefined)).toEqual({ id: "a" });
+  expect(mergeData(undefined, { ignored: true })).toEqual({ ignored: true });
+  expect(mergeData(undefined, undefined)).toEqual({});
+  expect(mergeData({ providerConfig: {} }, { providerConfig: {} })).toEqual({});
 });
 
-test("mergeModelData drops empty arrays", () => {
-  expect(mergeModelData({ providers: [] }, undefined)).toEqual({});
-  expect(mergeModelData({ aliases: [] }, undefined)).toEqual({});
-  expect(mergeModelData({ providers: ["kiro"] }, undefined).providers).toEqual(["kiro"]);
+test("mergeData drops empty arrays", () => {
+  expect(mergeData({ providers: [] }, undefined)).toEqual({});
+  expect(mergeData({ aliases: [] }, undefined)).toEqual({});
+  expect(mergeData({ providers: ["kiro"] }, undefined).providers).toEqual(["kiro"]);
 });
 
-test("splitModelData routes fields by ownership", () => {
-  const { generated, authored } = splitModelData({
+test("splitData routes fields by ownership", () => {
+  const { generated, authored } = splitData({
     id: "model",
     providers: ["kiro"],
     reasoning: true,
@@ -67,24 +67,24 @@ test("splitModelData routes fields by ownership", () => {
   });
 });
 
-test("splitModelData drops default ignored flags", () => {
-  const { authored } = splitModelData({ providers: ["kiro"], ignored: false });
+test("splitData drops default ignored flags", () => {
+  const { authored } = splitData({ providers: ["kiro"], ignored: false });
   expect(authored).toEqual({});
-  const kept = splitModelData({ ignored: true });
+  const kept = splitData({ ignored: true });
   expect(kept.authored).toEqual({ ignored: true });
 });
 
-test("splitModelData drops empty halves", () => {
-  const { generated, authored } = splitModelData({ providers: ["kiro"] });
+test("splitData drops empty halves", () => {
+  const { generated, authored } = splitData({ providers: ["kiro"] });
   expect(generated).toEqual({ providers: ["kiro"] });
   expect(authored).toEqual({});
 
-  const other = splitModelData({ ignored: true });
+  const other = splitData({ ignored: true });
   expect(other.generated).toEqual({});
   expect(other.authored).toEqual({ ignored: true });
 });
 
-test("splitModelData round-trips through mergeModelData", () => {
+test("splitData round-trips through mergeData", () => {
   const original: ModelData = {
     id: "model",
     providers: ["kiro", "openrouter"],
@@ -96,6 +96,6 @@ test("splitModelData round-trips through mergeModelData", () => {
       openrouter: { free: true },
     },
   };
-  const { generated, authored } = splitModelData(original);
-  expect(mergeModelData(generated, authored)).toEqual(original);
+  const { generated, authored } = splitData(original);
+  expect(mergeData(generated, authored)).toEqual(original);
 });

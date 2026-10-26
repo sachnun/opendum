@@ -3,8 +3,8 @@ import {
   chatgptSessionPlaceholder,
   providerConfigs,
   providerOptions,
-  isDeviceProvider,
-  isOAuthProvider,
+  isDevice,
+  oauthCheck,
 } from "~~/lib/provider-auth-config";
 import type { DeviceProviderKey } from "@opendum/providers/provider-accounts";
 import type { FlowType, MethodKey, Provider, ProviderConfig } from "~~/lib/provider-auth-config";
@@ -13,7 +13,7 @@ export function useAccountConnect(
   props: { initialProvider: Provider | null; triggerClass?: string; readonly?: boolean },
   handlers: {
     onConnected: (result: { provider: Provider; email: string; isUpdate: boolean }) => void;
-    onCustomCreated: (slug: string) => void;
+    customCreated: (slug: string) => void;
   }
 ) {
 const api = useApi();
@@ -41,7 +41,7 @@ const customProviderConfigs = computed<Record<string, ProviderConfig>>(() => Obj
   } satisfies ProviderConfig]),
 ));
 
-function isCustomProvider(providerKey: string | null): boolean {
+function customProvider(providerKey: string | null): boolean {
   return providerKey !== null && customList.value.some((row) => row.slug === providerKey);
 }
 
@@ -63,17 +63,17 @@ const deviceCodeInfo = ref<{ provider: DeviceProviderKey; deviceCode: string; us
 const copiedLink = ref(false);
 const copiedDeviceCode = ref(false);
 const copiedCallbackUrl = ref(false);
-const isApiKeyVisible = ref(false);
+const apiKeyVisible = ref(false);
 const isLoading = ref(false);
 const isFetchingUrl = ref(false);
 const isPolling = ref(false);
 const errorMessage = ref("");
 let pollingTimer: ReturnType<typeof setTimeout> | null = null;
 let copiedLinkTimer: ReturnType<typeof setTimeout> | null = null;
-let copiedDeviceCodeTimer: ReturnType<typeof setTimeout> | null = null;
-let copiedCallbackUrlTimer: ReturnType<typeof setTimeout> | null = null;
-let copyAutoNextTimer: ReturnType<typeof setTimeout> | null = null;
-let callbackAutoExchangeTimer: ReturnType<typeof setTimeout> | null = null;
+let copiedCodeTimer: ReturnType<typeof setTimeout> | null = null;
+let copiedCallbackTimer: ReturnType<typeof setTimeout> | null = null;
+let copyTimer: ReturnType<typeof setTimeout> | null = null;
+let exchangeTimer: ReturnType<typeof setTimeout> | null = null;
 
 const selectedConfig = computed<ProviderConfig | null>(() => {
   const key = provider.value;
@@ -97,17 +97,17 @@ const dialogOpen = computed({
 });
 const displayedSteps = computed(() => {
   const steps = props.initialProvider ? [2, 3, 4] : [1, 2, 3, 4];
-  return isCustomProvider(provider.value) ? steps.filter((stepNumber) => stepNumber !== authStep.value) : steps;
+  return customProvider(provider.value) ? steps.filter((stepNumber) => stepNumber !== authStep.value) : steps;
 });
-const shouldPreventOutsideClose = computed(() => {
+const preventOutsideClose = computed(() => {
   const flowType = activeFlowType.value;
   return customMode.value || isPolling.value || (step.value === authStep.value && (flowType === "api_key" || flowType === "api_key_with_account_id" || flowType === "chatgpt_session")) || (step.value === finishStep.value && flowType === "oauth_redirect");
 });
 
-function handleCustomCreated(createdSlug: string) {
+function customCreated(createdSlug: string) {
   customMode.value = false;
   open.value = false;
-  handlers.onCustomCreated(createdSlug);
+  handlers.customCreated(createdSlug);
   void invalidation.refreshData(dataKeys.customProviders);
   void invalidation.invalidateAccountCollection(createdSlug);
 }
@@ -141,7 +141,7 @@ watch([open, step, provider, selectedMethod], async () => {
 
   try {
     if (selectedFlowType === "oauth_redirect") {
-      if (!isOAuthProvider(selectedProvider)) return;
+      if (!oauthCheck(selectedProvider)) return;
       const result = await api.accounts.getAuthUrl({ provider: selectedProvider });
       if (!result.success) throw new Error(result.error);
       if (provider.value !== selectedProvider || activeFlowType.value !== selectedFlowType || step.value !== selectedStep) return;
@@ -152,7 +152,7 @@ watch([open, step, provider, selectedMethod], async () => {
     }
 
     if (selectedFlowType === "device_code") {
-      if (!isDeviceProvider(selectedProvider)) return;
+      if (!isDevice(selectedProvider)) return;
       const result = await api.accounts.initiateDeviceAuth({ provider: selectedProvider });
       if (!result.success) throw new Error(result.error);
       if (provider.value !== selectedProvider || activeFlowType.value !== selectedFlowType || step.value !== selectedStep) return;
@@ -194,7 +194,7 @@ function resetForm() {
   copiedLink.value = false;
   copiedDeviceCode.value = false;
   copiedCallbackUrl.value = false;
-  isApiKeyVisible.value = false;
+  apiKeyVisible.value = false;
   isLoading.value = false;
   isFetchingUrl.value = false;
   isPolling.value = false;
@@ -207,31 +207,31 @@ function resetForm() {
     clearTimeout(copiedLinkTimer);
     copiedLinkTimer = null;
   }
-  if (copiedDeviceCodeTimer) {
-    clearTimeout(copiedDeviceCodeTimer);
-    copiedDeviceCodeTimer = null;
+  if (copiedCodeTimer) {
+    clearTimeout(copiedCodeTimer);
+    copiedCodeTimer = null;
   }
-  if (copiedCallbackUrlTimer) {
-    clearTimeout(copiedCallbackUrlTimer);
-    copiedCallbackUrlTimer = null;
+  if (copiedCallbackTimer) {
+    clearTimeout(copiedCallbackTimer);
+    copiedCallbackTimer = null;
   }
-  if (copyAutoNextTimer) {
-    clearTimeout(copyAutoNextTimer);
-    copyAutoNextTimer = null;
+  if (copyTimer) {
+    clearTimeout(copyTimer);
+    copyTimer = null;
   }
-  clearCallbackAutoExchangeTimer();
+  clearExchange();
 }
 
-function clearCopyAutoNextTimer() {
-  if (!copyAutoNextTimer) return;
-  clearTimeout(copyAutoNextTimer);
-  copyAutoNextTimer = null;
+function clearCopy() {
+  if (!copyTimer) return;
+  clearTimeout(copyTimer);
+  copyTimer = null;
 }
 
-function clearCallbackAutoExchangeTimer() {
-  if (!callbackAutoExchangeTimer) return;
-  clearTimeout(callbackAutoExchangeTimer);
-  callbackAutoExchangeTimer = null;
+function clearExchange() {
+  if (!exchangeTimer) return;
+  clearTimeout(exchangeTimer);
+  exchangeTimer = null;
 }
 
 function finishConnection(result: { email: string; isUpdate: boolean }) {
@@ -241,7 +241,7 @@ function finishConnection(result: { email: string; isUpdate: boolean }) {
   open.value = false;
   handlers.onConnected({ provider: connectedProvider, ...result });
   void invalidation.invalidateAccountCollection(connectedProvider);
-  if (isCustomProvider(connectedProvider)) void invalidation.refreshData(dataKeys.customProviders);
+  if (customProvider(connectedProvider)) void invalidation.refreshData(dataKeys.customProviders);
 }
 
 function selectProvider(providerKey: Provider) {
@@ -258,7 +258,7 @@ function selectCustom() {
   customMode.value = true;
 }
 
-function resetAuthProgress() {
+function resetProgress() {
   callbackUrl.value = "";
   chatgptSessionJson.value = "";
   authUrl.value = "";
@@ -277,20 +277,12 @@ function resetAuthProgress() {
   }
 }
 
-function stopDevicePolling() {
-  isPolling.value = false;
-  if (pollingTimer) {
-    clearTimeout(pollingTimer);
-    pollingTimer = null;
-  }
-}
-
-function selectLoginMethod(method: MethodKey) {
+function selectLogin(method: MethodKey) {
   if (props.readonly) return;
   const config = selectedConfig.value;
   const target = config?.methods.find((item) => item.key === method && !item.disabled);
   if (!config || !target) return;
-  resetAuthProgress();
+  resetProgress();
   selectedMethod.value = method;
   const flow = target.flow ?? (method as FlowType);
   step.value = flow === "api_key" && !config.apiKeyPortalUrl ? finishStep.value : authStep.value;
@@ -310,10 +302,10 @@ async function copyText(value: string, target: "link" | "code") {
       }, 2000);
     } else {
       copiedDeviceCode.value = true;
-      if (copiedDeviceCodeTimer) clearTimeout(copiedDeviceCodeTimer);
-      copiedDeviceCodeTimer = setTimeout(() => {
+      if (copiedCodeTimer) clearTimeout(copiedCodeTimer);
+      copiedCodeTimer = setTimeout(() => {
         copiedDeviceCode.value = false;
-        copiedDeviceCodeTimer = null;
+        copiedCodeTimer = null;
       }, 2000);
     }
   } catch {
@@ -322,17 +314,17 @@ async function copyText(value: string, target: "link" | "code") {
   }
 
   if (target === "link" && activeFlowType.value !== "device_code" && step.value === authStep.value) {
-    clearCopyAutoNextTimer();
-    copyAutoNextTimer = setTimeout(() => {
+    clearCopy();
+    copyTimer = setTimeout(() => {
       if (step.value === authStep.value && activeFlowType.value !== "device_code") {
         step.value = finishStep.value;
       }
-      copyAutoNextTimer = null;
+      copyTimer = null;
     }, 2000);
   }
 
   if (target === "link" && activeFlowType.value === "device_code") {
-    startDevicePolling(null);
+    startPolling(null);
   }
 }
 
@@ -348,25 +340,25 @@ function openPopup(url: string, name: string, width: number, height: number) {
   return popup;
 }
 
-function openOAuthUrl() {
+function oauthUrl() {
   if (!authUrl.value) return;
   openPopup(authUrl.value, "oauth_popup", 600, 700);
   setTimeout(() => (step.value = finishStep.value), 600);
 }
 
-function openDeviceAuthUrl() {
+function deviceUrl() {
   if (!deviceCodeInfo.value) return;
   const popup = openPopup(deviceCodeInfo.value.verificationUrl, "device_auth_popup", 600, 700);
-  startDevicePolling(popup);
+  startPolling(popup);
 }
 
-function openApiKeyPortal() {
+function keyPortal() {
   if (!selectedConfig.value?.apiKeyPortalUrl) return;
   openPopup(selectedConfig.value.apiKeyPortalUrl, "api_key_portal_popup", 1100, 760);
   if (step.value === authStep.value) setTimeout(() => (step.value = finishStep.value), 600);
 }
 
-function startDevicePolling(popup: Window | null) {
+function startPolling(popup: Window | null) {
   if (!deviceCodeInfo.value || isPolling.value) return;
 
   isPolling.value = true;
@@ -375,7 +367,7 @@ function startDevicePolling(popup: Window | null) {
   let intervalMs = 8000;
 
   const stopPolling = (returnToAuthStep = false) => {
-    stopDevicePolling();
+    stopPolling();
     if (returnToAuthStep && step.value === finishStep.value && finishStep.value > authStep.value) {
       step.value = authStep.value;
     }
@@ -395,7 +387,7 @@ function startDevicePolling(popup: Window | null) {
     }
 
     try {
-      const result = await api.accounts.pollDeviceAuth({
+      const result = await api.accounts.pollAuth({
         provider: deviceCodeInfo.value.provider,
         deviceCode: deviceCodeInfo.value.deviceCode,
         userCode: deviceCodeInfo.value.userCode,
@@ -431,7 +423,7 @@ function startDevicePolling(popup: Window | null) {
   pollingTimer = setTimeout(poll, intervalMs);
 }
 
-async function handleConnectApiKey() {
+async function connectKey() {
   if (props.readonly) return;
   if (!provider.value || !selectedConfig.value) return;
 
@@ -441,7 +433,7 @@ async function handleConnectApiKey() {
     return;
   }
   const activeProvider = provider.value;
-  if (isCustomProvider(activeProvider)) {
+  if (customProvider(activeProvider)) {
     isLoading.value = true;
     try {
       const result = await api.customProviders.connect({ slug: activeProvider, token: apiKey.value.trim() });
@@ -476,7 +468,7 @@ async function handleConnectApiKey() {
   }
 }
 
-async function handleConnectCodexSession() {
+async function connectCodex() {
   if (props.readonly) return;
 
   errorMessage.value = "";
@@ -497,11 +489,11 @@ async function handleConnectCodexSession() {
   }
 }
 
-async function handleExchangeOAuth() {
+async function oauthExchange() {
   if (props.readonly) return;
   const selectedProvider = provider.value;
   if (!selectedProvider) return;
-  if (!isOAuthProvider(selectedProvider)) return;
+  if (!oauthCheck(selectedProvider)) return;
 
   errorMessage.value = "";
   if (!callbackUrl.value.trim()) {
@@ -516,7 +508,7 @@ async function handleExchangeOAuth() {
 
   isLoading.value = true;
   try {
-    const result = await api.accounts.exchangeOAuth({ provider: selectedProvider, callbackUrl: callbackUrl.value.trim(), state: oauthState.value, codeVerifier: oauthCodeVerifier.value });
+    const result = await api.accounts.oauthExchange({ provider: selectedProvider, callbackUrl: callbackUrl.value.trim(), state: oauthState.value, codeVerifier: oauthCodeVerifier.value });
     if (!result.success) throw new Error(result.error);
     finishConnection(result.data);
   } catch (error) {
@@ -526,8 +518,8 @@ async function handleExchangeOAuth() {
   }
 }
 
-function handleCallbackInput(event: Event) {
-  clearCallbackAutoExchangeTimer();
+function callbackInput(event: Event) {
+  clearExchange();
   if (props.readonly || isLoading.value) return;
   const value = event.target instanceof HTMLInputElement ? event.target.value : callbackUrl.value;
   try {
@@ -537,32 +529,32 @@ function handleCallbackInput(event: Event) {
     return;
   }
 
-  callbackAutoExchangeTimer = setTimeout(() => {
-    callbackAutoExchangeTimer = null;
-    void handleExchangeOAuth();
+  exchangeTimer = setTimeout(() => {
+    exchangeTimer = null;
+    void oauthExchange();
   }, 300);
 }
 
-async function pasteCallbackUrl() {
+async function pasteCallback() {
   if (props.readonly || isLoading.value) return;
 
   try {
     const value = await navigator.clipboard.readText();
     callbackUrl.value = value.trim();
     copiedCallbackUrl.value = true;
-    if (copiedCallbackUrlTimer) clearTimeout(copiedCallbackUrlTimer);
-    copiedCallbackUrlTimer = setTimeout(() => {
+    if (copiedCallbackTimer) clearTimeout(copiedCallbackTimer);
+    copiedCallbackTimer = setTimeout(() => {
       copiedCallbackUrl.value = false;
-      copiedCallbackUrlTimer = null;
+      copiedCallbackTimer = null;
     }, 2000);
-    clearCallbackAutoExchangeTimer();
-    await handleExchangeOAuth();
+    clearExchange();
+    await oauthExchange();
   } catch {
     errorMessage.value = "Failed to paste callback URL";
   }
 }
 
-async function handleCallbackPaste(event: ClipboardEvent) {
+async function callbackPaste(event: ClipboardEvent) {
   if (props.readonly || isLoading.value) return;
 
   const pastedText = event.clipboardData?.getData("text").trim();
@@ -570,16 +562,16 @@ async function handleCallbackPaste(event: ClipboardEvent) {
 
   event.preventDefault();
   callbackUrl.value = pastedText;
-  clearCallbackAutoExchangeTimer();
+  clearExchange();
   await nextTick();
-  await handleExchangeOAuth();
+  await oauthExchange();
 }
 
 function goBack() {
-  clearCopyAutoNextTimer();
+  clearCopy();
   const previousStep = step.value;
   let nextStep = Math.max(minimumStep.value, step.value - 1);
-  if (nextStep === authStep.value && previousStep === finishStep.value && isCustomProvider(provider.value)) {
+  if (nextStep === authStep.value && previousStep === finishStep.value && customProvider(provider.value)) {
     nextStep = Math.max(minimumStep.value, authStep.value - 1);
   }
   step.value = nextStep;
@@ -595,9 +587,9 @@ function goBack() {
   }
 }
 
-function goBackFromDevicePolling() {
-  clearCopyAutoNextTimer();
-  resetAuthProgress();
+function backPolling() {
+  clearCopy();
+  resetProgress();
   step.value = authStep.value;
 }
 
@@ -610,16 +602,16 @@ onBeforeUnmount(() => {
     clearTimeout(copiedLinkTimer);
     copiedLinkTimer = null;
   }
-  if (copiedDeviceCodeTimer) {
-    clearTimeout(copiedDeviceCodeTimer);
-    copiedDeviceCodeTimer = null;
+  if (copiedCodeTimer) {
+    clearTimeout(copiedCodeTimer);
+    copiedCodeTimer = null;
   }
-  if (copiedCallbackUrlTimer) {
-    clearTimeout(copiedCallbackUrlTimer);
-    copiedCallbackUrlTimer = null;
+  if (copiedCallbackTimer) {
+    clearTimeout(copiedCallbackTimer);
+    copiedCallbackTimer = null;
   }
-  clearCallbackAutoExchangeTimer();
-  clearCopyAutoNextTimer();
+  clearExchange();
+  clearCopy();
 });
 
   return {
@@ -641,7 +633,7 @@ onBeforeUnmount(() => {
     copiedLink,
     copiedDeviceCode,
     copiedCallbackUrl,
-    isApiKeyVisible,
+    apiKeyVisible,
     isLoading,
     isFetchingUrl,
     isPolling,
@@ -652,23 +644,23 @@ onBeforeUnmount(() => {
     finishStep,
     dialogOpen,
     displayedSteps,
-    shouldPreventOutsideClose,
-    handleCustomCreated,
+    preventOutsideClose,
+    customCreated,
     selectProvider,
     selectCustom,
-    selectLoginMethod,
+    selectLogin,
     copyText,
     openPopup,
-    openOAuthUrl,
-    openDeviceAuthUrl,
-    openApiKeyPortal,
-    handleConnectApiKey,
-    handleConnectCodexSession,
-    handleCallbackInput,
-    pasteCallbackUrl,
-    handleCallbackPaste,
+    oauthUrl,
+    deviceUrl,
+    keyPortal,
+    connectKey,
+    connectCodex,
+    callbackInput,
+    pasteCallback,
+    callbackPaste,
     goBack,
-    goBackFromDevicePolling,
+    backPolling,
     providerOptions,
     chatgptSessionPlaceholder,
     providerConfigs,

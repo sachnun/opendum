@@ -2,15 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { ConfigProvider, Effect, Exit, Schedule } from "effect";
 import { TestClock } from "effect/testing";
 import { proxyConfig } from "../config.js";
-import {
-  AuthenticationFailure,
-  RateLimitFailure,
-  ValidationFailure,
-  fromRouteError,
-  routeErrorResponse,
-  toRouteError,
-  type ProxyFailure,
-} from "../core/errors.js";
+import { AuthenticationFailure, FailureMap, RateLimitFailure, ValidationFailure, type ProxyFailure } from "../core/errors.js";
 
 const env = {
   DATABASE_URL: "postgres://localhost/db",
@@ -68,22 +60,22 @@ describe("typed proxy errors", () => {
       message: "slow down",
       type: "rate_limit_error",
       retryAfter: "3s",
-      retryAfterMs: 3000,
+      afterMs: 3000,
     };
-    const failure = fromRouteError(routeError);
+    const failure = FailureMap.fromRoute(routeError);
     expect(failure._tag).toBe("RateLimitFailure");
-    expect(toRouteError(failure)).toMatchObject(routeError);
+    expect(FailureMap.toRoute(failure)).toMatchObject(routeError);
   });
 
   it("maps an authentication failure to a 401 envelope", () => {
     const failure = new AuthenticationFailure({ message: "Invalid API key" });
-    const response = routeErrorResponse(toRouteError(failure), "openai");
+    const response = FailureMap.response(FailureMap.toRoute(failure), "openai");
     expect(response.status).toBe(401);
   });
 
   it("formats anthropic errors with the anthropic envelope", async () => {
     const failure = new ValidationFailure({ message: "bad model", param: "model", code: "invalid_model" });
-    const response = routeErrorResponse(toRouteError(failure), "anthropic");
+    const response = FailureMap.response(FailureMap.toRoute(failure), "anthropic");
     expect(response.status).toBe(400);
     const body = (await response.json()) as { type: string; error: { type: string; message: string } };
     expect(body.type).toBe("error");
@@ -95,9 +87,9 @@ describe("typed proxy errors", () => {
       message: "limited",
       status: 429,
       retryAfter: "2s",
-      retryAfterMs: 2000,
+      afterMs: 2000,
     });
-    const response = routeErrorResponse(toRouteError(failure), "openai");
+    const response = FailureMap.response(FailureMap.toRoute(failure), "openai");
     expect(response.headers.get("Retry-After")).toBe("2");
   });
 

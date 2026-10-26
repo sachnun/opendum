@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { modelProbeSets, modelProbes } from "./probes.ts";
+import { probeSets, modelProbes } from "./probes.ts";
 
 test("modelProbes collects id, fileId, aliases and upstreams", () => {
   const probes = modelProbes({
@@ -34,8 +34,8 @@ test("modelProbes drops blank candidates", () => {
   expect([...probes].sort()).toEqual(["file-id", "real"]);
 });
 
-test("modelProbeSets keeps historical aliases out of core", () => {
-  const { core, aliases } = modelProbeSets({
+test("probeSets keeps historical aliases out of core", () => {
+  const { core, aliases } = probeSets({
     id: "llama-3.1",
     fileId: "llama-3.1",
     data: {
@@ -51,8 +51,8 @@ test("modelProbeSets keeps historical aliases out of core", () => {
   expect([...aliases].sort()).toEqual(["llama-3.1-70b-instruct", "llama-3.1-8b-instruct"]);
 });
 
-test("modelProbeSets does not repeat core values as aliases", () => {
-  const { core, aliases } = modelProbeSets({
+test("probeSets does not repeat core values as aliases", () => {
+  const { core, aliases } = probeSets({
     id: "gemma-3",
     fileId: "gemma-3",
     data: { aliases: ["gemma-3", "google/gemma-3-12b-it"] },

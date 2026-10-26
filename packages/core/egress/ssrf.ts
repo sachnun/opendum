@@ -20,7 +20,7 @@ function parseIpv4(host: string): number[] | null {
   return octets;
 }
 
-function isPrivateIpv4(octets: number[]): boolean {
+function privateV4(octets: number[]): boolean {
   const [a, b] = octets;
   if (a === 0) return true;
   if (a === 10) return true;
@@ -33,7 +33,7 @@ function isPrivateIpv4(octets: number[]): boolean {
   return false;
 }
 
-function parseIpv6Groups(value: string): number[] | null {
+function v6Groups(value: string): number[] | null {
   const [headPart, tailPart] = value.split("::");
   const parse = (segment: string): number[] | null => {
     if (segment === "") return [];
@@ -55,7 +55,7 @@ function parseIpv6Groups(value: string): number[] | null {
   return [...head, ...Array.from({ length: missing }, () => 0), ...tail];
 }
 
-function isPrivateIpv6(groups: number[]): boolean {
+function privateV6(groups: number[]): boolean {
   const [g0, g1] = groups;
   const allZero = groups.every((group) => group === 0);
   if (allZero) return true;
@@ -68,25 +68,25 @@ function isPrivateIpv6(groups: number[]): boolean {
   const isMapped = groups.slice(0, 5).every((group) => group === 0) && groups[5] === 0xffff;
   if (isMapped) {
     const octets = [groups[6] >> 8, groups[6] & 0xff, groups[7] >> 8, groups[7] & 0xff];
-    return isPrivateIpv4(octets);
+    return privateV4(octets);
   }
   return false;
 }
 
-export function isPrivateIp(address: string): boolean {
+export function isPrivate(address: string): boolean {
   const family = isIP(address);
   if (family === 4) {
     const octets = parseIpv4(address);
-    return octets ? isPrivateIpv4(octets) : true;
+    return octets ? privateV4(octets) : true;
   }
   if (family === 6) {
-    const groups = parseIpv6Groups(address.toLowerCase());
-    return groups ? isPrivateIpv6(groups) : true;
+    const groups = v6Groups(address.toLowerCase());
+    return groups ? privateV6(groups) : true;
   }
   return true;
 }
 
-export function isPrivateHost(host: string): boolean {
+export function privateName(host: string): boolean {
   const normalized = host.toLowerCase().trim().replace(/^\[|\]$/g, "");
   if (normalized === "") return true;
   if (
@@ -98,11 +98,11 @@ export function isPrivateHost(host: string): boolean {
     return true;
   }
   if (isIP(normalized) === 0) return false;
-  return isPrivateIp(normalized);
+  return isPrivate(normalized);
 }
 
-export function assertPublicHost(host: string): void {
-  if (isPrivateHost(host)) {
+export function assertPublic(host: string): void {
+  if (privateName(host)) {
     throw new PrivateHostError(host);
   }
 }

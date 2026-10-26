@@ -1,9 +1,9 @@
 import { Effect, Schema } from "effect";
 import { type H3Event } from "h3";
 import type { ProxyContext } from "../core/context.js";
-import { extractSessionId } from "../core/service.js";
+import { sessionKey } from "../core/service.js";
 import type { Adapter } from "../core/endpoints.js";
-import { errorEnvelope, internalErrorResponse, jsonResponse } from "./errors.js";
+import { errorEnvelope, internalResponse, jsonResponse } from "./errors.js";
 
 const BodySchema = Schema.Record(Schema.String, Schema.Unknown);
 
@@ -30,7 +30,7 @@ export async function handleInference(
       Effect.catch(() => Effect.fail(new InvalidBody({ message: "Invalid JSON in request body" })))
     );
     const authHeader = event.req.headers.get("authorization") ?? event.req.headers.get("x-api-key") ?? "";
-    const sessionId = extractSessionId(event.req, body);
+    const sessionId = sessionKey(event.req, body);
     return yield* Effect.promise(() => context.service.handle(endpoint, body, authHeader, sessionId, event.req));
   });
 
@@ -45,7 +45,7 @@ export async function handleInference(
               cause: String(cause),
             })
           );
-          return internalErrorResponse(endpoint.format);
+          return internalResponse(endpoint.format);
         })
       ),
       Effect.withSpan("handleInference", { attributes: { endpoint: endpoint.endpoint } })

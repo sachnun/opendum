@@ -7,7 +7,7 @@ import { fetchExternalEffect } from "#web/lib/external.js";
 import { fromPromise } from "#web/lib/task.js";
 import { badRequest, unavailable } from "#web/errors.js";
 import type { OAuthResult } from "../types.js";
-import { formatProviderHttpError } from "../provider-http-errors.js";
+import { httpError } from "../provider-http-errors.js";
 import {
   AUTHORIZE_ENDPOINT,
   BROWSER_REDIRECT_URI,
@@ -17,7 +17,7 @@ import {
   TOKEN_ENDPOINT,
 } from "./constants.js";
 
-interface KiroTokenExchangeResponse {
+interface ExchangeResponse {
   accessToken: string;
   refreshToken: string;
   expiresIn?: number;
@@ -31,7 +31,7 @@ interface KiroRefreshResponse {
   profileArn?: string;
 }
 
-function isTokenExpired(expiresAt: Date): boolean {
+function tokenExpired(expiresAt: Date): boolean {
   const bufferMs = REFRESH_BUFFER_SECONDS * 1000;
   return Date.now() > expiresAt.getTime() - bufferMs;
 }
@@ -42,13 +42,13 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" ? value as Record<string, unknown> : null;
 }
 
-function toNonEmptyString(value: unknown): string | null {
+function nonEmpty(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
   return trimmed ? trimmed : null;
 }
 
-function parseJwtClaims(token: string): Record<string, unknown> | null {
+function jwtClaims(token: string): Record<string, unknown> | null {
   try {
     const parts = token.split(".");
     if (parts.length < 2) return null;
@@ -63,8 +63,8 @@ function parseJwtClaims(token: string): Record<string, unknown> | null {
   }
 }
 
-function extractTokenIdentity(accessToken: string): string | null {
-  const claims = parseJwtClaims(accessToken);
+function tokenIdentity(accessToken: string): string | null {
+  const claims = jwtClaims(accessToken);
   if (!claims) return null;
 
   const candidates = [
@@ -77,17 +77,17 @@ function extractTokenIdentity(accessToken: string): string | null {
   ];
 
   for (const candidate of candidates) {
-    const value = toNonEmptyString(candidate);
+    const value = nonEmpty(candidate);
     if (value) return value;
   }
 
   return null;
 }
 
-function buildKiroAccountIdentity(accessToken: string, refreshToken: string, profileArn: string) {
-  const tokenIdentity = extractTokenIdentity(accessToken);
+function accountIdentity(accessToken: string, refreshToken: string, profileArn: string) {
+  const identity = tokenIdentity(accessToken);
   const credentialFingerprint = hashString(refreshToken || accessToken).slice(0, 16);
-  const displayIdentifier = [profileArn, tokenIdentity, credentialFingerprint]
+  const displayIdentifier = [profileArn, identity, credentialFingerprint]
     .filter((value): value is string => Boolean(value))
     .join(":") || credentialFingerprint;
 
@@ -97,7 +97,7 @@ function buildKiroAccountIdentity(accessToken: string, refreshToken: string, pro
   };
 }
 
-export function generateCodeVerifier(): string {
+export function codeVerifier(): string {
   const bytes = new Uint8Array(32);
   crypto.getRandomValues(bytes);
   return btoa(String.fromCharCode(...bytes))
@@ -144,15 +144,15 @@ const exchangeKiroCode = Effect.fn("kiro.exchangeCode")(function* (
   if (!response.ok) {
     const errorText = yield* fromPromise(() => response.text(), "Failed to read Kiro response");
     return yield* unavailable(
-      formatProviderHttpError("Kiro", response, errorText, {
+      httpError("Kiro", response, errorText, {
         endpointLabel: "token exchange endpoint",
       })
     );
   }
 
-  const data = yield* readJson<KiroTokenExchangeResponse>(response);
+  const data = yield* readJson<ExchangeResponse>(response);
   const profileArn = data.profileArn || "";
-  const identity = buildKiroAccountIdentity(data.accessToken, data.refreshToken, profileArn);
+  const identity = accountIdentity(data.accessToken, data.refreshToken, profileArn);
 
   return {
     accessToken: data.accessToken,
@@ -177,7 +177,7 @@ const refreshKiroToken = Effect.fn("kiro.refreshToken")(function* (refreshToken:
   if (!response.ok) {
     const errorText = yield* fromPromise(() => response.text(), "Failed to read Kiro response");
     return yield* unavailable(
-      formatProviderHttpError("Kiro", response, errorText, {
+      httpError("Kiro", response, errorText, {
         endpointLabel: "token refresh endpoint",
       })
     );
@@ -186,7 +186,7 @@ const refreshKiroToken = Effect.fn("kiro.refreshToken")(function* (refreshToken:
   const data = yield* readJson<KiroRefreshResponse>(response);
   const profileArn = data.profileArn || "";
   const nextRefreshToken = data.refreshToken || refreshToken;
-  const identity = buildKiroAccountIdentity(data.accessToken, nextRefreshToken, profileArn);
+  const identity = accountIdentity(data.accessToken, nextRefreshToken, profileArn);
 
   return {
     accessToken: data.accessToken,
@@ -197,10 +197,10 @@ const refreshKiroToken = Effect.fn("kiro.refreshToken")(function* (refreshToken:
   } satisfies OAuthResult;
 });
 
-const getValidKiroCredentials = Effect.fn("kiro.getValidCredentials")(function* (
+const validCredentials = Effect.fn("kiro.getValidCredentials")(function* (
   account: CredentialAccount
 ) {
-  if (!isTokenExpired(account.expiresAt)) return decrypt(account.accessToken);
+  if (!tokenExpired(account.expiresAt)) return decrypt(account.accessToken);
 
   const refreshed = yield* refreshKiroToken(decrypt(account.refreshToken));
   yield* fromPromise(
@@ -223,10 +223,10 @@ const getValidKiroCredentials = Effect.fn("kiro.getValidCredentials")(function* 
 export const kiroProvider = {
   exchangeCode: exchangeKiroCode,
   refreshToken: refreshKiroToken,
-  getValidCredentials: getValidKiroCredentials,
+  getValidCredentials: validCredentials,
 };
 
-export const buildKiroAuthUrl = Effect.fn("kiro.buildAuthUrl")(function* (
+export const authUrl = Effect.fn("kiro.buildAuthUrl")(function* (
   state: string,
   codeVerifier: string
 ) {

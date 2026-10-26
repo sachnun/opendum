@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { Parser, buildKiroRequest, convertKiroEventsToCompletion } from "./transform.js";
+import { KiroCompletion, KiroRequest, Parser } from "./transform.js";
 
 type Json = Record<string, unknown>;
 
@@ -10,7 +10,7 @@ function choiceOf(completion: Json): { message: Json; finishReason: string } {
 
 describe("convertKiroEventsToCompletion", () => {
   it("aggregates content, reasoning and tool calls", () => {
-    const completion = convertKiroEventsToCompletion(
+    const completion = KiroCompletion.fromEvents(
       [
         { content: "he" },
         { content: "llo" },
@@ -37,7 +37,7 @@ describe("convertKiroEventsToCompletion", () => {
   });
 
   it("extracts bracket tool calls out of the content", () => {
-    const completion = convertKiroEventsToCompletion(
+    const completion = KiroCompletion.fromEvents(
       [{ content: 'sure [Called search with args:{"q":"x"}] done' }, { usage: { inputTokens: 1, outputTokens: 2 } }],
       "m"
     );
@@ -51,7 +51,7 @@ describe("convertKiroEventsToCompletion", () => {
   });
 
   it("nulls empty content, defaults blank arguments and derives usage from context", () => {
-    const completion = convertKiroEventsToCompletion([{ name: "f", toolUseId: "toolu_2" }, { stop: true }], "m");
+    const completion = KiroCompletion.fromEvents([{ name: "f", toolUseId: "toolu_2" }, { stop: true }], "m");
 
     const { message, finishReason } = choiceOf(completion);
     expect(message.content).toBeNull();
@@ -98,13 +98,13 @@ describe("Parser", () => {
 
 describe("buildKiroRequest conversation identity", () => {
   const registry = {
-    isSupportedByProvider: () => false,
+    supportsProvider: () => false,
     isReasoningModel: () => false,
     upstream: () => "",
   } as never;
 
-  function conversationIdOf(body: Json): string {
-    const payload = buildKiroRequest(registry, body) as Json;
+  function conversationId(body: Json): string {
+    const payload = KiroRequest.build(registry, body) as Json;
     const state = payload.conversationState as Json;
     return state.conversationId as string;
   }
@@ -112,8 +112,8 @@ describe("buildKiroRequest conversation identity", () => {
   it("derives the same conversation id from the same session", () => {
     const body = { model: "claude-sonnet-4.5", messages: [{ role: "user", content: "hi" }] };
 
-    const first = conversationIdOf({ ...body, _sessionId: "sess-1" });
-    const second = conversationIdOf({ ...body, _sessionId: "sess-1" });
+    const first = conversationId({ ...body, _sessionId: "sess-1" });
+    const second = conversationId({ ...body, _sessionId: "sess-1" });
 
     expect(first).toBe(second);
     expect(first.startsWith("conversation_")).toBe(true);
@@ -122,16 +122,16 @@ describe("buildKiroRequest conversation identity", () => {
   it("gives different sessions different conversation ids", () => {
     const body = { model: "claude-sonnet-4.5", messages: [{ role: "user", content: "hi" }] };
 
-    expect(conversationIdOf({ ...body, _sessionId: "sess-1" })).not.toBe(
-      conversationIdOf({ ...body, _sessionId: "sess-2" })
+    expect(conversationId({ ...body, _sessionId: "sess-1" })).not.toBe(
+      conversationId({ ...body, _sessionId: "sess-2" })
     );
   });
 
   it("falls back to the first user turn when the client sends no session", () => {
     const body = { model: "claude-sonnet-4.5", messages: [{ role: "user", content: "hello there" }] };
 
-    const first = conversationIdOf(body);
-    const second = conversationIdOf({ ...body, messages: [...(body.messages as Json[])] });
+    const first = conversationId(body);
+    const second = conversationId({ ...body, messages: [...(body.messages as Json[])] });
 
     expect(first).toBe(second);
   });

@@ -1,14 +1,12 @@
 import { describe, expect, it } from "bun:test";
 
 import {
-  buildRequestBody,
-  convertScenarioMessagesToAnthropic,
-  extractChatCompletionData,
-  formatDurationMs,
-  getEndpointPath,
-  getErrorMessageFromText,
-  normalizeTokenValue,
-  parseAdditionalParameters,
+  Body,
+  Completion,
+  Duration,
+  ErrorText,
+  Params,
+  Tokens,
 } from "./playground-protocol";
 
 const settings = {
@@ -24,19 +22,19 @@ const settings = {
 
 describe("playground helpers", () => {
   it("parses additional parameters", () => {
-    expect(parseAdditionalParameters("")).toEqual({ params: null, error: "" });
-    expect(parseAdditionalParameters('{"a":1}')).toEqual({ params: { a: 1 }, error: "" });
-    expect(parseAdditionalParameters('{"a":').error.length > 0).toBeTruthy();
+    expect(Params.parse("")).toEqual({ params: null, error: "" });
+    expect(Params.parse('{"a":1}')).toEqual({ params: { a: 1 }, error: "" });
+    expect(Params.parse('{"a":').error.length > 0).toBeTruthy();
   });
 
   it("extracts an error message from text", () => {
-    expect(getErrorMessageFromText('{"error":{"message":"boom"}}')).toBe("boom");
-    expect(getErrorMessageFromText('{"message":"plain"}')).toBe("plain");
-    expect(getErrorMessageFromText("nope")).toBe("nope");
+    expect(ErrorText.fromResponse('{"error":{"message":"boom"}}')).toBe("boom");
+    expect(ErrorText.fromResponse('{"message":"plain"}')).toBe("plain");
+    expect(ErrorText.fromResponse("nope")).toBe("nope");
   });
 
   it("extracts chat completion data", () => {
-    const result = extractChatCompletionData({
+    const result = Completion.chat({
       choices: [{ message: { content: "hi", reasoning_content: "why", tool_calls: [{ function: { name: "f", arguments: '{"x":1}' } }] } }],
       usage: { prompt_tokens: 1, completion_tokens: 2, total_tokens: 3 },
     });
@@ -47,14 +45,14 @@ describe("playground helpers", () => {
   });
 
   it("builds a chat completions request body", () => {
-    const body = buildRequestBody("m", [{ role: "user", content: "hi" }], settings);
+    const body = Body.build("m", [{ role: "user", content: "hi" }], settings);
     expect(body.model).toBe("m");
     expect(body.stream).toBe(true);
     expect(body.max_tokens).toBe(4096);
   });
 
   it("converts scenario messages to anthropic", () => {
-    const result = convertScenarioMessagesToAnthropic([
+    const result = Body.anthropicMessages([
       { role: "system", content: "sys" },
       { role: "user", content: "hi" },
     ]);
@@ -63,17 +61,17 @@ describe("playground helpers", () => {
   });
 
   it("formats durations and tokens", () => {
-    expect(formatDurationMs(500)).toBe("500 ms");
-    expect(formatDurationMs(1500)).toBe("1.5 s");
-    expect(formatDurationMs(20000)).toBe("20 s");
-    expect(formatDurationMs(null)).toBe("-");
-    expect(normalizeTokenValue("x")).toBe(null);
-    expect(normalizeTokenValue(5.6)).toBe(6);
+    expect(Duration.format(500)).toBe("500 ms");
+    expect(Duration.format(1500)).toBe("1.5 s");
+    expect(Duration.format(20000)).toBe("20 s");
+    expect(Duration.format(null)).toBe("-");
+    expect(Tokens.value("x")).toBe(null);
+    expect(Tokens.value(5.6)).toBe(6);
   });
 
   it("maps endpoints to paths", () => {
-    expect(getEndpointPath("messages")).toBe("/v1/messages");
-    expect(getEndpointPath("responses")).toBe("/v1/responses");
-    expect(getEndpointPath("chat_completions")).toBe("/v1/chat/completions");
+    expect(ErrorText.path("messages")).toBe("/v1/messages");
+    expect(ErrorText.path("responses")).toBe("/v1/responses");
+    expect(ErrorText.path("chat_completions")).toBe("/v1/chat/completions");
   });
 });

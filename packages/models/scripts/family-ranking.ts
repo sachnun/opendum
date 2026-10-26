@@ -1,7 +1,7 @@
-import { flagshipFamilyRanking, loadModelEntries } from "@opendum/models/runtime";
+import { flagshipRanking, loadEntries } from "@opendum/models/runtime";
 import { readText, writeText } from "#models/fs.ts";
 import { join } from "#models/paths.ts";
-import { packageModelsDir, runScript } from "./shared.ts";
+import { dataDir, runScript } from "./shared.ts";
 
 const MIN_FLAGSHIP_SCORE = 20;
 
@@ -18,13 +18,13 @@ function renderRanking(ranking: FamilyRankingRow[]): string {
   );
 
   return [
-    "export type ModelFamilyRankingEntry = {",
+    "export type RankingEntry = {",
     "  name: string;",
     "  anchorId: string;",
     "  score: number;",
     "};",
     "",
-    "export const MODEL_FAMILY_RANKING: readonly ModelFamilyRankingEntry[] = [",
+    "export const MODEL_FAMILY_RANKING: readonly RankingEntry[] = [",
     ...lines,
     "];",
     "",
@@ -32,10 +32,10 @@ function renderRanking(ranking: FamilyRankingRow[]): string {
 }
 
 async function main(): Promise<void> {
-  const dataDir = packageModelsDir();
-  const outputPath = join(dataDir, "..", "ranking.generated.ts");
+  const modelsDir = dataDir();
+  const outputPath = join(modelsDir, "..", "ranking.generated.ts");
 
-  const ranking = flagshipFamilyRanking(loadModelEntries(dataDir))
+  const ranking = flagshipRanking(loadEntries(modelsDir))
     .filter((entry) => entry.score >= MIN_FLAGSHIP_SCORE)
     .map((entry) => ({
       name: entry.family,

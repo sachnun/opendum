@@ -3,8 +3,8 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { admin, bearer, jwt } from "better-auth/plugins";
 import { eq } from "drizzle-orm";
 import { db as defaultDb, schema, user, type Database } from "@opendum/database";
-import { ensureUserPointBalance } from "./services/points.js";
-import { roleForEmail } from "./utils/maintainers.js";
+import { ensureBalance } from "./services/points.js";
+import { roleOf as maintainerRole } from "./utils/maintainers.js";
 
 export const ACCESS_TOKEN_TTL = "7d";
 export const ACCESS_TOKEN_ISSUER = "opendum";
@@ -18,8 +18,8 @@ function requireEnv(name: string): string {
   return value;
 }
 
-export function authRoleForEmail(email: string | null | undefined): string {
-  return roleForEmail(email) === "maintainer" ? ADMIN_ROLE : USER_ROLE;
+export function roleOf(email: string | null | undefined): string {
+  return maintainerRole(email) === "maintainer" ? ADMIN_ROLE : USER_ROLE;
 }
 
 export function createAuth(db: Database = defaultDb, options: { baseURL?: string } = {}) {
@@ -42,11 +42,11 @@ export function createAuth(db: Database = defaultDb, options: { baseURL?: string
       user: {
         create: {
           before: async (createdUser) => {
-            return { data: { ...createdUser, role: authRoleForEmail(createdUser.email) } };
+            return { data: { ...createdUser, role: roleOf(createdUser.email) } };
           },
           after: async (createdUser) => {
             try {
-              await ensureUserPointBalance(createdUser.id);
+              await ensureBalance(createdUser.id);
             } catch (error) {
               console.error("Failed to initialize point balance:", error);
             }
@@ -63,7 +63,7 @@ export function createAuth(db: Database = defaultDb, options: { baseURL?: string
               .limit(1);
             if (!found) return;
 
-            const role = authRoleForEmail(found.email);
+            const role = roleOf(found.email);
             if (found.role !== role) {
               await db.update(user).set({ role }).where(eq(user.id, found.id));
             }

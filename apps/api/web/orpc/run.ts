@@ -16,7 +16,7 @@ const STATUS_CODES = {
   504: "GATEWAY_TIMEOUT",
 } as const;
 
-export function toOrpcError(failure: ServiceFailure): ORPCError<string, unknown> {
+export function orpcError(failure: ServiceFailure): ORPCError<string, unknown> {
   const status = failure.status ?? 500;
   const code = STATUS_CODES[status as keyof typeof STATUS_CODES] ?? "INTERNAL_SERVER_ERROR";
   return new ORPCError(code, {
@@ -26,5 +26,5 @@ export function toOrpcError(failure: ServiceFailure): ORPCError<string, unknown>
 }
 
 export function runOrpc<A>(effect: Effect.Effect<A, ServiceFailure>): Promise<A> {
-  return Effect.runPromise(effect.pipe(Effect.mapError(toOrpcError)));
+  return Effect.runPromise(effect.pipe(Effect.mapError(orpcError)));
 }

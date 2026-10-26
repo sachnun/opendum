@@ -2,9 +2,9 @@ import { describe, expect, it } from "bun:test";
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
 import { CustomModels } from "../custom-models.js";
-import type { CustomProviderModelRecord, CustomProviderReader } from "../store/custom.js";
+import type { ModelRecord, CustomProviderReader } from "../store/custom.js";
 
-function modelRecord(overrides: Partial<CustomProviderModelRecord> & { modelId: string }): CustomProviderModelRecord {
+function modelRecord(overrides: Partial<ModelRecord> & { modelId: string }): ModelRecord {
   return {
     id: `m-${overrides.modelId}`,
     providerId: overrides.providerId ?? "p1",
@@ -23,7 +23,7 @@ function providerOf(id: string, slug: string) {
 }
 
 function readerOf(
-  providers: Array<{ id: string; slug: string; models: CustomProviderModelRecord[] }>
+  providers: Array<{ id: string; slug: string; models: ModelRecord[] }>
 ): CustomProviderReader {
   return {
     listProviders: () =>

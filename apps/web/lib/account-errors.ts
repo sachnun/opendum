@@ -79,7 +79,7 @@ export const HTTP_STATUS_DESCRIPTIONS: Record<number, string> = {
   511: "Network Authentication Required",
 };
 
-export function parseStoredErrorMessage(rawMessage: string, code: number | null | undefined): ParsedErrorDetails {
+export function parseMessage(rawMessage: string, code: number | null | undefined): ParsedErrorDetails {
   const sections: Record<"error" | "provider" | "endpoint" | "model" | "parameters" | "messages", string[]> = {
     error: [],
     provider: [],
@@ -145,7 +145,7 @@ export function parseStoredErrorMessage(rawMessage: string, code: number | null 
   })();
 
   return {
-    error: stripStatusFromErrorMessage(sections.error.join("\n"), code) || null,
+    error: stripStatus(sections.error.join("\n"), code) || null,
     provider: sections.provider.join("\n").trim() || null,
     endpoint: sections.endpoint.join("\n").trim() || null,
     model: sections.model.join("\n").trim() || null,
@@ -154,15 +154,15 @@ export function parseStoredErrorMessage(rawMessage: string, code: number | null 
   };
 }
 
-export function getHttpStatusDescription(code: number): string {
+export function statusText(code: number): string {
   return HTTP_STATUS_DESCRIPTIONS[code] ?? "HTTP Error";
 }
 
-export function getErrorStatusTag(code: number | null | undefined): ErrorStatusTag | null {
-  return code ? { code, label: getHttpStatusDescription(code) } : null;
+export function statusTag(code: number | null | undefined): ErrorStatusTag | null {
+  return code ? { code, label: statusText(code) } : null;
 }
 
-export function stripStatusFromErrorMessage(message: string, code: number | null | undefined): string {
+export function stripStatus(message: string, code: number | null | undefined): string {
   const trimmed = message.trimStart().replace(/^Error:\s*/i, "");
   if (!code) return trimmed;
 
@@ -173,11 +173,11 @@ export function stripStatusFromErrorMessage(message: string, code: number | null
     .trimStart();
 }
 
-export function getErrorMessageModel(message: string, code: number | null | undefined): string | null {
-  return parseStoredErrorMessage(message, code).model?.trim() || null;
+export function messageModel(message: string, code: number | null | undefined): string | null {
+  return parseMessage(message, code).model?.trim() || null;
 }
 
-export function normalizePlaygroundEndpoint(value: string | null | undefined): ErrorPlaygroundEndpoint | null {
+export function normalizeEndpoint(value: string | null | undefined): ErrorPlaygroundEndpoint | null {
   const normalized = value?.trim().replace(/^\/v1\//, "") ?? "";
   if (normalized === "chat/completions" || normalized === "chat_completions") return "chat_completions";
   if (normalized === "messages") return "messages";
@@ -185,7 +185,7 @@ export function normalizePlaygroundEndpoint(value: string | null | undefined): E
   return null;
 }
 
-export function parseErrorParameters(value: string | null | undefined): Record<string, unknown> | null {
+export function parseParams(value: string | null | undefined): Record<string, unknown> | null {
   if (!value?.trim()) return null;
 
   try {
@@ -196,7 +196,7 @@ export function parseErrorParameters(value: string | null | undefined): Record<s
   }
 }
 
-export function addPlaygroundParam(query: Record<string, string>, params: Record<string, unknown>, targetKey: string, sourceKeys: string[] = []) {
+export function addParam(query: Record<string, string>, params: Record<string, unknown>, targetKey: string, sourceKeys: string[] = []) {
   for (const key of [targetKey, ...sourceKeys]) {
     const value = params[key];
     if (typeof value === "string" && value.trim()) {
@@ -214,7 +214,7 @@ export function addPlaygroundParam(query: Record<string, string>, params: Record
   }
 }
 
-export function addAdditionalPlaygroundParams(query: Record<string, string>, params: Record<string, unknown>) {
+export function addParams(query: Record<string, string>, params: Record<string, unknown>) {
   const handledKeys = new Set([
     "stream",
     "temperature",
@@ -230,7 +230,7 @@ export function addAdditionalPlaygroundParams(query: Record<string, string>, par
   if (Object.keys(additionalParams).length > 0) query.additional_parameters = JSON.stringify(additionalParams);
 }
 
-export function isImmediatelyRecoverableErrorCode(code: number | null | undefined): boolean {
+export function isRecoverable(code: number | null | undefined): boolean {
   if (!code) return false;
   return code === 408 || code === 429 || (code >= 500 && code <= 599);
 }

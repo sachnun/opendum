@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { cn, requestErrorMessage } from "~~/lib/utils";
+import { cn, messageOf } from "~~/lib/utils";
 import { COMMON_HEADER_NAMES } from "~~/lib/headers";
 import type { ActionResult } from "~~/lib/api-types";
 
@@ -84,7 +84,7 @@ watch(models, (rows) => {
   if (!last || last.model.trim() !== "") rows.push({ model: "", alias: "", aliased: false });
 }, { deep: true });
 
-function setRowAlias(row: ModelRow, value: string) {
+function setAlias(row: ModelRow, value: string) {
   row.alias = value;
   row.aliased = value !== "";
 }
@@ -101,7 +101,7 @@ function run(action: () => Promise<ActionResult<unknown>>, key: string) {
       return true;
     })
     .catch((error) => {
-      errorMessage.value = requestErrorMessage(error);
+      errorMessage.value = messageOf(error);
       return false;
     })
     .finally(() => {
@@ -152,7 +152,7 @@ async function syncModels() {
       : [{ model: "", alias: "", aliased: false }];
     synced.value = true;
   } catch (error) {
-    errorMessage.value = requestErrorMessage(error);
+    errorMessage.value = messageOf(error);
   } finally {
     busy.value = "";
   }
@@ -259,7 +259,7 @@ function next() {
           <div v-for="(row, index) in models" :key="index" class="flex items-center gap-2">
             <input v-model="row.model" :class="inputClass" class="flex-1 font-mono" placeholder="model">
             <div class="min-w-0 flex-1">
-              <ModelAliasSelect :model-value="row.alias" :default-id="row.model" @update:model-value="(value: string) => setRowAlias(row, value)" />
+              <ModelAliasSelect :model-value="row.alias" :default-id="row.model" @update:model-value="(value: string) => setAlias(row, value)" />
             </div>
           </div>
           <p v-if="synced" class="text-xs text-muted-foreground">Synced {{ filledModels.length }} model(s).</p>

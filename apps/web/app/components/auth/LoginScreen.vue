@@ -22,7 +22,7 @@ type TetrisPiece = {
   drawY: number;
 };
 
-const maxVisibleTetrisPieces = 1;
+const maxPieces = 1;
 
 const tetrisPieces = [
   { shape: [[1, 1, 1, 1]], color: "rgba(226, 232, 240, 0.12)" },
@@ -61,7 +61,7 @@ const authError = computed(() => {
   return AUTH_ERROR_MESSAGES[decodedError] ?? "Sign in failed. Please try again.";
 });
 
-function continueWithProvider(provider: SocialProvider) {
+function continueWith(provider: SocialProvider) {
   loadingProvider.value = provider;
   startSignIn(provider, redirectTarget.value);
 }
@@ -88,7 +88,7 @@ onMounted(() => {
   let driftTimer = 0;
   let spawnTimer = 0;
 
-  function getViewportSize() {
+  function viewportSize() {
     const visualViewport = window.visualViewport;
 
     return {
@@ -101,7 +101,7 @@ onMounted(() => {
     board = Array.from({ length: rows }, () => Array<TetrisCell>(columns).fill(null));
   }
 
-  function seedBottomStack() {
+  function seedStack() {
     const stackHeight = Math.min(rows - 6, Math.max(5, Math.floor(rows * 0.22)));
     const colors = tetrisPieces.map(piece => piece.color);
     const wavePhase = Math.random() * Math.PI * 2;
@@ -134,10 +134,10 @@ onMounted(() => {
   }
 
   function canPlace(piece: TetrisPiece, nextX = piece.x, nextY = piece.y, shape = piece.shape) {
-    return canPlaceShape(shape, nextX, nextY);
+    return fits(shape, nextX, nextY);
   }
 
-  function canPlaceShape(shape: number[][], nextX: number, nextY: number) {
+  function fits(shape: number[][], nextX: number, nextY: number) {
     return shape.every((shapeRow, shapeY) => shapeRow.every((cell, shapeX) => {
       if (!cell) return true;
 
@@ -152,7 +152,7 @@ onMounted(() => {
     return first.length === second.length && first.every((row, rowIndex) => row.join("") === second[rowIndex]?.join(""));
   }
 
-  function getShapeRotations(shape: number[][]) {
+  function rotationsOf(shape: number[][]) {
     const rotations: number[][][] = [];
     let nextShape = shape;
 
@@ -203,19 +203,19 @@ onMounted(() => {
     return completedLines * 90 - aggregateHeight * 2.2 - holes * 12 - bumpiness * 3 + Math.random() * 4;
   }
 
-  function chooseBestMove(shape: number[][]) {
+  function bestMove(shape: number[][]) {
     let bestMove: { shape: number[][]; x: number; score: number } | null = null;
 
-    getShapeRotations(shape).forEach((rotation) => {
+    rotationsOf(shape).forEach((rotation) => {
       const maxX = columns - rotation[0]!.length;
       for (let x = 0; x <= maxX; x += 1) {
         let y = -rotation.length;
 
-        while (canPlaceShape(rotation, x, y + 1)) {
+        while (fits(rotation, x, y + 1)) {
           y += 1;
         }
 
-        if (!canPlaceShape(rotation, x, y)) continue;
+        if (!fits(rotation, x, y)) continue;
 
         const score = scoreLanding(rotation, x, y);
         if (!bestMove || score > bestMove.score) {
@@ -228,12 +228,12 @@ onMounted(() => {
   }
 
   function planPiece(piece: TetrisPiece) {
-    const move = chooseBestMove(piece.shape);
+    const move = bestMove(piece.shape);
     piece.targetShape = move.shape;
     piece.targetX = move.x;
   }
 
-  function isReadyToDrop(piece: TetrisPiece) {
+  function ready(piece: TetrisPiece) {
     return piece.x === piece.targetX && shapesEqual(piece.shape, piece.targetShape);
   }
 
@@ -249,7 +249,7 @@ onMounted(() => {
     const source = tetrisPieces[Math.floor(Math.random() * tetrisPieces.length)]!;
     const shape = source.shape;
     const pieceWidth = shape[0]!.length;
-    const targetMove = chooseBestMove(shape);
+    const targetMove = bestMove(shape);
     const x = Math.max(0, Math.floor((columns - pieceWidth) / 2));
     const y = -shape.length;
 
@@ -287,8 +287,8 @@ onMounted(() => {
     }
   }
 
-  function updateCanvasSize() {
-    const { width, height } = getViewportSize();
+  function resizeCanvas() {
+    const { width, height } = viewportSize();
     const ratio = window.devicePixelRatio || 1;
 
     cellSize = width < 640 ? 14 : 18;
@@ -300,9 +300,9 @@ onMounted(() => {
     canvas!.style.height = `${height}px`;
     context!.setTransform(ratio, 0, 0, ratio, 0, 0);
     createBoard();
-    seedBottomStack();
+    seedStack();
     activePieces = [];
-    for (let index = 0; index < maxVisibleTetrisPieces; index += 1) {
+    for (let index = 0; index < maxPieces; index += 1) {
       spawnPiece();
     }
   }
@@ -369,7 +369,7 @@ onMounted(() => {
         piece.drawY += (piece.y - piece.drawY) * Math.min(1, delta / 75);
       });
 
-      if (spawnTimer > 210 && activePieces.length < maxVisibleTetrisPieces) {
+      if (spawnTimer > 210 && activePieces.length < maxPieces) {
         spawnTimer = 0;
         spawnPiece();
       }
@@ -406,7 +406,7 @@ onMounted(() => {
         for (let index = activePieces.length - 1; index >= 0; index -= 1) {
           const piece = activePieces[index]!;
 
-          if (isReadyToDrop(piece)) {
+          if (ready(piece)) {
             hardDrop(piece);
             lockPiece(piece);
             activePieces.splice(index, 1);
@@ -433,20 +433,20 @@ onMounted(() => {
     animationFrame = window.requestAnimationFrame(tick);
   }
 
-  updateCanvasSize();
+  resizeCanvas();
   draw();
 
   if (!reducedMotion) {
     animationFrame = window.requestAnimationFrame(tick);
   }
 
-  window.addEventListener("resize", updateCanvasSize);
-  window.visualViewport?.addEventListener("resize", updateCanvasSize);
+  window.addEventListener("resize", resizeCanvas);
+  window.visualViewport?.addEventListener("resize", resizeCanvas);
 
   onUnmounted(() => {
     window.cancelAnimationFrame(animationFrame);
-    window.removeEventListener("resize", updateCanvasSize);
-    window.visualViewport?.removeEventListener("resize", updateCanvasSize);
+    window.removeEventListener("resize", resizeCanvas);
+    window.visualViewport?.removeEventListener("resize", resizeCanvas);
   });
 });
 
@@ -490,7 +490,7 @@ onMounted(() => {
             aria-label="Continue with GitHub"
             :disabled="loadingProvider !== null"
             class="relative inline-flex size-10 shrink-0 cursor-pointer items-center justify-center gap-2 overflow-visible whitespace-nowrap rounded-full border border-border/70 bg-background/80 text-sm font-medium text-foreground shadow-none outline-none transition-all hover:bg-muted/60 hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-default disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0"
-            @click="continueWithProvider('github')"
+            @click="continueWith('github')"
           >
             <span v-if="loadingProvider === 'github'" class="absolute inset-0 rounded-full border border-primary/70 animate-ping" aria-hidden="true" />
             <svg :class="['h-5 w-5 transition-transform', loadingProvider === 'github' ? 'animate-pulse scale-110' : '']" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -503,7 +503,7 @@ onMounted(() => {
             aria-label="Continue with Google"
             :disabled="loadingProvider !== null"
             class="relative inline-flex size-10 shrink-0 cursor-pointer items-center justify-center gap-2 overflow-visible whitespace-nowrap rounded-full border border-border/70 bg-background/80 text-sm font-medium text-foreground shadow-none outline-none transition-all hover:bg-muted/60 hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-default disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0"
-            @click="continueWithProvider('google')"
+            @click="continueWith('google')"
           >
             <span v-if="loadingProvider === 'google'" class="absolute inset-0 rounded-full border border-primary/70 animate-ping" aria-hidden="true" />
             <svg :class="['h-5 w-5 transition-transform', loadingProvider === 'google' ? 'animate-pulse scale-110' : '']" viewBox="0 0 48 48" aria-hidden="true">
