@@ -1,5 +1,6 @@
 import { Effect } from "effect";
 
+import { OAuthClient } from "@opendum/providers/auth/client";
 import type { AuthRuntime } from "@opendum/providers/auth/runtime";
 import { failedResult, pendingResult, ProviderResponse } from "@opendum/providers/auth/response";
 import type { OAuthResult } from "@opendum/providers/auth/result";
@@ -104,28 +105,40 @@ function firstAccount(value: WorkbuddyAccountResponse["data"]): WorkbuddyAccount
   return value as WorkbuddyAccount;
 }
 
+const JSON_HEADERS = {
+  "Content-Type": "application/json",
+  Accept: "application/json",
+};
+
+class WorkbuddyClient extends OAuthClient {
+  constructor(runtime: AuthRuntime) {
+    super({ provider: "workbuddy", label: "WorkBuddy" }, runtime);
+  }
+}
+
 export function workbuddyAuth(runtime: AuthRuntime) {
   const response = new ProviderResponse("WorkBuddy");
+  const client = new WorkbuddyClient(runtime);
 
   const startDeviceFlow = Effect.fn("workbuddy.initiateDeviceCodeFlow")(function* () {
     const url = `${WORKBUDDY_BASE_URL}${AUTH_STATE_PATH}?platform=${encodeURIComponent(WORKBUDDY_PLATFORM)}`;
-    const result = yield* runtime.fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({}),
-      cache: "no-store",
-    });
-
-    if (!result.ok) {
-      const body = yield* response.text(result);
-      return yield* runtime.unavailable(response.failure(result, body, "auth state endpoint"));
-    }
-
-    const data = yield* response.jsonOr<WorkbuddyStateResponse>(result, {});
+    const data = yield* client.decode<WorkbuddyStateResponse>(
+      {
+        url,
+        endpoint: "auth state endpoint",
+        init: {
+          method: "POST",
+          headers: JSON_HEADERS,
+          body: JSON.stringify({}),
+          cache: "no-store",
+        },
+      },
+      (payload) => (payload as WorkbuddyStateResponse | null) ?? null
+    );
     const state = data.data?.state?.trim() ?? "";
     const authUrl = data.data?.authUrl?.trim() ?? "";
     if (!state || !authUrl) {
-      return yield* runtime.unavailable("WorkBuddy auth state response is missing required fields");
+      return yield* Effect.fail(client.fail("WorkBuddy auth state response is missing required fields"));
     }
 
     return {

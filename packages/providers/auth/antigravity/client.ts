@@ -1,5 +1,6 @@
 import { Effect } from "effect";
 
+import { OAuthClient } from "@opendum/providers/auth/client";
 import type { AuthRuntime } from "@opendum/providers/auth/runtime";
 import type { OAuthResult } from "@opendum/providers/auth/result";
 import { ProviderResponse } from "@opendum/providers/auth/response";
@@ -14,8 +15,34 @@ import {
   REFRESH_BUFFER_SECONDS,
 } from "@opendum/providers/auth/antigravity/constants";
 
+const TOKEN_URL = "https://oauth2.googleapis.com/token";
+
+const FORM_HEADERS = {
+  "Content-Type": "application/x-www-form-urlencoded",
+  Accept: "application/json",
+};
+
+type GoogleToken = {
+  access_token: string;
+  refresh_token?: string;
+  expires_in: number;
+};
+
+function pickToken(payload: unknown): GoogleToken | null {
+  const value = payload as Partial<GoogleToken> | null;
+  if (!value || typeof value.access_token !== "string" || !value.access_token) return null;
+  return value as GoogleToken;
+}
+
+class AntigravityClient extends OAuthClient {
+  constructor(runtime: AuthRuntime) {
+    super({ provider: "antigravity", label: "Antigravity" }, runtime);
+  }
+}
+
 export function antigravityAuth(runtime: AuthRuntime) {
   const response = new ProviderResponse("Antigravity");
+  const client = new AntigravityClient(runtime);
 
   function normalizeTier(value: unknown): string {
     return typeof value === "string" ? value.trim().toLowerCase() : "";
@@ -46,19 +73,13 @@ export function antigravityAuth(runtime: AuthRuntime) {
       body.code_verifier = codeVerifier;
     }
 
-    const result = yield* runtime.fetch("https://oauth2.googleapis.com/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams(body),
-    });
-
-    if (!result.ok) {
-      const error = yield* response.text(result);
-      return yield* runtime.unavailable(response.failure(result, error, "token exchange endpoint"));
-    }
-
-    const tokens = yield* response.json<{ access_token: string; refresh_token: string; expires_in: number }>(
-      result
+    const tokens = yield* client.decode<GoogleToken>(
+      {
+        url: TOKEN_URL,
+        endpoint: "token exchange endpoint",
+        init: { method: "POST", headers: FORM_HEADERS, body: new URLSearchParams(body) },
+      },
+      pickToken
     );
     const accountInfo = yield* fetchAccountInfo(tokens.access_token);
 
@@ -73,24 +94,22 @@ export function antigravityAuth(runtime: AuthRuntime) {
   });
 
   const refreshAntigravityToken = Effect.fn("antigravity.refreshToken")(function* (refreshToken: string) {
-    const result = yield* runtime.fetch("https://oauth2.googleapis.com/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        client_id: CLIENT_ID,
-        client_secret: CLIENT_SECRET,
-        refresh_token: refreshToken,
-        grant_type: "refresh_token",
-      }),
-    });
-
-    if (!result.ok) {
-      const error = yield* response.text(result);
-      return yield* runtime.unavailable(response.failure(result, error, "token refresh endpoint"));
-    }
-
-    const tokens = yield* response.json<{ access_token: string; refresh_token?: string; expires_in: number }>(
-      result
+    const tokens = yield* client.decode<GoogleToken>(
+      {
+        url: TOKEN_URL,
+        endpoint: "token refresh endpoint",
+        init: {
+          method: "POST",
+          headers: FORM_HEADERS,
+          body: new URLSearchParams({
+            client_id: CLIENT_ID,
+            client_secret: CLIENT_SECRET,
+            refresh_token: refreshToken,
+            grant_type: "refresh_token",
+          }),
+        },
+      },
+      pickToken
     );
     const accountInfo = yield* fetchAccountInfo(tokens.access_token);
 

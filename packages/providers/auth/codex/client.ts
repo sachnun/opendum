@@ -1,5 +1,6 @@
 import { Effect } from "effect";
 
+import { OAuthClient } from "@opendum/providers/auth/client";
 import type { AuthRuntime } from "@opendum/providers/auth/runtime";
 import { Jwt, Value } from "@opendum/providers";
 import type { OAuthResult } from "@opendum/providers/auth/result";
@@ -7,8 +8,11 @@ import { tokenExpired, type CredentialAccount as Credential } from "@opendum/pro
 import { Pkce } from "@opendum/providers/auth/pkce";
 import { ProviderResponse, failedResult, pendingResult } from "@opendum/providers/auth/response";
 import {
+  AUTHORIZE_ENDPOINT,
   BROWSER_REDIRECT_URI,
   CLIENT_ID,
+  ORIGINATOR,
+  SCOPE,
   USER_AGENT,
   DEVICE_CODE_ENDPOINT,
   DEVICE_REDIRECT_URI,
@@ -53,8 +57,26 @@ interface SessionPayload {
   user?: SessionUser;
 }
 
+const FORM_HEADERS = {
+  "Content-Type": "application/x-www-form-urlencoded",
+  Accept: "application/json",
+};
+
+function pickToken(payload: unknown): CodexTokenResponse | null {
+  const value = payload as Partial<CodexTokenResponse> | null;
+  if (!value || typeof value.access_token !== "string" || !value.access_token) return null;
+  return value as CodexTokenResponse;
+}
+
+class CodexClient extends OAuthClient {
+  constructor(runtime: AuthRuntime) {
+    super({ provider: "codex", label: "Codex" }, runtime);
+  }
+}
+
 export function codexAuth(runtime: AuthRuntime) {
   const response = new ProviderResponse("Codex");
+  const client = new CodexClient(runtime);
 
   function codeVerifier(): string {
     return Pkce.verifier();
@@ -217,60 +239,43 @@ export function codexAuth(runtime: AuthRuntime) {
     };
   }
 
-  const exchangeCodexCode = Effect.fn("codex.exchangeCode")(function* (
-    code: string,
-    redirectUri: string,
-    codeVerifier?: string
-  ) {
-    const body: Record<string, string> = {
-      grant_type: "authorization_code",
-      code,
-      client_id: CLIENT_ID,
-      redirect_uri: redirectUri || BROWSER_REDIRECT_URI,
-    };
-
-    if (codeVerifier) {
-      body.code_verifier = codeVerifier;
-    }
-
-    const result = yield* runtime.fetch(TOKEN_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Accept: "application/json",
+  const exchangeCodexCode = (code: string, redirectUri: string, codeVerifier?: string) =>
+    client.decode<CodexTokenResponse>(
+      {
+        url: TOKEN_ENDPOINT,
+        endpoint: "token exchange endpoint",
+        init: {
+          method: "POST",
+          headers: FORM_HEADERS,
+          body: new URLSearchParams({
+            grant_type: "authorization_code",
+            code,
+            client_id: CLIENT_ID,
+            redirect_uri: redirectUri || BROWSER_REDIRECT_URI,
+            ...(codeVerifier ? { code_verifier: codeVerifier } : {}),
+          }),
+        },
       },
-      body: new URLSearchParams(body),
-    });
+      pickToken
+    ).pipe(Effect.map((data) => buildResult(data)));
 
-    if (!result.ok) {
-      const error = yield* response.text(result);
-      return yield* runtime.unavailable(response.failure(result, error, "token exchange endpoint"));
-    }
-
-    return buildResult(yield* response.json<CodexTokenResponse>(result));
-  });
-
-  const refreshCodexToken = Effect.fn("codex.refreshToken")(function* (refreshToken: string) {
-    const result = yield* runtime.fetch(TOKEN_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Accept: "application/json",
+  const refreshCodexToken = (refreshToken: string) =>
+    client.decode<CodexTokenResponse>(
+      {
+        url: TOKEN_ENDPOINT,
+        endpoint: "token refresh endpoint",
+        init: {
+          method: "POST",
+          headers: FORM_HEADERS,
+          body: new URLSearchParams({
+            grant_type: "refresh_token",
+            refresh_token: refreshToken,
+            client_id: CLIENT_ID,
+          }),
+        },
       },
-      body: new URLSearchParams({
-        grant_type: "refresh_token",
-        refresh_token: refreshToken,
-        client_id: CLIENT_ID,
-      }),
-    });
-
-    if (!result.ok) {
-      const error = yield* response.text(result);
-      return yield* runtime.unavailable(response.failure(result, error, "token refresh endpoint"));
-    }
-
-    return buildResult(yield* response.json<CodexTokenResponse>(result), refreshToken);
-  });
+      pickToken
+    ).pipe(Effect.map((data) => buildResult(data, refreshToken)));
 
   const validCredentials = Effect.fn("codex.getValidCredentials")(function* (
     account: CredentialAccount
@@ -381,5 +386,35 @@ export function codexAuth(runtime: AuthRuntime) {
       return failedResult(response.failure(result, error, "device auth polling endpoint"));
   });
 
-  return { codexProvider, sessionResult, startDeviceFlow, pollDeviceAuth, codeVerifier, generateCodeChallenge };
+  const authUrl = Effect.fn("codex.buildAuthUrl")(function* (state: string) {
+    const verifier = codeVerifier();
+    const codeChallenge = yield* generateCodeChallenge(verifier);
+    return {
+      authUrl: `${AUTHORIZE_ENDPOINT}?${new URLSearchParams({
+        response_type: "code",
+        client_id: CLIENT_ID,
+        redirect_uri: BROWSER_REDIRECT_URI,
+        scope: SCOPE,
+        code_challenge: codeChallenge,
+        code_challenge_method: "S256",
+        id_token_add_organizations: "true",
+        codex_cli_simplified_flow: "true",
+        state,
+        originator: ORIGINATOR,
+      }).toString()}`,
+      state,
+      codeVerifier: verifier,
+    };
+  });
+
+  return {
+    codexProvider,
+    sessionResult,
+    startDeviceFlow,
+    pollDeviceAuth,
+    codeVerifier,
+    generateCodeChallenge,
+    authUrl,
+    BROWSER_REDIRECT_URI,
+  };
 }

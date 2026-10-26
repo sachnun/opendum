@@ -1,5 +1,6 @@
 import { Effect } from "effect";
 
+import { OAuthClient } from "@opendum/providers/auth/client";
 import type { AuthRuntime } from "@opendum/providers/auth/runtime";
 import { ProviderResponse } from "@opendum/providers/auth/response";
 import { Pkce } from "@opendum/providers/auth/pkce";
@@ -47,22 +48,27 @@ export interface PerchInitiateResult {
     verificationUrl: string;
 }
 
+class PerchClient extends OAuthClient {
+  constructor(runtime: AuthRuntime) {
+    super({ provider: "perch", label: "Perch" }, runtime);
+  }
+}
+
 export function perchAuth(runtime: AuthRuntime) {
   const response = new ProviderResponse("Perch");
+  const client = new PerchClient(runtime);
 
   const authConfig = Effect.fn("perch.authConfig")(function* () {
-    const result = yield* runtime.fetch(`${PERCH_APP_URL}${PERCH_CONFIG_PATH}`, {
-      method: "GET",
-      headers: { Accept: "application/json" },
-      cache: "no-store",
-    });
-    if (!result.ok) {
-      const body = yield* response.text(result);
-      return yield* runtime.unavailable(response.failure(result, body, "auth config endpoint"));
-    }
-    const config = yield* response.jsonOr<Partial<PerchAuthConfig>>(result, {});
+    const config = yield* client.decode<Partial<PerchAuthConfig>>(
+      {
+        url: `${PERCH_APP_URL}${PERCH_CONFIG_PATH}`,
+        endpoint: "auth config endpoint",
+        init: { method: "GET", headers: { Accept: "application/json" }, cache: "no-store" },
+      },
+      (payload) => (payload as Partial<PerchAuthConfig> | null) ?? null
+    );
     if (!config.supabaseUrl || !config.supabaseAnonKey) {
-      return yield* runtime.unavailable("Perch auth config is incomplete. Please try again later.");
+      return yield* Effect.fail(client.fail("Perch auth config is incomplete. Please try again later."));
     }
     return config as PerchAuthConfig;
   });

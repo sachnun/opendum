@@ -1,11 +1,11 @@
 import { Effect } from "effect";
 
-import type { AuthRuntime } from "@opendum/providers/auth/runtime";
-import type { OAuthResult } from "@opendum/providers/auth/result";
-import { Pkce } from "@opendum/providers/auth/pkce";
-import { ProviderResponse } from "@opendum/providers/auth/response";
-import { Jwt } from "@opendum/providers";
+import { OAuthClient, tokenLifetime } from "@opendum/providers/auth/client";
 import { validToken, type CredentialAccount } from "@opendum/providers/auth/credentials";
+import { Pkce } from "@opendum/providers/auth/pkce";
+import type { OAuthResult } from "@opendum/providers/auth/result";
+import type { AuthRuntime } from "@opendum/providers/auth/runtime";
+import { Jwt } from "@opendum/providers";
 import {
   AUTHORIZE_ENDPOINT,
   BROWSER_REDIRECT_URI,
@@ -15,148 +15,109 @@ import {
   TOKEN_ENDPOINT,
 } from "@opendum/providers/auth/kiro/constants";
 
-interface ExchangeResponse {
-  accessToken: string;
-  refreshToken: string;
-  expiresIn?: number;
-  profileArn?: string;
-}
-
-interface KiroRefreshResponse {
+interface KiroToken {
   accessToken: string;
   refreshToken?: string;
   expiresIn?: number;
   profileArn?: string;
 }
 
-export function kiroAuth(runtime: AuthRuntime) {
-  const response = new ProviderResponse("Kiro");
+const REQUEST_HEADERS = {
+  "Content-Type": "application/json",
+  Accept: "application/json",
+  "User-Agent": "KiroIDE",
+};
 
-  function tokenIdentity(accessToken: string): string | null {
-    const claims = Jwt.claims(accessToken);
-    if (!claims) return null;
-    return Jwt.first(claims, [
-      "sub",
-      "email",
-      "username",
-      "cognito:username",
-      "user_id",
-      "account_id",
-    ]) || null;
+function pickToken(payload: unknown): KiroToken | null {
+  const value = payload as Partial<KiroToken> | null;
+  if (!value || typeof value.accessToken !== "string" || !value.accessToken.trim()) return null;
+  return value as KiroToken;
+}
+
+class KiroClient extends OAuthClient {
+  constructor(runtime: AuthRuntime) {
+    super({ provider: "kiro", label: "Kiro" }, runtime);
   }
 
-  function accountIdentity(accessToken: string, refreshToken: string, profileArn: string) {
-    const identity = tokenIdentity(accessToken);
-    const credentialFingerprint = runtime.hash(refreshToken || accessToken).slice(0, 16);
-    const displayIdentifier = [profileArn, identity, credentialFingerprint]
-      .filter((value): value is string => Boolean(value))
-      .join(":") || credentialFingerprint;
+  private identity(accessToken: string, refreshToken: string, profileArn: string) {
+    const claims = Jwt.claims(accessToken);
+    const identity = claims
+      ? Jwt.first(claims, ["sub", "email", "username", "cognito:username", "user_id", "account_id"])
+      : null;
+    const fingerprint = this.runtime.hash(refreshToken || accessToken).slice(0, 16);
+    const display = [profileArn, identity, fingerprint].filter((v): v is string => Boolean(v)).join(":");
+    return { email: `kiro-${display || fingerprint}`, accountId: profileArn || undefined };
+  }
 
+  private toResult(data: KiroToken, refreshToken: string): OAuthResult & { refreshToken: string } {
+    const nextRefresh = data.refreshToken || refreshToken;
+    const identity = this.identity(data.accessToken, nextRefresh, data.profileArn ?? "");
     return {
-      email: `kiro-${displayIdentifier}`,
-      accountId: profileArn || undefined,
+      accessToken: data.accessToken,
+      refreshToken: nextRefresh,
+      expiresAt: tokenLifetime(data.expiresIn),
+      email: identity.email,
+      accountId: identity.accountId,
     };
   }
 
-  function codeVerifier(): string {
-    return Pkce.verifier();
-  }
-
-  const generateCodeChallenge = (verifier: string) => Pkce.challenge(verifier, "Kiro");
-
-  const exchangeKiroCode = Effect.fn("kiro.exchangeCode")(function* (
-    code: string,
-    redirectUri: string,
-    codeVerifier?: string
-  ) {
-    if (!codeVerifier) {
-      return yield* runtime.badRequest("Code verifier is required for Kiro token exchange");
-    }
-
-    const result = yield* runtime.fetch(TOKEN_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        "User-Agent": "KiroIDE",
+  readonly exchangeCode = (code: string, redirectUri: string, codeVerifier?: string) =>
+    Effect.gen({ self: this }, function* (this: KiroClient) {
+    if (!codeVerifier) return yield* Effect.fail(this.reject("Code verifier is required for Kiro token exchange"));
+    const data = yield* this.decode<KiroToken>(
+      {
+        url: TOKEN_ENDPOINT,
+        endpoint: "token exchange endpoint",
+        init: {
+          method: "POST",
+          headers: REQUEST_HEADERS,
+          body: JSON.stringify({
+            code,
+            code_verifier: codeVerifier,
+            redirect_uri: redirectUri || BROWSER_REDIRECT_URI,
+          }),
+        },
       },
-      body: JSON.stringify({
-        code,
-        code_verifier: codeVerifier,
-        redirect_uri: redirectUri || BROWSER_REDIRECT_URI,
-      }),
+      pickToken
+    );
+    return this.toResult(data, data.refreshToken ?? "");
     });
 
-    if (!result.ok) {
-      const errorText = yield* response.text(result);
-      return yield* runtime.unavailable(response.failure(result, errorText, "token exchange endpoint"));
-    }
-
-    const data = yield* response.json<ExchangeResponse>(result);
-    const profileArn = data.profileArn || "";
-    const identity = accountIdentity(data.accessToken, data.refreshToken, profileArn);
-
-    return {
-      accessToken: data.accessToken,
-      refreshToken: data.refreshToken,
-      expiresAt: new Date(Date.now() + (data.expiresIn || 3600) * 1000),
-      email: identity.email,
-      accountId: identity.accountId,
-    } satisfies OAuthResult;
-  });
-
-  const refreshKiroToken = Effect.fn("kiro.refreshToken")(function* (refreshToken: string) {
-    const result = yield* runtime.fetch(REFRESH_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        "User-Agent": "KiroIDE",
+  readonly refreshToken = (refreshToken: string) =>
+    Effect.gen({ self: this }, function* (this: KiroClient) {
+    const data = yield* this.decode<KiroToken>(
+      {
+        url: REFRESH_ENDPOINT,
+        endpoint: "token refresh endpoint",
+        init: { method: "POST", headers: REQUEST_HEADERS, body: JSON.stringify({ refreshToken }) },
       },
-      body: JSON.stringify({ refreshToken }),
+      pickToken
+    );
+    return this.toResult(data, refreshToken);
     });
 
-    if (!result.ok) {
-      const errorText = yield* response.text(result);
-      return yield* runtime.unavailable(response.failure(result, errorText, "token refresh endpoint"));
-    }
+  readonly getValidCredentials = (account: CredentialAccount) =>
+    Effect.gen({ self: this }, function* (this: KiroClient) {
+    return yield* validToken(
+      account,
+      {
+        bufferSeconds: REFRESH_BUFFER_SECONDS,
+        message: "Failed to persist refreshed Kiro credentials",
+        refresh: (token) => this.refreshToken(token),
+        patch: (refreshed) => (refreshed.accountId ? { accountId: refreshed.accountId } : {}),
+      },
+      this.runtime.store
+    );
+    });
+}
 
-    const data = yield* response.json<KiroRefreshResponse>(result);
-    const profileArn = data.profileArn || "";
-    const nextRefreshToken = data.refreshToken || refreshToken;
-    const identity = accountIdentity(data.accessToken, nextRefreshToken, profileArn);
+export function kiroAuth(runtime: AuthRuntime) {
+  const client = new KiroClient(runtime);
 
-    return {
-      accessToken: data.accessToken,
-      refreshToken: nextRefreshToken,
-      expiresAt: new Date(Date.now() + (data.expiresIn || 3600) * 1000),
-      email: identity.email,
-      accountId: identity.accountId,
-    } satisfies OAuthResult;
-  });
+  const codeVerifier = (): string => Pkce.verifier();
 
-  const validCredentials = Effect.fn("kiro.getValidCredentials")(function* (
-    account: CredentialAccount
-  ) {
-    return yield* validToken(account, {
-      bufferSeconds: REFRESH_BUFFER_SECONDS,
-      message: "Failed to persist refreshed Kiro credentials",
-      refresh: refreshKiroToken,
-      patch: (refreshed) => (refreshed.accountId ? { accountId: refreshed.accountId } : {}),
-    }, runtime.store);
-  });
-
-  const kiroProvider = {
-    exchangeCode: exchangeKiroCode,
-    refreshToken: refreshKiroToken,
-    getValidCredentials: validCredentials,
-  };
-
-  const authUrl = Effect.fn("kiro.buildAuthUrl")(function* (
-    state: string,
-    codeVerifier: string
-  ) {
-    const codeChallenge = yield* generateCodeChallenge(codeVerifier);
+  const authUrl = Effect.fn("kiro.buildAuthUrl")(function* (state: string, verifier: string) {
+    const codeChallenge = yield* Pkce.challenge(verifier, "Kiro");
     const params = new URLSearchParams({
       idp: IDP,
       redirect_uri: BROWSER_REDIRECT_URI,
@@ -165,9 +126,23 @@ export function kiroAuth(runtime: AuthRuntime) {
       state,
       prompt: "select_account",
     });
-
     return `${AUTHORIZE_ENDPOINT}?${params.toString()}`;
   });
 
-  return { kiroProvider, authUrl, codeVerifier };
+  return {
+    kiroProvider: {
+      exchangeCode: client.exchangeCode,
+      refreshToken: client.refreshToken,
+      getValidCredentials: client.getValidCredentials,
+    },
+    authUrl,
+    codeVerifier,
+    AUTHORIZE_ENDPOINT,
+    authParams: (state: string) => ({
+      idp: IDP,
+      redirect_uri: BROWSER_REDIRECT_URI,
+      state,
+      prompt: "select_account",
+    }),
+  };
 }

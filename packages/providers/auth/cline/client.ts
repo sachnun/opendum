@@ -1,5 +1,6 @@
 import { Effect } from "effect";
 
+import { OAuthClient } from "@opendum/providers/auth/client";
 import type { AuthRuntime } from "@opendum/providers/auth/runtime";
 import { failedResult, pendingResult, ProviderResponse } from "@opendum/providers/auth/response";
 import type { OAuthResult } from "@opendum/providers/auth/result";
@@ -44,25 +45,42 @@ export interface ClineInitiateResult {
   interval: number;
 }
 
+const FORM_HEADERS = {
+  "Content-Type": "application/x-www-form-urlencoded",
+  Accept: "application/json",
+};
+
+const JSON_HEADERS = {
+  "Content-Type": "application/json",
+  Accept: "application/json",
+};
+
+class ClineClient extends OAuthClient {
+  constructor(runtime: AuthRuntime) {
+    super({ provider: "cline", label: "Cline" }, runtime);
+  }
+}
+
 export function clineAuth(runtime: AuthRuntime) {
   const response = new ProviderResponse("Cline");
+  const client = new ClineClient(runtime);
 
   const startDeviceFlow = Effect.fn("cline.initiateDeviceCodeFlow")(function* () {
-    const result = yield* runtime.fetch(`${WORKOS_BASE_URL}${DEVICE_AUTHORIZE_PATH}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: `client_id=${CLIENT_ID}`,
-      cache: "no-store",
-    });
-
-    if (!result.ok) {
-      const body = yield* response.text(result);
-      return yield* runtime.unavailable(response.failure(result, body, "device code endpoint"));
-    }
-
-    const data = yield* response.jsonOr<CodeResponse>(result, {});
+    const data = yield* client.decode<CodeResponse>(
+      {
+        url: `${WORKOS_BASE_URL}${DEVICE_AUTHORIZE_PATH}`,
+        endpoint: "device code endpoint",
+        init: {
+          method: "POST",
+          headers: FORM_HEADERS,
+          body: `client_id=${CLIENT_ID}`,
+          cache: "no-store",
+        },
+      },
+      (payload) => (payload as CodeResponse | null) ?? null
+    );
     if (!data.device_code || !data.verification_uri_complete) {
-      return yield* runtime.unavailable("Cline device code response is missing required fields");
+      return yield* Effect.fail(client.fail("Cline device code response is missing required fields"));
     }
 
     return {
@@ -79,21 +97,21 @@ export function clineAuth(runtime: AuthRuntime) {
     workosAccessToken: string,
     workosRefreshToken: string
   ) {
-    const result = yield* runtime.fetch(`${CLINE_BASE_URL}${CLINE_REGISTER_PATH}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ accessToken: workosAccessToken, refreshToken: workosRefreshToken }),
-      cache: "no-store",
-    });
-
-    if (!result.ok) {
-      const body = yield* response.text(result);
-      return yield* runtime.unavailable(response.failure(result, body, "registration endpoint"));
-    }
-
-    const data = yield* response.jsonOr<ClineRegisterResponse>(result, {});
+    const data = yield* client.decode<ClineRegisterResponse>(
+      {
+        url: `${CLINE_BASE_URL}${CLINE_REGISTER_PATH}`,
+        endpoint: "registration endpoint",
+        init: {
+          method: "POST",
+          headers: JSON_HEADERS,
+          body: JSON.stringify({ accessToken: workosAccessToken, refreshToken: workosRefreshToken }),
+          cache: "no-store",
+        },
+      },
+      (payload) => (payload as ClineRegisterResponse | null) ?? null
+    );
     if (!data.data?.accessToken || !data.data?.refreshToken) {
-      return yield* runtime.unavailable("Cline registration returned an incomplete session");
+      return yield* Effect.fail(client.fail("Cline registration returned an incomplete session"));
     }
 
     return { accessToken: `workos:${data.data.accessToken}`, refreshToken: data.data.refreshToken };
@@ -101,9 +119,9 @@ export function clineAuth(runtime: AuthRuntime) {
 
   const pollDeviceAuth = Effect.fn("cline.pollDeviceCodeAuthorization")(
     function* (deviceCode: string) {
-      const result = yield* runtime.fetch(`${WORKOS_BASE_URL}${DEVICE_AUTHENTICATE_PATH}`, {
+      const result = yield* client.call(`${WORKOS_BASE_URL}${DEVICE_AUTHENTICATE_PATH}`, {
         method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        headers: FORM_HEADERS,
         body: `grant_type=urn:ietf:params:oauth:grant-type:device_code&device_code=${encodeURIComponent(deviceCode)}&client_id=${CLIENT_ID}`,
         cache: "no-store",
       });
