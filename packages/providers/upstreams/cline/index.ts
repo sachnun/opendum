@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Result } from "effect";
 import { OAuth } from "@opendum/providers/core/oauth";
 import { OAuthProvider, type Json, type ProviderOptions } from "@opendum/providers/core/provider";
 import { Value } from "@opendum/providers/core/helpers";
@@ -50,13 +50,13 @@ export class ClineProvider extends OAuthProvider {
         const data = (payload as { data?: { accessToken?: string; refreshToken?: string } }).data;
         const accessToken = data?.accessToken ?? "";
         if (!accessToken.trim()) {
-          throw new Error("cline token refresh returned empty access token");
+          return Result.fail("cline token refresh returned empty access token");
         }
-        return {
+        return Result.succeed({
           accessToken: `workos:${accessToken}`,
           refreshToken: data?.refreshToken || refreshToken,
           expiresAt: new Date(Date.now() + ACCESS_TTL_MS),
-        };
+        });
       },
     });
   }

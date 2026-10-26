@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { settle } from "~~/lib/settle";
 import {
   messageModel,
   isRecoverable,
@@ -450,24 +451,17 @@ function textColor(group: QuotaGroupDisplay): string {
 
 async function resolveErrors() {
   resolvingErrors.value = true;
-  try {
-    const result = await api.accounts.resolveErrors({ accountId: props.account.id });
-    if (!result.success) throw new Error(result.error);
-    errorDialogOpen.value = false;
-    activeErrorIndex.value = 0;
-    emit("errors-resolved", props.account.id);
-  } finally {
-    resolvingErrors.value = false;
-  }
+  const resolved = await settle(() => api.accounts.resolveErrors({ accountId: props.account.id }));
+  resolvingErrors.value = false;
+  if (!resolved.ok || !resolved.value.success) return;
+  errorDialogOpen.value = false;
+  activeErrorIndex.value = 0;
+  emit("errors-resolved", props.account.id);
 }
 
 async function copyText(value: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(value);
-    return true;
-  } catch {
-    return false;
-  }
+  const copied = await settle(() => navigator.clipboard.writeText(value));
+  return copied.ok;
 }
 
 function resetFlag(flag: { value: boolean }) {
@@ -509,12 +503,13 @@ async function copyErrors() {
 
 async function copySession() {
   sessionLoading.value = true;
-  try {
+  {
     const result = await api.accounts.copySession({ id: props.account.id });
     if (!result.success || !(await copyText(result.data.session))) return;
     copiedSession.value = true;
     resetFlag(copiedSession);
-  } finally {
+  }
+  {
     sessionLoading.value = false;
   }
 }

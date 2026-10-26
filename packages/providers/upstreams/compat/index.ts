@@ -136,10 +136,7 @@ export class CompatProvider extends BaseProvider implements ResponsesNativeProvi
       if (convertImages) {
         const messages = payload.messages;
         if (Array.isArray(messages)) {
-          payload.messages = yield* Effect.tryPromise({
-            try: () => new ChatImageInliner(direct).run(messages),
-            catch: (cause) => RequestFailure.transport(this.name, cause),
-          });
+          payload.messages = yield* new ChatImageInliner(direct).run(messages);
         }
       }
       return yield* this.post(

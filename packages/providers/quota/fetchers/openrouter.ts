@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Result } from "effect";
 import {
   baseInfo,
   clampFraction,
@@ -15,14 +15,16 @@ export function openrouterQuota(
   account: QuotaAccount,
   forceRefresh: boolean
 ): Effect.Effect<AccountQuotaInfo> {
-  let apiKey: string;
-  try {
-    apiKey = ctx.decrypt(account.accessToken ?? "");
-  } catch {
+  const decrypted = Result.try({
+    try: () => ctx.decrypt(account.accessToken ?? ""),
+    catch: () => null,
+  });
+  if (Result.isFailure(decrypted)) {
     return Effect.succeed(
       expiredInfo("API key is missing or invalid. Please reconnect this account.")
     );
   }
+  const apiKey = decrypted.success;
   const headers = { Authorization: `Bearer ${apiKey.trim()}`, Accept: "application/json" };
   return Effect.all(
     [

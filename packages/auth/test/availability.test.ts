@@ -117,10 +117,8 @@ describe("Availability", () => {
 
   it("falls back to the database when redis fails", async () => {
     const failingRedis = {
-      get: async () => {
-        throw new Error("redis down");
-      },
-      set: async () => "OK",
+      get: () => Effect.fail(new Error("redis down")),
+      set: () => Effect.succeed("OK"),
     } as unknown as OpendumRedis;
     const { queries, calls } = queriesOf({ disabledByUser: ["m"] });
     const service = serviceOf({ redis: failingRedis, queries });

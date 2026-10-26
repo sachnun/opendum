@@ -109,7 +109,7 @@ function harness(replies: Array<Reply>, accounts = ["acc-1", "acc-2"]): Harness 
     get: (name: string) => (name === "workbuddy" ? provider : undefined),
     isAuthless: () => false,
     refreshableProviderNames: () => [],
-    transport: { direct: () => Promise.reject(new Error("no fetch")) },
+    transport: { direct: () => Effect.runPromise(Effect.fail(new Error("no fetch"))) },
   } as unknown as ProviderRegistry;
   const models = {
     providers: () => ["workbuddy"],

@@ -1,6 +1,7 @@
 import { mkdir as fsMkdir, rename as fsRename } from "node:fs/promises";
 
-import { Effect } from "effect";
+import { Effect, Result } from "effect";
+import { raise } from "@opendum/models/refresh/core/raise";
 
 import { ModelParseFailure, ModelReadFailure, ModelWriteFailure, asError } from "@opendum/models/errors";
 import { dirname } from "@opendum/models/paths";
@@ -42,20 +43,22 @@ export function fileSize(path: string): number {
 }
 
 export function exists(path: string): boolean {
-  try {
-    return Bun.file(path).lastModified !== MISSING_MTIME;
-  } catch {
-    return false;
-  }
+  const checked = Result.try({
+    try: () => Bun.file(path).lastModified !== MISSING_MTIME,
+    catch: () => false,
+  });
+  return Result.isSuccess(checked) ? checked.success : false;
 }
 
 export function isDirectory(path: string): boolean {
-  try {
-    Bun.mmap(path);
-    return false;
-  } catch (cause) {
-    return errorCode(cause) === "EISDIR";
-  }
+  const probed = Result.try({
+    try: () => {
+      Bun.mmap(path);
+      return "file";
+    },
+    catch: (cause: unknown) => errorCode(cause),
+  });
+  return Result.isFailure(probed) && probed.failure === "EISDIR";
 }
 
 export function isFile(path: string): boolean {
@@ -64,21 +67,22 @@ export function isFile(path: string): boolean {
 }
 
 export function readBytes(path: string): Uint8Array {
-  try {
-    return Bun.mmap(path);
-  } catch (cause) {
-    const code = errorCode(cause);
-    if (code === "EINVAL") return new Uint8Array();
-    if (code === "ENOENT") throw missing(path, "open");
-    if (code === "EISDIR") {
-      throw Object.assign(new Error(`EISDIR: illegal operation on a directory, read '${path}'`), {
+  const read = Result.try({ try: () => Bun.mmap(path), catch: (cause: unknown) => cause });
+  if (Result.isSuccess(read)) return read.success;
+  const cause = read.failure;
+  const code = errorCode(cause);
+  if (code === "EINVAL") return new Uint8Array();
+  if (code === "ENOENT") raise(missing(path, "open"));
+  if (code === "EISDIR") {
+    raise(
+      Object.assign(new Error(`EISDIR: illegal operation on a directory, read '${path}'`), {
         code,
         path,
         syscall: "read",
-      });
-    }
-    throw cause;
+      })
+    );
   }
+  raise(cause instanceof Error ? cause : new Error(String(cause)));
 }
 
 export function readText(path: string): string {
@@ -88,7 +92,7 @@ export function readText(path: string): string {
 export function readJson(path: string): unknown {
   const content = readText(path);
   if (content.length === 0) {
-    throw new SyntaxError(`Unexpected end of JSON input: ${path}`);
+    raise(new SyntaxError(`Unexpected end of JSON input: ${path}`));
   }
   return JSON.parse(content);
 }
@@ -137,12 +141,12 @@ export function tryRemove(path: string): Effect.Effect<void, ModelWriteFailure> 
   return Effect.tryPromise({
     try: async () => {
       if (!exists(path) || isDirectory(path)) return;
-      try {
-        await Bun.file(path).delete();
-      } catch (cause) {
-        if (isMissing(cause)) return;
-        throw cause;
-      }
+      const removed = await Bun.file(path)
+        .delete()
+        .then(() => null)
+        .catch((cause: unknown) => cause);
+      if (removed === null || isMissing(removed)) return;
+      raise(removed instanceof Error ? removed : new Error(String(removed)));
     },
     catch: (cause) => writeFailure(path, cause),
   });
@@ -181,13 +185,13 @@ export function rename(from: string, to: string): Promise<void> {
 
 function listWith(scan: () => Iterable<string>): string[] {
   const files: string[] = [];
-  try {
-    for (const relativePath of scan()) files.push(relativePath);
-  } catch (cause) {
-    const code = errorCode(cause);
+  const scanned = Result.try({ try: () => [...scan()], catch: (cause) => cause });
+  if (Result.isFailure(scanned)) {
+    const code = errorCode(scanned.failure);
     if (code === "ENOENT" || code === "ENOTDIR") return [];
-    throw cause;
+    raise(scanned.failure instanceof Error ? scanned.failure : new Error(String(scanned.failure)));
   }
+  files.push(...scanned.success);
   return files.sort();
 }
 

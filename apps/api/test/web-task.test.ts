@@ -3,6 +3,7 @@ import { Effect, Exit } from "effect";
 
 import { ServiceFailure, asFailure, badRequest, forbidden, internal, notFound, unauthorized, unavailable } from "@opendum/api/web/errors";
 import { fromPromise, fromSync, toResult, toVoid, withContext } from "@opendum/api/web/lib/task";
+import { raise } from "@opendum/core/raise";
 
 describe("web errors", () => {
   it("maps status codes to tagged failures", () => {
@@ -47,7 +48,7 @@ describe("web task helpers", () => {
 
   it("maps a rejected promise to a ServiceFailure", async () => {
     const failure = await Effect.runPromise(
-      fromPromise(async () => Promise.reject(new Error("boom")), "Failed").pipe(Effect.flip)
+      fromPromise(async () => Effect.runSync(Effect.die(new Error("boom"))), "Failed").pipe(Effect.flip)
     );
     expect(failure).toBeInstanceOf(ServiceFailure);
     expect(failure.message).toBe("boom");
@@ -56,7 +57,7 @@ describe("web task helpers", () => {
   it("maps a thrown sync function to a ServiceFailure", async () => {
     const exit = await Effect.runPromiseExit(
       fromSync(() => {
-        throw new Error("sync boom");
+        raise(new Error("sync boom"));
       })
     );
     expect(Exit.isFailure(exit)).toBe(true);

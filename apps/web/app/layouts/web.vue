@@ -6,6 +6,7 @@ import {
   familyCounts,
   type ShellAccountSummary,
 } from "~~/lib/account-overview";
+import { settle } from "~~/lib/settle";
 
 import type { AccountsData, ModelsData, UsageData } from "@opendum/providers/contract";
 import type { NavItem, NavSubItem, ProviderAccountIndicator } from "~~/lib/navigation";
@@ -292,18 +293,15 @@ async function updateSharing(enabled: boolean) {
   if (isAuditMode.value || sharingUpdating.value) return;
 
   sharingUpdating.value = true;
-  try {
-    const result = await api.sharing.update({ enabled });
-    sharingEnabled.value = result.enabled;
-    if (me.value) {
-      me.value = {
-        ...me.value,
-        sharing: { enabled: result.enabled },
-      };
-    }
-  } finally {
-    sharingUpdating.value = false;
+  const result = await api.sharing.update({ enabled });
+  sharingEnabled.value = result.enabled;
+  if (me.value) {
+    me.value = {
+      ...me.value,
+      sharing: { enabled: result.enabled },
+    };
   }
+  sharingUpdating.value = false;
 }
 
 function toggleSharing() {

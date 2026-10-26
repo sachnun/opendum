@@ -1,3 +1,5 @@
+import { Result } from "effect";
+
 export class Value {
   static string(value: unknown): string {
     return typeof value === "string" ? value : "";
@@ -10,6 +12,21 @@ export class Value {
   static record(value: unknown): Record<string, unknown> | null {
     if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
     return value as Record<string, unknown>;
+  }
+
+  static jsonRecord(text: string): Record<string, unknown> | null {
+    const parsed = Value.parseJson(text);
+    return Value.record(parsed);
+  }
+
+  static parseJson(text: string): unknown {
+    const parsed = Result.try({ try: () => JSON.parse(text), catch: () => null });
+    return Result.isSuccess(parsed) ? parsed.success : null;
+  }
+
+  static parsed<T>(text: string, fallback: T): unknown | T {
+    const value = Value.parseJson(text);
+    return value === null ? fallback : value;
   }
 
   static stringOr(value: unknown, fallback: string): string {

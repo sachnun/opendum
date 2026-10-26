@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 import { expect, test } from "bun:test";
 
 import { idMap, buildIndex, upstream, prune, moveFiles, sync, writeGenerated, write } from "@opendum/models/model-store";
@@ -6,15 +7,15 @@ import { join } from "@opendum/models/paths";
 import { makeDir, removeDir } from "@opendum/models/test-support";
 import type { ModelData } from "@opendum/models/types";
 
-async function tempWorkspace<A>(run: (dataDir: string, generatedDir: string) => A | Promise<A>): Promise<A> {
+function tempWorkspace<A>(run: (dataDir: string, generatedDir: string) => A | Promise<A>): Promise<A> {
   const root = makeDir("models-registry-");
   const dataDir = join(root, "data");
   const generatedDir = join(root, "generated");
-  try {
-    return await run(dataDir, generatedDir);
-  } finally {
-    removeDir(root);
-  }
+  return Effect.runPromise(
+    Effect.tryPromise({ try: async () => run(dataDir, generatedDir), catch: (cause) => cause }).pipe(
+      Effect.ensuring(Effect.sync(() => removeDir(root)))
+    )
+  );
 }
 
 const toKey = (modelId: string) => modelId.replace(/^[^/]*\//, "").toLowerCase();

@@ -1,4 +1,5 @@
-import { Effect, Schema } from "effect";
+import { Effect, Result, Schema } from "effect";
+import { raise } from "@opendum/models/refresh/core/raise";
 
 import { ModelParseFailure } from "@opendum/models/errors";
 import type { ModelData, ProviderModelConfig } from "@opendum/models/types";
@@ -94,11 +95,12 @@ export function decodeModel(
 }
 
 export function decodeSync(content: string, path: string): ModelData {
-  try {
-    return Schema.decodeUnknownSync(JsonFromString)(content) as ModelData;
-  } catch (cause) {
-    throw decodeFailure(path, `invalid model JSON: ${path}`, cause);
-  }
+  const decoded = Result.try({
+    try: () => Schema.decodeUnknownSync(JsonFromString)(content) as ModelData,
+    catch: (cause: unknown) => cause,
+  });
+  if (Result.isFailure(decoded)) raise(decodeFailure(path, `invalid model JSON: ${path}`, decoded.failure));
+  return decoded.success;
 }
 
 export function validateModel(

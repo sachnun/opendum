@@ -1,4 +1,5 @@
 import { createParser, type EventSourceMessage } from "eventsource-parser";
+import { parseJson, raise } from "~~/lib/settle";
 import { Completion, Tokens } from "~~/lib/playground/parsing";
 import type { ParsedCompletionData, PlaygroundEndpoint } from "~~/lib/playground/types";
 
@@ -11,15 +12,11 @@ export class Sse {
     const data = message.data.trim();
     if (!data || data === "[DONE]") return false;
 
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(data);
-    } catch {
-      return false;
-    }
+    const parsed = parseJson(data);
+    if (parsed === null) return false;
 
     const errorMessage = Completion.error(parsed);
-    if (errorMessage) throw new Error(errorMessage);
+    if (errorMessage) raise(new Error(errorMessage));
 
     const eventName =
       message.event ??

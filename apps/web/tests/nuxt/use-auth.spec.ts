@@ -1,4 +1,6 @@
+import { Effect } from "effect";
 import { beforeEach, describe, expect, it, mock } from "bun:test";
+import { raise } from "~~/lib/settle";
 import { ref } from "vue";
 
 import {
@@ -11,7 +13,7 @@ import {
 } from "~~/lib/auth-token";
 import { stateKeys } from "~/utils/dataKeys";
 
-const fetchMock = mock((..._args: unknown[]) => Promise.resolve<unknown>({}));
+const fetchMock = mock((..._args: unknown[]) => Effect.runPromise(Effect.succeed<unknown>({})));
 
 (globalThis as Record<string, unknown>).useRuntimeConfig = () => ({ public: { apiUrl: "https://api.example.com" } });
 (globalThis as Record<string, unknown>).useState = <T>(_key: string, init?: () => T) => ref<T | undefined>(init ? init() : undefined);
@@ -37,7 +39,7 @@ describe("useAuth", () => {
   beforeEach(() => {
     mock.clearAllMocks();
     clearTokens();
-    fetchMock.mockImplementation((..._args: unknown[]) => Promise.resolve<unknown>({}));
+    fetchMock.mockImplementation((..._args: unknown[]) => Effect.runPromise(Effect.succeed<unknown>({})));
   });
 
   it("keeps the handoff tokens", () => {
@@ -82,9 +84,7 @@ describe("useAuth", () => {
     const base = createToken({ sub: "maintainer-1", name: "Grace", email: "grace@example.com", image: null });
     setTokens({ access: createToken({ sub: "user-2" }), session: "session-token" });
     setImpersonation("impersonation-token");
-    fetchMock.mockImplementationOnce(async () => {
-      throw { status: 401 };
-    });
+    fetchMock.mockImplementationOnce(async () => raise(Object.assign(new Error("401"), { status: 401 })));
     fetchMock.mockImplementationOnce(async () => ({ token: base }));
 
     expect(await auth.refreshAccessToken()).toBe(true);
@@ -136,9 +136,9 @@ describe("useAuth", () => {
   it("reports impersonation failures", async () => {
     const auth = useAuth();
     setTokens({ access: createToken({ sub: "user-1" }), session: "session-token" });
-    fetchMock.mockImplementation(async () => {
-      throw { status: 403, data: { message: "You cannot impersonate admins" } };
-    });
+    fetchMock.mockImplementation(async () =>
+      raise(Object.assign(new Error("You cannot impersonate admins"), { status: 403, data: { message: "You cannot impersonate admins" } }))
+    );
 
     await expect(auth.startAudit("user-2")).rejects.toThrow("You cannot impersonate admins");
     expect(impersonationToken()).toBeNull();

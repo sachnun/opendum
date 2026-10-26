@@ -1,4 +1,4 @@
-import { Duration, Effect } from "effect";
+import { Duration, Effect, Result } from "effect";
 import type { OpendumRedis } from "@opendum/core/redis";
 
 import { Value, Payload, Ids, Responses } from "@opendum/providers/core/helpers";
@@ -115,11 +115,11 @@ export class AntigravityProvider extends OAuthProvider {
       }),
       parse: async (payload, refreshToken) => {
         const token = payload as { access_token?: string; refresh_token?: string; expires_in?: number };
-        if (!token.access_token) throw new Error("antigravity token refresh returned empty access token");
+        if (!token.access_token) return Result.fail("antigravity token refresh returned empty access token");
         const nextRefresh = token.refresh_token || refreshToken;
         const expiresIn = token.expires_in && token.expires_in > 0 ? token.expires_in : 3600;
         const info = await this.fetchAccountInfo(token.access_token);
-        return {
+        return Result.succeed({
           accessToken: token.access_token,
           refreshToken: nextRefresh,
           expiresAt: new Date(Date.now() + expiresIn * 1000),
@@ -127,7 +127,7 @@ export class AntigravityProvider extends OAuthProvider {
           tier: info.tier,
           paidTier: info.paidTier,
           email: info.email,
-        };
+        });
       },
     });
     this.redis = options.redis ?? null;
@@ -158,24 +158,20 @@ export class AntigravityProvider extends OAuthProvider {
     for (const endpoint of this.loadEndpoints) {
       const headers: Record<string, string> = {};
       this.setGoogleHeaders(headers, accessToken, false);
-      let resp: Response;
-      try {
-        resp = await this.transport.direct(`${endpoint}/v1internal:loadCodeAssist`, {
+      const resp = await this.transport
+        .direct(`${endpoint}/v1internal:loadCodeAssist`, {
           method: "POST",
           headers,
           body: JSON.stringify({ metadata: CodeAssist.metadata() }),
-        });
-      } catch {
+        })
+        .catch(() => null);
+      if (!resp) {
         hadError = true;
         continue;
       }
       let data: Json = {};
       if (resp.status >= 200 && resp.status < 300) {
-        try {
-          data = (await resp.json()) as Json;
-        } catch {
-          data = {};
-        }
+        data = ((await resp.json().catch(() => null)) as Json | null) ?? {};
       } else {
         hadError = true;
       }
@@ -241,30 +237,24 @@ export class AntigravityProvider extends OAuthProvider {
   private async postOnboardUser(accessToken: string, endpoint: string, payload: string): Promise<Json | null> {
     const headers: Record<string, string> = {};
     this.setGoogleHeaders(headers, accessToken, false);
-    try {
-      const resp = await this.transport.direct(`${endpoint}/v1internal:onboardUser`, {
-        method: "POST",
-        headers,
-        body: payload,
-      });
-      if (resp.status < 200 || resp.status >= 300) return null;
-      return (await resp.json()) as Json;
-    } catch {
-      return null;
-    }
+    const resp = await this.transport
+      .direct(`${endpoint}/v1internal:onboardUser`, { method: "POST", headers, body: payload })
+      .catch(() => null);
+    if (!resp) return null;
+    if (resp.status < 200 || resp.status >= 300) return null;
+    return (await resp.json().catch(() => null)) as Json | null;
   }
 
   private async fetchGoogleEmail(accessToken: string): Promise<string> {
     const headers: Record<string, string> = {};
     this.setGoogleHeaders(headers, accessToken, false);
-    try {
-      const resp = await this.transport.direct("https://www.googleapis.com/oauth2/v2/userinfo", { headers });
-      if (resp.status < 200 || resp.status >= 300) return "";
-      const data = (await resp.json()) as Json;
-      return Value.string(data.email);
-    } catch {
-      return "";
-    }
+    const resp = await this.transport
+      .direct("https://www.googleapis.com/oauth2/v2/userinfo", { headers })
+      .catch(() => null);
+    if (!resp) return "";
+    if (resp.status < 200 || resp.status >= 300) return "";
+    const data = ((await resp.json().catch(() => null)) as Json | null) ?? {};
+    return Value.string(data.email);
   }
 
   makeRequest(request: ProviderRequest): Effect.Effect<Response, ProviderFailure> {
@@ -297,10 +287,7 @@ export class AntigravityProvider extends OAuthProvider {
         const messages = normalizedBody.messages;
         if (Array.isArray(messages) && modelName.includes("claude")) {
           normalizedBody = Payload.clone(normalizedBody);
-          normalizedBody.messages = yield* Effect.tryPromise({
-            try: () => new ChatImageInliner(this.transport.direct).run(messages),
-            catch: (cause) => RequestFailure.transport("antigravity", cause),
-          });
+          normalizedBody.messages = yield* new ChatImageInliner(this.transport.direct).run(messages);
         }
 
         const clientSession = Value.string(normalizedBody._sessionId);
@@ -329,16 +316,17 @@ export class AntigravityProvider extends OAuthProvider {
           this.setGoogleHeaders(headers, request.credentials, actualStream);
           if (this.needsAnthropicBeta(modelName)) headers["anthropic-beta"] = CLAUDE_BETA_HEADER;
           const url = `${endpoint}/v1internal:${action}`;
-          let resp: Response;
-          try {
-            resp = yield* Effect.tryPromise({
+          const attempt = yield* Effect.result(
+            Effect.tryPromise({
               try: () => this.transport.direct(url, { method: "POST", headers, body: encoded }),
               catch: (cause) => RequestFailure.transport("antigravity", cause, url),
-            });
-          } catch (error) {
-            lastErr = error;
+            })
+          );
+          if (Result.isFailure(attempt)) {
+            lastErr = attempt.failure;
             continue;
           }
+          const resp: Response = attempt.success;
           if (resp.status === 429) {
             request.onResponseStart?.();
             return resp;
@@ -357,10 +345,8 @@ export class AntigravityProvider extends OAuthProvider {
           break;
         }
         const resp = lastResp;
-        if (lastErr || !resp || resp.status < 200 || resp.status >= 300) {
-          if (lastErr) throw lastErr;
-          return resp as Response;
-        }
+        if (lastErr) return yield* Effect.fail(lastErr);
+        if (!resp || resp.status < 200 || resp.status >= 300) return resp as Response;
 
         let streamBody: ReadableStream<Uint8Array> | null = resp.body;
         if (request.stream || actualStream) {
@@ -700,27 +686,19 @@ export class AntigravityProvider extends OAuthProvider {
 
   async getCachedSignature(model: string, sessionId: string, thoughtText: string): Promise<string> {
     if (!this.redis || !sessionId || !thoughtText.trim()) return "";
-    try {
-      const raw = await this.redis.get(this.signatureCacheKey(model, sessionId, thoughtText));
-      if (!raw) return "";
-      const cached = JSON.parse(raw) as Json;
-      return Value.string(cached.signature);
-    } catch {
-      return "";
-    }
+    const raw = await this.redis.get(this.signatureCacheKey(model, sessionId, thoughtText)).catch(() => null);
+    if (!raw) return "";
+    const cached = Value.parseJson(raw) as Json;
+    return Value.string(cached?.signature);
   }
 
   async cacheSignature(model: string, sessionId: string, thoughtText: string, signature: string): Promise<void> {
     if (!this.redis || !sessionId || !thoughtText.trim() || !signature.trim()) return;
-    try {
-      await this.redis.set(
-        this.signatureCacheKey(model, sessionId, thoughtText),
-        JSON.stringify({ signature }),
-        { EX: SIGNATURE_TTL_SECONDS }
-      );
-    } catch {
-      return;
-    }
+    await this.redis
+      .set(this.signatureCacheKey(model, sessionId, thoughtText), JSON.stringify({ signature }), {
+        EX: SIGNATURE_TTL_SECONDS,
+      })
+      .catch(() => undefined);
   }
 
   async cacheSignatures(response: Json, model: string, sessionId: string): Promise<void> {

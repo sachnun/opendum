@@ -1,3 +1,5 @@
+import { Duration, Effect } from "effect";
+import { raise } from "@opendum/core/raise";
 const encoder = new TextEncoder();
 
 export const STREAM_HEARTBEAT_MS = 15 * 1000;
@@ -26,26 +28,29 @@ export function withHeartbeat(
     if (pending === null) {
       pending = reader.read().then(
         (result): ReadResult => ({ done: result.done, value: result.value }),
-        (error) => {
-          throw error;
-        }
+        (error: unknown) => raise(error instanceof Error ? error : new Error(String(error)))
       );
     }
     return pending;
   };
 
   const tick = (): Promise<"tick"> =>
-    new Promise<"tick">((resolve) => {
-      timer = setTimeout(() => {
-        timer = null;
-        resolve("tick");
-      }, intervalMs);
-    });
+    Effect.runPromise(
+      Effect.sleep(Duration.millis(intervalMs)).pipe(
+        Effect.map((): "tick" => "tick"),
+        Effect.orDie
+      )
+    );
 
   return new ReadableStream<Uint8Array>({
     async pull(controller) {
       if (finished) return;
-      const outcome = await Promise.race([nextChunk(), tick()]);
+      const outcome = await Effect.runPromise(
+        Effect.raceFirst(
+          Effect.tryPromise({ try: () => nextChunk(), catch: (cause) => cause }),
+          Effect.tryPromise({ try: () => tick(), catch: (cause) => cause })
+        )
+      );
       clearTimer();
       if (outcome === "tick") {
         if (finished) return;

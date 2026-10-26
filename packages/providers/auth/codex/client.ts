@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Result } from "effect";
 
 import { OAuthClient } from "@opendum/providers/auth/client";
 import type { AuthRuntime } from "@opendum/providers/auth/runtime";
@@ -164,20 +164,14 @@ export function codexAuth(runtime: AuthRuntime) {
     return claims ? claimsTier(claims) : null;
   }
 
-  function parseSession(sessionJson: string): SessionPayload {
-    try {
-      const parsed = JSON.parse(sessionJson) as unknown;
-      const record = Value.record(parsed);
-      if (!record) {
-        throw new Error("ChatGPT session payload must be a JSON object");
-      }
-      return record as SessionPayload;
-    } catch (error) {
-      if (error instanceof SyntaxError) {
-        throw new Error("Invalid ChatGPT session JSON. Copy the full response from https://chatgpt.com/api/auth/session.", { cause: error });
-      }
-      throw error;
+  function parseSession(sessionJson: string): Result.Result<SessionPayload, string> {
+    const record = Value.jsonRecord(sessionJson);
+    if (!record) {
+      return Result.fail(
+        "Invalid ChatGPT session JSON. Copy the full response from https://chatgpt.com/api/auth/session."
+      );
     }
+    return Result.succeed(record as SessionPayload);
   }
 
   type CredentialAccount = Credential & { accountId: string | null };
@@ -205,16 +199,20 @@ export function codexAuth(runtime: AuthRuntime) {
     };
   }
 
-  function sessionResult(sessionJson: string): OAuthResult {
-    const session = parseSession(sessionJson);
+  function sessionResult(sessionJson: string): Result.Result<OAuthResult, string> {
+    const parsedSession = parseSession(sessionJson);
+    if (Result.isFailure(parsedSession)) return Result.fail(parsedSession.failure);
+    const session = parsedSession.success;
     const accessToken = nonEmpty(session.accessToken);
     if (!accessToken) {
-      throw new Error("ChatGPT session JSON is missing accessToken");
+      return Result.fail("ChatGPT session JSON is missing accessToken");
     }
 
     const claims = jwtClaims(accessToken);
     if (!claims) {
-      throw new Error("ChatGPT session accessToken is not a valid JWT. Copy the full response from https://chatgpt.com/api/auth/session.");
+      return Result.fail(
+        "ChatGPT session accessToken is not a valid JWT. Copy the full response from https://chatgpt.com/api/auth/session."
+      );
     }
     const accountId =
       (session.account ? nonEmpty(session.account.id) : null) ||
@@ -230,10 +228,12 @@ export function codexAuth(runtime: AuthRuntime) {
 
     const expiresAt = claimsExpiry(claims);
     if (!expiresAt || expiresAt <= new Date()) {
-      throw new Error("ChatGPT session accessToken is expired or missing an expiry. Please copy a fresh session JSON.");
+      return Result.fail(
+        "ChatGPT session accessToken is expired or missing an expiry. Please copy a fresh session JSON."
+      );
     }
 
-    return {
+    return Result.succeed({
       accessToken,
       refreshToken: "",
       expiresAt,
@@ -241,7 +241,7 @@ export function codexAuth(runtime: AuthRuntime) {
       accountId: accountId || undefined,
       workspaceId: workspaceId || undefined,
       tier: tier || undefined,
-    };
+    });
   }
 
   const exchangeCodexCode = (code: string, redirectUri: string, codeVerifier?: string) =>

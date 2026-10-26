@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Effect } from "effect";
+import { raise } from "@opendum/models/refresh/core/raise";
 
 import { ScraperFailure, orderScripts, runSteps } from "@opendum/models/refresh";
 
@@ -39,7 +40,7 @@ describe("refresh orchestration", () => {
   test("reports a spawn error as a typed scraper failure", async () => {
     const result = await Effect.runPromise(
       runSteps([{ script: "boom.ts", path: "/boom.ts" }], async () => {
-        throw new Error("cannot spawn");
+        raise(new Error("cannot spawn"));
       })
     );
     expect(result.ran).toEqual([]);

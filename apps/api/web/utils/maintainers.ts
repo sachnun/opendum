@@ -1,3 +1,4 @@
+import { parseJson } from "@opendum/core/json";
 export type UserRole = "user" | "maintainer";
 
 const MAINTAINER_ROLE: UserRole = "maintainer";
@@ -23,24 +24,19 @@ function maintainerEmails(): Set<string> {
     return new Set();
   }
 
-  try {
-    const parsedValue = JSON.parse(rawValue) as unknown;
+  const parsedValue = parseJson(rawValue) as unknown;
 
-    if (!Array.isArray(parsedValue)) {
-      warnInvalid();
-      return new Set();
-    }
-
-    return new Set(parsedValue.flatMap((value) => {
-      if (typeof value !== "string") return [];
-
-      const email = normalizeEmail(value);
-      return email ? [email] : [];
-    }));
-  } catch {
+  if (!Array.isArray(parsedValue)) {
     warnInvalid();
     return new Set();
   }
+
+  return new Set(parsedValue.flatMap((value) => {
+    if (typeof value !== "string") return [];
+
+    const email = normalizeEmail(value);
+    return email ? [email] : [];
+  }));
 }
 
 export function roleOf(email: string | null | undefined): UserRole {

@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Result } from "effect";
 import type { OpendumRedis } from "@opendum/core/redis";
 import { Value, Payload, Responses, JSONText } from "@opendum/providers/core/helpers";
 import { Jwt, ModelName } from "@opendum/providers/core/identity";
@@ -245,7 +245,7 @@ export class CodexProvider extends OAuthProvider {
           id_token?: string;
         };
         const accessToken = token.access_token ?? "";
-        if (!accessToken) throw new Error("codex token refresh returned empty access token");
+        if (!accessToken) return Result.fail("codex token refresh returned empty access token");
         const nextRefresh = token.refresh_token || refreshToken;
         const expiresIn = token.expires_in && token.expires_in > 0 ? token.expires_in : 3600;
         let accountId = jwtAccount(accessToken);
@@ -253,13 +253,13 @@ export class CodexProvider extends OAuthProvider {
         let tier = "";
         if (token.id_token) tier = jwtTier(token.id_token);
         if (!tier) tier = jwtTier(accessToken);
-        return {
+        return Result.succeed({
           accessToken,
           refreshToken: nextRefresh,
           expiresAt: new Date(Date.now() + expiresIn * 1000),
           tier,
           accountId,
-        };
+        });
       },
     });
     this.redis = options.redis ?? null;
@@ -347,13 +347,9 @@ export class CodexProvider extends OAuthProvider {
     snapshot.status = "success";
     snapshot.source = "headers";
     snapshot.fetchedAt = Date.now();
-    try {
-      await this.redis.set(`opendum:quota:codex:snapshot:${accountId}`, JSON.stringify(snapshot), {
-        EX: 15 * 60,
-      });
-    } catch {
-      return;
-    }
+    await this.redis
+      .set(`opendum:quota:codex:snapshot:${accountId}`, JSON.stringify(snapshot), { EX: 15 * 60 })
+      .catch(() => undefined);
   }
 
   private isModelAllowed(model: string): boolean {

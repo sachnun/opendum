@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Result } from "effect";
 
 import { antigravityAuth } from "@opendum/providers/auth/antigravity/index";
 import {
@@ -205,12 +205,9 @@ export function validateContext(
 export function parseCallback(callbackUrl: string, providerLabel: string) {
   if (!callbackUrl || typeof callbackUrl !== "string") return badRequest("Callback URL is required");
 
-  let url: URL;
-  try {
-    url = new URL(callbackUrl);
-  } catch {
-    return badRequest("Invalid URL format");
-  }
+  const parsedUrl = Result.try({ try: () => new URL(callbackUrl), catch: () => null });
+  if (Result.isFailure(parsedUrl)) return badRequest("Invalid URL format");
+  const url = parsedUrl.success;
 
   const error = url.searchParams.get("error");
   if (error) {

@@ -1,4 +1,6 @@
 import { Effect, Option, Schema } from "effect";
+import { raise } from "@opendum/models/refresh/core/raise";
+import { parseJson } from "@opendum/models/refresh/core/json";
 import { buildIndex } from "@opendum/models/model-store";
 import { fetchText } from "@opendum/models/sync/http";
 import { entryFor, writeEntry } from "@opendum/models/refresh/core/keys";
@@ -53,7 +55,7 @@ const decodeHtml = (value: string): string =>
 
 const parseWidgets = (html: string): ReadonlyArray<Widget> => {
   const start = html.indexOf("model-selector-group");
-  if (start < 0) throw new Error("could not find the Antigravity model selector in the docs");
+  if (start < 0) raise(new Error("could not find the Antigravity model selector in the docs"));
 
   const seen = new Map<string, Widget>();
   for (const row of html.slice(start).split(/<div class="model-item-row/).slice(1)) {
@@ -64,13 +66,7 @@ const parseWidgets = (html: string): ReadonlyArray<Widget> => {
     const tiersRaw = decodeHtml(/data-tiers="([^"]*)"/.exec(row)?.[1] ?? "");
     const tiers = Option.getOrElse(
       Schema.decodeUnknownOption(Schema.Record(Schema.String, Schema.Unknown))(
-        (() => {
-          try {
-            return JSON.parse(tiersRaw || "{}") as unknown;
-          } catch {
-            return {};
-          }
-        })()
+        parseJson(tiersRaw || "{}")
       ),
       () => ({})
     );
@@ -83,7 +79,7 @@ const parseWidgets = (html: string): ReadonlyArray<Widget> => {
     if (seen.size >= 50) break;
   }
 
-  if (seen.size === 0) throw new Error("no Antigravity models found in the docs model selector");
+  if (seen.size === 0) raise(new Error("no Antigravity models found in the docs model selector"));
   return [...seen.values()];
 };
 
@@ -132,7 +128,7 @@ const buildModels = (widgets: ReadonlyArray<Widget>): Map<string, string> => {
       ranks.set(key, next);
     }
   }
-  if (models.size === 0) throw new Error("no Antigravity model IDs could be derived from the docs");
+  if (models.size === 0) raise(new Error("no Antigravity model IDs could be derived from the docs"));
   return models;
 };
 

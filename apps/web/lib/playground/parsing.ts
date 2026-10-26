@@ -5,6 +5,7 @@ import type {
   ScenarioMessage,
   ToolCallData,
 } from "~~/lib/playground/types";
+import { parseJson } from "~~/lib/settle";
 
 export class Content {
   static text(content: unknown): string {
@@ -149,11 +150,8 @@ export class ToolCalls {
   }
 
   static format(value: string): string {
-    try {
-      return JSON.stringify(JSON.parse(value), null, 2);
-    } catch {
-      return value;
-    }
+    const parsed = parseJson(value);
+    return parsed === null ? value : JSON.stringify(parsed, null, 2);
   }
 }
 

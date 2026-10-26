@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { Effect } from "effect";
+import { Effect, Result } from "effect";
 import type { ProviderAccount } from "@opendum/providers/types";
 import type { UpstreamTransport } from "@opendum/providers/core/http";
 import { OAuth, type Spec } from "@opendum/providers/core/oauth";
@@ -30,8 +30,8 @@ function spec(overrides: Partial<Spec> = {}): Spec {
     }),
     parse: (payload) => {
       const token = (payload as { access_token?: string }).access_token ?? "";
-      if (!token) throw new Error("demo token refresh returned empty access token");
-      return { accessToken: token, refreshToken: "next", expiresAt: new Date(0) };
+      if (!token) return Result.fail("demo token refresh returned empty access token");
+      return Result.succeed({ accessToken: token, refreshToken: "next", expiresAt: new Date(0) });
     },
     transport: transport({}),
     ...overrides,
@@ -83,7 +83,8 @@ describe("OAuth", () => {
     const exchange = new OAuth(
       spec({
         transport: transport({ body: JSON.stringify({ access_token: "at-1" }) }),
-        parse: async () => ({ accessToken: "async-at", refreshToken: "rt-2", expiresAt: new Date(123) }),
+        parse: async () =>
+          Result.succeed({ accessToken: "async-at", refreshToken: "rt-2", expiresAt: new Date(123) }),
       })
     );
     const result = await attempt(exchange);

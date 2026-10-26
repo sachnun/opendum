@@ -136,15 +136,8 @@ export class KiroToolCalls {
     const id = Value.string(call.id);
     const name = Value.string(fn.name);
     if (!id || !name) return null;
-    let input: unknown = {};
     const args = Value.string(fn.arguments);
-    if (args) {
-      try {
-        input = JSON.parse(args);
-      } catch {
-        input = {};
-      }
-    }
+    const input = args ? (Value.parseJson(args) ?? {}) : {};
     return { toolUseId: id, name, input };
   }
 

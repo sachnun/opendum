@@ -16,13 +16,7 @@ const globalForDb = globalThis as unknown as {
 const MAX_CONNECTIONS = 10;
 
 function connectionString(): string {
-  const connectionString = process.env.DATABASE_URL;
-
-  if (!connectionString) {
-    throw new Error("DATABASE_URL is required");
-  }
-
-  return connectionString;
+  return process.env.DATABASE_URL ?? "";
 }
 
 function createDb(): Database {

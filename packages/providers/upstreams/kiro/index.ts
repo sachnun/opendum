@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Result } from "effect";
 import { Value, Ids, Responses } from "@opendum/providers/core/helpers";
 import { RequestFailure } from "@opendum/providers/core/http";
 import { OAuth } from "@opendum/providers/core/oauth";
@@ -42,11 +42,16 @@ export class KiroProvider extends OAuthProvider {
       parse: async (payload, refreshToken) => {
         const token = payload as { accessToken?: string; refreshToken?: string; expiresIn?: number };
         const accessToken = (token.accessToken ?? "").trim();
-        if (!accessToken) throw new Error("kiro token refresh returned empty access token");
+        if (!accessToken) return Result.fail("kiro token refresh returned empty access token");
         const nextRefresh = token.refreshToken || refreshToken;
         const expiresIn = token.expiresIn && token.expiresIn > 0 ? token.expiresIn : 3600;
         const tier = await this.fetchSubscriptionTier(accessToken);
-        return { accessToken, refreshToken: nextRefresh, expiresAt: new Date(Date.now() + expiresIn * 1000), tier };
+        return Result.succeed({
+          accessToken,
+          refreshToken: nextRefresh,
+          expiresAt: new Date(Date.now() + expiresIn * 1000),
+          tier,
+        });
       },
     });
   }
@@ -59,8 +64,8 @@ export class KiroProvider extends OAuthProvider {
   }
 
   private async fetchSubscriptionTier(accessToken: string): Promise<string> {
-    try {
-      const resp = await this.transport.direct("https://q.us-east-1.amazonaws.com/", {
+    const resp = await this.transport
+      .direct("https://q.us-east-1.amazonaws.com/", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${accessToken.trim()}`,
@@ -70,16 +75,15 @@ export class KiroProvider extends OAuthProvider {
           "User-Agent": "KiroIDE-1.3.11",
         },
         body: JSON.stringify({ origin: "AI_EDITOR" }),
-      });
-      if (resp.status < 200 || resp.status >= 300) return "";
-      const payload = (await resp.json()) as Json;
-      const record = ((payload.data ?? payload) as Json) ?? {};
-      const sub = record.subscriptionInfo;
-      if (sub === null || typeof sub !== "object" || Array.isArray(sub)) return "";
-      return KiroTier.normalize(Value.string((sub as Json).type), Value.string((sub as Json).subscriptionTitle));
-    } catch {
-      return "";
-    }
+      })
+      .catch(() => null);
+    if (!resp) return "";
+    if (resp.status < 200 || resp.status >= 300) return "";
+    const payload = ((await resp.json().catch(() => null)) as Json | null) ?? {};
+    const record = ((payload.data ?? payload) as Json) ?? {};
+    const sub = record.subscriptionInfo;
+    if (sub === null || typeof sub !== "object" || Array.isArray(sub)) return "";
+    return KiroTier.normalize(Value.string((sub as Json).type), Value.string((sub as Json).subscriptionTitle));
   }
 
   makeRequest(request: ProviderRequest): Effect.Effect<Response, ProviderFailure> {
@@ -240,22 +244,19 @@ async function* transformSse(source: ReadableStream<Uint8Array>, model: string):
 
   const reader = source.getReader();
   const decoder = new TextDecoder();
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      const text = decoder.decode(value, { stream: true });
-      for (const event of parser.feed(text)) processEvent(event);
-      for (const chunk of pending.splice(0)) yield chunk;
-    }
-    const tail = decoder.decode();
-    if (tail) {
-      for (const event of parser.feed(tail)) processEvent(event);
-    }
-    for (const event of parser.finish()) processEvent(event);
-  } finally {
-    reader.releaseLock();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const text = decoder.decode(value, { stream: true });
+    for (const event of parser.feed(text)) processEvent(event);
+    for (const chunk of pending.splice(0)) yield chunk;
   }
+  const tail = decoder.decode();
+  if (tail) {
+    for (const event of parser.feed(tail)) processEvent(event);
+  }
+  for (const event of parser.finish()) processEvent(event);
+  reader.releaseLock();
 
   let [flushContent, flushReasoning] = parser.flushContent();
   if (hasNativeReasoning) flushReasoning = "";

@@ -1,5 +1,6 @@
 import { mkdirSync, rmSync } from "node:fs";
 
+import { raise } from "@opendum/models/refresh/core/raise";
 import { Effect } from "effect";
 
 import { listJson, readText, remove, writeText } from "@opendum/models/fs";
@@ -19,13 +20,13 @@ export function makeDir(prefix = "opendum-models-"): string {
   return dir;
 }
 
-export async function inTemp<A>(run: (dir: string) => A | Promise<A>): Promise<A> {
+export function inTemp<A>(run: (dir: string) => A | Promise<A>): Promise<A> {
   const dir = makeDir();
-  try {
-    return await run(dir);
-  } finally {
-    removeDir(dir);
-  }
+  return Effect.runPromise(
+    Effect.tryPromise({ try: async () => run(dir), catch: (cause) => cause }).pipe(
+      Effect.ensuring(Effect.sync(() => removeDir(dir)))
+    )
+  );
 }
 
 export function removeDir(dir: string): void {
@@ -54,7 +55,7 @@ export function removeFile(path: string): Promise<void> {
 }
 
 export function runEffect<A, E>(effect: Effect.Effect<A, E>, label: string): Promise<A> {
-  return Effect.runPromise(effect).catch((cause: unknown) => {
-    throw new Error(`${label} failed: ${cause instanceof Error ? cause.message : String(cause)}`);
-  });
+  return Effect.runPromise(effect).catch((cause: unknown) =>
+    raise(new Error(`${label} failed: ${cause instanceof Error ? cause.message : String(cause)}`))
+  );
 }

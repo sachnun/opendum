@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Result } from "effect";
 import { Value, Payload, Ids, Responses, JSONText } from "@opendum/providers/core/helpers";
 import { RequestFailure } from "@opendum/providers/core/http";
 import { OAuth } from "@opendum/providers/core/oauth";
@@ -63,11 +63,7 @@ function traceHeaders(): Record<string, string> {
 }
 
 function parseJson(text: string): unknown {
-  try {
-    return JSON.parse(text) as unknown;
-  } catch {
-    return undefined;
-  }
+  return Value.parseJson(text);
 }
 
 function normalizeTools(value: unknown): unknown[] | null {
@@ -131,13 +127,13 @@ export class WorkbuddyProvider extends OAuthProvider {
         };
         const accessToken = (parsed.data?.accessToken ?? "").trim();
         if (parsed.code !== 0 || !accessToken) {
-          throw new Error("workbuddy token refresh returned empty token");
+          return Result.fail("workbuddy token refresh returned empty token");
         }
-        return {
+        return Result.succeed({
           accessToken,
           refreshToken: (parsed.data?.refreshToken ?? "").trim() || refreshToken.trim(),
           expiresAt: workbuddyExpiry(parsed.data?.expiresAt ?? 0, parsed.data?.expiresIn ?? 0),
-        };
+        });
       },
     });
   }

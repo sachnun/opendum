@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Result } from "effect";
 import { fetchQuota as providerQuota, isQuota } from "@opendum/providers/quota";
 import type { QuotaContext, QuotaJournal } from "@opendum/providers/quota";
 import { decrypt } from "@opendum/core/crypto";
@@ -41,9 +41,9 @@ export async function fetchQuota(
   );
   if (!row) return { status: "not-found" };
 
-  try {
-    const data = await Effect.runPromise(
-      providerQuota(
+  {
+    const outcome = await Effect.runPromise(
+      Effect.result(providerQuota(
         quotaContext(context),
         {
           id: row.id,
@@ -55,10 +55,12 @@ export async function fetchQuota(
           accessToken: row.accessToken,
         },
         input.forceRefresh
-      )
+      ))
     );
-    return { status: "success", data };
-  } catch (error) {
-    return { status: "error", message: error instanceof Error ? error.message : String(error) };
+    if (Result.isFailure(outcome)) {
+      const cause: unknown = outcome.failure;
+      return { status: "error", message: cause instanceof Error ? cause.message : String(cause) };
+    }
+    return { status: "success", data: outcome.success };
   }
 }

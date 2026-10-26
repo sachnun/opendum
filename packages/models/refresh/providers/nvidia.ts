@@ -1,4 +1,5 @@
 import { Effect, Option, Schema } from "effect";
+import { raise } from "@opendum/models/refresh/core/raise";
 import { buildIndex, upstream } from "@opendum/models/model-store";
 import { fetchDecoded } from "@opendum/models/sync/http";
 import { afterFirstSlash, standardKey } from "@opendum/models/refresh/core/keys";
@@ -154,7 +155,7 @@ export const nvidiaSource: ModelSource = {
         { label: "Nvidia NIM models", headers: { Accept: "application/json" } },
         async (response) => upstreamIds(await response.json())
       );
-      if (payload.length === 0) throw new Error("unexpected Nvidia /v1/models payload");
+      if (payload.length === 0) raise(new Error("unexpected Nvidia /v1/models payload"));
 
       const pages = yield* Effect.forEach(
         DOCS_URLS,
@@ -168,7 +169,7 @@ export const nvidiaSource: ModelSource = {
       );
 
       const generative = new Set(pages.flatMap((page) => [...generativeKeys(page)]));
-      if (generative.size === 0) throw new Error("unexpected Nvidia model docs payload");
+      if (generative.size === 0) raise(new Error("unexpected Nvidia model docs payload"));
 
       return sourceOf(buildMap(payload, existingKeys(ctx), generative)) satisfies SourceResult;
     }).pipe(Effect.mapError((cause) => ({ provider: PROVIDER, message: cause.message }))),

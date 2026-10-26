@@ -1,4 +1,5 @@
 import { Cause, Effect, Metric, Result, Schedule } from "effect";
+import { raise } from "@opendum/core/raise";
 import { databaseFailure } from "@opendum/database";
 import type { Database } from "@opendum/database";
 import { decrypt, encrypt } from "@opendum/core/crypto";
@@ -1144,7 +1145,7 @@ export class ProxyService implements StreamRecorder {
     const refreshed = await this.refreshIfDue(requestAccount, providerImpl, true);
     if (refreshed.error) {
       if (requestAccount.expiresAt && requestAccount.expiresAt.getTime() < Date.now()) {
-        throw refreshed.error;
+        raise(refreshed.error);
       }
       return { credentials, account: requestAccount };
     }
@@ -1239,7 +1240,7 @@ export class ProxyService implements StreamRecorder {
     const row = await Effect.runPromise(
       this.repositories.accounts.credentialsById(accountId)
     );
-    if (!row) throw new Error("provider account not found");
+    if (!row) raise(new Error("provider account not found"));
     return {
       id: row.id,
       userId: row.userId,
@@ -1260,7 +1261,7 @@ export class ProxyService implements StreamRecorder {
     refreshed: RefreshedCredentials
   ): Promise<ProviderAccount> {
     if (!refreshed.accessToken || !refreshed.refreshToken || !refreshed.expiresAt) {
-      throw new Error("provider token refresh returned incomplete credentials");
+      raise(new Error("provider token refresh returned incomplete credentials"));
     }
     const storeAccessToken = refreshed.storeAccessToken?.trim() || refreshed.accessToken;
     const encryptedAccess = encrypt(this.secret, storeAccessToken);

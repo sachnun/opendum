@@ -1,4 +1,5 @@
 import { Effect } from "effect";
+import { raise } from "@opendum/models/refresh/core/raise";
 
 const UNPKG = "https://unpkg.com";
 
@@ -6,7 +7,7 @@ const getJson = (url: string): Effect.Effect<unknown, Error> =>
   Effect.tryPromise({
     try: async () => {
       const response = await fetch(url, { headers: { Accept: "application/json" } });
-      if (!response.ok) throw new Error(`failed to fetch ${url} (${response.status})`);
+      if (!response.ok) raise(new Error(`failed to fetch ${url} (${response.status})`));
       return (await response.json()) as unknown;
     },
     catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),

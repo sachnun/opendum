@@ -1,4 +1,5 @@
 import { Chunk, Effect, Option, Schema } from "effect";
+import { parseJson as parseJsonPayload } from "@opendum/models/refresh/core/json";
 import { idMap } from "@opendum/models/model-store";
 import { fetchText } from "@opendum/models/sync/http";
 import { standardKey } from "@opendum/models/refresh/core/keys";
@@ -22,14 +23,6 @@ const decodeEntry = Schema.decodeUnknownOption(Entry);
 const decodeModalities = Schema.decodeUnknownOption(Schema.Array(Schema.Unknown));
 
 const unescape = (html: string): string => html.replace(/\\"/g, '"');
-
-const parseJson = (raw: string): unknown => {
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-};
 
 const detailed = (html: string): Chunk.Chunk<Entry> =>
   Chunk.fromIterable([...unescape(html).matchAll(DETAILED)]).pipe(
@@ -64,7 +57,7 @@ const textCapable = (entry: Entry): boolean =>
   Option.match(Option.fromNullishOr(entry.modalities), {
     onNone: () => true,
     onSome: (raw) =>
-      Option.match(decodeModalities(parseJson(raw)), {
+      Option.match(decodeModalities(parseJsonPayload(raw)), {
         onNone: () => true,
         onSome: (values) => values.length === 0 || values.includes("text"),
       }),

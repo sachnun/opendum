@@ -30,10 +30,7 @@ export class WorkersAiProvider extends StaticProvider {
     const direct = this.transport.direct;
     return Effect.gen(function* () {
       if (Array.isArray(payload.messages)) {
-        payload.messages = yield* Effect.tryPromise({
-          try: () => new ChatImageInliner(direct).run(payload.messages as unknown[]),
-          catch: (cause) => RequestFailure.transport("workers_ai", cause, url),
-        });
+        payload.messages = yield* new ChatImageInliner(direct).run(payload.messages as unknown[]);
       }
       return yield* JSONPoster.withAuth({
         provider: "workers_ai",

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { settle } from "~~/lib/settle";
 import { cn } from "~~/lib/utils";
 
 const props = defineProps<{
@@ -33,17 +34,15 @@ async function togglePin(event: Event) {
   const previous = localPinned.value;
   localPinned.value = !previous;
   pending.value = true;
-  try {
-    const result = await api.accounts.togglePinned({ providerKey: props.providerKey });
-    if (!result.success) throw new Error(result.error);
-    localPinned.value = result.data.pinned;
-    invalidation.patchPinnedProvider(props.providerKey, result.data.pinned);
-    emit("toggled", props.providerKey, result.data.pinned);
-  } catch {
+  const toggled = await settle(() => api.accounts.togglePinned({ providerKey: props.providerKey }));
+  pending.value = false;
+  if (!toggled.ok || !toggled.value.success) {
     localPinned.value = previous;
-  } finally {
-    pending.value = false;
+    return;
   }
+  localPinned.value = toggled.value.data.pinned;
+  invalidation.patchPinnedProvider(props.providerKey, toggled.value.data.pinned);
+  emit("toggled", props.providerKey, toggled.value.data.pinned);
 }
 </script>
 

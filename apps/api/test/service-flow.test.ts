@@ -43,7 +43,7 @@ describe("ProxyService full flow", () => {
       get: (name: string) => (name === "opencode" ? provider : undefined),
       isAuthless: (name: string) => name === "opencode",
       refreshableProviderNames: () => [],
-      transport: { direct: () => Promise.reject(new Error("no fetch")) },
+      transport: { direct: () => Effect.runPromise(Effect.fail(new Error("no fetch"))) },
     } as unknown as ProviderRegistry;
     const models = {
       providers: () => ["opencode"],
@@ -102,7 +102,7 @@ describe("ProxyService full flow", () => {
       get: (name: string) => (name === "workbuddy" ? provider : undefined),
       isAuthless: () => false,
       refreshableProviderNames: () => [],
-      transport: { direct: () => Promise.reject(new Error("no fetch")) },
+      transport: { direct: () => Effect.runPromise(Effect.fail(new Error("no fetch"))) },
     } as unknown as ProviderRegistry;
     const models = {
       providers: () => ["workbuddy"],

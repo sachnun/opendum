@@ -118,13 +118,10 @@ export class Parser {
       }
       const candidate = this.eventBuffer.slice(start, end + 1);
       cursor = end + 1;
-      try {
-        const parsed = JSON.parse(candidate) as Json;
-        for (const event of KiroEvents.expand(parsed)) {
-          if (KiroEvents.relevant(event)) events.push(event);
-        }
-      } catch {
-        continue;
+      const parsed = Value.parseJson(candidate) as Json;
+      if (parsed === null) continue;
+      for (const event of KiroEvents.expand(parsed)) {
+        if (KiroEvents.relevant(event)) events.push(event);
       }
     }
     this.eventBuffer = "";
@@ -241,9 +238,7 @@ export class BracketCalls {
         continue;
       }
       const args = text.slice(argsStart, argsEnd + 1);
-      try {
-        JSON.parse(args);
-      } catch {
+      if (Value.parseJson(args) === null) {
         search = closeIdx + 1;
         continue;
       }

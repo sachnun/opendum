@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Result } from "effect";
 import { Responses, Value } from "@opendum/providers/core/helpers";
 import { RequestFailure } from "@opendum/providers/core/http";
 import { OAuth } from "@opendum/providers/core/oauth";
@@ -38,14 +38,16 @@ export class PerchProvider extends OAuthProvider {
       provider: "perch",
       tokenUrl: async () => {
         const config = await this.auth.config();
-        return `${config.supabaseUrl}/auth/v1/token?grant_type=refresh_token`;
+        if (Result.isFailure(config)) return "";
+        return `${config.success.supabaseUrl}/auth/v1/token?grant_type=refresh_token`;
       },
       transport: options.transport,
       request: async (refreshToken) => {
         const headers = await this.auth.tokenHeaders();
+        const values = Result.isFailure(headers) ? {} : headers.success;
         return {
           method: "POST",
-          headers: { ...headers, Accept: "application/json" },
+          headers: { ...values, Accept: "application/json" },
           body: JSON.stringify({ refresh_token: refreshToken.trim() }),
         };
       },
@@ -57,12 +59,12 @@ export class PerchProvider extends OAuthProvider {
           expires_in?: number;
         };
         const accessToken = (token.access_token ?? "").trim();
-        if (!accessToken) throw new Error("perch token refresh returned empty access token");
+        if (!accessToken) return Result.fail("perch token refresh returned empty access token");
         let expiresAt = new Date(Date.now() + ACCESS_TTL_MS);
         if ((token.expires_at ?? 0) > 0) expiresAt = new Date(Math.trunc((token.expires_at as number) * 1000));
         else if ((token.expires_in ?? 0) > 0) expiresAt = new Date(Date.now() + (token.expires_in as number) * 1000);
         const nextRefresh = (token.refresh_token ?? "").trim() || refreshToken.trim();
-        return { accessToken, refreshToken: nextRefresh, expiresAt };
+        return Result.succeed({ accessToken, refreshToken: nextRefresh, expiresAt });
       },
     });
     this.auth = new PerchAuth(options.transport);
@@ -102,10 +104,14 @@ export class PerchProvider extends OAuthProvider {
     return RequestFailure.normalize(
       "perch",
       Effect.gen(function* () {
-        const { ticket, runId: ticketRunId } = yield* Effect.tryPromise({
+        const ticketResult = yield* Effect.tryPromise({
           try: () => auth.turnTicket(request.credentials),
           catch: (cause) => RequestFailure.transport("perch", cause),
         });
+        if (Result.isFailure(ticketResult)) {
+          return yield* Effect.fail(RequestFailure.transport("perch", new Error(ticketResult.failure)));
+        }
+        const { ticket, runId: ticketRunId } = ticketResult.success;
         const runId = ticketRunId.trim() || PerchAuth.runId();
 
         let attribution: Json | null = null;

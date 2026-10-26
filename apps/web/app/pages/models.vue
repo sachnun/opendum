@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { SORT_ORDER, anchorId } from "@opendum/models/ranking";
+import { decodeHash, errorText, failureText, settle } from "~~/lib/settle";
 import { compareEntries } from "@opendum/models/sort";
 import { dayKeys, emptyStats, hourKeys, LOOKBACK_HOURS, MODEL_STATS_DAYS, type ModelStats } from "@opendum/models/stats";
 import { costEntries, costPoints, type ModelCost } from "~~/lib/model-cost";
@@ -173,14 +174,13 @@ async function loadStats(modelIds: string[], options: { force?: boolean } = {}) 
 
   for (const modelId of requestedModelIds) loadingStatsIds.add(modelId);
 
-  try {
-    const response = await api.models.stats({ models: requestedModelIds });
-    for (const [modelId, stats] of Object.entries(response)) statsById[modelId] = stats;
-  } catch (error) {
-    console.error("Failed to load model stats:", error);
-  } finally {
-    for (const modelId of requestedModelIds) loadingStatsIds.delete(modelId);
+  const loaded = await settle(() => api.models.stats({ models: requestedModelIds }));
+  if (loaded.ok) {
+    for (const [modelId, stats] of Object.entries(loaded.value)) statsById[modelId] = stats;
+  } else {
+    console.error("Failed to load model stats:", loaded.error);
   }
+  for (const modelId of requestedModelIds) loadingStatsIds.delete(modelId);
 }
 
 function observeCards() {
@@ -256,16 +256,14 @@ async function enableModel(model: ModelListItem, enabled: boolean) {
   const previousValue = model.isEnabled;
   applyEnabled(model.id, enabled);
 
-  try {
-    const result = await api.models.setEnabled({ modelId: model.id, enabled });
-    if (!result.success) throw new Error(result.error);
-    invalidation.patchModelEnabled(result.data.model, result.data.enabled);
+  const updated = await settle(() => api.models.setEnabled({ modelId: model.id, enabled }));
+  pendingModelId.value = null;
+  if (updated.ok && updated.value.success) {
+    invalidation.patchModelEnabled(updated.value.data.model, updated.value.data.enabled);
     void invalidation.invalidateModelAvailability();
-  } catch (error) {
+  } else {
     applyEnabled(model.id, previousValue);
-    console.error(error);
-  } finally {
-    pendingModelId.value = null;
+    console.error(updated.ok ? failureText(updated, "Failed to update model") : errorText(updated.error, "Failed to update model"));
   }
 }
 
@@ -274,11 +272,7 @@ function hashModel(hash: string): string | null {
   const id = raw.startsWith("model-") ? raw.slice("model-".length) : raw;
   if (!id) return null;
 
-  try {
-    return decodeURIComponent(id);
-  } catch {
-    return id;
-  }
+  return decodeHash(id);
 }
 
 watch(

@@ -1,4 +1,5 @@
 import { Effect, Match, Option, Schema } from "effect";
+import { raise } from "@opendum/models/refresh/core/raise";
 import { idMap } from "@opendum/models/model-store";
 import { fetchDecoded } from "@opendum/models/sync/http";
 import { arrayAt, asRecord, stringAt, trimmed } from "@opendum/models/json";
@@ -42,7 +43,7 @@ function freeIds(payload: unknown): ReadonlyArray<string> {
     onNone: () => arrayAt(payload, "data"),
     onSome: (value) => value.data,
   });
-  if (data.length === 0) throw new Error("unexpected OpenRouter /v1/models payload");
+  if (data.length === 0) raise(new Error("unexpected OpenRouter /v1/models payload"));
 
   return [
     ...new Set(

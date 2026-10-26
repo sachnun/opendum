@@ -1,3 +1,4 @@
+import { raise } from "@opendum/models/refresh/core/raise";
 import { expect, test } from "bun:test";
 
 import { MAX_FETCH_ATTEMPTS, runJson, runText, sleep } from "@opendum/models/sync/http";
@@ -39,7 +40,7 @@ test("fetchJson retries after a transient failure", async () => {
   const payload = await withFetch(
     async () => {
       calls += 1;
-      if (calls === 1) throw new Error("network down");
+      if (calls === 1) raise(new Error("network down"));
       return new Response(JSON.stringify({ retried: true }), { status: 200 });
     },
     () => runJson("https://example.test/data", { attempts: 2 }),
@@ -54,7 +55,7 @@ test("fetchJson rejects after exhausting attempts", async () => {
     withFetch(
       async () => {
         calls += 1;
-        throw new Error("still down");
+        raise(new Error("still down"));
       },
       () => runJson("https://example.test/data", { attempts: 1 }),
     ),

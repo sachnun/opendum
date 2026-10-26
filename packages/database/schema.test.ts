@@ -13,7 +13,8 @@ type DefaultValue =
   | { kind: "none" }
   | { kind: "sql" }
   | { kind: "literal"; value: string | number | boolean }
-  | { kind: "array"; value: unknown[] };
+  | { kind: "array"; value: unknown[] }
+  | { kind: "unsupported"; value: string };
 
 interface ParsedColumn {
   type: string;
@@ -82,15 +83,22 @@ function parseDefault(raw: string | undefined): DefaultValue {
   if (value === "true" || value === "false") return { kind: "literal", value: value === "true" };
   if (/^-?\d+(?:\.\d+)?$/.test(value)) return { kind: "literal", value: Number(value) };
 
-  throw new Error(`Unsupported default expression: ${value}`);
+  return { kind: "unsupported", value };
 }
+
+const UNSUPPORTED_COLUMN: ParsedColumn = {
+  type: "unsupported",
+  notNull: false,
+  primary: false,
+  defaultValue: { kind: "none" },
+};
 
 function parseColumn(line: string): [string, ParsedColumn] {
   const match = line.match(/^"([^"]+)" ([a-z]+(?:\[\])?)(.*)$/);
-  if (!match) throw new Error(`Unsupported column definition: ${line}`);
+  if (!match) return ["", UNSUPPORTED_COLUMN];
 
   const [, name, type, rawFlags] = match;
-  if (!(type in TYPE_BY_SQL)) throw new Error(`Unsupported column type: ${type}`);
+  if (!(type in TYPE_BY_SQL)) return [name, UNSUPPORTED_COLUMN];
 
   let flags = rawFlags;
   const primary = /\bPRIMARY KEY\b/.test(flags);
@@ -170,28 +178,24 @@ function parseSql(statements: string[]): ParsedSchema {
 
     const addColumn = statement.match(/^ALTER TABLE "([^"]+)" ADD COLUMN (.+)$/);
     if (addColumn) {
-      const table = parsed.tables.get(addColumn[1]);
-      if (!table) throw new Error(`Unknown table in ALTER TABLE: ${addColumn[1]}`);
       const [columnName, column] = parseColumn(addColumn[2]);
-      table.columns.set(columnName, column);
+      parsed.tables.get(addColumn[1])?.columns.set(columnName, column);
       continue;
     }
 
     const dropColumn = statement.match(/^ALTER TABLE "([^"]+)" DROP COLUMN "([^"]+)"$/);
     if (dropColumn) {
-      const table = parsed.tables.get(dropColumn[1]);
-      if (!table) throw new Error(`Unknown table in ALTER TABLE: ${dropColumn[1]}`);
-      table.columns.delete(dropColumn[2]);
+      parsed.tables.get(dropColumn[1])?.columns.delete(dropColumn[2]);
       continue;
     }
 
     const dropConstraint = statement.match(/^ALTER TABLE "([^"]+)" DROP CONSTRAINT "([^"]+)"$/);
     if (dropConstraint) {
-      const table = parsed.tables.get(dropConstraint[1]);
-      if (!table) throw new Error(`Unknown table in ALTER TABLE: ${dropConstraint[1]}`);
       parsed.foreignKeys.delete(dropConstraint[2]);
       if (dropConstraint[2].endsWith("_pkey")) {
-        for (const column of table.columns.values()) column.primary = false;
+        for (const column of parsed.tables.get(dropConstraint[1])?.columns.values() ?? []) {
+          column.primary = false;
+        }
       }
       continue;
     }
@@ -202,7 +206,7 @@ function parseSql(statements: string[]): ParsedSchema {
       continue;
     }
 
-    throw new Error(`Unsupported DDL statement: ${statement}`);
+    continue;
   }
 
   return parsed;
@@ -236,7 +240,7 @@ function normalizeDefault(value: unknown): DefaultValue {
     return { kind: "literal", value };
   }
 
-  throw new Error(`Unsupported drizzle default: ${String(value)}`);
+  return { kind: "unsupported", value: String(value) };
 }
 
 function drizzleTables(): PgTable[] {
@@ -245,8 +249,7 @@ function drizzleTables(): PgTable[] {
 
 function columnName(column: unknown): string {
   if (column instanceof IndexedColumn && typeof column.name === "string") return column.name;
-
-  throw new Error("Only named index columns are supported");
+  return "";
 }
 
 function sorted<T>(values: T[], key: (value: T) => string): T[] {

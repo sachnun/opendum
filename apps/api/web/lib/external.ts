@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import { assertPublic, PrivateHostError } from "@opendum/core/egress";
+import { hostError } from "@opendum/core/egress";
 import { proxyContext } from "@opendum/api/context";
 import { ServiceFailure, asFailure, badRequest, unavailable } from "@opendum/api/web/errors";
 
@@ -28,16 +28,9 @@ function resolveTarget(url: string, method: string): Effect.Effect<Target, Servi
     return Effect.fail(badRequest("url must be an https provider URL"));
   }
 
-  return Effect.try({
-    try: () => {
-      assertPublic(target.hostname);
-      return { method, target: target.toString() };
-    },
-    catch: (cause) =>
-      cause instanceof PrivateHostError
-        ? badRequest("url must not target a private network address")
-        : asFailure(cause),
-  });
+  const hostIssue = hostError(target.hostname);
+  if (hostIssue) return Effect.fail(badRequest("url must not target a private network address"));
+  return Effect.succeed({ method, target: target.toString() });
 }
 
 function normalizeBody(body: ExternalFetchInit["body"]): BodyInit | undefined {

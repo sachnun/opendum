@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Result } from "effect";
 import { baseInfo, expiredInfo, parseNumber } from "@opendum/providers/quota/helpers";
 import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay } from "@opendum/providers/quota/types";
 import { quotaPayload, type Json } from "@opendum/providers/quota/fetchers/shared";
@@ -8,14 +8,16 @@ export function hyperQuota(
   account: QuotaAccount,
   forceRefresh: boolean
 ): Effect.Effect<AccountQuotaInfo> {
-  let apiKey: string;
-  try {
-    apiKey = ctx.decrypt(account.accessToken ?? "");
-  } catch {
+  const decrypted = Result.try({
+    try: () => ctx.decrypt(account.accessToken ?? ""),
+    catch: () => null,
+  });
+  if (Result.isFailure(decrypted)) {
     return Effect.succeed(
       expiredInfo("API key is missing or invalid. Please reconnect this account.")
     );
   }
+  const apiKey = decrypted.success;
   return quotaPayload(ctx, account, forceRefresh, {
     cache: "hyper:credits",
     method: "GET",

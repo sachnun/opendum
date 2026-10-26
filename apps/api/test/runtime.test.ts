@@ -147,7 +147,7 @@ describe("retry schedules", () => {
         poll.pipe(Effect.repeat(Schedule.spaced("1 hour")), Effect.timeout("3 hours"))
       );
       yield* TestClock.adjust("3 hours");
-      const exit = yield* Effect.promise(() => Promise.resolve(fiber));
+      const exit = yield* Effect.succeed(fiber);
       void exit;
       return runs;
     });

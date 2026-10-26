@@ -1,4 +1,5 @@
 import { Effect, Option, Schema } from "effect";
+import { raise } from "@opendum/models/refresh/core/raise";
 import { idMap } from "@opendum/models/model-store";
 import { fetchJson } from "@opendum/models/sync/http";
 import { slashedKey } from "@opendum/models/refresh/core/keys";
@@ -38,7 +39,7 @@ const freePlanSlugs = (plans: unknown): ReadonlySet<string> => {
     () => new Error("unexpected ZenMux get_all_plans payload")
   );
   const freePlan = parsed.data.find((plan) => (plan.desc ?? "").includes(FREE_PLAN_MARKER));
-  if (!freePlan) throw new Error(`Free Plan (${FREE_PLAN_MARKER}) not found in ZenMux plans`);
+  if (!freePlan) raise(new Error(`Free Plan (${FREE_PLAN_MARKER}) not found in ZenMux plans`));
 
   const slugs = new Set<string>();
   for (const model of freePlan.models ?? []) {
@@ -51,7 +52,7 @@ const freePlanSlugs = (plans: unknown): ReadonlySet<string> => {
       },
     });
   }
-  if (slugs.size === 0) throw new Error("no models found in the ZenMux free plan");
+  if (slugs.size === 0) raise(new Error("no models found in the ZenMux free plan"));
   return slugs;
 };
 
@@ -65,7 +66,7 @@ const freeIds = (catalog: unknown, allowed: ReadonlySet<string>): ReadonlyArray<
     decodeCatalog(catalog),
     () => new Error("unexpected ZenMux /v1/models payload")
   );
-  if (parsed.data.length === 0) throw new Error("ZenMux returned no models");
+  if (parsed.data.length === 0) raise(new Error("ZenMux returned no models"));
 
   return [
     ...new Set(

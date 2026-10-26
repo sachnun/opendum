@@ -54,9 +54,9 @@ export const ProxyContextLayer = Layer.effect(
             headersTimeout: config.requestTimeoutMs > 0 ? config.requestTimeoutMs : undefined,
           })
       ),
-      (fetcher) => Effect.promise(() => fetcher.close())
+      (fetcher) => Effect.orDie(fetcher.close())
     );
-    const guardedFetch: Fetch = (url, init) => guard.fetch(url, init);
+    const guardedFetch: Fetch = (url, init) => Effect.runPromise(guard.fetch(url, init));
     const directFetch = (url: string, init?: RequestInit): Promise<Response> =>
       Effect.runPromise(
         Effect.tryPromise({

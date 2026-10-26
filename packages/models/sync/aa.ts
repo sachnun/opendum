@@ -1,3 +1,4 @@
+import { parseJson } from "@opendum/models/refresh/core/json";
 import { Effect } from "effect";
 
 import { ModelDecodeFailure, asError } from "@opendum/models/errors";
@@ -62,11 +63,8 @@ function flightPayload(html: string): string {
   FLIGHT_CHUNK.lastIndex = 0;
   let match: RegExpExecArray | null;
   while ((match = FLIGHT_CHUNK.exec(html)) !== null) {
-    try {
-      chunks.push(JSON.parse(`"${match[1]}"`) as string);
-    } catch {
-      continue;
-    }
+    const parsedChunk = parseJson(`"${match[1]}"`);
+    if (parsedChunk !== null) chunks.push(parsedChunk as string);
   }
   return chunks.join("");
 }
@@ -107,12 +105,7 @@ function scoredModels(payload: string): Record<string, unknown>[] {
   while ((match = MODEL_LIST_KEY.exec(payload)) !== null) {
     const raw = balancedArray(payload, match.index + match[0].length - 1);
     if (!raw) continue;
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      continue;
-    }
+    const parsed = parseJson(raw);
     if (!Array.isArray(parsed)) continue;
     const items = parsed.filter(
       (item): item is Record<string, unknown> =>

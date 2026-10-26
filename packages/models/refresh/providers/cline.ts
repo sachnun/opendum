@@ -1,8 +1,8 @@
-import { Effect, Option, Schema } from "effect";
+import { Effect, Option, Result, Schema } from "effect";
 import { idMap } from "@opendum/models/model-store";
 import { fetchJson } from "@opendum/models/sync/http";
 import { slashedKey } from "@opendum/models/refresh/core/keys";
-import { sourceOf, type ModelSource, type SourceResult } from "@opendum/models/refresh/core/types";
+import { sourceOf, type ModelSource, type SourceFailure, type SourceResult } from "@opendum/models/refresh/core/types";
 
 const MODELS_URL = "https://api.cline.bot/api/v1/ai/cline/recommended-models";
 
@@ -12,12 +12,12 @@ const Entry = Schema.Struct({ id: Schema.String });
 const decodePayload = Schema.decodeUnknownOption(Payload);
 const decodeEntry = Schema.decodeUnknownOption(Entry);
 
-const freeIds = (payload: unknown): ReadonlyArray<string> => {
+const freeIds = (payload: unknown): Result.Result<ReadonlyArray<string>, string> => {
   const free = Option.match(decodePayload(payload), {
     onNone: () => [],
     onSome: (value) => value.free,
   });
-  if (free.length === 0) throw new Error("unexpected Cline recommended-models payload");
+  if (free.length === 0) return Result.fail("unexpected Cline recommended-models payload");
 
   const ids = free.flatMap((entry) =>
     Option.match(decodeEntry(entry), {
@@ -25,8 +25,8 @@ const freeIds = (payload: unknown): ReadonlyArray<string> => {
       onSome: (value) => [value.id],
     })
   );
-  if (ids.length === 0) throw new Error("Cline returned no free models");
-  return ids;
+  if (ids.length === 0) return Result.fail("Cline returned no free models");
+  return Result.succeed(ids);
 };
 
 export const clineSource: ModelSource = {
@@ -37,7 +37,11 @@ export const clineSource: ModelSource = {
 
   fetch: () =>
     fetchJson(MODELS_URL, { label: "Cline recommended models" }).pipe(
-      Effect.map((payload): SourceResult => sourceOf(idMap([...freeIds(payload)], slashedKey))),
+      Effect.flatMap((payload): Effect.Effect<SourceResult, SourceFailure> => {
+        const ids = freeIds(payload);
+        if (Result.isFailure(ids)) return Effect.fail({ provider: "cline", message: ids.failure });
+        return Effect.succeed(sourceOf(idMap([...ids.success], slashedKey)));
+      }),
       Effect.mapError((cause) => ({ provider: "cline", message: cause.message }))
     ),
 };

@@ -8,9 +8,7 @@ import { RequestFailure, Retry } from "@opendum/providers/core/http";
 describe("fallback router", () => {
   it("keeps a best effort sticky check failure on the success channel", async () => {
     const router = new RedisFallbackRouter({
-      exists: async () => {
-        throw new Error("redis down");
-      },
+      exists: () => Effect.fail(new Error("redis down")),
     } as never);
     const sticky = await Effect.runPromise(router.sticky("openrouter"));
     expect(sticky).toBe(false);
@@ -18,12 +16,8 @@ describe("fallback router", () => {
 
   it("swallows strike and clear failures", async () => {
     const router = new RedisFallbackRouter({
-      incr: async () => {
-        throw new Error("redis down");
-      },
-      del: async () => {
-        throw new Error("redis down");
-      },
+      incr: () => Effect.fail(new Error("redis down")),
+      del: () => Effect.fail(new Error("redis down")),
     } as never);
     await Effect.runPromise(router.recordStrike("openrouter"));
     await Effect.runPromise(router.clear("openrouter"));

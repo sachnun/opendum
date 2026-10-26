@@ -100,13 +100,9 @@ export function useAccountActions(
     }
 
     isToggling.value = true;
-    try {
-      const result = await api.accounts.update({ id: props.account.id, isActive: !props.account.isActive });
-      if (!result.success) throw new Error(result.error);
-      handlers.onActiveUpdated(result.data);
-    } finally {
-      isToggling.value = false;
-    }
+    const result = await api.accounts.update({ id: props.account.id, isActive: !props.account.isActive });
+    isToggling.value = false;
+    if (result.success) handlers.onActiveUpdated(result.data);
   }
 
   async function disableTemporarily() {
@@ -119,40 +115,30 @@ export function useAccountActions(
 
     isTemporaryDisabling.value = true;
     temporaryOffError.value = "";
-    try {
-      const result = await api.accounts.update({ id: props.account.id, disabledUntil: disabledUntil.toISOString() });
-      if (!result.success) throw new Error(result.error);
-      dialogOpen.value = false;
-      handlers.onTemporarilyDisabled(result.data);
-    } catch (error) {
-      temporaryOffError.value = error instanceof Error ? error.message : "Failed to disable account temporarily";
-    } finally {
-      isTemporaryDisabling.value = false;
+    const result = await api.accounts.update({ id: props.account.id, disabledUntil: disabledUntil.toISOString() });
+    isTemporaryDisabling.value = false;
+    if (!result.success) {
+      temporaryOffError.value = result.error;
+      return;
     }
+    dialogOpen.value = false;
+    handlers.onTemporarilyDisabled(result.data);
   }
 
   async function renameAccount() {
     if (props.readonly) return;
     savingName.value = true;
-    try {
-      const result = await api.accounts.update({ id: props.account.id, name: editName.value });
-      if (!result.success) throw new Error(result.error);
-      handlers.onRenamed(result.data);
-    } finally {
-      savingName.value = false;
-    }
+    const result = await api.accounts.update({ id: props.account.id, name: editName.value });
+    savingName.value = false;
+    if (result.success) handlers.onRenamed(result.data);
   }
 
   async function deleteAccount() {
     if (props.readonly) return;
     deleting.value = true;
-    try {
-      const result = await api.accounts.delete({ id: props.account.id });
-      if (!result.success) throw new Error(result.error);
-      handlers.onDeleted(props.account.id);
-    } finally {
-      deleting.value = false;
-    }
+    const result = await api.accounts.delete({ id: props.account.id });
+    deleting.value = false;
+    if (result.success) handlers.onDeleted(props.account.id);
   }
 
   return {

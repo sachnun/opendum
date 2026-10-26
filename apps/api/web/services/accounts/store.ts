@@ -1,4 +1,5 @@
 import { Effect } from "effect";
+import { parseJson } from "@opendum/core/json";
 import { db, pinnedProvider, accountModelHealth } from "@opendum/database";
 import { fromPromise } from "@opendum/api/web/lib/task";
 import { getRedisClient } from "@opendum/api/web/lib/redis";
@@ -32,30 +33,27 @@ export class ErrorHistory {
 
   static parse(value: string | null): HistoryEntry | null {
     if (!value) return null;
-    try {
-      const parsed = JSON.parse(value) as Partial<HistoryEntry>;
-      if (
-        !parsed.id ||
-        !parsed.providerAccountId ||
-        typeof parsed.errorCode !== "number" ||
-        typeof parsed.errorMessage !== "string" ||
-        !parsed.createdAt
-      ) {
-        return null;
-      }
-      return {
-        id: parsed.id,
-        providerAccountId: parsed.providerAccountId,
-        userId: parsed.userId ?? "",
-        model: typeof parsed.model === "string" ? parsed.model : null,
-        errorCode: parsed.errorCode,
-        errorMessage: parsed.errorMessage,
-        createdAt: parsed.createdAt,
-        dedupeKey: parsed.dedupeKey,
-      };
-    } catch {
+    const parsed = parseJson(value) as Partial<HistoryEntry> | null;
+    if (!parsed) return null;
+    if (
+      !parsed.id ||
+      !parsed.providerAccountId ||
+      typeof parsed.errorCode !== "number" ||
+      typeof parsed.errorMessage !== "string" ||
+      !parsed.createdAt
+    ) {
       return null;
     }
+    return {
+      id: parsed.id,
+      providerAccountId: parsed.providerAccountId,
+      userId: parsed.userId ?? "",
+      model: typeof parsed.model === "string" ? parsed.model : null,
+      errorCode: parsed.errorCode,
+      errorMessage: parsed.errorMessage,
+      createdAt: parsed.createdAt,
+      dedupeKey: parsed.dedupeKey,
+    };
   }
 
   static toEntry(entry: HistoryEntry): ErrorEntry {

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { errorText, settle } from "~~/lib/settle";
 import type { MeData } from "~~/lib/api-types";
 
 const props = withDefaults(
@@ -63,17 +64,20 @@ async function reveal() {
   if (props.readonly || revealedApiKey.value || isRevealing.value) return;
   isRevealing.value = true;
   errorMessage.value = "";
-  try {
-    const result = await api.apiKeys.reveal({ id: props.id });
-    if (!result.success) throw new Error(result.error);
+  const updated = await settle(() => api.apiKeys.reveal({ id: props.id }));
+  isRevealing.value = false;
+  if (!updated.ok) {
+    errorMessage.value = errorText(updated.error, "Failed to reveal API key");
+    return;
+  }
+  if (!updated.value.success) {
+    errorMessage.value = updated.value.error;
+    return;
+  }
+  const result = updated.value;
     revealedApiKey.value = result.data.key;
     apiKeyValue.value = result.data.key;
     isDirty.value = false;
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : "Failed to reveal API key";
-  } finally {
-    isRevealing.value = false;
-  }
 }
 
 function markDirty() {
@@ -87,17 +91,20 @@ async function updateName() {
   if (hasInsufficientPoints.value) return;
   isUpdating.value = true;
   errorMessage.value = "";
-  try {
-    const result = await api.apiKeys.updateName({ id: props.id, name: newName.value, ...(saveCostsPoints.value ? { key: normalizedValue.value } : {}) });
-    if (!result.success) throw new Error(result.error);
+  const updated = await settle(() => api.apiKeys.updateName({ id: props.id, name: newName.value, ...(saveCostsPoints.value ? { key: normalizedValue.value } : {}) }));
+  isUpdating.value = false;
+  if (!updated.ok) {
+    errorMessage.value = errorText(updated.error, "Failed to update API key");
+    return;
+  }
+  if (!updated.value.success) {
+    errorMessage.value = updated.value.error;
+    return;
+  }
+  const result = updated.value;
     editDialogOpen.value = false;
     if (saveCostsPoints.value) void refreshNuxtData(dataKeys.me);
     emit("updated", { name: result.data.name, keyPreview: result.data.keyPreview });
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : "Failed to update API key";
-  } finally {
-    isUpdating.value = false;
-  }
 }
 </script>
 

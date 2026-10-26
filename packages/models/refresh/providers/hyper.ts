@@ -1,4 +1,5 @@
 import { Effect, Option, Schema } from "effect";
+import { raise } from "@opendum/models/refresh/core/raise";
 import { fetchJson } from "@opendum/models/sync/http";
 import { entryFor, slugify, writeEntry } from "@opendum/models/refresh/core/keys";
 import { sourceOf, type ModelSource, type SourceResult } from "@opendum/models/refresh/core/types";
@@ -44,12 +45,12 @@ const parseModels = (payload: unknown): ReadonlyArray<Entry> => {
     onNone: () => [] as ReadonlyArray<unknown>,
     onSome: (value) => value.data,
   });
-  if (data.length === 0) throw new Error("unexpected Hyper /v1/models payload");
+  if (data.length === 0) raise(new Error("unexpected Hyper /v1/models payload"));
 
   const parsed = data.flatMap((item) =>
     Option.match(decodeEntry(item), { onNone: () => [], onSome: (entry) => [entry] })
   );
-  if (parsed.length === 0) throw new Error("Hyper /v1/models returned no models");
+  if (parsed.length === 0) raise(new Error("Hyper /v1/models returned no models"));
   if (parsed.length < MIN_EXPECTED_MODELS) {
     console.warn(`[Hyper] only ${parsed.length} models returned (expected >= ${MIN_EXPECTED_MODELS})`);
   }

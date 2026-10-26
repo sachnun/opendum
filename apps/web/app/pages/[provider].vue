@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ActionResult, CustomListItem, CustomModelRow, ErrorHistoryResult, AccountUpdateData, ProviderDetailData, ProviderStats, QuotaGroupDisplay, QuotaProviderKey } from "~~/lib/api-types";
+import { decodeHash, settle } from "~~/lib/settle";
 import type { AccountsData, UsageData } from "@opendum/providers/contract";
 import { BY_KEY, providerOf, QUOTA_PROVIDER_KEYS, type ProviderAccountKey } from "@opendum/providers/provider-accounts";
 import { COMMON_HEADER_NAMES } from "~~/lib/headers";
@@ -144,11 +145,8 @@ async function refreshQuota() {
     if (accountsToRefresh.length > 0) await runQuotaQueue(accountsToRefresh, { refreshExisting: true });
   })().catch(() => undefined);
 
-  try {
-    await quotaRefreshing;
-  } finally {
-    quotaRefreshing = null;
-  }
+  await settle(() => quotaRefreshing as Promise<void>);
+  quotaRefreshing = null;
 }
 
 watch(
@@ -506,8 +504,9 @@ async function loadStats(accountIds: string[], options: { force?: boolean } = {}
 
   for (const accountId of requestedAccountIds) loadingStatsIds.add(accountId);
 
-  try {
-    const stats = await api.accounts.stats({ accountIds: requestedAccountIds });
+  const loaded = await settle(() => api.accounts.stats({ accountIds: requestedAccountIds }));
+  if (loaded.ok) {
+    const stats = loaded.value;
     const nextDelta = { ...deltaReady.value };
     const nextFetched = { ...statsFetched.value };
 
@@ -519,11 +518,10 @@ async function loadStats(accountIds: string[], options: { force?: boolean } = {}
     for (const [accountId, stat] of Object.entries(stats)) statsById[accountId] = stat;
     deltaReady.value = nextDelta;
     statsFetched.value = nextFetched;
-  } catch (error) {
-    console.error("Failed to load account stats:", error);
-  } finally {
-    for (const accountId of requestedAccountIds) loadingStatsIds.delete(accountId);
+  } else {
+    console.error("Failed to load account stats:", loaded.error);
   }
+  for (const accountId of requestedAccountIds) loadingStatsIds.delete(accountId);
 }
 
 async function loadHistories(accountIds: string[]) {
@@ -536,13 +534,12 @@ async function loadHistories(accountIds: string[]) {
 
   for (const accountId of requestedAccountIds) loadingHistoryIds.add(accountId);
 
-  try {
-    const response = await api.accounts.errorHistories({ accountIds: requestedAccountIds, limit: 100 });
+  const loaded = await settle(() => api.accounts.errorHistories({ accountIds: requestedAccountIds, limit: 100 }));
+  if (loaded.ok && loaded.value.success) {
+    const response = loaded.value;
     const nextHistory = { ...historyById.value };
     const nextError = { ...historyError.value };
     const nextFetched = { ...historyFetched.value };
-
-    if (!response.success) throw new Error(response.error);
 
     for (const accountId of requestedAccountIds) {
       const result = response.data[accountId];
@@ -560,14 +557,13 @@ async function loadHistories(accountIds: string[]) {
     historyById.value = nextHistory;
     historyError.value = nextError;
     historyFetched.value = nextFetched;
-  } catch (error) {
-    console.error("Failed to load account error histories:", error);
+  } else {
+    console.error("Failed to load account error histories:", loaded.ok ? "request failed" : loaded.error);
     historyById.value = { ...historyById.value, ...Object.fromEntries(requestedAccountIds.map((accountId) => [accountId, []])) };
     historyError.value = { ...historyError.value, ...Object.fromEntries(requestedAccountIds.map((accountId) => [accountId, null])) };
     historyFetched.value = { ...historyFetched.value, ...Object.fromEntries(requestedAccountIds.map((accountId) => [accountId, true])) };
-  } finally {
-    for (const accountId of requestedAccountIds) loadingHistoryIds.delete(accountId);
   }
+  for (const accountId of requestedAccountIds) loadingHistoryIds.delete(accountId);
 }
 
 function pruneStats() {
@@ -800,35 +796,46 @@ async function saveSettings() {
   if (!form || !key) return;
   settingsBusy.value = "save";
   settingsError.value = "";
-  try {
-    const updated = await api.customProviders.update({
+  const saved = await settle(() =>
+    api.customProviders.update({
       slug: key,
       name: form.name.trim() || undefined,
       baseUrl: form.baseUrl.trim() || undefined,
       extraHeaders: headersPayload(form),
       enabled: form.enabled,
-    });
-    if (!updated.success) throw new Error(updated.error);
-
+    })
+  );
+  settingsBusy.value = "";
+  if (!saved.ok) {
+    settingsError.value = messageOf(saved.error);
+    return;
+  }
+  if (!saved.value.success) {
+    settingsError.value = saved.value.error;
+    return;
+  }
+  {
     const desired = form.models
       .filter((row) => row.model.trim() !== "")
       .map((row) => ({ modelId: row.alias.trim() || row.model.trim(), upstream: row.model.trim(), aliased: row.aliased }));
     const desiredIds = new Set(desired.map((row) => row.modelId));
     for (const model of customModels.value.filter((row) => !desiredIds.has(row.modelId))) {
       const removed = await api.customProviders.deleteModel({ slug: key, modelId: model.modelId });
-      if (!removed.success) throw new Error(removed.error);
+      if (!removed.success) {
+        settingsError.value = removed.error;
+        return;
+      }
     }
     if (desired.length > 0) {
       const added = await api.customProviders.addModels({ slug: key, models: desired });
-      if (!added.success) throw new Error(added.error);
+      if (!added.success) {
+        settingsError.value = added.error;
+        return;
+      }
     }
 
     await refreshCustomProviders();
     settingsOpen.value = false;
-  } catch (error) {
-    settingsError.value = messageOf(error);
-  } finally {
-    settingsBusy.value = "";
   }
 }
 
@@ -848,29 +855,27 @@ async function deleteProvider() {
   if (!key) return;
   deleteBusy.value = true;
   deleteError.value = "";
-  try {
-    const result = await api.customProviders.remove({ slug: key });
-    if (!result.success) throw new Error(result.error);
-    deleteOpen.value = false;
-    settingsOpen.value = false;
-    await refreshCustomProviders();
-    await navigateTo("/");
-  } catch (error) {
-    deleteError.value = messageOf(error);
-  } finally {
-    deleteBusy.value = false;
+  const removed = await settle(() => api.customProviders.remove({ slug: key }));
+  deleteBusy.value = false;
+  if (!removed.ok) {
+    deleteError.value = messageOf(removed.error);
+    return;
   }
+  if (!removed.value.success) {
+    deleteError.value = removed.value.error;
+    return;
+  }
+  deleteOpen.value = false;
+  settingsOpen.value = false;
+  await refreshCustomProviders();
+  await navigateTo("/");
 }
 
 function hashAccount(hash: string): string | null {
   const accountId = hash.startsWith("#") ? hash.slice(1) : hash;
   if (!accountId) return null;
 
-  try {
-    return decodeURIComponent(accountId);
-  } catch {
-    return accountId;
-  }
+  return decodeHash(accountId);
 }
 </script>
 

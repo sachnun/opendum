@@ -151,9 +151,7 @@ describe("quota registry", () => {
     const result = await Effect.runPromise(
       registry.fetch(
         context({
-          getCredentials: async () => {
-            throw new Error("token missing");
-          },
+          getCredentials: async () => Effect.runSync(Effect.die(new Error("token missing"))),
         }),
         account("tokened"),
         false

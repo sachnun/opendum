@@ -1,3 +1,5 @@
+import {} from "effect";
+import { raise } from "@opendum/providers/core/errors";
 import { Value, Payload, Ids } from "@opendum/providers/core/helpers";
 import {
   RETIRED_MODEL_PATTERN,
@@ -46,12 +48,8 @@ async function* sseGenerator(
     if (!trimmed.startsWith("data:")) return;
     const dataText = trimmed.slice("data:".length).trim();
     if (!dataText || dataText === "[DONE]") return;
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(dataText) as unknown;
-    } catch {
-      return;
-    }
+    const parsed = Value.parseJson(dataText);
+    if (parsed === null) return;
     const response = GeminiResponse.unwrap(parsed);
     await provider.cacheSignatures(response, model, sessionId);
     const notice = GeminiResponse.retiredNotice(response);
@@ -77,26 +75,23 @@ async function* sseGenerator(
     }
   };
 
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-      for (const line of lines) {
-        await handleLine(line);
-        for (const chunk of pending.splice(0)) yield chunk;
-      }
-    }
-    buffer += decoder.decode();
-    if (buffer) {
-      await handleLine(buffer);
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
+      await handleLine(line);
       for (const chunk of pending.splice(0)) yield chunk;
     }
-  } finally {
-    reader.releaseLock();
   }
+  buffer += decoder.decode();
+  if (buffer) {
+    await handleLine(buffer);
+    for (const chunk of pending.splice(0)) yield chunk;
+  }
+  reader.releaseLock();
 
   if (trackedUsage) writeChunk({}, null, trackedUsage);
   if (!sentFinal) writeChunk({}, hasToolCalls ? "tool_calls" : "stop", null);
@@ -403,11 +398,7 @@ export class GeminiArgs {
   if ((!value.includes("\\n") && !value.includes("\\t")) || value.includes('\\"') || value.includes("\\\\")) {
     return value;
   }
-  try {
-    return JSON.parse(`"${value.replace(/"/g, '\\"')}"`) as unknown;
-  } catch {
-    return value;
-  }
+  return Value.parsed(`"${value.replace(/"/g, '\\"')}"`, value);
 }
 
   static normalize(args: unknown, toolName: string, schemas: ToolSchemaMap): unknown {
@@ -422,11 +413,7 @@ export class GeminiArgs {
       continue;
     }
     if (typeof value === "string" && (expectedType === "array" || expectedType === "object")) {
-      try {
-        result[key] = JSON.parse(value) as unknown;
-      } catch {
-        result[key] = GeminiArgs.escapeSequences(value);
-      }
+      result[key] = Value.parsed(value, GeminiArgs.escapeSequences(value));
       continue;
     }
     result[key] = GeminiArgs.escapeSequences(value);
@@ -490,39 +477,33 @@ export class GeminiResponse {
   const prefix: Uint8Array[] = [];
   let buffered = "";
   let sawData = false;
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      if (value) {
-        prefix.push(value);
-        buffered += decoder.decode(value, { stream: true });
-      }
-      const lines = buffered.split("\n");
-      buffered = lines.pop() ?? "";
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed.startsWith("data:")) continue;
-        sawData = true;
-        const dataText = trimmed.slice("data:".length).trim();
-        if (!dataText || dataText === "[DONE]") continue;
-        let parsed: unknown;
-        try {
-          parsed = JSON.parse(dataText) as unknown;
-        } catch {
-          continue;
-        }
-        const notice = GeminiResponse.retiredNotice(GeminiResponse.unwrap(parsed));
-        if (notice) {
-          await reader.cancel().catch(() => undefined);
-          return { retired: true, notice, body: null };
-        }
-      }
-      if (sawData) break;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (value) {
+      prefix.push(value);
+      buffered += decoder.decode(value, { stream: true });
     }
-  } finally {
-    reader.releaseLock();
+    const lines = buffered.split("\n");
+    buffered = lines.pop() ?? "";
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("data:")) continue;
+      sawData = true;
+      const dataText = trimmed.slice("data:".length).trim();
+      if (!dataText || dataText === "[DONE]") continue;
+      const parsed = Value.parseJson(dataText);
+      if (parsed === null) continue;
+      const notice = GeminiResponse.retiredNotice(GeminiResponse.unwrap(parsed));
+      if (notice) {
+        await reader.cancel().catch(() => undefined);
+        reader.releaseLock();
+        return { retired: true, notice, body: null };
+      }
+    }
+    if (sawData) break;
   }
+  reader.releaseLock();
   const remaining = resp.body.getReader();
   let prefixIndex = 0;
   const body = new ReadableStream<Uint8Array>({
@@ -671,16 +652,12 @@ export class GeminiStream {
     if (!trimmed.startsWith("data:")) return false;
     const dataText = trimmed.slice("data:".length).trim();
     if (!dataText || dataText === "[DONE]") return false;
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(dataText) as unknown;
-    } catch {
-      return false;
-    }
+    const parsed = Value.parseJson(dataText);
+    if (parsed === null) return false;
     const response = GeminiResponse.unwrap(parsed);
     await provider.cacheSignatures(response, model, sessionId);
     const notice = GeminiResponse.retiredNotice(response);
-    if (notice) throw new Error(`antigravity model ${model} is retired: ${notice}`);
+    if (notice) raise(new Error(`antigravity model ${model} is retired: ${notice}`));
     for (const delta of GeminiStream.deltas(response, schemas, toolIndex)) {
       content += Value.string(delta.content);
       reasoning += Value.string(delta.reasoning_content);
@@ -692,22 +669,19 @@ export class GeminiStream {
     if (mapped) finish = mapped;
     return false;
   };
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-      for (const line of lines) {
-        if (await handleLine(line)) break;
-      }
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
+      if (await handleLine(line)) break;
     }
-    buffer += decoder.decode();
-    if (buffer) await handleLine(buffer);
-  } finally {
-    reader.releaseLock();
   }
+  buffer += decoder.decode();
+  if (buffer) await handleLine(buffer);
+  reader.releaseLock();
   const message: Json = { role: "assistant", content: null };
   if (content) message.content = content;
   if (reasoning) message.reasoning_content = reasoning;

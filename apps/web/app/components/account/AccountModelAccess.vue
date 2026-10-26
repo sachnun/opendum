@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { settle } from "~~/lib/settle";
 import { compareIds } from "@opendum/models/sort";
 import type { AccountHealthItem } from "~~/lib/api-types";
 
@@ -64,18 +65,16 @@ async function toggleModel(model: string) {
   disabledModels.value = next;
   togglingModels.value = new Set(togglingModels.value).add(model);
 
-  try {
-    const result = await api.accounts.enableModel({ accountId: props.accountId, modelId: model, enabled });
-    if (!result.success) throw new Error(result.error);
+  const toggled = await settle(() => api.accounts.enableModel({ accountId: props.accountId, modelId: model, enabled }));
+  if (toggled.ok && toggled.value.success) {
     invalidation.patchDisabledModels(props.provider, props.accountId, Array.from(disabledModels.value));
     invalidation.clearOptions();
-  } catch {
+  } else {
     disabledModels.value = previous;
-  } finally {
-    const pending = new Set(togglingModels.value);
-    pending.delete(model);
-    togglingModels.value = pending;
   }
+  const pending = new Set(togglingModels.value);
+  pending.delete(model);
+  togglingModels.value = pending;
 }
 </script>
 

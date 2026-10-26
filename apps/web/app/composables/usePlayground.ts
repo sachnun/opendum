@@ -1,3 +1,6 @@
+import { Effect } from "effect";
+import { Result } from "effect";
+import { deferred, raise, settle } from "~~/lib/settle";
 import { SORT_ORDER, categorize } from "@opendum/models/ranking";
 import { compareEntries } from "@opendum/models/sort";
 import { BY_KEY, accountPath, labelOf, type ProviderAccountKey } from "@opendum/providers/provider-accounts";
@@ -895,10 +898,13 @@ function onScroll(panelId: string, event: Event) {
 
 
 function streamRequest(input: StreamRequest): Promise<void> {
-  return new Promise((resolve, reject) => {
+  const gate = deferred<void>();
+  {
+    const resolve = gate.resolve;
+    const reject = gate.reject;
     if (input.signal.aborted) {
       reject(new DOMException("Aborted", "AbortError"));
-      return;
+      return gate.promise;
     }
 
     const xhr = new XMLHttpRequest();
@@ -955,23 +961,27 @@ function streamRequest(input: StreamRequest): Promise<void> {
     xhr.onabort = () => settle(() => reject(new DOMException("Aborted", "AbortError")));
 
     input.signal.addEventListener("abort", abortRequest, { once: true });
-    try {
-      xhr.open("POST", input.url, true);
-      for (const [name, value] of Object.entries(input.headers)) {
-        xhr.setRequestHeader(name, value);
-      }
-      xhr.send(input.body);
-    } catch (error) {
-      settle(() => reject(error));
-    }
-  });
+    const opened = Result.try({
+      try: () => {
+        xhr.open("POST", input.url, true);
+        for (const [name, value] of Object.entries(input.headers)) {
+          xhr.setRequestHeader(name, value);
+        }
+        xhr.send(input.body);
+        return null;
+      },
+      catch: (error: unknown) => error,
+    });
+    if (Result.isFailure(opened)) settle(() => reject(opened.failure));
+  }
+  return gate.promise;
 }
 
 
 
 function proxyUrl(): string {
   const proxyUrl = options.value?.proxyBaseUrl?.trim().replace(/\/+$/, "");
-  if (!proxyUrl) throw new Error("Proxy URL is not configured");
+  if (!proxyUrl) raise(new Error("Proxy URL is not configured"));
   return proxyUrl;
 }
 
@@ -1046,21 +1056,21 @@ async function fetchModel(panelId: string, modelId: string, scenario: Scenario, 
   autoScroll[panelId] = true;
   setResponse(panelId, { content: "", reasoning: "", toolCalls: [], isLoading: true, metrics: Tokens.metrics(null, null, null), startedAt: requestStartedAt });
 
-  try {
+  const outcome = await settle(async () => {
     const requestBody = Body.build(modelId, messages, currentSettings);
     errorContextParameters = requestBody;
     const endpointOverrides = Body.overrides(scenario.requestOverrides, currentSettings.endpoint);
     if (endpointOverrides) Object.assign(requestBody, endpointOverrides);
     const additionalParameters = Params.parse(additionalParametersInput.value);
-    if (additionalParameters.error) throw new Error(`Invalid additional parameters: ${additionalParameters.error}`);
+    if (additionalParameters.error) raise(new Error(`Invalid additional parameters: ${additionalParameters.error}`));
     if (additionalParameters.params) Object.assign(requestBody, additionalParameters.params);
     Body.route(requestBody, provider, accountId);
-    if (!canUsePlayground.value) throw new Error(playgroundSetupMessage.value || "Playground is not ready.");
+    if (!canUsePlayground.value) raise(new Error(playgroundSetupMessage.value || "Playground is not ready."));
 
     const controller = new AbortController();
     controllers.set(panelId, controller);
     const auth = await api.playground.auth({ endpoint: currentSettings.endpoint });
-    if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
+    if (controller.signal.aborted) raise(new DOMException("Aborted", "AbortError"));
 
     const url = `${proxyUrl()}${ErrorText.path(currentSettings.endpoint)}`;
     const headers = {
@@ -1116,21 +1126,31 @@ async function fetchModel(panelId: string, modelId: string, scenario: Scenario, 
     if (!response.ok) {
       const clonedResponse = response.clone();
       let errorMessage = "Request failed";
-      try {
-        const errorData = await response.json();
-        errorMessage = Completion.error(errorData) ?? errorMessage;
-      } catch {
-        const errorText = await clonedResponse.text();
-        if (errorText.trim()) errorMessage = errorText;
+      {
+        const parsedError = await settle(() => response.json());
+        if (parsedError.ok) {
+          errorMessage = Completion.error(parsedError.value) ?? errorMessage;
+        } else {
+          const fallback = await settle(() => clonedResponse.text());
+          if (fallback.ok && fallback.value.trim()) errorMessage = fallback.value;
+        }
       }
-      throw new Error(errorMessage);
+      raise(new Error(errorMessage));
     }
 
     const payload = await response.json();
     const parsed = currentSettings.endpoint === "messages" ? Completion.anthropic(payload) : currentSettings.endpoint === "responses" ? Completion.responses(payload) : Completion.chat(payload);
     setResponse(panelId, { content: parsed.content, reasoning: parsed.reasoning, toolCalls: parsed.toolCalls, isLoading: false, metrics: Tokens.metrics(waitMs, Date.now() - requestStartedAt, parsed.usage), usedAccountId }, requestId);
-    return "success";
-  } catch (error) {
+    return "success" as const;
+  });
+  if (requestIds.get(panelId) === requestId) {
+    controllers.delete(panelId);
+    requestIds.delete(panelId);
+  }
+  if (shouldRefreshOverview) refreshOverview();
+  if (outcome.ok) return outcome.value;
+  {
+    const error = outcome.error;
     if (error instanceof DOMException && error.name === "AbortError") {
       const existing = responses.value[panelId];
       if (existing && requestIds.get(panelId) === requestId) setResponse(panelId, { ...existing, isLoading: false, error: undefined });
@@ -1144,12 +1164,6 @@ async function fetchModel(panelId: string, modelId: string, scenario: Scenario, 
     const errorDetails = ErrorText.build(errorMessage, { model: modelId, provider: errorProvider, endpoint: currentSettings.endpoint, parameters: errorContextParameters, messages });
     setResponse(panelId, { content: "", reasoning: "", toolCalls: [], isLoading: false, error: errorMessage, errorDetails, metrics: Tokens.metrics(waitMs, null, null), usedAccountId }, requestId);
     return "error";
-  } finally {
-    if (requestIds.get(panelId) === requestId) {
-      controllers.delete(panelId);
-      requestIds.delete(panelId);
-    }
-    if (shouldRefreshOverview) refreshOverview();
   }
 }
 
@@ -1171,8 +1185,8 @@ async function runScenario(requestedLoopCount = 1) {
   stoppedPanels.clear();
   batchActive.value = true;
 
-  try {
-    await Promise.all(panelsWithModels.map(async (panel) => {
+  {
+    await Effect.runPromise(Effect.all(panelsWithModels.map((panel) => Effect.promise(async () => {
       for (let iteration = 0; iteration < totalLoops; iteration += 1) {
         if (!batchActive.value || stoppedPanels.has(panel.id)) break;
         activeLoopProgress.value = totalLoops > 1 ? { current: iteration + 1, total: totalLoops } : null;
@@ -1185,12 +1199,11 @@ async function runScenario(requestedLoopCount = 1) {
           break;
         }
       }
-    }));
-  } finally {
-    activeLoopProgress.value = null;
-    stoppedPanels.clear();
-    batchActive.value = false;
+    })), { concurrency: "unbounded" }));
   }
+  activeLoopProgress.value = null;
+  stoppedPanels.clear();
+  batchActive.value = false;
 }
 
 function stopPanel(panelId: string) {
@@ -1219,11 +1232,8 @@ async function retryPanel(panelId: string) {
   if (selectedScenario.value.id === "chat") {
     batchActive.value = true;
     stoppedPanels.delete(panel.id);
-    try {
-      await runChat(panel as PanelState & { modelId: string }, selectedScenario.value, { ...settings });
-    } finally {
-      batchActive.value = wasBatchActive;
-    }
+    await runChat(panel as PanelState & { modelId: string }, selectedScenario.value, { ...settings });
+    batchActive.value = wasBatchActive;
     return;
   }
   await fetchModel(panel.id, panel.modelId, selectedScenario.value, { ...settings }, panelProvider(panel), routeAccount(panel));
@@ -1271,18 +1281,18 @@ async function copyError(panelId: string) {
   const error = response?.error;
   if (!error) return;
 
-  try {
-    await navigator.clipboard.writeText(response.errorDetails ?? error);
-    copiedError[panelId] = true;
-    const existingTimeout = copyErrorTimeouts.get(panelId);
-    if (existingTimeout) clearTimeout(existingTimeout);
-    copyErrorTimeouts.set(panelId, setTimeout(() => {
-      copiedError[panelId] = false;
-      copyErrorTimeouts.delete(panelId);
-    }, 1800));
-  } catch {
+  const copied = await settle(() => navigator.clipboard.writeText(response.errorDetails ?? error));
+  if (!copied.ok) {
     console.error("Failed to copy error");
+    return;
   }
+  copiedError[panelId] = true;
+  const existingTimeout = copyErrorTimeouts.get(panelId);
+  if (existingTimeout) clearTimeout(existingTimeout);
+  copyErrorTimeouts.set(panelId, setTimeout(() => {
+    copiedError[panelId] = false;
+    copyErrorTimeouts.delete(panelId);
+  }, 1800));
 }
 
   return {

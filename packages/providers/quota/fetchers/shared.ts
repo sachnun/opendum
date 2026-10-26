@@ -36,11 +36,7 @@ export function quotaAttempt(
 
 export class QuotaJson {
   static parse(text: string): Json | null {
-    try {
-      return Value.record(JSON.parse(text));
-    } catch {
-      return null;
-    }
+    return Value.record(Value.parseJson(text));
   }
 
   static expiredStatus(status: number): boolean {

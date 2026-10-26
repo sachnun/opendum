@@ -41,8 +41,7 @@ export const KEY_SETTINGS: Record<KeyProvider, KeySetting> = {
 
 export function baseUrl(provider: string): string {
   const spec = COMPAT_SPECS.find((item) => item.name === provider);
-  if (!spec) throw new Error(`unknown compatible provider: ${provider}`);
-  return spec.baseUrl;
+  return spec?.baseUrl ?? "";
 }
 
 export type ValidationRequest = {

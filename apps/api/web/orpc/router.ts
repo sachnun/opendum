@@ -3,6 +3,7 @@ import { contract } from "@opendum/providers/contract";
 import { playgroundSignature } from "@opendum/core/crypto";
 import { implement } from "@orpc/server";
 import { Effect } from "effect";
+import { raise } from "@opendum/core/raise";
 
 import { proxyContext } from "@opendum/api/context";
 import { runOrpc } from "@opendum/api/web/orpc/run";
@@ -156,7 +157,7 @@ export const router = authed.router({
     ),
     session: writable.accounts.session.handler(({ context, input }) => {
       if (process.env.NODE_ENV === "production" && !context.requestContext.isMaintainer) {
-        throw new ORPCError("NOT_FOUND", { message: "Not Found" });
+        raise(new ORPCError("NOT_FOUND", { message: "Not Found" }));
       }
       return runOrpc(accounts.getAccountSession(context.requestContext.userId, input));
     }),
@@ -348,7 +349,7 @@ export const router = authed.router({
       const method = "POST";
       const path = endpointPath(input.endpoint);
       const secret = process.env.BETTER_AUTH_SECRET;
-      if (!secret) throw new ORPCError("INTERNAL_SERVER_ERROR", { message: "BETTER_AUTH_SECRET is required" });
+      if (!secret) raise(new ORPCError("INTERNAL_SERVER_ERROR", { message: "BETTER_AUTH_SECRET is required" }));
 
       return {
         headers: {

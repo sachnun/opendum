@@ -1,5 +1,5 @@
 import { and, count as countFn, eq } from "drizzle-orm";
-import { Effect } from "effect";
+import { Effect, Result } from "effect";
 
 import type { CodexSessionInput, ExchangeInput, AuthUrlInput, DeviceAuthInput, DevicePollInput } from "@opendum/providers/contract";
 import { db, providerAccount } from "@opendum/database";
@@ -159,10 +159,9 @@ export const connectCodex = Effect.fn("accountAuth.connectCodex")(function* (
   userId: string,
   input: CodexSessionInput
 ) {
-  const oauthResult = yield* Effect.try({
-    try: () => codexAuth(authRuntime).sessionResult(input.sessionJson),
-    catch: (cause) => badRequest(cause instanceof Error ? cause.message : "Failed to connect account"),
-  });
+  const parsedSession = codexAuth(authRuntime).sessionResult(input.sessionJson);
+  if (Result.isFailure(parsedSession)) return yield* Effect.fail(badRequest(parsedSession.failure));
+  const oauthResult = parsedSession.success;
   const data = yield* upsertAccount(
     userId,
     "codex",

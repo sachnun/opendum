@@ -4,6 +4,7 @@ import type { ProxyContext } from "@opendum/api/core/context";
 import { Chat, Messages } from "@opendum/api/core/endpoints";
 import { handleInference } from "@opendum/api/handlers/inference";
 import { handleModels } from "@opendum/api/handlers/models";
+import { raise } from "@opendum/core/raise";
 
 function fakeContext(overrides: Partial<ProxyContext> = {}): ProxyContext {
   return {
@@ -44,7 +45,7 @@ describe("handleInference", () => {
     const failing = fakeContext({
       service: {
         handle: async () => {
-          throw new Error("service exploded");
+          raise(new Error("service exploded"));
         },
       } as unknown as ProxyContext["service"],
     });
@@ -61,7 +62,7 @@ describe("handleModels", () => {
     const failing = fakeContext({
       auth: {
         validateKey: () => {
-          throw new Error("auth exploded");
+          raise(new Error("auth exploded"));
         },
       } as unknown as ProxyContext["auth"],
     });

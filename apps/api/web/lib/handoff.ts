@@ -1,3 +1,4 @@
+import { Result } from "effect";
 const MAX_REDIRECT_LENGTH = 512;
 
 export function safePath(value: unknown): string | null {
@@ -15,12 +16,10 @@ export function webOrigin(value: unknown): string | null {
   const candidate = value.trim();
   if (!candidate) return null;
 
-  try {
-    const url = new URL(candidate);
-    return url.protocol === "http:" || url.protocol === "https:" ? url.origin : null;
-  } catch {
-    return null;
-  }
+  const parsed = Result.try({ try: () => new URL(candidate), catch: () => null });
+  if (Result.isFailure(parsed)) return null;
+  const url = parsed.success;
+  return url.protocol === "http:" || url.protocol === "https:" ? url.origin : null;
 }
 
 export function handoffUrl(baseUrl: string, options: { to: string; redirect?: string | null }): string {

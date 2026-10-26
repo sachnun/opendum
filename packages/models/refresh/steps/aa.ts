@@ -1,4 +1,5 @@
 import { Effect } from "effect";
+import { raise } from "@opendum/models/refresh/core/raise";
 
 import {
   aaIndex,
@@ -51,8 +52,10 @@ async function main(): Promise<void> {
 
   const models = await loadModels();
   if (models.length < MIN_EXPECTED_MODELS) {
-    throw new Error(
-      `Artificial Analysis leaderboard returned ${models.length} scored models, expected at least ${MIN_EXPECTED_MODELS}`
+    raise(
+      new Error(
+        `Artificial Analysis leaderboard returned ${models.length} scored models, expected at least ${MIN_EXPECTED_MODELS}`
+      )
     );
   }
 

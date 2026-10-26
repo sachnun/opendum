@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { toExpJWT } from "better-auth/plugins";
+import { Effect } from "effect";
 
 process.env.BETTER_AUTH_SECRET ??= "test-secret";
 
@@ -46,13 +47,19 @@ describe("auth roles", () => {
     const previous = process.env.MAINTAINERS;
     process.env.MAINTAINERS = JSON.stringify(["Ada@Example.com"]);
 
-    try {
-      expect(roleOf("ada@example.com")).toBe("admin");
-      expect(roleOf("grace@example.com")).toBe("user");
-      expect(roleOf(null)).toBe("user");
-    } finally {
-      process.env.MAINTAINERS = previous;
-    }
+    const roles = Effect.runSync(
+      Effect.ensuring(
+        Effect.sync(() => {
+          expect(roleOf("ada@example.com")).toBe("admin");
+          expect(roleOf("grace@example.com")).toBe("user");
+          expect(roleOf(null)).toBe("user");
+        }),
+        Effect.sync(() => {
+          process.env.MAINTAINERS = previous;
+        })
+      )
+    );
+    void roles;
   });
 });
 

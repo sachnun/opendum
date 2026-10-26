@@ -1,4 +1,5 @@
 import { Effect, Option, Schema } from "effect";
+import { raise } from "@opendum/models/refresh/core/raise";
 import { fetchText } from "@opendum/models/sync/http";
 import { stripParams } from "@opendum/models/model/clean-key";
 import { packageVersion } from "@opendum/models/refresh/core/fetch";
@@ -72,7 +73,7 @@ const extractFree = (markdown: string): { freeModels: ReadonlyArray<string>; end
       headerIndex(table.headers, "Cached Read") !== -1
   );
   if (!endpointsTable || !pricingTable) {
-    throw new Error("unexpected OpenCode Console docs format: endpoint or pricing table missing");
+    raise(new Error("unexpected OpenCode Console docs format: endpoint or pricing table missing"));
   }
 
   const idsByName = new Map<string, string>();
@@ -98,10 +99,10 @@ const extractFree = (markdown: string): { freeModels: ReadonlyArray<string>; end
     );
     if (!free) continue;
     const id = idsByName.get(nameKey(cell(row, pricingModel)));
-    if (!id) throw new Error("OpenCode pricing model missing from the endpoint table");
+    if (!id) raise(new Error("OpenCode pricing model missing from the endpoint table"));
     freeModels.push(id);
   }
-  if (freeModels.length === 0) throw new Error("OpenCode docs listed no free models");
+  if (freeModels.length === 0) raise(new Error("OpenCode docs listed no free models"));
 
   return { freeModels: freeModels.sort((left, right) => left.localeCompare(right)), endpoints };
 };
@@ -181,7 +182,7 @@ export const opencodeSource: ModelSource = {
         )
       );
       const available = availableIds(payload);
-      if (available.size === 0) throw new Error("unexpected Opencode /zen/v1/models payload");
+      if (available.size === 0) raise(new Error("unexpected Opencode /zen/v1/models payload"));
 
       const { freeModels, endpoints } = extractFree(markdown);
       const missing = freeModels.filter((id) => !available.has(id));
@@ -196,7 +197,7 @@ export const opencodeSource: ModelSource = {
         const key = toKey(id);
         if (!models.has(key)) models.set(key, id);
       }
-      if (models.size === 0) throw new Error("Opencode resolved no free models");
+      if (models.size === 0) raise(new Error("Opencode resolved no free models"));
 
       return {
         ...sourceOf(new Map([...models.entries()].sort(([left], [right]) => left.localeCompare(right)))),

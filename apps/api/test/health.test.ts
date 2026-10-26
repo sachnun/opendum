@@ -165,7 +165,7 @@ describe("Health", () => {
 
   it("bumps request counts in the background", async () => {
     healthService().bumpRequest("acc-1");
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await Effect.runPromise(Effect.sleep("10 millis"));
     expect(repositories.health.bumpRequests).toHaveBeenCalledTimes(1);
   });
 });

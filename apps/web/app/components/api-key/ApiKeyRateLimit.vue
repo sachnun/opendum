@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { errorText, settle } from "~~/lib/settle";
 interface RuleInput {
   target: string;
   targetType: "model" | "family";
@@ -90,18 +91,21 @@ async function save() {
 
   isSaving.value = true;
   errorMessage.value = "";
-  try {
-    const result = await api.apiKeys.updateRateLimits({ id: props.apiKeyId, rules });
-    if (!result.success) throw new Error(result.error);
+  const updated = await settle(() => api.apiKeys.updateRateLimits({ id: props.apiKeyId, rules }));
+  isSaving.value = false;
+  if (!updated.ok) {
+    errorMessage.value = errorText(updated.error, "Failed to update rate limits");
+    return;
+  }
+  if (!updated.value.success) {
+    errorMessage.value = updated.value.error;
+    return;
+  }
+  const result = updated.value;
     savedRules.value = result.data.rules;
     draftRules.value = result.data.rules.map(toState);
     pickerOpen.value = false;
     emit("updated", savedRules.value);
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : "Failed to update rate limits";
-  } finally {
-    isSaving.value = false;
-  }
 }
 
 const usedTargets = computed(() => new Set(draftRules.value.map((rule) => `${rule.targetType}:${rule.target}`)));

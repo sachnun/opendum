@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { errorText, settle } from "~~/lib/settle";
 import { compareIds } from "@opendum/models/sort";
 
 import type { AccessMode } from "~~/lib/access-draft";
@@ -34,18 +35,21 @@ const targets = computed(() =>
 async function save(value: { mode: AccessMode; ids: string[] }) {
   isSaving.value = true;
   error.value = "";
-  try {
-    const result = await api.apiKeys.updateModelAccess({ id: props.apiKeyId, mode: value.mode, models: value.ids });
-    if (!result.success) throw new Error(result.error);
+  const updated = await settle(() => api.apiKeys.updateModelAccess({ id: props.apiKeyId, mode: value.mode, models: value.ids }));
+  isSaving.value = false;
+  if (!updated.ok) {
+    error.value = errorText(updated.error, "Failed to update model access");
+    return;
+  }
+  if (!updated.value.success) {
+    error.value = updated.value.error;
+    return;
+  }
+  const result = updated.value;
     saved.value = { mode: result.data.mode, ids: result.data.models };
     mode.value = result.data.mode;
     models.value = [...result.data.models];
     emit("updated", { mode: result.data.mode, models: result.data.models });
-  } catch (failure) {
-    error.value = failure instanceof Error ? failure.message : "Failed to update model access";
-  } finally {
-    isSaving.value = false;
-  }
 }
 </script>
 

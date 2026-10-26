@@ -73,7 +73,7 @@ function fakeProviders(): ProviderRegistry {
     get: () => undefined,
     isAuthless: () => false,
     refreshableProviderNames: () => [],
-    transport: { direct: () => Promise.reject(new Error("no fetch")) },
+    transport: { direct: () => Effect.runPromise(Effect.fail(new Error("no fetch"))) },
   } as unknown as ProviderRegistry;
 }
 

@@ -1,4 +1,5 @@
 import { Effect, Option, Schema } from "effect";
+import { raise } from "@opendum/models/refresh/core/raise";
 import { buildIndex, upstream } from "@opendum/models/model-store";
 import { entryFor, slugify, writeEntry } from "@opendum/models/refresh/core/keys";
 import { env } from "@opendum/models/refresh/core/env";
@@ -30,14 +31,14 @@ const fetchJson = (url: string, label: string): Effect.Effect<unknown> =>
   Effect.tryPromise({
     try: async () => {
       const response = await fetch(url, { headers: headers() });
-      if (!response.ok) throw new Error(`failed to fetch ${label} (${response.status})`);
+      if (!response.ok) raise(new Error(`failed to fetch ${label} (${response.status})`));
       return (await response.json()) as unknown;
     },
     catch: (cause) => cause,
   }).pipe(Effect.orDie);
 
 const files = (payload: unknown): ReadonlyArray<File> => {
-  if (!Array.isArray(payload)) throw new Error("unexpected Cloudflare Workers AI model file list payload");
+  if (!Array.isArray(payload)) raise(new Error("unexpected Cloudflare Workers AI model file list payload"));
   return payload
     .flatMap((entry) =>
       Option.match(decodeFile(entry), {
@@ -149,7 +150,7 @@ export const cloudflareSource: ModelSource = {
     Effect.gen(function* () {
       const payload = yield* fetchJson(API_URL, "Cloudflare model index");
       const catalog = files(payload);
-      if (catalog.length === 0) throw new Error("Cloudflare model index is empty");
+      if (catalog.length === 0) raise(new Error("Cloudflare model index is empty"));
 
       const reverse = reverseIndex(ctx.modelsDir);
       const models = new Map<string, string>();
@@ -188,7 +189,7 @@ export const cloudflareSource: ModelSource = {
         }
       }
 
-      if (models.size === 0) throw new Error("Cloudflare resolved no models");
+      if (models.size === 0) raise(new Error("Cloudflare resolved no models"));
 
       return {
         ...sourceOf(new Map([...models.entries()].sort(([left], [right]) => left.localeCompare(right)))),

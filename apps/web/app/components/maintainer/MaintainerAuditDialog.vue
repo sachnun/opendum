@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { errorText, settle } from "~~/lib/settle";
 import type { AuditSearchUser, MaintainerAuditUser } from "~~/lib/api-types";
 import { avatarUrl } from "~~/lib/utils";
 
@@ -63,27 +64,25 @@ async function loadUsers(requestId: number, append = false) {
 
   errorMessage.value = "";
 
-  try {
-    const result = await api.maintainer.users.search({
+  const searched = await settle(() =>
+    api.maintainer.users.search({
       q: normalizedQuery || undefined,
       offset: append ? nextOffset.value : 0,
       limit: PAGE_SIZE,
-    });
-    if (requestId !== searchRequestId) return;
-
+    })
+  );
+  if (requestId !== searchRequestId) return;
+  if (searched.ok) {
+    const result = searched.value;
     users.value = append ? [...users.value, ...result.users] : result.users;
     hasMore.value = result.hasMore;
     nextOffset.value = result.nextOffset;
-  } catch (error) {
-    if (requestId !== searchRequestId) return;
-    errorMessage.value = error instanceof Error ? error.message : "Failed to load users";
+  } else {
+    errorMessage.value = errorText(searched.error, "Failed to load users");
     if (!append) resetUsers();
-  } finally {
-    if (requestId === searchRequestId) {
-      isSearching.value = false;
-      isLoadingMore.value = false;
-    }
   }
+  isSearching.value = false;
+  isLoadingMore.value = false;
 }
 
 function usersScroll(event: Event) {
@@ -144,16 +143,18 @@ async function selectUser(user: AuditSearchUser) {
   selectingUserId.value = user.id;
   errorMessage.value = "";
 
-  try {
-    const result = await api.maintainer.audit.start({ userId: user.id });
-    if (!result.success) throw new Error(result.error);
-    open.value = false;
-    emit("selected", result.data.user);
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : "Failed to start audit mode";
-  } finally {
-    selectingUserId.value = null;
+  const started = await settle(() => api.maintainer.audit.start({ userId: user.id }));
+  selectingUserId.value = null;
+  if (!started.ok) {
+    errorMessage.value = errorText(started.error, "Failed to start audit mode");
+    return;
   }
+  if (!started.value.success) {
+    errorMessage.value = started.value.error;
+    return;
+  }
+  open.value = false;
+  emit("selected", started.value.data.user);
 }
 </script>
 

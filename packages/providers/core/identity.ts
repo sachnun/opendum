@@ -16,11 +16,7 @@ export class Jwt {
     const parts = token.split(".");
     const payload = parts[1];
     if (parts.length < 2 || !payload) return null;
-    try {
-      return Value.record(JSON.parse(Buffer.from(payload, "base64url").toString("utf8")));
-    } catch {
-      return null;
-    }
+    return Value.jsonRecord(Buffer.from(payload, "base64url").toString("utf8"));
   }
 
   static claim(claims: Claims, key: string): string {

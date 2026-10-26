@@ -4,6 +4,7 @@ import type { OpendumRedis } from "@opendum/core/redis";
 
 import { ProxyService } from "@opendum/api/core/service";
 import { fakes } from "@opendum/api/test/fakes";
+import { raise } from "@opendum/core/raise";
 
 type Service = InstanceType<typeof ProxyService>;
 
@@ -94,7 +95,7 @@ describe("refresh lock release", () => {
   it("swallows redis failures", async () => {
     const service = serviceWith(
       redis(async () => {
-        throw new Error("redis down");
+        raise(new Error("redis down"));
       })
     );
 

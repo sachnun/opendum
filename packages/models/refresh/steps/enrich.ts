@@ -1,3 +1,4 @@
+import { raise } from "@opendum/models/refresh/core/raise";
 import { folderOf } from "@opendum/models/model/families";
 import { buildIndex, persist, moveFiles, generatedDir } from "@opendum/models/model-store";
 import { applyMerge, planCanonicalization } from "@opendum/models/model/canonicalize";
@@ -216,7 +217,7 @@ async function main(): Promise<void> {
   const catalogs = await externalRegistries({ logger: (message) => console.log(message) });
   const registries = catalogs.registries;
   if (Object.values(registries).every((registry) => registry === undefined)) {
-    throw new Error("No external registry available, aborting metadata refresh");
+    raise(new Error("No external registry available, aborting metadata refresh"));
   }
   reportRegistries(registries);
 

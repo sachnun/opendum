@@ -1,4 +1,5 @@
 import { Effect } from "effect";
+import { raise } from "@opendum/models/refresh/core/raise";
 import { buildIndex } from "@opendum/models/model-store";
 import { fetchText } from "@opendum/models/sync/http";
 import { normalizeKey, normalizeName } from "@opendum/models/model/similarity";
@@ -59,7 +60,7 @@ const extractRows = (html: string): ReadonlyArray<Row> => {
     }
     if (rows.length > 0) return rows;
   }
-  throw new Error("unable to locate the Perch Starter model table in the docs page");
+  raise(new Error("unable to locate the Perch Starter model table in the docs page"));
 };
 
 const perchUpstream = (entry: ModelIndexEntry): string | null => {
@@ -122,7 +123,7 @@ const starterPool = (
     }
     const existing = models.get(entry.fileId);
     if (existing !== undefined && existing !== row.command) {
-      throw new Error(`duplicate Perch Starter mapping for ${entry.fileId}`);
+      raise(new Error(`duplicate Perch Starter mapping for ${entry.fileId}`));
     }
     models.set(entry.fileId, row.command);
   }
@@ -154,7 +155,7 @@ export const perchSource: ModelSource = {
     }).pipe(
       Effect.map((html): SourceResult => {
         const rows = extractRows(html);
-        if (rows.length === 0) throw new Error("Perch Starter model table is empty");
+        if (rows.length === 0) raise(new Error("Perch Starter model table is empty"));
         const { models, unresolved } = starterPool(ctx.modelsDir, rows);
         if (unresolved.length > 0) {
           console.warn(`[Perch] skipped Starter model(s) absent from the registry: ${unresolved.join(", ")}`);

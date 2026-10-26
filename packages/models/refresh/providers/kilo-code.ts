@@ -1,4 +1,5 @@
 import { Effect, Option, Schema } from "effect";
+import { raise } from "@opendum/models/refresh/core/raise";
 import { idMap } from "@opendum/models/model-store";
 import { fetchDecoded } from "@opendum/models/sync/http";
 import { afterFirstSlash, standardKey } from "@opendum/models/refresh/core/keys";
@@ -27,7 +28,7 @@ const freeIds = (payload: unknown): ReadonlyArray<string> => {
     onNone: () => [] as ReadonlyArray<unknown>,
     onSome: (value) => value.data,
   });
-  if (entries.length === 0) throw new Error("unexpected Kilo Gateway /models payload");
+  if (entries.length === 0) raise(new Error("unexpected Kilo Gateway /models payload"));
 
   return entries.flatMap((entry) =>
     Option.match(decodeEntry(entry), {

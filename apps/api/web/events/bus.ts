@@ -206,13 +206,14 @@ export async function* subscribeEvents(userId: string, topics: LiveTopic[], sign
   activeUserIds.add(userId);
   startWorkers();
 
-  try {
+  {
     yield* initialEvents(userId, topics);
 
     for await (const event of publisher.subscribe(userId, { signal })) {
       if (event.type === "ping" || wanted.has(event.topic)) yield event;
     }
-  } finally {
+  }
+  {
     activeUserIds.delete(userId);
     await Effect.runPromise(Ref.update(usagePublishedAt, (current) => {
       const next = new Map(current);

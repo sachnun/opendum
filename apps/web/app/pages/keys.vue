@@ -2,6 +2,8 @@
 definePageMeta({ middleware: "auth", layout: "web" });
 
 import type { AccessMode } from "~~/lib/access-draft";
+import { Effect } from "effect";
+import { errorText, settle } from "~~/lib/settle";
 
 const api = useApi();
 const { isAuditMode } = useAudit();
@@ -13,8 +15,10 @@ type ApiKeyOptions = Awaited<ReturnType<typeof api.apiKeys.options>>;
 type RateLimitRule = ApiKeyOptions["rateLimitsByKeyId"][string][number];
 
 const { data, error, refresh } = useAsyncData(dataKeys.apiKeys, async () => {
-  const [apiKeys, options] = await Promise.all([api.apiKeys.list(), api.apiKeys.options()]);
-  return { apiKeys, options };
+  const loaded = await Effect.runPromise(
+    Effect.all([Effect.promise(() => api.apiKeys.list()), Effect.promise(() => api.apiKeys.options())])
+  );
+  return { apiKeys: loaded[0], options: loaded[1] };
 });
 
 const apiKeys = computed<KeyListItem[]>(() => data.value?.apiKeys ?? []);
@@ -32,20 +36,16 @@ const copiedProxy = ref(false);
 let copyTimer: ReturnType<typeof setTimeout> | null = null;
 
 async function copyProxy() {
-  try {
-    await navigator.clipboard.writeText(proxyBaseUrl.value);
-    copiedProxy.value = true;
-
-    if (copyTimer) {
-      clearTimeout(copyTimer);
-    }
-
-    copyTimer = setTimeout(() => {
-      copiedProxy.value = false;
-    }, 1800);
-  } catch {
+  const copied = await settle(() => navigator.clipboard.writeText(proxyBaseUrl.value));
+  if (!copied.ok) {
     console.error("Failed to copy proxy base URL");
+    return;
   }
+  copiedProxy.value = true;
+  if (copyTimer) clearTimeout(copyTimer);
+  copyTimer = setTimeout(() => {
+    copiedProxy.value = false;
+  }, 1800);
 }
 
 onBeforeUnmount(() => {
@@ -151,20 +151,19 @@ async function toggleKey(apiKey: KeyListItem) {
   togglingIds.value = nextTogglingIds;
   toggleErrors.value = { ...toggleErrors.value, [apiKey.id]: "" };
 
-  try {
-    const result = await api.apiKeys.toggle({ id: apiKey.id });
-    if (!result.success) throw new Error(result.error);
-    applyState(apiKey.id, { isActive: result.data.isActive, expiresAt: result.data.expiresAt });
-  } catch (error) {
-    toggleErrors.value = {
-      ...toggleErrors.value,
-      [apiKey.id]: error instanceof Error ? error.message : "Failed to toggle API key",
-    };
-  } finally {
-    const nextTogglingIds = new Set(togglingIds.value);
-    nextTogglingIds.delete(apiKey.id);
-    togglingIds.value = nextTogglingIds;
+  const toggled = await settle(() => api.apiKeys.toggle({ id: apiKey.id }));
+  const afterToggle = new Set(togglingIds.value);
+  afterToggle.delete(apiKey.id);
+  togglingIds.value = afterToggle;
+  if (!toggled.ok) {
+    toggleErrors.value = { ...toggleErrors.value, [apiKey.id]: errorText(toggled.error, "Failed to toggle API key") };
+    return;
   }
+  if (!toggled.value.success) {
+    toggleErrors.value = { ...toggleErrors.value, [apiKey.id]: toggled.value.error };
+    return;
+  }
+  applyState(apiKey.id, { isActive: toggled.value.data.isActive, expiresAt: toggled.value.data.expiresAt });
 }
 
 async function toggleRoaming(apiKey: KeyListItem, enabled: boolean) {
@@ -176,20 +175,19 @@ async function toggleRoaming(apiKey: KeyListItem, enabled: boolean) {
   roamingUpdatingIds.value = nextUpdatingIds;
   roamingErrors.value = { ...roamingErrors.value, [apiKey.id]: "" };
 
-  try {
-    const result = await api.apiKeys.updateRoaming({ id: apiKey.id, enabled });
-    if (!result.success) throw new Error(result.error);
-    applyPatch(apiKey.id, { roamingEnabled: result.data.roamingEnabled });
-  } catch (error) {
-    roamingErrors.value = {
-      ...roamingErrors.value,
-      [apiKey.id]: error instanceof Error ? error.message : "Failed to update roaming",
-    };
-  } finally {
-    const nextUpdatingIds = new Set(roamingUpdatingIds.value);
-    nextUpdatingIds.delete(apiKey.id);
-    roamingUpdatingIds.value = nextUpdatingIds;
+  const updated = await settle(() => api.apiKeys.updateRoaming({ id: apiKey.id, enabled }));
+  const afterUpdate = new Set(roamingUpdatingIds.value);
+  afterUpdate.delete(apiKey.id);
+  roamingUpdatingIds.value = afterUpdate;
+  if (!updated.ok) {
+    roamingErrors.value = { ...roamingErrors.value, [apiKey.id]: errorText(updated.error, "Failed to update roaming") };
+    return;
   }
+  if (!updated.value.success) {
+    roamingErrors.value = { ...roamingErrors.value, [apiKey.id]: updated.value.error };
+    return;
+  }
+  applyPatch(apiKey.id, { roamingEnabled: updated.value.data.roamingEnabled });
 }
 
 function updateModels(apiKeyId: string, value: { mode: AccessMode; models: string[] }) {

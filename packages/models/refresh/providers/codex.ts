@@ -1,4 +1,5 @@
 import { Effect, Option, Schema } from "effect";
+import { raise } from "@opendum/models/refresh/core/raise";
 import { fetchDecoded, fetchText } from "@opendum/models/sync/http";
 import { entryFor, writeEntry } from "@opendum/models/refresh/core/keys";
 import { sourceOf, type ModelSource, type SourceResult } from "@opendum/models/refresh/core/types";
@@ -35,7 +36,7 @@ const parseModels = (payload: unknown): ReadonlyArray<Entry> => {
     onNone: () => [] as ReadonlyArray<unknown>,
     onSome: (value) => value.models,
   });
-  if (data.length === 0) throw new Error("unexpected Codex models.json payload");
+  if (data.length === 0) raise(new Error("unexpected Codex models.json payload"));
 
   return data.flatMap((item) =>
     Option.match(decodeEntry(item), {

@@ -1,4 +1,5 @@
 import { Effect } from "effect";
+import { raise } from "@opendum/models/refresh/core/raise";
 import { fetchText } from "@opendum/models/sync/http";
 import { stripParams } from "@opendum/models/model/clean-key";
 import { join } from "@opendum/models/paths";
@@ -48,7 +49,7 @@ const isIgnored = (name: string): boolean => !/[0-9]/.test(name);
 
 const parseRows = (html: string): ReadonlyArray<Row> => {
   const tables = [...html.matchAll(TABLE)].map((match) => match[1] ?? "");
-  if (tables.length === 0) throw new Error("no tables found on the Kiro docs page");
+  if (tables.length === 0) raise(new Error("no tables found on the Kiro docs page"));
 
   for (const table of tables) {
     const rows = tableRows(table);
@@ -66,7 +67,7 @@ const parseRows = (html: string): ReadonlyArray<Row> => {
       (cell) => cell === "pro+" || cell === "pro plus" || (cell.startsWith("pro") && cell.includes("+"))
     );
     const powerIndex = header.findIndex((cell) => cell === "power");
-    if (nameIndex < 0) throw new Error("could not find the Model column in the Kiro comparison table");
+    if (nameIndex < 0) raise(new Error("could not find the Model column in the Kiro comparison table"));
 
     const parsed: Row[] = [];
     for (const row of rows.slice(1)) {
@@ -79,10 +80,10 @@ const parseRows = (html: string): ReadonlyArray<Row> => {
         (powerIndex >= 0 ? (row[powerIndex] ?? "") : "").length > 0;
       parsed.push({ name, free, paid });
     }
-    if (parsed.length === 0) throw new Error("no models found in the Kiro comparison table");
+    if (parsed.length === 0) raise(new Error("no models found in the Kiro comparison table"));
     return parsed;
   }
-  throw new Error('could not find the Kiro "Quick comparison" table');
+  raise(new Error('could not find the Kiro "Quick comparison" table'));
 };
 
 const publishedIds = (html: string): Effect.Effect<ReadonlyMap<string, string>> =>
@@ -163,7 +164,7 @@ export const kiroSource: ModelSource = {
       const catalog = yield* publishedIds(html);
 
       const usable = rows.filter((row) => !isIgnored(row.name));
-      if (usable.length === 0) throw new Error("Kiro docs returned no usable models");
+      if (usable.length === 0) raise(new Error("Kiro docs returned no usable models"));
 
       const models = new Map<string, string>();
       for (const row of usable) {

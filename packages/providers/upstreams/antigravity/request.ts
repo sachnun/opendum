@@ -107,15 +107,8 @@ export class GeminiToolCalls {
       const fn = (call.function ?? {}) as Json;
       const name = Value.string(fn.name);
       if (!name) continue;
-      let args: unknown = {};
       const rawArgs = Value.string(fn.arguments);
-      if (rawArgs) {
-        try {
-          args = JSON.parse(rawArgs);
-        } catch {
-          args = {};
-        }
-      }
+      const args: unknown = rawArgs ? (Value.parseJson(rawArgs) ?? {}) : {};
       parts.push({ functionCall: { name, args, id } });
     }
     return parts;

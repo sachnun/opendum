@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { errorText, settle } from "~~/lib/settle";
 import { labelOf } from "@opendum/providers/provider-accounts";
 
 import type { AccessMode } from "~~/lib/access-draft";
@@ -50,18 +51,21 @@ function searchText(target: { id: string }): string {
 async function save(value: { mode: AccessMode; ids: string[] }) {
   isSaving.value = true;
   error.value = "";
-  try {
-    const result = await api.apiKeys.updateAccountAccess({ id: props.apiKeyId, mode: value.mode, accounts: value.ids });
-    if (!result.success) throw new Error(result.error);
+  const updated = await settle(() => api.apiKeys.updateAccountAccess({ id: props.apiKeyId, mode: value.mode, accounts: value.ids }));
+  isSaving.value = false;
+  if (!updated.ok) {
+    error.value = errorText(updated.error, "Failed to update account access");
+    return;
+  }
+  if (!updated.value.success) {
+    error.value = updated.value.error;
+    return;
+  }
+  const result = updated.value;
     saved.value = { mode: result.data.mode, ids: result.data.accounts };
     mode.value = result.data.mode;
     accounts.value = [...result.data.accounts];
     emit("updated", { mode: result.data.mode, accounts: result.data.accounts });
-  } catch (failure) {
-    error.value = failure instanceof Error ? failure.message : "Failed to update account access";
-  } finally {
-    isSaving.value = false;
-  }
 }
 </script>
 

@@ -1,4 +1,5 @@
 import { Duration, Effect, Schedule } from "effect";
+import { raise } from "@opendum/models/refresh/core/raise";
 
 import {
   ModelFetchFailure,
@@ -104,9 +105,7 @@ function retryFetch<A>(
 }
 
 export function orThrow<A>(effect: Effect.Effect<A, unknown>): Promise<A> {
-  return Effect.runPromise(effect).catch((cause: unknown) => {
-    throw asError(cause);
-  });
+  return Effect.runPromise(effect).catch((cause: unknown) => raise(asError(cause)));
 }
 
 export function runTyped<A, E>(effect: Effect.Effect<A, E>): Promise<A> {
@@ -176,7 +175,7 @@ export function request<T>(
     }
 
     return yield* Effect.tryPromise({
-      try: () => Promise.resolve(decode(response)),
+      try: async () => decode(response) as T,
       catch: (cause) =>
         timeoutCause(cause)
           ? timeoutFailure(label, timeout, "reading")

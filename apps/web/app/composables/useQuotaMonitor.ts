@@ -1,4 +1,6 @@
 import type { ComputedRef } from "vue";
+import { Effect } from "effect";
+import { failureText, settle } from "~~/lib/settle";
 import type { AccountQuotaInfo, ProviderDetailData, QuotaProviderKey } from "~~/lib/api-types";
 
 type Account = ProviderDetailData["accounts"][number];
@@ -57,21 +59,18 @@ export function useQuotaMonitor(options: {
     setQuotaLoading(account.id, true);
     errorById.value = { ...errorById.value, [account.id]: "" };
 
-    try {
-      const result = await api.accounts.quota({ provider, accountId: account.id, forceRefresh });
-      if (runId !== undefined && runId !== queueRunId) return;
-      if (!result.success) throw new Error(result.error);
-
-      quotaById.value = { ...quotaById.value, [account.id]: result.data };
-      errorById.value = Object.fromEntries(Object.entries(errorById.value).filter(([accountId]) => accountId !== account.id));
-    } catch (error) {
-      if (runId !== undefined && runId !== queueRunId) return;
-
-      const message = error instanceof Error ? error.message : "Failed to fetch quota data";
+    const fetched = await settle(() => api.accounts.quota({ provider, accountId: account.id, forceRefresh }));
+    if (runId !== undefined && runId !== queueRunId) return;
+    if (fetched.ok && fetched.value.success) {
+      quotaById.value = { ...quotaById.value, [account.id]: fetched.value.data };
+      errorById.value = Object.fromEntries(
+        Object.entries(errorById.value).filter(([accountId]) => accountId !== account.id)
+      );
+    } else {
+      const message = failureText(fetched, "Failed to fetch quota data");
       if (refreshExisting || !hadQuota) errorById.value = { ...errorById.value, [account.id]: message };
-    } finally {
-      setQuotaLoading(account.id, false);
     }
+    setQuotaLoading(account.id, false);
   }
 
   async function runQuotaQueue(accounts = options.quotaCapableAccounts.value, refreshOptions: RefreshOptions | boolean = {}) {
@@ -105,15 +104,22 @@ export function useQuotaMonitor(options: {
         accountsByProvider.set(provider, [...(accountsByProvider.get(provider) ?? []), account]);
       }
 
-      const providerResults = await Promise.all(Array.from(accountsByProvider.entries()).map(async ([provider, providerAccounts]) => {
-        try {
-          const result = await api.accounts.quotas({ provider, accountIds: providerAccounts.map((account) => account.id), forceRefresh });
-          if (!result.success) throw new Error(result.error);
-          return { ok: true as const, provider, providerAccounts, data: result.data };
-        } catch (error) {
-          return { ok: false as const, providerAccounts, error };
+      const providerResults = await Effect.runPromise(Effect.all(Array.from(accountsByProvider.entries()).map(([provider, providerAccounts]) => Effect.promise(async () => {
+        {
+          const fetched = await settle(() =>
+            api.accounts.quotas({
+              provider,
+              accountIds: providerAccounts.map((account) => account.id),
+              forceRefresh,
+            })
+          );
+          if (!fetched.ok) return { ok: false as const, providerAccounts, error: fetched.error };
+          if (!fetched.value.success) {
+            return { ok: false as const, providerAccounts, error: new Error(fetched.value.error) };
+          }
+          return { ok: true as const, provider, providerAccounts, data: fetched.value.data };
         }
-      }));
+      })), { concurrency: "unbounded" }));
 
       if (runId !== queueRunId) return;
 

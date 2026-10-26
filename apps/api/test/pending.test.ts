@@ -5,14 +5,10 @@ import { pendingCount, settleTasks, trackPending, trackWork } from "@opendum/api
 
 describe("pending task tracker", () => {
   it("tracks work until it settles", async () => {
-    let release: (() => void) | undefined;
-    const gate = new Promise<void>((resolve) => {
-      release = resolve;
-    });
+    const gate = Effect.runPromise(Effect.sleep("50 millis"));
     const before = pendingCount();
     trackPending(gate);
     expect(pendingCount()).toBe(before + 1);
-    release?.();
     expect(await settleTasks(1_000)).toBe(true);
     expect(pendingCount()).toBe(before);
   });
@@ -20,26 +16,21 @@ describe("pending task tracker", () => {
   it("drains a task that settles while another is added", async () => {
     let added = false;
     trackPending(
-      (async () => {
-        await Promise.resolve();
-        if (added) return;
-        added = true;
-        trackPending(Effect.runPromise(Effect.sleep("1 millis")));
-      })()
+      Effect.runPromise(
+        Effect.sync(() => {
+          if (added) return;
+          added = true;
+          trackPending(Effect.runPromise(Effect.sleep("1 millis")));
+        })
+      )
     );
     expect(await settleTasks(2_000)).toBe(true);
     expect(pendingCount()).toBe(0);
   });
 
   it("reports a timeout without throwing", async () => {
-    let release: (() => void) | undefined;
-    trackPending(
-      new Promise<void>((resolve) => {
-        release = resolve;
-      })
-    );
+    trackPending(Effect.runPromise(Effect.sleep("50 millis")));
     expect(await settleTasks(10)).toBe(false);
-    release?.();
     expect(await settleTasks(1_000)).toBe(true);
   });
 

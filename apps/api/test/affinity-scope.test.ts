@@ -13,16 +13,17 @@ import type { Health } from "@opendum/api/core/health";
 import type { ProviderPerformance } from "@opendum/api/core/provider-performance";
 import { Rotation } from "@opendum/api/core/rotation";
 import { fakes } from "@opendum/api/test/fakes";
+import { raise } from "@opendum/core/raise";
 
 function memoryRedis(fail = false): { redis: OpendumRedis; store: Map<string, string> } {
   const store = new Map<string, string>();
   const redis = {
     get: async (key: string) => {
-      if (fail) throw new Error("redis unavailable");
+      if (fail) raise(new Error("redis unavailable"));
       return store.get(key) ?? null;
     },
     set: async (key: string, value: string) => {
-      if (fail) throw new Error("redis unavailable");
+      if (fail) raise(new Error("redis unavailable"));
       store.set(key, value);
       return "OK";
     },

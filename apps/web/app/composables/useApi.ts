@@ -27,6 +27,7 @@ import type {
   ProviderDetailData,
   AccountUpdateData,
 } from "~~/lib/api-types";
+import { errorText, settle } from "~~/lib/settle";
 import type { DeviceProviderKey, AuthProvider } from "@opendum/providers/provider-accounts";
 import type { AccessMode } from "~~/lib/access-draft";
 import { apiUrl } from "~~/lib/api-url";
@@ -132,11 +133,12 @@ export function useApi() {
       },
       audit: {
         start: async (body: { userId: string }) => {
-          try {
-            const user = await auth.startAudit(body.userId);
-            return { success: true, data: { user } } as const;
-          } catch (error) {
-            return { success: false, error: error instanceof Error ? error.message : "Failed to start audit mode" } as const;
+          {
+            const started = await settle(() => auth.startAudit(body.userId));
+            if (!started.ok) {
+              return { success: false, error: errorText(started.error, "Failed to start audit mode") } as const;
+            }
+            return { success: true, data: { user: started.value } } as const;
           }
         },
         stop: async () => {

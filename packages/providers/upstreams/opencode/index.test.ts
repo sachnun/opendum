@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { raise } from "@opendum/providers/core/errors";
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
 import { OpencodeProvider } from "@opendum/providers/upstreams/opencode/index";
@@ -32,7 +33,7 @@ function capture(model: string, body: Record<string, unknown>, streaming = true)
   const provider = new OpencodeProvider({ registry, transport, fallback: null });
   const request = { body, stream: streaming } as ProviderRequest;
   return Effect.runPromise(provider.makeRequest(request) as Effect.Effect<Response, never>).then(() => {
-    if (!captured) throw new Error("no request captured");
+    if (!captured) raise(new Error("no request captured"));
     return captured;
   });
 }

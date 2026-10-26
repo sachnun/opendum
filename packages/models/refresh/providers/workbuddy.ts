@@ -1,4 +1,6 @@
 import { Effect, Option, Schema } from "effect";
+import { raise } from "@opendum/models/refresh/core/raise";
+import { parseJson } from "@opendum/models/refresh/core/json";
 import { buildIndex } from "@opendum/models/model-store";
 import { exists, readText } from "@opendum/models/fs";
 import { join } from "@opendum/models/paths";
@@ -35,14 +37,14 @@ const remoteCatalog = (): Effect.Effect<ReadonlyArray<Entry>> =>
       Schema.decodeUnknownOption(Schema.Struct({ version: Schema.String }))(manifest),
       () => ({ version: "" })
     ).version;
-    if (!version) throw new Error(`could not read the version of ${NPM_PACKAGE}`);
+    if (!version) raise(new Error(`could not read the version of ${NPM_PACKAGE}`));
 
     const payload = yield* fetchJsonEffect(`${UNPKG}/${NPM_PACKAGE}@${version}/${PRODUCT_FILE}`);
     const models = Option.match(decodePayload(payload), {
       onNone: () => [] as ReadonlyArray<unknown>,
       onSome: (value) => value.models,
     });
-    if (models.length === 0) throw new Error(`unexpected models payload in ${NPM_PACKAGE}@${version}`);
+    if (models.length === 0) raise(new Error(`unexpected models payload in ${NPM_PACKAGE}@${version}`));
     return models.flatMap((item) => Option.match(toEntry(item), { onNone: () => [], onSome: (entry) => [entry] }));
   });
 
@@ -52,22 +54,18 @@ const localCatalog = (): ReadonlyArray<Entry> => {
   const candidate = join(home, ".workbuddy-ai", "cache", "acc-product-config-v3.json");
   if (!exists(candidate)) return [];
 
-  try {
-    const payload: unknown = JSON.parse(readText(candidate));
-    const models = Array.isArray(payload)
-      ? payload
-      : Option.getOrElse(decodePayload(payload), () => ({ models: [] as ReadonlyArray<unknown> })).models;
-    return models.flatMap((item) => Option.match(toEntry(item), { onNone: () => [], onSome: (entry) => [entry] }));
-  } catch {
-    return [];
-  }
+  const payload: unknown = parseJson(readText(candidate));
+  const models = Array.isArray(payload)
+    ? payload
+    : Option.getOrElse(decodePayload(payload), () => ({ models: [] as ReadonlyArray<unknown> })).models;
+  return models.flatMap((item) => Option.match(toEntry(item), { onNone: () => [], onSome: (entry) => [entry] }));
 };
 
 const fetchJsonEffect = (url: string): Effect.Effect<unknown> =>
   Effect.tryPromise({
     try: async () => {
       const response = await fetch(url, { headers: { Accept: "application/json" } });
-      if (!response.ok) throw new Error(`failed to fetch ${url} (${response.status})`);
+      if (!response.ok) raise(new Error(`failed to fetch ${url} (${response.status})`));
       return (await response.json()) as unknown;
     },
     catch: (cause) => cause,
@@ -100,7 +98,7 @@ export const workbuddySource: ModelSource = {
           models.set(entry.id, entry.id);
           reasoning.set(entry.id, entry.supportsReasoning === true);
         }
-        if (models.size === 0) throw new Error("WorkBuddy catalog produced no models");
+        if (models.size === 0) raise(new Error("WorkBuddy catalog produced no models"));
         if (models.size < MIN_EXPECTED_MODELS) {
           console.warn(`[WorkBuddy] only ${models.size} models (expected >= ${MIN_EXPECTED_MODELS})`);
         }

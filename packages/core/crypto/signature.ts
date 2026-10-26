@@ -22,9 +22,6 @@ export function equalHex(a: string, b: string): boolean {
 }
 
 export function signaturesMatch(expectedHex: string, providedHex: string): boolean {
-  try {
-    return equalHex(expectedHex, providedHex);
-  } catch {
-    return false;
-  }
+  if (!/^[0-9a-f]*$/iu.test(expectedHex) || !/^[0-9a-f]*$/iu.test(providedHex)) return false;
+  return equalHex(expectedHex, providedHex);
 }

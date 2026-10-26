@@ -1,3 +1,4 @@
+import { raise } from "@opendum/core/raise";
 import { defineHandler } from "nitro";
 import { getQuery, HTTPError } from "h3";
 import { z } from "zod";
@@ -11,10 +12,10 @@ const providerSchema = z.enum(["github", "google"]);
 export default defineHandler(async (event) => {
   const query = getQuery(event);
   const target = webOrigin(query.to);
-  if (!target) throw new HTTPError({ status: 400, statusText: "Invalid web origin" });
+  if (!target) raise(new HTTPError({ status: 400, statusText: "Invalid web origin" }));
 
   const provider = providerSchema.safeParse(typeof query.provider === "string" ? query.provider.trim() : undefined);
-  if (!provider.success) throw new HTTPError({ status: 400, statusText: "Unsupported sign in provider" });
+  if (!provider.success) raise(new HTTPError({ status: 400, statusText: "Unsupported sign in provider" }));
 
   const baseUrl = process.env.BETTER_AUTH_URL?.trim().replace(/\/+$/, "") || requestOrigin(event);
   const callbackURL = handoffUrl(baseUrl, { to: target, redirect: safePath(query.redirect) });
@@ -24,7 +25,7 @@ export default defineHandler(async (event) => {
     returnHeaders: true,
   });
 
-  if (!response?.url) throw new HTTPError({ status: 502, statusText: "Failed to start sign in" });
+  if (!response?.url) raise(new HTTPError({ status: 502, statusText: "Failed to start sign in" }));
 
   const redirect = new Response(null, { status: 302, headers: { location: response.url } });
   for (const cookie of headers.getSetCookie()) {

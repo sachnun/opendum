@@ -1,9 +1,41 @@
 import { Effect } from "effect";
-import { tryAsync } from "@opendum/core/best-effort";
-import { assertPublic } from "@opendum/core/egress/ssrf";
+import { hostError } from "@opendum/core/egress/ssrf";
 import { guardedFetch, type Fetch, type FetchHandle, type GuardedFetchOptions } from "@opendum/core/egress/guard";
 
 export const MAX_REDIRECTS = 10;
+
+export class RedirectFailure extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RedirectFailure";
+  }
+}
+
+function cancelBody(response: Response): Effect.Effect<void, RedirectFailure> {
+  return Effect.ignore(
+    Effect.tryPromise({
+      try: async () => {
+        await response.body?.cancel();
+      },
+      catch: (cause) => new RedirectFailure(String(cause)),
+    })
+  );
+}
+
+function requestHop(baseFetch: Fetch, url: string, init: RequestInit | undefined): Effect.Effect<Response, RedirectFailure> {
+  return Effect.tryPromise({
+    try: () => baseFetch(url, { ...init, redirect: "manual" }),
+    catch: (cause) => new RedirectFailure(String(cause)),
+  });
+}
+
+function rewrittenInit(response: Response, init: RequestInit | undefined): RequestInit | undefined {
+  const method = (init?.method ?? "GET").toUpperCase();
+  const downgrade =
+    response.status === 303 ||
+    ((response.status === 301 || response.status === 302) && method !== "GET" && method !== "HEAD");
+  return downgrade ? { ...init, method: "GET", body: undefined } : init;
+}
 
 export class Redirects {
   readonly maxRedirects: number;
@@ -12,27 +44,32 @@ export class Redirects {
     this.maxRedirects = maxRedirects;
   }
 
-  async follow(baseFetch: Fetch, url: string, init?: RequestInit): Promise<Response> {
-    let current = url;
-    let currentInit = init;
-    for (let hop = 0; hop <= this.maxRedirects; hop += 1) {
-      const parsed = new URL(current);
-      assertPublic(parsed.hostname);
-      const response = await baseFetch(current, { ...currentInit, redirect: "manual" });
-      if (response.status < 300 || response.status >= 400) return response;
-      const location = response.headers.get("location");
-      if (!location) return response;
-      await Effect.runPromise(tryAsync(() => response.body?.cancel() ?? Promise.resolve(), undefined));
-      if (hop === this.maxRedirects) throw new Error("stopped after 10 redirects");
-      const next = new URL(location, current);
-      if (next.protocol !== "https:") throw new Error("redirect must use https");
-      const method = (currentInit?.method ?? "GET").toUpperCase();
-      if (response.status === 303 || ((response.status === 301 || response.status === 302) && method !== "GET" && method !== "HEAD")) {
-        currentInit = { ...currentInit, method: "GET", body: undefined };
+  follow(baseFetch: Fetch, url: string, init?: RequestInit): Effect.Effect<Response, RedirectFailure> {
+    const limit = this.maxRedirects;
+    return Effect.gen(function* () {
+      let current = url;
+      let currentInit = init;
+      for (let hop = 0; hop <= limit; hop += 1) {
+        const host = new URL(current).hostname;
+        const hostFailure = hostError(host);
+        if (hostFailure) return yield* Effect.fail(new RedirectFailure(hostFailure.message));
+        const response = yield* requestHop(baseFetch, current, currentInit);
+        if (response.status < 300 || response.status >= 400) return response;
+        const location = response.headers.get("location");
+        if (!location) return response;
+        yield* cancelBody(response);
+        if (hop === limit) {
+          return yield* Effect.fail(new RedirectFailure("stopped after 10 redirects"));
+        }
+        const next = new URL(location, current);
+        if (next.protocol !== "https:") {
+          return yield* Effect.fail(new RedirectFailure("redirect must use https"));
+        }
+        currentInit = rewrittenInit(response, currentInit);
+        current = next.toString();
       }
-      current = next.toString();
-    }
-    throw new Error("stopped after 10 redirects");
+      return yield* Effect.fail(new RedirectFailure("stopped after 10 redirects"));
+    });
   }
 }
 
@@ -45,11 +82,14 @@ export class Fetcher {
     this.handle = guardedFetch(options);
   }
 
-  fetch(url: string, init?: RequestInit): Promise<Response> {
+  fetch(url: string, init?: RequestInit): Effect.Effect<Response, RedirectFailure> {
     return this.policy.follow(this.handle.fetch, url, init);
   }
 
-  close(): Promise<void> {
-    return this.handle.close();
+  close(): Effect.Effect<void, RedirectFailure> {
+    return Effect.tryPromise({
+      try: () => this.handle.close(),
+      catch: (cause) => new RedirectFailure(String(cause)),
+    });
   }
 }
