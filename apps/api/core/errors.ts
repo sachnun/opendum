@@ -1,5 +1,6 @@
 import { Result, Schema } from "effect";
 import { parseJson, stringValue, trySync } from "./helpers.js";
+import { HEADERS_TIMEOUT_MESSAGE } from "./upstream-timeout.js";
 import type { ErrorFormat, RouteError } from "./types.js";
 
 const OptionalString = Schema.optional(Schema.NullOr(Schema.String));
@@ -281,13 +282,67 @@ export function workbuddyRestrictionDisabledUntil(
   now: Date
 ): Date | null {
   if (provider !== "workbuddy") return null;
+  const code = workbuddyCode(body);
+  if (code === null || !WORKBUDDY_RESTRICTION_CODES.has(code)) return null;
+  return new Date(now.getTime() + WORKBUDDY_RESTRICTION_COOLDOWN_MS);
+}
+
+const WORKBUDDY_USAGE_LIMIT_CODE = 6004;
+const WORKBUDDY_REQUEST_FAULT_CODES = new Set([11128]);
+const WORKBUDDY_USAGE_LIMIT_FALLBACK_MS = 5 * 60 * 1000;
+const WORKBUDDY_RESET_PATTERN = /reset at (\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2}) UTC([+-]\d{1,2})/;
+
+function workbuddyPayload(body: string): Record<string, unknown> | null {
   const parsed = parseJson(body.trim());
   if (Result.isFailure(parsed)) return null;
   const payload = parsed.success;
   if (payload === null || typeof payload !== "object" || Array.isArray(payload)) return null;
-  const code = (payload as Record<string, unknown>).code;
-  if (typeof code !== "number" || !WORKBUDDY_RESTRICTION_CODES.has(code)) return null;
-  return new Date(now.getTime() + WORKBUDDY_RESTRICTION_COOLDOWN_MS);
+  return payload as Record<string, unknown>;
+}
+
+function workbuddyCode(body: string): number | null {
+  const code = workbuddyPayload(body)?.code;
+  return typeof code === "number" ? code : null;
+}
+
+export function isTransientUpstreamStatus(status: number): boolean {
+  return status === 408 || status >= 500;
+}
+
+export function isUpstreamTimeout(message: string): boolean {
+  return message.includes(HEADERS_TIMEOUT_MESSAGE) || message.includes("upstream request timed out");
+}
+
+export function isWorkbuddyRequestFault(provider: string, body: string): boolean {
+  if (provider !== "workbuddy") return false;
+  const code = workbuddyCode(body);
+  return code !== null && WORKBUDDY_REQUEST_FAULT_CODES.has(code);
+}
+
+export function workbuddyUsageLimitResetAt(provider: string, body: string, now: Date): Date | null {
+  if (provider !== "workbuddy" || workbuddyCode(body) !== WORKBUDDY_USAGE_LIMIT_CODE) return null;
+  const payload = workbuddyPayload(body) ?? {};
+  const reset = parseWorkbuddyReset(`${stringValue(payload.msg)} ${stringValue(payload.message)}`);
+  if (reset && reset.getTime() > now.getTime()) return reset;
+  return new Date(now.getTime() + WORKBUDDY_USAGE_LIMIT_FALLBACK_MS);
+}
+
+function parseWorkbuddyReset(text: string): Date | null {
+  const match = WORKBUDDY_RESET_PATTERN.exec(text);
+  if (!match) return null;
+  const [, year, month, day, hour, minute, second, offset] = match;
+  const offsetHours = Number.parseInt(offset, 10);
+  if (!Number.isFinite(offsetHours)) return null;
+  const utc = Date.UTC(
+    Number.parseInt(year, 10),
+    Number.parseInt(month, 10) - 1,
+    Number.parseInt(day, 10),
+    Number.parseInt(hour, 10),
+    Number.parseInt(minute, 10),
+    Number.parseInt(second, 10)
+  );
+  const timestamp = utc - offsetHours * 60 * 60 * 1000;
+  return Number.isFinite(timestamp) ? new Date(timestamp) : null;
 }
 
 export function isAntigravityResourceExhausted(provider: string, status: number, body: string): boolean {

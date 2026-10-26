@@ -32,12 +32,16 @@ import {
   codexUsageLimitDisabledUntil,
   endpointPath,
   isAntigravityResourceExhausted,
+  isTransientUpstreamStatus,
+  isUpstreamTimeout,
+  isWorkbuddyRequestFault,
   prefixWithProvider,
   retryMetadata,
   routeErrorResponse,
   sanitizedProxyError,
   shouldRotate,
   workbuddyRestrictionDisabledUntil,
+  workbuddyUsageLimitResetAt,
 } from "./errors.js";
 import { upsertErrorHistory } from "./error-history.js";
 import {
@@ -94,6 +98,10 @@ const REFRESH_FAIL_COUNT_PREFIX = "opendum:provider-account:refresh-fail-count:"
 const REFRESH_FAIL_COUNT_TTL_SECONDS = 30 * 24 * 60 * 60;
 const REFRESH_MAX_CONSECUTIVE_FAILURES = 5;
 const RELEASE_REFRESH_LOCK_SCRIPT = `if redis.call("GET", KEYS[1]) == ARGV[1] then return redis.call("DEL", KEYS[1]) end return 0`;
+const TRANSIENT_MAX_RETRIES = 2;
+const TRANSIENT_RETRY_DELAY_MS = 1500;
+
+export type TransientRetryOptions = { maxRetries: number; delayMs: number };
 
 export type ProxyServiceOptions = {
   database: Database;
@@ -108,6 +116,7 @@ export type ProxyServiceOptions = {
   streamHeartbeatMs?: number;
   events?: ProxyEvents;
   saturation?: ModelSaturationOptions;
+  retry?: Partial<TransientRetryOptions>;
 };
 
 type AccountErrorContext = {
@@ -145,6 +154,7 @@ export class ProxyService implements StreamRecorder {
   private readonly roaming: Roaming;
   private readonly playground: Playground;
   private readonly saturation: ModelSaturation;
+  private readonly retry: TransientRetryOptions;
 
   constructor(options: ProxyServiceOptions) {
     this.redis = options.redis;
@@ -185,6 +195,7 @@ export class ProxyService implements StreamRecorder {
     });
     this.playground = new Playground(options.betterAuthSecret);
     this.saturation = new ModelSaturation(options.redis, options.saturation);
+    this.retry = { maxRetries: TRANSIENT_MAX_RETRIES, delayMs: TRANSIENT_RETRY_DELAY_MS, ...options.retry };
   }
 
   get points(): PointPort {
@@ -643,6 +654,8 @@ export class ProxyService implements StreamRecorder {
       let delayedFinalFailure: { account: ProviderAccount; statusCode: number; message: string } | null = null;
       let accountConfigured = false;
       let saturationRetries = 0;
+      let transientRetries = 0;
+      let transientRetryAccount = "";
       let retryAccount: ProviderAccount | null = null;
       let pendingReservation: PointReservation | null = null;
 
@@ -766,6 +779,33 @@ export class ProxyService implements StreamRecorder {
             message,
             this.errorContext(cfg, validation, parsed, account.provider)
           );
+          if (
+            !forced &&
+            !isUpstreamTimeout(message) &&
+            (transientRetryAccount !== account.id || transientRetries < this.retry.maxRetries)
+          ) {
+            if (transientRetryAccount !== account.id) {
+              transientRetryAccount = account.id;
+              transientRetries = 0;
+            }
+            transientRetries += 1;
+            yield* Effect.ignore(
+              Effect.promise(() =>
+                this.usage.logUsage(authResult, account, validation, status, Date.now() - startMs)
+              )
+            );
+            yield* Metric.update(upstreamErrors, 1);
+            lastFailure = {
+              status,
+              message: prefixWithProvider(account.provider, message),
+              type: "api_error",
+              accountId: account.id,
+            };
+            yield* Effect.promise(() => sleep(this.retry.delayMs * transientRetries));
+            retryAccount = account;
+            pendingReservation = roaming;
+            continue;
+          }
           const failedAt = yield* this.health.markAccountFailed(
             account.id,
             validation.model,
@@ -802,10 +842,23 @@ export class ProxyService implements StreamRecorder {
           delayedFinalFailure = null;
           const badRequestFromProvider = response.status === 400;
           const fallbackAcrossProviders = badRequestFromProvider && !forced && validation.provider === null;
+          const restrictedUntil = workbuddyRestrictionDisabledUntil(account.provider, bodyText, new Date());
+          const usageLimitedUntil = workbuddyUsageLimitResetAt(account.provider, bodyText, new Date());
           const detailed = buildAccountErrorMessage(
             bodyText,
             this.errorContext(cfg, validation, parsed, account.provider)
           );
+          const accountFault =
+            restrictedUntil !== null ||
+            codexUsageLimitDisabledUntil(account.provider, response.status, bodyText, new Date()) !== null ||
+            isAntigravityResourceExhausted(account.provider, response.status, bodyText);
+          const transient =
+            !accountFault &&
+            (isTransientUpstreamStatus(response.status) || isWorkbuddyRequestFault(account.provider, bodyText));
+          const retryable =
+            transient &&
+            !forced &&
+            (transientRetryAccount !== account.id || transientRetries < this.retry.maxRetries);
           if (isModelSaturated(response.status, bodyText)) {
             yield* Effect.ignore(
               Effect.promise(() =>
@@ -833,7 +886,7 @@ export class ProxyService implements StreamRecorder {
               accountId: account.id,
             };
           }
-          if (response.status !== 408 && !badRequestFromProvider) {
+          if (!transient && response.status !== 408 && !badRequestFromProvider) {
             if (!forced && isAntigravityResourceExhausted(account.provider, response.status, bodyText)) {
               delayedFinalFailure = { account, statusCode: response.status, message: detailed };
               yield* this.health.logAccountError(
@@ -882,12 +935,19 @@ export class ProxyService implements StreamRecorder {
               detailed
             );
           }
-          const restrictedUntil = workbuddyRestrictionDisabledUntil(account.provider, bodyText, new Date());
           if (restrictedUntil) {
             yield* this.health.markAccountUsageLimited(
               account.id,
               validation.model,
               restrictedUntil,
+              failedAt ?? new Date()
+            );
+          }
+          if (usageLimitedUntil) {
+            yield* this.health.markAccountUsageLimited(
+              account.id,
+              validation.model,
+              usageLimitedUntil,
               failedAt ?? new Date()
             );
           }
@@ -905,6 +965,17 @@ export class ProxyService implements StreamRecorder {
           };
           yield* Metric.update(upstreamErrors, 1);
           yield* Metric.update(upstreamTtft, upstreamFirstResponseMs - requestStartMs);
+          if (retryable) {
+            if (transientRetryAccount !== account.id) {
+              transientRetryAccount = account.id;
+              transientRetries = 0;
+            }
+            transientRetries += 1;
+            yield* Effect.promise(() => sleep(this.retry.delayMs * transientRetries));
+            retryAccount = account;
+            pendingReservation = roaming;
+            continue;
+          }
           if (roaming) yield* Effect.ignore(this.roaming.refund(roaming));
           if (fallbackAcrossProviders) {
             if (!excludedProviders.includes(account.provider)) excludedProviders.push(account.provider);
