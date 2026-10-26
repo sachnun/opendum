@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Effect, Ref } from "effect";
+import { raise } from "@opendum/models/refresh/core/raise";
 import { runSources } from "@opendum/models/refresh/core/runner";
 import { sourceOf, type ModelSource, type SourceContext, type SourceResult } from "@opendum/models/refresh/core/types";
 
@@ -65,6 +66,32 @@ describe("model source runner", () => {
     );
 
     expect(seen).toEqual(["fetch-a", "fetch-b", "tail-a"]);
+  });
+
+  test("reports a defect as a failure without aborting the remaining sources", async () => {
+    const seen: string[] = [];
+    const defective = source("broken", {
+      order: 1,
+      fetch: () =>
+        Effect.sync(() => {
+          seen.push("broken");
+          raise(new Error("upstream exploded"));
+          return sourceOf(new Map());
+        }),
+    });
+    const healthy = source("healthy", {
+      order: 2,
+      fetch: () =>
+        Effect.sync(() => {
+          seen.push("healthy");
+          return sourceOf(new Map());
+        }),
+    });
+
+    const report = await Effect.runPromise(runSources([defective, healthy], ctx()));
+
+    expect(seen).toEqual(["broken", "healthy"]);
+    expect(report.failures).toEqual([{ provider: "broken", message: "upstream exploded" }]);
   });
 
   test("reports providers whose models vanished", async () => {

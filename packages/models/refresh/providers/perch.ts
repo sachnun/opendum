@@ -1,10 +1,12 @@
-import { Effect } from "effect";
+import { Effect, Cause } from "effect";
 import { raise } from "@opendum/models/refresh/core/raise";
 import { buildIndex } from "@opendum/models/model-store";
 import { fetchText } from "@opendum/models/sync/http";
 import { normalizeKey, normalizeName } from "@opendum/models/model/similarity";
 import { join } from "@opendum/models/paths";
 import { packageVersion } from "@opendum/models/refresh/core/fetch";
+import { causeMessage } from "@opendum/models/refresh/core/failure";
+import type { ModelFetchFailure, ModelTimeoutFailure } from "@opendum/models/errors";
 import type { ModelIndexEntry } from "@opendum/models/types";
 import { sourceOf, type ModelSource, type SourceContext, type SourceResult, type VersionTarget } from "@opendum/models/refresh/core/types";
 
@@ -134,11 +136,33 @@ const starterPool = (
   };
 };
 
+const registeredPool = (modelsDir: string): Map<string, string> =>
+  new Map(
+    Object.values(buildIndex(modelsDir))
+      .flatMap((entry) => {
+        if (!(entry.data.providers ?? []).includes(PROVIDER)) return [];
+        const upstream = perchUpstream(entry);
+        return upstream ? [[entry.fileId, upstream] as const] : [];
+      })
+      .sort(([left], [right]) => left.localeCompare(right))
+  );
+
+const degraded = (
+  ctx: SourceContext,
+  cause: ModelFetchFailure | ModelTimeoutFailure
+): Effect.Effect<SourceResult> =>
+  Effect.andThen(
+    Effect.logWarning(
+      `[Perch] docs unavailable (${causeMessage(Cause.fail(cause))}); keeping the ${registeredPool(ctx.modelsDir).size} registered Starter model(s)`
+    ),
+    Effect.sync(() => sourceOf(registeredPool(ctx.modelsDir)) as SourceResult)
+  );
+
 const versionTargets = (ctx: SourceContext): ReadonlyArray<VersionTarget> => [
   {
     label: "perch provider",
-    path: join(ctx.repoRoot, "packages/providers/upstreams/perch.ts"),
-    pattern: /(const PERCH_CLI_VERSION = ")(\d+\.\d+\.\d+)(")/,
+    path: join(ctx.repoRoot, "packages/providers/upstreams/perch/auth.ts"),
+    pattern: /(const CLI_VERSION = ")(\d+\.\d+\.\d+)(")/,
   },
 ];
 
@@ -162,7 +186,14 @@ export const perchSource: ModelSource = {
         }
         return sourceOf(models);
       }),
-      Effect.mapError((cause) => ({ provider: PROVIDER, message: cause.message }))
+      Effect.catchTags({
+        ModelFetchFailure: (cause) => degraded(ctx, cause),
+        ModelTimeoutFailure: (cause) => degraded(ctx, cause),
+      }),
+      Effect.mapError((cause: unknown) => ({
+        provider: PROVIDER,
+        message: cause instanceof Error ? cause.message : String(cause),
+      }))
     ),
 
   versionTargets,

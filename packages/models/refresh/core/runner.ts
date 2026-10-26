@@ -1,7 +1,8 @@
-import { Effect, Match, Option } from "effect";
+import { Effect, Exit, Option } from "effect";
 import { syncCli } from "@opendum/models/refresh/steps/version-sync";
 import { buildIndex } from "@opendum/models/model-store";
 import { apply, report } from "@opendum/models/refresh/core/keys";
+import { causeMessage } from "@opendum/models/refresh/core/failure";
 import type {
   ModelSource,
   RunReport,
@@ -36,12 +37,6 @@ const snapshot = (modelsDir: string, providers: ReadonlyArray<string>): Snapshot
   return result;
 };
 
-const messageOf = (cause: unknown): string =>
-  Match.value(cause).pipe(
-    Match.when(Match.instanceOf(Error), (error) => error.message),
-    Match.orElse((value) => String(value))
-  );
-
 const failed = (provider: string, message: string): SourceFailure => ({ provider, message });
 
 const versionSync = (
@@ -56,7 +51,7 @@ const versionSync = (
       latest().pipe(
         Effect.flatMap((version) => Effect.sync(() => syncCli(source.label, [...targets], version))),
         Effect.catchCause((cause) =>
-          Effect.logWarning(`[${source.label}] version sync failed (${messageOf(cause)})`)
+          Effect.logWarning(`[${source.label}] version sync failed (${causeMessage(cause)})`)
         )
       ),
   });
@@ -110,14 +105,17 @@ export const runSources = (
           Effect.tap((outcome) =>
             Effect.forEach(outcome.notes, (note) => Effect.logInfo(note), { discard: true })
           ),
-          Effect.matchEffect({
-            onFailure: (failure) =>
-              Effect.logError(failure.message).pipe(
-                Effect.as({ ...state, failures: [...state.failures, failure] })
-              ),
-            onSuccess: (outcome) =>
-              Effect.succeed({ ...state, outcomes: [...state.outcomes, outcome] }),
-          })
+          Effect.exit,
+          Effect.flatMap((exit) =>
+            Exit.isSuccess(exit)
+              ? Effect.succeed({ ...state, outcomes: [...state.outcomes, exit.value] })
+              : Effect.logError(causeMessage(exit.cause)).pipe(
+                  Effect.as({
+                    ...state,
+                    failures: [...state.failures, failed(source.provider, causeMessage(exit.cause))],
+                  })
+                )
+          )
         )
     );
 

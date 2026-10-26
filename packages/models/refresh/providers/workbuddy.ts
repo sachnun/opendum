@@ -1,4 +1,4 @@
-import { Effect, Option, Schema } from "effect";
+import { Effect, Option, Schema, Cause } from "effect";
 import { raise } from "@opendum/models/refresh/core/raise";
 import { parseJson } from "@opendum/models/refresh/core/json";
 import { buildIndex } from "@opendum/models/model-store";
@@ -6,13 +6,17 @@ import { exists, readText } from "@opendum/models/fs";
 import { join } from "@opendum/models/paths";
 import { env } from "@opendum/models/refresh/core/env";
 import { entryFor, writeEntry } from "@opendum/models/refresh/core/keys";
-import { sourceOf, type ModelSource, type SourceResult } from "@opendum/models/refresh/core/types";
+import { fetchJson } from "@opendum/models/sync/http";
+import { causeMessage } from "@opendum/models/refresh/core/failure";
+import type { ModelFetchFailure, ModelTimeoutFailure } from "@opendum/models/errors";
+import { sourceOf, type ModelSource, type SourceContext, type SourceResult } from "@opendum/models/refresh/core/types";
 
 const PROVIDER = "workbuddy";
 const NPM_PACKAGE = "@tencent-ai/codebuddy-code";
 const PRODUCT_FILE = "product.json";
 const MIN_EXPECTED_MODELS = 20;
 const HOUSE_MODEL = /(?:^|-)model$/;
+const NPM_REGISTRY = "https://registry.npmjs.org";
 const UNPKG = "https://unpkg.com";
 
 const Entry = Schema.Struct({ id: Schema.String, supportsReasoning: Schema.optional(Schema.Boolean) });
@@ -30,16 +34,27 @@ const toEntry = (value: unknown): Option.Option<Entry> =>
     excluded(entry.id) ? Option.none() : Option.some(entry)
   );
 
-const remoteCatalog = (): Effect.Effect<ReadonlyArray<Entry>> =>
-  Effect.gen(function* () {
-    const manifest = yield* fetchJsonEffect(`${UNPKG}/${NPM_PACKAGE}/package.json`);
-    const version = Option.getOrElse(
-      Schema.decodeUnknownOption(Schema.Struct({ version: Schema.String }))(manifest),
-      () => ({ version: "" })
-    ).version;
-    if (!version) raise(new Error(`could not read the version of ${NPM_PACKAGE}`));
+type RemoteFailure = ModelFetchFailure | ModelTimeoutFailure;
 
-    const payload = yield* fetchJsonEffect(`${UNPKG}/${NPM_PACKAGE}@${version}/${PRODUCT_FILE}`);
+const remoteVersion = (): Effect.Effect<string, RemoteFailure> =>
+  fetchJson(`${NPM_REGISTRY}/${NPM_PACKAGE}/latest`, { label: `${NPM_PACKAGE} npm metadata` }).pipe(
+    Effect.map((manifest) =>
+      Option.getOrElse(
+        Schema.decodeUnknownOption(Schema.Struct({ version: Schema.String }))(manifest),
+        () => ({ version: "" })
+      ).version
+    ),
+    Effect.flatMap((version) =>
+      version ? Effect.succeed(version) : Effect.die(new Error(`could not read the version of ${NPM_PACKAGE}`))
+    )
+  );
+
+const remoteCatalog = (): Effect.Effect<ReadonlyArray<Entry>, RemoteFailure> =>
+  Effect.gen(function* () {
+    const version = yield* remoteVersion();
+    const payload = yield* fetchJson(`${UNPKG}/${NPM_PACKAGE}@${version}/${PRODUCT_FILE}`, {
+      label: `${NPM_PACKAGE} product catalog`,
+    });
     const models = Option.match(decodePayload(payload), {
       onNone: () => [] as ReadonlyArray<unknown>,
       onSome: (value) => value.models,
@@ -61,16 +76,6 @@ const localCatalog = (): ReadonlyArray<Entry> => {
   return models.flatMap((item) => Option.match(toEntry(item), { onNone: () => [], onSome: (entry) => [entry] }));
 };
 
-const fetchJsonEffect = (url: string): Effect.Effect<unknown> =>
-  Effect.tryPromise({
-    try: async () => {
-      const response = await fetch(url, { headers: { Accept: "application/json" } });
-      if (!response.ok) raise(new Error(`failed to fetch ${url} (${response.status})`));
-      return (await response.json()) as unknown;
-    },
-    catch: (cause) => cause,
-  }).pipe(Effect.orDie);
-
 const ignoredTargets = (modelsDir: string): ReadonlyArray<{ key: string; entry: ReturnType<typeof entryFor> }> =>
   Object.values(buildIndex(modelsDir))
     .flatMap((entry) => {
@@ -82,13 +87,34 @@ const ignoredTargets = (modelsDir: string): ReadonlyArray<{ key: string; entry: 
       return [{ key, entry: entryFor(modelsDir, key) }];
     });
 
+const registeredCatalog = (modelsDir: string): ReadonlyMap<string, string> => {
+  const models = new Map<string, string>();
+  for (const [modelId, entry] of Object.entries(buildIndex(modelsDir))) {
+    if (!(entry.data.providers ?? []).includes(PROVIDER)) continue;
+    const key = entry.id || modelId;
+    models.set(key, key);
+  }
+  return models;
+};
+
+const degraded = (
+  ctx: SourceContext,
+  cause: ModelFetchFailure | ModelTimeoutFailure
+): Effect.Effect<SourceResult> =>
+  Effect.andThen(
+    Effect.logWarning(
+      `[WorkBuddy] catalog unavailable (${causeMessage(Cause.fail(cause))}); keeping the registered models`
+    ),
+    Effect.sync(() => sourceOf(registeredCatalog(ctx.modelsDir)) as SourceResult)
+  );
+
 export const workbuddySource: ModelSource = {
   provider: PROVIDER,
   label: "WorkBuddy",
   order: 80,
   phase: "fetch",
 
-  fetch: () =>
+  fetch: (ctx) =>
     remoteCatalog().pipe(
       Effect.map((remote): SourceResult => {
         const models = new Map<string, string>();
@@ -104,6 +130,10 @@ export const workbuddySource: ModelSource = {
         }
         const sorted = new Map([...models.entries()].sort(([left], [right]) => left.localeCompare(right)));
         return { ...sourceOf(sorted), extra: new Map([["reasoning", reasoning]]) };
+      }),
+      Effect.catchTags({
+        ModelFetchFailure: (cause) => degraded(ctx, cause),
+        ModelTimeoutFailure: (cause) => degraded(ctx, cause),
       }),
       Effect.mapError((cause: unknown) => ({
         provider: PROVIDER,
