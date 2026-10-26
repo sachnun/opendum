@@ -1,5 +1,3 @@
-import os from "node:os";
-
 export const CODEX_AUTH_ISSUER = "https://auth.openai.com";
 export const CODEX_CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
 export const CODEX_AUTHORIZE_ENDPOINT = `${CODEX_AUTH_ISSUER}/oauth/authorize`;
@@ -25,9 +23,6 @@ export const ORIGINATOR = CODEX_ORIGINATOR;
 export const REFRESH_BUFFER_SECONDS = CODEX_BUFFER_SECONDS;
 export const SCOPE = CODEX_SCOPE;
 export const TOKEN_ENDPOINT = CODEX_TOKEN_ENDPOINT;
-
-const OPENCODE_VERSION = "1.19.4";
-export const USER_AGENT = `opencode/${OPENCODE_VERSION} (${os.platform()} ${os.release()}; ${os.arch()})`;
 
 export const PROVIDER = {
   spec: {

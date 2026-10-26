@@ -150,9 +150,9 @@ const versionTargets = (ctx: SourceContext): ReadonlyArray<VersionTarget> => [
     pattern: /(User-Agent": `opencode\/)(\d+\.\d+\.\d+)( \()/,
   },
   {
-    label: "codex web constants",
-    path: join(ctx.repoRoot, "apps/api/web/lib/providers/codex/constants.ts"),
-    pattern: /(const OPENCODE_VERSION = ")(\d+\.\d+\.\d+)(")/,
+    label: "codex user agent",
+    path: join(ctx.repoRoot, "packages/providers/auth/codex/user-agent.ts"),
+    pattern: /(export const OPENCODE_VERSION = ")(\d+\.\d+\.\d+)(")/,
   },
 ];
 

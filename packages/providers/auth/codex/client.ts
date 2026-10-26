@@ -13,7 +13,6 @@ import {
   CLIENT_ID,
   ORIGINATOR,
   SCOPE,
-  USER_AGENT,
   DEVICE_CODE_ENDPOINT,
   DEVICE_REDIRECT_URI,
   DEVICE_TOKEN_ENDPOINT,
@@ -21,6 +20,7 @@ import {
   REFRESH_BUFFER_SECONDS,
   TOKEN_ENDPOINT,
 } from "@opendum/providers/auth/codex/constants";
+import { USER_AGENT } from "@opendum/providers/auth/codex/user-agent";
 
 interface CodexTokenResponse {
   access_token: string;
