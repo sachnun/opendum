@@ -1,9 +1,8 @@
 import { Effect } from "effect";
 
-import { fromPromise } from "@opendum/api/web/lib/task";
-import type { ServiceFailure } from "@opendum/api/web/errors";
-import type { OAuthResult } from "@opendum/api/web/lib/providers/types";
-import { httpError } from "@opendum/api/web/lib/providers/provider-http-errors";
+import type { OAuthResult } from "@opendum/providers/auth/result";
+import { httpError } from "@opendum/providers/auth/http-errors";
+import { AuthFailure, asFailure } from "@opendum/providers/auth/failure";
 
 export class ProviderResponse {
   private readonly label: string;
@@ -12,25 +11,25 @@ export class ProviderResponse {
     this.label = label;
   }
 
-  text(response: Response) {
-    return fromPromise(
-      () => response.text().catch(() => ""),
-      `Failed to read ${this.label} response`
-    );
+  text(response: Response): Effect.Effect<string, AuthFailure> {
+    return Effect.tryPromise({
+      try: () => response.text().catch(() => ""),
+      catch: (cause) => asFailure(cause, `Failed to read ${this.label} response`),
+    });
   }
 
-  json<T>(response: Response) {
-    return fromPromise(
-      async () => ((await response.json()) as T),
-      `Failed to read ${this.label} response`
-    );
+  json<T>(response: Response): Effect.Effect<T, AuthFailure> {
+    return Effect.tryPromise({
+      try: async () => (await response.json()) as T,
+      catch: (cause) => asFailure(cause, `Failed to read ${this.label} response`),
+    });
   }
 
-  jsonOr<T>(response: Response, fallback: T) {
-    return fromPromise(
-      async () => ((await response.json().catch(() => fallback)) as T),
-      `Failed to read ${this.label} response`
-    );
+  jsonOr<T>(response: Response, fallback: T): Effect.Effect<T, AuthFailure> {
+    return Effect.tryPromise({
+      try: async () => (await response.json().catch(() => fallback)) as T,
+      catch: (cause) => asFailure(cause, `Failed to read ${this.label} response`),
+    });
   }
 
   failure(response: Response, body: string, endpointLabel: string): string {
@@ -70,10 +69,9 @@ export interface DeviceCodeInitiate {
 }
 
 export interface DeviceCodeFlow {
-  startDeviceFlow(): Effect.Effect<DeviceCodeInitiate, ServiceFailure>;
+  startDeviceFlow(): Effect.Effect<DeviceCodeInitiate, AuthFailure>;
   pollDeviceAuth(
     deviceCode: string,
     userCode: string
-  ): Effect.Effect<PollResult | OAuthResult, ServiceFailure>;
+  ): Effect.Effect<PollResult | OAuthResult, AuthFailure>;
 }
-

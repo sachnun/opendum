@@ -5,9 +5,9 @@ import {
   providerOptions,
   isDevice,
   oauthCheck,
-} from "~~/lib/provider-auth-config";
+} from "@opendum/providers/auth/config";
 import type { DeviceProviderKey } from "@opendum/providers/provider-accounts";
-import type { FlowType, MethodKey, Provider, ProviderConfig } from "~~/lib/provider-auth-config";
+import type { FlowType, MethodKey, Provider, ProviderConfig } from "@opendum/providers/auth/config";
 
 export function useAccountConnect(
   props: { initialProvider: Provider | null; triggerClass?: string; readonly?: boolean },

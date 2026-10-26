@@ -5,21 +5,29 @@ import type { CodexSessionInput, ExchangeInput, AuthUrlInput, DeviceAuthInput, D
 import { db, providerAccount } from "@opendum/database";
 import { publishAccounts } from "@opendum/api/web/events/bus";
 import { encrypt } from "@opendum/api/web/lib/encryption";
-import { antigravityProvider } from "@opendum/api/web/lib/providers/antigravity/index";
-import { CLIENT_ID as antigravityClientId, REDIRECT_URI as antigravityRedirectUri, SCOPES as antigravityScopes } from "@opendum/api/web/lib/providers/antigravity/constants";
-import { AUTHORIZE_ENDPOINT as codexAuthorizeEndpoint, BROWSER_REDIRECT_URI as codexBrowserRedirectUri, CLIENT_ID as codexClientId, ORIGINATOR as codexOriginator, SCOPE as codexScope, sessionResult, codexProvider, generateCodeChallenge as generateCodexCodeChallenge, codeVerifier as generateCodexCodeVerifier, startDeviceFlow as startCodexDevice, pollDeviceAuth as pollCodexDevice } from "@opendum/api/web/lib/providers/codex/index";
-import { BROWSER_REDIRECT_URI as kiroBrowserRedirectUri, authUrl, codeVerifier as generateKiroCodeVerifier, kiroProvider } from "@opendum/api/web/lib/providers/kiro/index";
-import { startDeviceFlow as startWorkbuddyDevice, pollDeviceAuth as pollWorkbuddyDevice } from "@opendum/api/web/lib/providers/workbuddy/index";
-import { exchangeCode, initiateOAuth } from "@opendum/api/web/lib/providers/perch/index";
-import { startDeviceFlow as startClineDevice, pollDeviceAuth as pollClineDevice } from "@opendum/api/web/lib/providers/cline/index";
+import { antigravityAuth } from "@opendum/providers/auth/antigravity/index";
+import { authRuntime } from "@opendum/api/web/lib/providers/runtime";
+import { CLIENT_ID as antigravityClientId, REDIRECT_URI as antigravityRedirectUri, SCOPES as antigravityScopes } from "@opendum/providers/auth/antigravity/constants";
+import { AUTHORIZE_ENDPOINT as codexAuthorizeEndpoint, BROWSER_REDIRECT_URI as codexBrowserRedirectUri, CLIENT_ID as codexClientId, ORIGINATOR as codexOriginator, SCOPE as codexScope, codexAuth } from "@opendum/providers/auth/codex/index";
+import { BROWSER_REDIRECT_URI as kiroBrowserRedirectUri, kiroAuth } from "@opendum/providers/auth/kiro/index";
+import { workbuddyAuth } from "@opendum/providers/auth/workbuddy/index";
+import { perchAuth } from "@opendum/providers/auth/perch/index";
+import { clineAuth } from "@opendum/providers/auth/cline/index";
 import { clearFails } from "@opendum/api/web/lib/proxy/auth";
-import { isFailed, isPending, type DeviceCodeFlow } from "@opendum/api/web/lib/providers/provider-response";
-import type { OAuthResult } from "@opendum/api/web/lib/providers/types";
+import { isFailed, isPending, type DeviceCodeFlow } from "@opendum/providers/auth/response";
+import type { OAuthResult } from "@opendum/providers/auth/result";
 import type { DeviceProviderKey, AuthProvider } from "@opendum/providers/provider-accounts";
 import type { ActionResult } from "@opendum/api/web/utils/api";
 import { fromPromise } from "@opendum/api/web/lib/task";
 import { ServiceFailure, badRequest, internal } from "@opendum/api/web/errors";
 import { trackProviderEmail } from "@opendum/api/web/services/points";
+
+const antigravity = antigravityAuth(authRuntime);
+const codex = codexAuth(authRuntime);
+const kiro = kiroAuth(authRuntime);
+const workbuddy = workbuddyAuth(authRuntime);
+const perch = perchAuth(authRuntime);
+const cline = clineAuth(authRuntime);
 
 const GOOGLE_AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 
@@ -47,51 +55,51 @@ function googleUrl(): string {
 }
 
 const codexAuthUrl = Effect.fn("accountAuth.codexAuthUrl")(function* (state: string) {
-  const codeVerifier = generateCodexCodeVerifier();
-  const codeChallenge = yield* generateCodexCodeChallenge(codeVerifier);
+  const codeVerifier = codex.codeVerifier();
+  const codeChallenge = yield* codex.generateCodeChallenge(codeVerifier);
   const params = new URLSearchParams({ response_type: "code", client_id: codexClientId, redirect_uri: codexBrowserRedirectUri, scope: codexScope, code_challenge: codeChallenge, code_challenge_method: "S256", id_token_add_organizations: "true", codex_cli_simplified_flow: "true", state, originator: codexOriginator });
   return { authUrl: `${codexAuthorizeEndpoint}?${params.toString()}`, state, codeVerifier };
 });
 
 const kiroAuthUrl = Effect.fn("accountAuth.kiroAuthUrl")(function* (state: string) {
-  const codeVerifier = generateKiroCodeVerifier();
-  return { authUrl: yield* authUrl(state, codeVerifier), state, codeVerifier };
+  const codeVerifier = kiro.codeVerifier();
+  return { authUrl: yield* kiro.authUrl(state, codeVerifier), state, codeVerifier };
 });
 
 const OAUTH_PROVIDERS: Record<AuthProvider, {
   label: string;
   accountIdPrefix?: string;
   requiresCodeVerifier?: boolean;
-  buildAuthUrl: () => Effect.Effect<AuthUrlResult, ServiceFailure>;
-  exchangeCode: (code: string, codeVerifier?: string | null) => Effect.Effect<OAuthResult, ServiceFailure>;
+  buildAuthUrl: () => Effect.Effect<AuthUrlResult, unknown>;
+  exchangeCode: (code: string, codeVerifier?: string | null) => Effect.Effect<OAuthResult, unknown>;
 }> = {
   antigravity: {
     label: "Antigravity",
     buildAuthUrl: () => Effect.succeed({ authUrl: googleUrl(), state: null, codeVerifier: null }),
-    exchangeCode: (code) => antigravityProvider.exchangeCode(code, antigravityRedirectUri),
+    exchangeCode: (code) => antigravity.antigravityProvider.exchangeCode(code, antigravityRedirectUri),
   },
   codex: {
     label: "Codex",
     accountIdPrefix: "codex",
     requiresCodeVerifier: true,
     buildAuthUrl: () => codexAuthUrl(oauthState()),
-    exchangeCode: (code, codeVerifier) => codexProvider.exchangeCode(code, codexBrowserRedirectUri, codeVerifier ?? undefined),
+    exchangeCode: (code, codeVerifier) => codex.codexProvider.exchangeCode(code, codexBrowserRedirectUri, codeVerifier ?? undefined),
   },
   kiro: {
     label: "Kiro",
     accountIdPrefix: "kiro",
     requiresCodeVerifier: true,
     buildAuthUrl: () => kiroAuthUrl(oauthState()),
-    exchangeCode: (code, codeVerifier) => kiroProvider.exchangeCode(code, kiroBrowserRedirectUri, codeVerifier ?? undefined),
+    exchangeCode: (code, codeVerifier) => kiro.kiroProvider.exchangeCode(code, kiroBrowserRedirectUri, codeVerifier ?? undefined),
   },
   perch: {
     label: "Perch",
     requiresCodeVerifier: true,
     buildAuthUrl: () =>
-      initiateOAuth().pipe(
+      perch.initiateOAuth().pipe(
         Effect.map((result) => ({ authUrl: result.authUrl, state: null, codeVerifier: result.codeVerifier }))
       ),
-    exchangeCode: (code, codeVerifier) => exchangeCode(code, codeVerifier ?? ""),
+    exchangeCode: (code, codeVerifier) => perch.exchangeCode(code, codeVerifier ?? ""),
   },
 };
 
@@ -111,16 +119,16 @@ function deviceEntry(
 
 const DEVICE_PROVIDERS: Record<DeviceProviderKey, DeviceEntry> = {
   codex: deviceEntry("Codex", "codex", {
-    startDeviceFlow: () => startCodexDevice(),
-    pollDeviceAuth: (deviceCode, userCode) => pollCodexDevice(deviceCode, userCode),
+    startDeviceFlow: () => codex.startDeviceFlow(),
+    pollDeviceAuth: (deviceCode, userCode) => codex.pollDeviceAuth(deviceCode, userCode),
   }),
   workbuddy: deviceEntry("WorkBuddy", "workbuddy", {
-    startDeviceFlow: () => startWorkbuddyDevice(),
-    pollDeviceAuth: (deviceCode) => pollWorkbuddyDevice(deviceCode),
+    startDeviceFlow: () => workbuddy.startDeviceFlow(),
+    pollDeviceAuth: (deviceCode) => workbuddy.pollDeviceAuth(deviceCode),
   }),
   cline: deviceEntry("Cline", "cline", {
-    startDeviceFlow: () => startClineDevice(),
-    pollDeviceAuth: (deviceCode) => pollClineDevice(deviceCode),
+    startDeviceFlow: () => cline.startDeviceFlow(),
+    pollDeviceAuth: (deviceCode) => cline.pollDeviceAuth(deviceCode),
   }),
 };
 
@@ -278,7 +286,10 @@ function parseCallback(callbackUrl: string, providerLabel: string) {
 export const authUrlFor = Effect.fn("accountAuth.getAuthUrl")(function* (input: AuthUrlInput) {
   const config = OAUTH_PROVIDERS[input.provider];
   const data = yield* config.buildAuthUrl().pipe(
-    Effect.mapError((failure: { message?: string; cause?: unknown }) => internal(failure.message ?? "Account auth failed", failure.cause))
+    Effect.mapError((failure) => {
+      const error = failure as { message?: string; cause?: unknown } | null;
+      return internal(error?.message ?? "Account auth failed", error?.cause);
+    })
   );
   return { success: true as const, data };
 });
@@ -312,7 +323,7 @@ export const connectCodex = Effect.fn("accountAuth.connectCodex")(function* (
   input: CodexSessionInput
 ) {
   const oauthResult = yield* Effect.try({
-    try: () => sessionResult(input.sessionJson),
+    try: () => codex.sessionResult(input.sessionJson),
     catch: (cause) => badRequest(cause instanceof Error ? cause.message : "Failed to connect account"),
   });
   const data = yield* upsertAccount(
@@ -333,7 +344,10 @@ export const initiateDeviceAuth = Effect.fn("accountAuth.initiateDeviceAuth")(fu
 ) {
   const config = DEVICE_PROVIDERS[input.provider];
   const data = yield* config.flow.startDeviceFlow().pipe(
-    Effect.mapError((failure) => internal(failure.message || "Account auth failed", failure.cause))
+    Effect.mapError((failure) => {
+      const error = failure as { message?: string; cause?: unknown } | null;
+      return internal(error?.message || "Account auth failed", error?.cause);
+    })
   );
   return { success: true as const, data };
 });
@@ -343,7 +357,12 @@ export const pollAuth = Effect.fn("accountAuth.pollAuth")(function* (
   input: DevicePollInput
 ) {
   const config = DEVICE_PROVIDERS[input.provider];
-  const result = yield* config.flow.pollDeviceAuth(input.deviceCode, input.userCode ?? "");
+  const result = yield* config.flow.pollDeviceAuth(input.deviceCode, input.userCode ?? "").pipe(
+    Effect.mapError((failure) => {
+      const error = failure as { message?: string; cause?: unknown } | null;
+      return internal(error?.message || "Account auth failed", error?.cause);
+    })
+  );
   if (isPending(result)) {
     return {
       success: true as const,

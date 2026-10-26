@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { callbackPlaceholder, providerConfigs, providerOptions } from "~~/lib/provider-auth-config";
+import { callbackPlaceholder, providerConfigs, providerOptions } from "@opendum/providers/auth/config";
 
 describe("add account dialog config", () => {
   it("exposes provider options with configs", () => {

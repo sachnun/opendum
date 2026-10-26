@@ -2,6 +2,7 @@ import { formatDistanceToNowStrict } from "date-fns";
 
 import type { ProviderDetailData } from "~~/lib/api-types";
 import { statusTag, stripStatus, type ErrorStatusTag } from "~~/lib/account-errors";
+export { paidTier, freeTier, tierLabel } from "@opendum/providers/auth/tier";
 
 export type StatDeltaTone = "positive" | "negative" | "neutral";
 
@@ -117,23 +118,6 @@ export function prevDay(time: string): boolean {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return date < today;
-}
-
-export function paidTier(tier: string, provider?: string): boolean {
-  const value = tier.trim().toLowerCase();
-  if (provider === "antigravity") return ["paid", "standard-tier"].includes(value) || value.startsWith("g1-");
-  if (provider === "kiro") return ["pro", "pro-plus", "pro+", "power"].includes(value);
-  return ["paid", "standard-tier", "plus", "pro", "pro-plus", "pro+", "prolite", "power", "team", "go", "self_serve_business_usage_based", "business", "enterprise_cbp_usage_based", "enterprise", "student", "edu", "education", "hc"].includes(value);
-}
-
-export function freeTier(tier: string): boolean {
-  return ["free", "free-tier", "legacy-tier"].includes(tier.trim().toLowerCase());
-}
-
-export function tierLabel(tier: string, provider?: string): "Paid" | "Free" | "" {
-  if (paidTier(tier, provider)) return "Paid";
-  if (freeTier(tier)) return "Free";
-  return "";
 }
 
 export function maskText(value: string): string {

@@ -1,7 +1,5 @@
 import { Effect } from "effect";
 
-import { fromPromise } from "@opendum/api/web/lib/task";
-
 export class Pkce {
   static verifier(): string {
     const bytes = new Uint8Array(32);
@@ -16,10 +14,10 @@ export class Pkce {
   }
 
   static challenge(verifier: string, label: string) {
-    return fromPromise(
-      () => crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)),
-      `Failed to build ${label} code challenge`
-    ).pipe(Effect.map((digest) => Pkce.encode(new Uint8Array(digest))));
+    return Effect.tryPromise({
+      try: () => crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)),
+      catch: (cause) => new Error(`Failed to build ${label} code challenge`, { cause }),
+    }).pipe(Effect.map((digest) => Pkce.encode(new Uint8Array(digest))));
   }
 
   static pair(label: string) {

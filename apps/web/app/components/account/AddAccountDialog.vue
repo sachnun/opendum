@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { cn } from "~~/lib/utils";
-import type { Provider } from "~~/lib/provider-auth-config";
+import type { Provider } from "@opendum/providers/auth/config";
 
 const props = withDefaults(
   defineProps<{
