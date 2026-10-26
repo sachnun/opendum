@@ -27,9 +27,9 @@
     "output": 128000
   },
   "cost": {
-    "input": 20,
-    "output": 100,
-    "cacheRead": 2,
+    "input": 10,
+    "output": 50,
+    "cacheRead": 1,
     "cacheWrite": 25
   },
   "scores": {
@@ -44,11 +44,11 @@
       "maxOutputTokens": 128000
     },
     "kiro": {
-      "contextWindow": 1050000,
+      "contextWindow": 262144,
       "maxOutputTokens": 128000
     },
     "workbuddy": {
-      "contextWindow": 1050000,
+      "contextWindow": 262144,
       "maxOutputTokens": 128000
     }
   }

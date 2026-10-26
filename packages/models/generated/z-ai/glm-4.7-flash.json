@@ -22,7 +22,7 @@
   "cost": {
     "input": 0.3025,
     "output": 2,
-    "cacheRead": 0,
+    "cacheRead": 0.05,
     "cacheWrite": 0
   },
   "scores": {

@@ -24,12 +24,12 @@
     ]
   },
   "limit": {
-    "context": 1048000,
-    "output": 65535
+    "context": 1048576,
+    "output": 65536
   },
   "cost": {
     "input": 1.5,
-    "output": 12.5,
+    "output": 12.495,
     "cacheRead": 0.15,
     "cacheWrite": 0.416667
   },
@@ -41,8 +41,8 @@
   },
   "providerConfig": {
     "antigravity": {
-      "contextWindow": 1048000,
-      "maxOutputTokens": 65535
+      "contextWindow": 1048576,
+      "maxOutputTokens": 65536
     }
   }
 }
