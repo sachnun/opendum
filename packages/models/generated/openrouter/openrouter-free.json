@@ -2,6 +2,10 @@
   "providers": [
     "openrouter"
   ],
+  "aliases": [
+    "openrouter-free",
+    "openrouter/free"
+  ],
   "reasoning": true,
   "modalities": {
     "input": [

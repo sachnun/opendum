@@ -2,6 +2,10 @@
   "providers": [
     "kilo_code"
   ],
+  "aliases": [
+    "kilo-auto-free",
+    "kilo-auto/free"
+  ],
   "providerConfig": {
     "kilo_code": {
       "upstream": "kilo-auto/free"
