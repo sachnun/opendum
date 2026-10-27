@@ -1,11 +1,9 @@
 import { Cause, Effect, Metric, Result, Schedule } from "effect";
 import { raise } from "@opendum/core/raise";
-import { databaseFailure } from "@opendum/database";
-import type { Database } from "@opendum/database";
+import { databaseFailure, type Database, type DatabaseFailure } from "@opendum/database";
 import { decrypt, encrypt } from "@opendum/core/crypto";
 import type { Registry } from "@opendum/models/runtime";
-import type { OpendumRedis } from "@opendum/core/redis";
-import { AccountAffinity } from "@opendum/core/redis";
+import { AccountAffinity, type OpendumRedis } from "@opendum/core/redis";
 import type { AuthResult, AuthService, ModelValidationResult } from "@opendum/auth";
 import {
   adapt,
@@ -66,17 +64,17 @@ import { Usage } from "@opendum/api/core/usage-log";
 import { proxyEvents, type ProxyEvents } from "@opendum/api/core/events";
 import { repositories, type PointPort, type Repositories } from "@opendum/api/core/repositories";
 import type { Adapter } from "@opendum/api/core/endpoints";
-import type {
-  Failure,
-  ParsedEndpointRequest,
-  ResponseContext,
-  RouteError,
-  StreamCompletion,
-  StreamRecorder,
-  SuccessRecord,
-  UsageCounts,
+import {
+  routeFailure,
+  type Failure,
+  type ParsedEndpointRequest,
+  type ResponseContext,
+  type RouteError,
+  type StreamCompletion,
+  type StreamRecorder,
+  type SuccessRecord,
+  type UsageCounts,
 } from "@opendum/api/core/types";
-import { routeFailure } from "@opendum/api/core/types";
 
 const LOCK_PREFIX = "opendum:provider-account:refresh-lock:";
 const LOCK_TTL_SECONDS = 120;
@@ -204,9 +202,9 @@ export class ProxyService implements StreamRecorder {
     authHeader: string,
     sessionId: string,
     request?: Request
-  ): Effect.Effect<Response, import("@opendum/database").DatabaseFailure> {
+  ): Effect.Effect<Response, DatabaseFailure> {
     const startedAt = Date.now();
-    return Effect.gen({ self: this }, function* () {
+    const pipeline = Effect.fn("ProxyService.runPipeline")(function* (this: ProxyService) {
       const startMs = Date.now();
       const playground = this.playground.authenticate(request);
       const authResult = playground.handled
@@ -368,7 +366,8 @@ export class ProxyService implements StreamRecorder {
       }
       yield* Effect.ignore(this.health.markRecovered(rotationFailures));
       return result;
-    }).pipe(
+    });
+    return pipeline.call(this).pipe(
       Effect.tap(() => Metric.update(proxyRequests, 1)),
       Effect.tap(() => Metric.update(requestDuration, Date.now() - startedAt)),
       Effect.withSpan("ProxyService.handle", { attributes: { endpoint: cfg.endpoint } })
@@ -447,7 +446,9 @@ export class ProxyService implements StreamRecorder {
     const model = modelParam.slice(index + 1).trim();
     if (!prefix || !model || this.isKnownPrefix(prefix)) return null;
     if (userId) {
-      const custom = await this.repositories.customProviders.getCustomProvider(userId, prefix.toLowerCase());
+      const custom = await Effect.runPromise(
+        this.repositories.customProviders.getCustomProvider(userId, prefix.toLowerCase())
+      );
       if (custom) return null;
     }
     return { accountId: prefix, model };
@@ -627,7 +628,7 @@ export class ProxyService implements StreamRecorder {
         roaming: PointReservation | null;
       }
     | RouteError,
-    import("@opendum/database").DatabaseFailure
+    DatabaseFailure
   > {
     const program = Effect.gen({ self: this }, function* () {
       const tried: string[] = [];
@@ -659,7 +660,7 @@ export class ProxyService implements StreamRecorder {
             excludedProviders,
             useShared
           );
-          accountConfigured = accountConfigured || selection.configured;
+          accountConfigured ||= selection.configured;
           account = selection.account;
         }
 
@@ -787,7 +788,8 @@ export class ProxyService implements StreamRecorder {
               type: "api_error",
               accountId: account.id,
             };
-            yield* Effect.promise(() => Delay.sleep(this.retry.delayMs * transientRetries));
+            const retryDelayMs = this.retry.delayMs * transientRetries;
+            yield* Effect.promise(() => Delay.sleep(retryDelayMs));
             retryAccount = account;
             pendingReservation = roaming;
             continue;
@@ -957,7 +959,8 @@ export class ProxyService implements StreamRecorder {
               transientRetries = 0;
             }
             transientRetries += 1;
-            yield* Effect.promise(() => Delay.sleep(this.retry.delayMs * transientRetries));
+            const retryDelayMs = this.retry.delayMs * transientRetries;
+            yield* Effect.promise(() => Delay.sleep(retryDelayMs));
             retryAccount = account;
             pendingReservation = roaming;
             continue;
@@ -1272,8 +1275,8 @@ export class ProxyService implements StreamRecorder {
     if (refreshed.paidTier) tier = refreshed.paidTier;
     const email = refreshed.email ? refreshed.email : account.email ?? null;
     const accountId = refreshed.accountId ? refreshed.accountId : account.accountId ?? null;
-    await this.repositories.accounts.updateRefreshedCredentials(
-      {
+    await Effect.runPromise(
+      this.repositories.accounts.updateRefreshedCredentials({
         id: account.id,
         accessToken: encryptedAccess,
         refreshToken: encryptedRefresh,
@@ -1282,7 +1285,7 @@ export class ProxyService implements StreamRecorder {
         tier,
         email,
         accountId,
-      }
+      })
     );
     return {
       ...account,
@@ -1401,9 +1404,9 @@ export class ProxyService implements StreamRecorder {
         catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
       }).pipe(
         Effect.catch((error) =>
-          Effect.logError("token refresh cycle failed", { cause: error }).pipe(
-            Effect.withSpan("ProxyService.tokenRefresh")
-          )
+          Effect.logError("token refresh cycle failed")
+            .pipe(Effect.annotateLogs({ cause: String(error) }))
+            .pipe(Effect.withSpan("ProxyService.tokenRefresh"))
         )
       )
     );
@@ -1430,9 +1433,9 @@ export class ProxyService implements StreamRecorder {
               })
               .pipe(Effect.result);
             if (accounts._tag === "Failure") {
-              yield* Effect.logError(`token refresh query failed for provider ${name}`, {
-                cause: accounts.failure,
-              });
+              yield* Effect.logError(`token refresh query failed for provider ${name}`).pipe(
+                Effect.annotateLogs({ cause: String(accounts.failure) })
+              );
               return;
             }
             yield* Effect.forEach(

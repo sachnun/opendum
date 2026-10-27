@@ -12,6 +12,7 @@ import type {
   SourceResult,
   VersionTarget,
 } from "@opendum/models/refresh/core/types";
+import { compareText } from "@opendum/models/compare";
 
 type Snapshot = ReadonlyMap<string, ReadonlySet<string>>;
 
@@ -22,7 +23,7 @@ const orderSources = (sources: ReadonlyArray<ModelSource>): ReadonlyArray<ModelS
     (left, right) =>
       phaseRank(left) - phaseRank(right) ||
       left.order - right.order ||
-      left.provider.localeCompare(right.provider)
+      compareText(left.provider, right.provider)
   );
 
 const snapshot = (modelsDir: string, providers: ReadonlyArray<string>): Snapshot => {
@@ -49,7 +50,7 @@ const versionSync = (
     onNone: () => Effect.void,
     onSome: (latest) =>
       latest().pipe(
-        Effect.flatMap((version) => Effect.sync(() => syncCli(source.label, [...targets], version))),
+        Effect.flatMap((version) => Effect.promise(() => syncCli(source.label, [...targets], version))),
         Effect.catchCause((cause) =>
           Effect.logWarning(`[${source.label}] version sync failed (${causeMessage(cause)})`)
         )

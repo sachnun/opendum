@@ -58,13 +58,13 @@ function applyMetadata(data: ModelData, patch: ModelMetadataPatch): boolean {
 
     data.providerConfig ??= {};
     data.providerConfig[provider] ??= {};
-    const config = data.providerConfig[provider]!;
+    const config = data.providerConfig[provider];
 
     for (const key of MANAGED_PROVIDER_KEYS) {
       const next = limits[key];
       if (next === undefined) {
         if (config[key] !== undefined) {
-          delete config[key];
+          Reflect.deleteProperty(config, key);
           changed = true;
         }
         continue;
@@ -75,7 +75,9 @@ function applyMetadata(data: ModelData, patch: ModelMetadataPatch): boolean {
       }
     }
 
-    if (Object.keys(config).length === 0) delete data.providerConfig[provider];
+    if (Object.keys(config).length === 0 && data.providerConfig) {
+      Reflect.deleteProperty(data.providerConfig, provider);
+    }
   }
 
   if (data.providerConfig && Object.keys(data.providerConfig).length === 0) {
@@ -135,11 +137,11 @@ function reportStats(stats: Stats, updatedCount: number, dryRun: boolean): void 
   }
 }
 
-function canonicalizeIds(
+async function canonicalizeIds(
   canonical: Awaited<ReturnType<typeof externalRegistries>>["canonical"],
   stats: Stats,
   dryRun: boolean,
-): void {
+): Promise<void> {
   const index = buildIndex(modelsDir);
   const models = Object.values(index).map((entry) => ({
     id: entry.id,
@@ -174,8 +176,8 @@ function canonicalizeIds(
     applyMerge(target.data as ModelData, action);
     stats.canonicalized.push({ from: action.from, to: action.to, tier: `merge:${action.tier}` });
     if (dryRun) continue;
-    persist({ modelsDir, relativeId: target.relativeId }, target.data as ModelData);
-    remove(action.path);
+    await persist({ modelsDir, relativeId: target.relativeId }, target.data as ModelData);
+    await remove(action.path);
   }
 
   stats.ambiguous.push(...plan.unresolved);
@@ -188,14 +190,14 @@ function canonicalizeIds(
   if (dryRun) return;
   const dir = generatedDir(modelsDir);
   for (const target of targets.values()) {
-    persist({ modelsDir, relativeId: target.relativeId }, target.data);
+    await persist({ modelsDir, relativeId: target.relativeId }, target.data);
   }
   for (const [nextFileId, target] of targets) {
-    moveFiles({ modelsDir, generatedDir: dir, relativeId: target.relativeId }, nextFileId);
+    await moveFiles({ modelsDir, generatedDir: dir, relativeId: target.relativeId }, nextFileId);
   }
 }
 
-function relocateRoots(dryRun: boolean): string[] {
+async function relocateRoots(dryRun: boolean): Promise<string[]> {
   const index = buildIndex(modelsDir);
   const moved: string[] = [];
   for (const [fileId, entry] of Object.entries(index)) {
@@ -206,7 +208,7 @@ function relocateRoots(dryRun: boolean): string[] {
     const target = join(modelsDir, folder, basename(entry.path));
     if (exists(target)) continue;
     moved.push(`${id} -> ${folder}/`);
-    if (!dryRun) rename(entry.path, target);
+    if (!dryRun) await rename(entry.path, target);
   }
   return moved;
 }
@@ -236,7 +238,7 @@ async function main(): Promise<void> {
   };
   const updated: string[] = [];
 
-  canonicalizeIds(catalogs.canonical, stats, dryRun);
+  await canonicalizeIds(catalogs.canonical, stats, dryRun);
 
   const index = buildIndex(modelsDir);
 
@@ -281,7 +283,7 @@ async function main(): Promise<void> {
 
     if (applyMetadata(data, patch)) {
       updated.push(id);
-      if (!dryRun) persist(entry, data);
+      if (!dryRun) await persist(entry, data);
       if (verbose) {
         console.log(`[metadata] ${id} reasoning=${patch.reasoning} limit=${JSON.stringify(patch.limits)}`);
       }
@@ -290,7 +292,7 @@ async function main(): Promise<void> {
 
   reportStats(stats, updated.length, dryRun);
 
-  const moved = relocateRoots(dryRun);
+  const moved = await relocateRoots(dryRun);
   if (moved.length > 0) {
     console.log(`[metadata] relocated ${moved.length} model files into family folders${dryRun ? " (dry run)" : ""}:`);
     for (const item of moved) console.log(`  ${item}`);

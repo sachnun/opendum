@@ -50,7 +50,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  writeText(outputPath, content);
+  await writeText(outputPath, content);
   console.log(`[family-ranking] wrote ${ranking.length} families to ${outputPath}`);
 }
 

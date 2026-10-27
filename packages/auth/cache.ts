@@ -49,7 +49,7 @@ export class Cache {
         EX: TOUCH_TTL,
       });
       if (!updated) return;
-      await touchLastUsed(apiKeyId);
+      await Effect.runPromise(touchLastUsed(apiKeyId));
     });
   }
 

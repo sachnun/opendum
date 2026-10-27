@@ -382,7 +382,7 @@ export class AntigravityProvider extends OAuthProvider {
         }
         const data = (yield* Effect.promise(() => resp.json())) as unknown;
         const response = GeminiResponse.unwrap(data);
-        this.cacheSignatures(response, modelName, sessionId);
+        yield* Effect.promise(() => this.cacheSignatures(response, modelName, sessionId));
         return Responses.json(200, GeminiCompletion.build(response, modelName, toolSchemas));
       })
     );
@@ -802,7 +802,7 @@ export class AntigravityProvider extends OAuthProvider {
           const name = Value.string(fn.name);
           if (fn.id === undefined || fn.id === null) fn.id = Ids.random(name);
           if (strict && name) {
-            callIdQueues[name] = callIdQueues[name] ?? [];
+            callIdQueues[name] ??= [];
             callIdQueues[name].push(Value.string(fn.id));
           }
           if (!strict && this.configBool(model, "inject_thought_signature") && part.thoughtSignature === undefined) {
