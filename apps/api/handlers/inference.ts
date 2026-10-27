@@ -1,5 +1,5 @@
 import { Effect, Schema } from "effect";
-import { type H3Event } from "h3";
+import type { H3Event } from "h3";
 import type { ProxyContext } from "@opendum/api/core/context";
 import { sessionKey } from "@opendum/api/core/service";
 import type { Adapter } from "@opendum/api/core/endpoints";
@@ -40,10 +40,12 @@ export async function handleInference(
       Effect.catchCause((cause) =>
         Effect.sync(() => {
           void Effect.runFork(
-            Effect.logError("inference request failed", {
-              endpoint: endpoint.endpoint,
-              cause: String(cause),
-            })
+            Effect.logError("inference request failed").pipe(
+              Effect.annotateLogs({
+                endpoint: endpoint.endpoint,
+                cause: String(cause),
+              })
+            )
           );
           return internalResponse(endpoint.format);
         })

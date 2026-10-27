@@ -14,6 +14,7 @@ import {
 } from "@opendum/models/fs";
 import { basename, dirname, join, relative, sep } from "@opendum/models/paths";
 import type { JsonValue, ModelData, ModelIndex, ModelIndexEntry } from "@opendum/models/types";
+import { compareText } from "@opendum/models/compare";
 
 const MODEL_EXT = ".json";
 
@@ -65,7 +66,7 @@ function orderProviders(value: Record<string, JsonValue>, preferredKeys: string[
     const entry = value[provider];
     result[provider] = isObject(entry)
       ? orderObject(entry, preferredKeys)
-      : orderValue(entry!, provider);
+      : orderValue(entry, provider);
   }
   return result;
 }
@@ -220,7 +221,7 @@ export function buildIndex(modelsDir: string, options: { generatedDir?: string }
       id: publicId(data, basename(relativeId)),
       fileId: basename(relativeId),
       relativeId,
-      path: authoredPath ?? generatedPath!,
+      path: authoredPath ?? generatedPath ?? relativeId,
       generatedPath,
       modelsDir,
       generatedDir: dir,
@@ -286,7 +287,7 @@ export function idMap(modelIds: string[], modelKey: (modelId: string) => string)
     }
   }
 
-  return new Map([...map.entries()].sort(([a], [b]) => a.localeCompare(b)));
+  return new Map([...map.entries()].sort(([a], [b]) => compareText(a, b)));
 }
 
 export function persist(
@@ -456,7 +457,7 @@ export async function sync(
       const nextValue = extras[key];
       if (nextValue === undefined) {
         if (providerConfig[key] !== undefined) {
-          delete providerConfig[key];
+          Reflect.deleteProperty(providerConfig, key);
           changed = true;
         }
         continue;
@@ -495,10 +496,11 @@ export async function sync(
 
     entry.data.providers = providers.filter((provider) => provider !== providerName);
 
-    if (entry.data.providerConfig?.[providerName]) {
-      delete entry.data.providerConfig[providerName];
-      if (Object.keys(entry.data.providerConfig).length === 0) {
-        delete entry.data.providerConfig;
+    const providerConfig = entry.data.providerConfig;
+    if (providerConfig?.[providerName]) {
+      Reflect.deleteProperty(providerConfig, providerName);
+      if (Object.keys(providerConfig).length === 0) {
+        Reflect.deleteProperty(entry.data, "providerConfig");
       }
     }
 
@@ -535,11 +537,11 @@ export async function sync(
           nextProviderConfig.upstream = upstreamName;
           changed = true;
         }
-        if (Object.keys(nextProviderConfig).length === 0) {
-          delete existing.data.providerConfig[providerName];
+        if (Object.keys(nextProviderConfig).length === 0 && existing.data.providerConfig) {
+          Reflect.deleteProperty(existing.data.providerConfig, providerName);
         }
         if (existing.data.providerConfig && Object.keys(existing.data.providerConfig).length === 0) {
-          delete existing.data.providerConfig;
+          Reflect.deleteProperty(existing.data, "providerConfig");
         }
       }
 
@@ -582,10 +584,10 @@ export async function sync(
             touched = true;
           }
           if (Object.keys(nextProviderConfig).length === 0) {
-            delete existing.providerConfig[providerName];
+            Reflect.deleteProperty(existing.providerConfig, providerName);
           }
           if (Object.keys(existing.providerConfig).length === 0) {
-            delete existing.providerConfig;
+            Reflect.deleteProperty(existing, "providerConfig");
           }
         }
 

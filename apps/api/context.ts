@@ -6,7 +6,7 @@ import { ProxyContextTag, type ProxyContext } from "@opendum/api/core/services";
 
 type Runtime = ManagedRuntime.ManagedRuntime<Layer.Success<typeof ProxyContextLayer>, Layer.Error<typeof ProxyContextLayer>>;
 
-let runtime: Runtime | undefined;
+const runtimeState: { current?: Runtime } = {};
 
 function buildRuntime(): Runtime {
   envFile(".env");
@@ -17,8 +17,8 @@ function buildRuntime(): Runtime {
 }
 
 export function proxyRuntime(): Runtime {
-  runtime ??= buildRuntime();
-  return runtime;
+  runtimeState.current ??= buildRuntime();
+  return runtimeState.current;
 }
 
 export function proxyContext(): Promise<ProxyContext> {
@@ -30,8 +30,8 @@ export function proxyContext(): Promise<ProxyContext> {
 }
 
 export async function disposeContext(): Promise<void> {
-  const current = runtime;
-  runtime = undefined;
+  const current = runtimeState.current;
+  runtimeState.current = undefined;
   if (!current) return;
   await current.dispose();
 }

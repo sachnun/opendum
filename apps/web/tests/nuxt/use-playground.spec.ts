@@ -46,7 +46,9 @@ describe("usePlayground", () => {
 
   it("switches the selected scenario", async () => {
     const playground = mountProbe();
-    const next = playground.SCENARIOS[1]!;
+    const next = playground.SCENARIOS[1];
+    expect(next).toBeDefined();
+    if (!next) return;
     playground.selectScenario(next);
     expect(playground.selectedScenario.value.id).toBe(next.id);
   });

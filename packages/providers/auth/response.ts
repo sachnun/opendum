@@ -2,7 +2,7 @@ import { Effect } from "effect";
 
 import type { OAuthResult } from "@opendum/providers/auth/result";
 import { httpError } from "@opendum/providers/auth/http-errors";
-import { AuthFailure, asFailure } from "@opendum/providers/auth/failure";
+import { type AuthFailure, asFailure } from "@opendum/providers/auth/failure";
 
 export class ProviderResponse {
   private readonly label: string;

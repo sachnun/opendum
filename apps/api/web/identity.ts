@@ -8,7 +8,7 @@ export class IdentityService {
     this.auth = auth;
   }
 
-  verifyAccessToken(token: string): Effect.Effect<unknown | null> {
+  verifyAccessToken(token: string): Effect.Effect<Record<string, unknown> | null> {
     return Effect.tryPromise({
       try: () => this.auth.api.verifyJWT({ body: { token } }),
       catch: (cause) => cause,
@@ -45,13 +45,13 @@ export const IdentityLayer = Layer.effect(
 
 type Runtime = ManagedRuntime.ManagedRuntime<Layer.Success<typeof IdentityLayer>, Layer.Error<typeof IdentityLayer>>;
 
-let runtime: Runtime | undefined;
+const runtimeState: { current?: Runtime } = {};
 
 export function getIdentity(): Effect.Effect<IdentityService> {
   return Effect.gen(function* () {
     const active = yield* Effect.sync(() => {
-      runtime ??= ManagedRuntime.make(IdentityLayer);
-      return runtime;
+      runtimeState.current ??= ManagedRuntime.make(IdentityLayer);
+      return runtimeState.current;
     });
     return yield* Effect.promise(() =>
       active.runPromise(

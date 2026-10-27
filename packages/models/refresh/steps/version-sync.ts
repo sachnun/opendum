@@ -10,7 +10,7 @@ function globalize(pattern: RegExp): RegExp {
   return new RegExp(pattern.source, pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`);
 }
 
-export function syncCli(label: string, targets: CliVersionTarget[], latest: string | null): void {
+export async function syncCli(label: string, targets: CliVersionTarget[], latest: string | null): Promise<void> {
   if (!latest) {
     console.warn(`[${label}] Could not determine the latest version, skipping.`);
     return;
@@ -26,7 +26,7 @@ export function syncCli(label: string, targets: CliVersionTarget[], latest: stri
       continue;
     }
     if (current.every((version) => version === latest)) continue;
-    writeText(target.path, source.replace(pattern, `$1${latest}$3`));
+    await writeText(target.path, source.replace(pattern, `$1${latest}$3`));
     console.log(`[${label}] Updated ${target.label} ${[...new Set(current)].join(", ")} -> ${latest}`);
     updated += 1;
   }

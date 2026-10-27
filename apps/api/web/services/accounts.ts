@@ -40,7 +40,7 @@ type HealthRecoveryRow = HealthRow & {
   createdAt: Date | string | null;
 };
 
-interface OverviewOptions extends AccountReadOptions {}
+type OverviewOptions = AccountReadOptions;
 
 const PROVIDER_KEY_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/;
 const listColumns = {
@@ -85,10 +85,11 @@ const listAccountsInner = Effect.fnUntraced(function* (userId: string) {
         .orderBy(asc(providerAccount.createdAt)),
     "Failed to list accounts"
   );
-  return accounts.map((account) => ({
-    ...AccountState.withActive(account, now),
-    unhealthyCount: account.consecutiveErrors,
-  }));
+  return accounts.map((account) =>
+    Object.assign(AccountState.withActive(account, now), {
+      unhealthyCount: account.consecutiveErrors,
+    })
+  );
 });
 
 export const listByProvider = Effect.fn("accounts.listByProvider")(function* (
@@ -114,10 +115,11 @@ const listInner = Effect.fnUntraced(function* (
         .orderBy(...lastUsedOrder),
     "Failed to list provider accounts"
   );
-  return accounts.map((account) => ({
-    ...AccountState.withActive(account, now),
-    unhealthyCount: account.consecutiveErrors,
-  }));
+  return accounts.map((account) =>
+    Object.assign(AccountState.withActive(account, now), {
+      unhealthyCount: account.consecutiveErrors,
+    })
+  );
 });
 
 export const getAccountOverview = Effect.fn("accounts.overview")(function* (
@@ -337,15 +339,14 @@ const buildAccountDetail = Effect.fnUntraced(function* (
       const unhealthyCount = health?.unhealthyCount ?? account.consecutiveErrors;
       const status = AccountState.hasCooldown(account, now) || unhealthyCount >= UNHEALTHY_THRESHOLD ? "failed" : "active";
 
-      return {
-        ...AccountState.withActive(account, now),
+      return Object.assign(AccountState.withActive(account, now), {
         status,
         consecutiveErrors: unhealthyCount,
         unhealthyCount,
         lastErrorAt: health?.lastErrorAt ?? account.lastErrorAt,
         lastSuccessAt: health?.lastSuccessAt ?? account.lastSuccessAt,
         stats: emptyStats(),
-      };
+      });
     });
 
     return {
@@ -421,13 +422,11 @@ const updateAccountInner = Effect.fnUntraced(function* (
     if (input.disabledUntil <= now) return yield* Effect.fail(internal("Please choose a future time"));
     updates.isActive = true;
     updates.disabledUntil = input.disabledUntil;
-  } else {
-    if (input.isActive !== undefined) {
-      updates.isActive = input.isActive;
-      updates.disabledUntil = null;
-    } else if (input.disabledUntil === null) {
-      updates.disabledUntil = null;
-    }
+  } else if (input.isActive !== undefined) {
+    updates.isActive = input.isActive;
+    updates.disabledUntil = null;
+  } else if (input.disabledUntil === null) {
+    updates.disabledUntil = null;
   }
 
   if (Object.keys(updates).length > 0) {
@@ -577,9 +576,10 @@ const togglePinInner = Effect.fnUntraced(function* (
     "Failed to load pinned provider"
   );
 
-  if (existing[0]) {
+  const pinned = existing[0];
+  if (pinned) {
     yield* fromPromise(
-      () => db.delete(pinnedProvider).where(eq(pinnedProvider.id, existing[0]!.id)),
+      () => db.delete(pinnedProvider).where(eq(pinnedProvider.id, pinned.id)),
       "Failed to update pinned provider"
     );
     publishAccounts(userId);

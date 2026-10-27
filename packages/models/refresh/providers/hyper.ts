@@ -3,6 +3,7 @@ import { raise } from "@opendum/models/refresh/core/raise";
 import { fetchJson } from "@opendum/models/sync/http";
 import { entryFor, slugify, writeEntry } from "@opendum/models/refresh/core/keys";
 import { sourceOf, type ModelSource, type SourceResult } from "@opendum/models/refresh/core/types";
+import { compareText } from "@opendum/models/compare";
 
 const MODELS_URL = "https://hyper.charm.land/v1/models";
 const MIN_EXPECTED_MODELS = 10;
@@ -37,7 +38,7 @@ const uniqueKeys = (entries: ReadonlyArray<Entry>): Map<string, string> => {
     }
     map.set(key, entry.id);
   }
-  return new Map([...map.entries()].sort(([left], [right]) => left.localeCompare(right)));
+  return new Map([...map.entries()].sort(([left], [right]) => compareText(left, right)));
 };
 
 const parseModels = (payload: unknown): ReadonlyArray<Entry> => {
@@ -72,7 +73,7 @@ export const hyperSource: ModelSource = {
         const models = uniqueKeys(entries);
         const reasoning = new Set(entries.filter(isReasoning).map((entry) => entry.id));
         const reasoningKeys = new Set(
-          [...models.entries()].filter(([, id]) => reasoning.has(id)).map(([key]) => key)
+          [...models.entries()].flatMap(([key, id]) => (reasoning.has(id) ? [key] : []))
         );
         return { ...sourceOf(models), extra: new Map([["reasoningKeys", reasoningKeys]]) };
       }),

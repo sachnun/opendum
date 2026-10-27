@@ -1,9 +1,10 @@
 import { Effect } from "effect";
+import { compareText } from "@opendum/models/compare";
 import { and, asc, desc, eq, inArray, lte } from "drizzle-orm";
 
 import { db, providerAccount, proxyApiKey, keyRateLimit } from "@opendum/database";
 import { fromPromise } from "@opendum/api/web/lib/task";
-import { internal, notFound } from "@opendum/api/web/errors";
+import { internal, notFound, type ServiceFailure } from "@opendum/api/web/errors";
 import { decrypt, encrypt, mintKey, keyPreview, hashString } from "@opendum/api/web/lib/encryption";
 import { modelAvailability, invalidateValidation } from "@opendum/api/web/lib/proxy/auth";
 import { authlessAccounts, isSynthetic } from "@opendum/api/web/lib/proxy/authless-providers";
@@ -24,7 +25,8 @@ interface ReadOptions {
 }
 
 function modelList(models: string[]): string[] {
-  return Array.from(new Set(models.map((model) => aliasOf(model.trim())).filter((model) => model.length > 0))).sort(compareModels);
+  const aliases = models.map((model) => aliasOf(model.trim()));
+  return Array.from(new Set(aliases.filter((model) => model.length > 0))).sort(compareModels);
 }
 
 const customModelIds = Effect.fn("apiKeys.customModelIds")(function* (userId: string) {
@@ -73,15 +75,13 @@ const getOwned = Effect.fn("apiKeys.getOwned")(function* (userId: string, id: st
   return rows[0] ?? null;
 });
 
-type OwnedApiKey = NonNullable<
-  import("effect").Effect.Success<ReturnType<typeof getOwned>>
->;
+type OwnedApiKey = NonNullable<Effect.Success<ReturnType<typeof getOwned>>>;
 
 const withOwned = Effect.fn("apiKeys.withOwned")(function* <T>(
   userId: string,
   id: string,
   failureMessage: string,
-  action: (apiKey: OwnedApiKey) => import("effect").Effect.Effect<T, import("@opendum/api/web/errors").ServiceFailure>
+  action: (apiKey: OwnedApiKey) => Effect.Effect<T, ServiceFailure>
 ) {
   const apiKey = yield* getOwned(userId, id);
   if (!apiKey) return yield* notFound("API key not found");
@@ -199,11 +199,12 @@ const listInner = Effect.fnUntraced(function* (
     const apiKeyIds = apiKeys.map((apiKey) => apiKey.id);
     const roaming = yield* roamingPoints(userId, apiKeyIds);
 
-    return apiKeys.map(({ encryptedKey, ...apiKey }) => ({
-      ...apiKey,
-      keyPreview: encryptedKey ? keyPreview(decrypt(encryptedKey)) : apiKey.keyPreview,
-      roamingPointsUsed: roaming.get(apiKey.id) ?? 0,
-    }));
+    return apiKeys.map(({ encryptedKey, ...apiKey }) =>
+      Object.assign(apiKey, {
+        keyPreview: encryptedKey ? keyPreview(decrypt(encryptedKey)) : apiKey.keyPreview,
+        roamingPointsUsed: roaming.get(apiKey.id) ?? 0,
+      })
+    );
   }
 });
 
@@ -438,7 +439,7 @@ export const updateAccess = Effect.fn("apiKeys.updateAccountAccess")(function* (
         input.mode === "all"
           ? []
           : Array.from(new Set(input.accounts.map((account) => account.trim()).filter(Boolean))).sort((a, b) =>
-              a.localeCompare(b)
+              compareText(a, b)
             );
       if (input.mode !== "all" && normalizedAccounts.length === 0) {
         return yield* failWith("Select at least one account");

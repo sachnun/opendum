@@ -78,7 +78,8 @@ const applyTransaction = Effect.fn("points.applyPointTransaction")(function* (
     "Failed to insert point transaction"
   );
 
-  if (!inserted[0]) return { applied: false, balance: null };
+  const transaction = inserted[0];
+  if (!transaction) return { applied: false, balance: null };
 
   const updated = yield* fromPromise(
     () =>
@@ -93,14 +94,14 @@ const applyTransaction = Effect.fn("points.applyPointTransaction")(function* (
     "Failed to update point balance"
   );
 
-  const balance = updated[0]!.balance;
+  const balance = updated[0]?.balance ?? 0;
 
   yield* fromPromise(
     () =>
       client
         .update(pointTransaction)
         .set({ balanceAfter: balance })
-        .where(eq(pointTransaction.id, inserted[0]!.id)),
+        .where(eq(pointTransaction.id, transaction.id)),
     "Failed to update point transaction balance"
   );
 
@@ -336,7 +337,8 @@ export const debitUserPoints = Effect.fn("points.debitUserPoints")(function* (
     "Failed to debit point balance"
   );
 
-  if (!debited[0]) {
+  const debit = debited[0];
+  if (!debit) {
     const existing = yield* fromPromise(
       () =>
         client
@@ -356,12 +358,12 @@ export const debitUserPoints = Effect.fn("points.debitUserPoints")(function* (
         userId,
         amount: -amount,
         type,
-        balanceAfter: debited[0]!.balance,
+        balanceAfter: debit.balance,
       }),
     "Failed to record point transaction"
   );
 
-  publishPoints(userId, debited[0].balance);
+  publishPoints(userId, debit.balance);
 
   return { success: true as const, balance: debited[0].balance };
 });

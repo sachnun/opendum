@@ -4,6 +4,7 @@ import type { Registry } from "@opendum/models/runtime";
 import type { ProviderAccount } from "@opendum/providers/types";
 import type { UpstreamTransport } from "@opendum/providers/core/http";
 import { PERCH_ACCOUNT_PATH, PERCH_APP_URL, PERCH_CONFIG_PATH } from "@opendum/providers/auth/perch/constants";
+import { compareText } from "@opendum/models/compare";
 
 export type Json = Record<string, unknown>;
 
@@ -157,7 +158,7 @@ export class PerchModels {
   }
 
   static supported(registry: Registry): string {
-    return registry.models("perch").sort((a, b) => a.localeCompare(b)).join(", ");
+    return registry.models("perch").sort((a, b) => compareText(a, b)).join(", ");
   }
 
   static effort(body: Json): { level: string; reasoningEnabled: boolean } {

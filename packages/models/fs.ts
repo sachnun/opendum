@@ -146,7 +146,7 @@ export function tryRemove(path: string): Effect.Effect<void, ModelWriteFailure> 
         .then(() => null)
         .catch((cause: unknown) => cause);
       if (removed === null || isMissing(removed)) return;
-      raise(removed instanceof Error ? removed : new Error(String(removed)));
+      raise(asError(removed));
     },
     catch: (cause) => writeFailure(path, cause),
   });

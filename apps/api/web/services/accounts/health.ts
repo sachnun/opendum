@@ -5,8 +5,9 @@ import {
   MODEL_DEGRADED_THRESHOLD,
   IDLE_DECAY_MS,
   UNHEALTHY_THRESHOLD,
+  type HealthRow,
+  type AccountRow,
 } from "@opendum/api/web/services/accounts/types";
-import type { HealthRow, AccountRow } from "@opendum/api/web/services/accounts/types";
 import { INDICATOR_WEIGHT, type ProviderAccountIndicator } from "@opendum/api/web/services/account-stats";
 
 export class Clock {
@@ -269,11 +270,12 @@ export class Health {
     ) as Record<string, { connected: number; active: number; indicator: ProviderAccountIndicator }>;
 
     for (const account of accounts) {
-      const summary = (summaries[account.provider] ??= {
+      summaries[account.provider] ??= {
         connected: 0,
         active: 0,
         indicator: "normal",
-      });
+      };
+      const summary = summaries[account.provider];
       summary.connected += 1;
 
       if (!AccountState.active(account, now)) continue;

@@ -50,17 +50,16 @@ export const SUPPORTED_OPENCODE = new Set([
 
 type Json = Record<string, unknown>;
 
-let lastIdMillis = 0;
-let idCounter = 0;
+const idState = { lastMillis: 0, counter: 0 };
 
 function opencodeId(prefix: string, descending: boolean): string {
   const now = Date.now();
-  if (now !== lastIdMillis) {
-    lastIdMillis = now;
-    idCounter = 0;
+  if (now !== idState.lastMillis) {
+    idState.lastMillis = now;
+    idState.counter = 0;
   }
-  idCounter += 1;
-  let value = BigInt(now) * 0x1000n + BigInt(idCounter);
+  idState.counter += 1;
+  let value = BigInt(now) * 0x1000n + BigInt(idState.counter);
   if (descending) value = ~value & 0xffffffffffffffffn;
   const timeBytes = new Uint8Array(6);
   for (let index = 0; index < 6; index += 1) {

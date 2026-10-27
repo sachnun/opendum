@@ -1,4 +1,4 @@
-import { SQL } from "bun";
+import type { SQL } from "bun";
 import { drizzle, type BunSQLDatabase } from "drizzle-orm/bun-sql";
 import * as relations from "@opendum/database/relations";
 import * as schema from "@opendum/database/schema/index";
@@ -39,8 +39,8 @@ function getDb(): Database {
 }
 
 export const db = new Proxy({} as Database, {
-  get(_target, property, receiver) {
-    return Reflect.get(getDb() as object, property, receiver);
+  get(_target, property) {
+    return (getDb() as unknown as Record<PropertyKey, unknown>)[property];
   },
 }) as Database;
 

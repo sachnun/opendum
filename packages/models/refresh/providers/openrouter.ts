@@ -5,6 +5,7 @@ import { fetchDecoded } from "@opendum/models/sync/http";
 import { arrayAt, asRecord, stringAt, trimmed } from "@opendum/models/json";
 import { slashedKey } from "@opendum/models/refresh/core/keys";
 import { sourceOf, type ModelSource, type SourceResult } from "@opendum/models/refresh/core/types";
+import { compareText } from "@opendum/models/compare";
 
 const MODELS_URL = "https://openrouter.ai/api/v1/models";
 const SUPPORTED_PARAM_HINTS = ["max_tokens", "temperature", "tools"] as const;
@@ -60,7 +61,7 @@ function freeIds(payload: unknown): ReadonlyArray<string> {
         });
       })
     ),
-  ].sort((left, right) => left.localeCompare(right));
+  ].sort((left, right) => compareText(left, right));
 }
 
 export const openrouterSource: ModelSource = {

@@ -63,7 +63,7 @@ export class FailureMap {
           message: error.message,
           type: "configuration_error",
         };
-      case "InternalFailure":
+      default:
         return {
           status: error.status ?? 500,
           message: error.message,

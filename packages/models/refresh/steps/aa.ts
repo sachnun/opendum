@@ -81,7 +81,7 @@ async function main(): Promise<void> {
       delete generated.scores.artificialAnalysis;
       if (Object.keys(generated.scores).length === 0) delete generated.scores;
       cleared += 1;
-      if (!dryRun) writeGenerated(file, generated);
+      if (!dryRun) await writeGenerated(file, generated);
       continue;
     }
     scored += 1;
@@ -98,7 +98,7 @@ async function main(): Promise<void> {
     const generated = exists(file) ? read(readText(file)) : ({} as ModelData);
     generated.scores = { artificialAnalysis: next };
     updated += 1;
-    if (!dryRun) writeGenerated(file, generated);
+    if (!dryRun) await writeGenerated(file, generated);
   }
 
   console.log(

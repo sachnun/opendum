@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { db, user } from "@opendum/database";
 import { authUser, type AuthUser } from "@opendum/api/web/lib/claims";
 import { fromPromise } from "@opendum/api/web/lib/task";
+import type { ServiceFailure } from "@opendum/api/web/errors";
 
 export const findUser = Effect.fn("findUser")(function* (userId: string) {
   const rows = yield* fromPromise(
@@ -18,4 +19,4 @@ export const findUser = Effect.fn("findUser")(function* (userId: string) {
 
   const found = rows[0];
   return found ? authUser(found) : null;
-}) satisfies (userId: string) => Effect.Effect<AuthUser | null, import("@opendum/api/web/errors").ServiceFailure>;
+}) satisfies (userId: string) => Effect.Effect<AuthUser | null, ServiceFailure>;

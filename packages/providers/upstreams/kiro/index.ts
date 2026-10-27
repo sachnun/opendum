@@ -205,8 +205,8 @@ async function* transformSse(source: ReadableStream<Uint8Array>, model: string):
     }
     if (typeof event.content === "string" && event.followupPrompt === undefined) {
       totalContent += event.content;
-      let [contentDelta, reasoningDelta] = parser.processContent(event.content, false);
-      if (hasNativeReasoning && reasoningDelta) reasoningDelta = "";
+      const [contentDelta, parsedReasoningDelta] = parser.processContent(event.content, false);
+      const reasoningDelta = hasNativeReasoning ? "" : parsedReasoningDelta;
       emitContent(contentDelta, reasoningDelta);
       void contentDelta;
     }
@@ -258,8 +258,8 @@ async function* transformSse(source: ReadableStream<Uint8Array>, model: string):
   for (const event of parser.finish()) processEvent(event);
   reader.releaseLock();
 
-  let [flushContent, flushReasoning] = parser.flushContent();
-  if (hasNativeReasoning) flushReasoning = "";
+  const [flushContent, parsedFlushReasoning] = parser.flushContent();
+  const flushReasoning = hasNativeReasoning ? "" : parsedFlushReasoning;
   emitContent(flushContent, flushReasoning);
   for (const call of BracketCalls.parse(totalContent)) {
     const idx = toolCallCount;

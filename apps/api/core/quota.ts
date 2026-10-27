@@ -1,6 +1,5 @@
 import { Effect, Result } from "effect";
-import { fetchQuota as providerQuota, isQuota } from "@opendum/providers/quota";
-import type { QuotaContext, QuotaJournal } from "@opendum/providers/quota";
+import { fetchQuota as providerQuota, isQuota, type QuotaContext, type QuotaJournal } from "@opendum/providers/quota";
 import { decrypt } from "@opendum/core/crypto";
 import type { ProxyContext } from "@opendum/api/core/context";
 

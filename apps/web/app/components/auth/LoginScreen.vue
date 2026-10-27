@@ -67,7 +67,8 @@ function continueWith(provider: SocialProvider) {
 }
 
 function rotateShape(shape: number[][]) {
-  return shape[0]!.map((_, columnIndex) => shape.map(row => row[columnIndex]!).reverse());
+  const width = shape[0]?.length ?? 0;
+  return Array.from({ length: width }, (_, columnIndex) => shape.map(row => row[columnIndex] ?? 0).reverse());
 }
 
 onMounted(() => {
@@ -75,6 +76,9 @@ onMounted(() => {
   const context = canvas?.getContext("2d");
 
   if (!canvas || !context) return;
+
+  const surface = canvas;
+  const ctx = context;
 
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   let animationFrame = 0;
@@ -122,13 +126,17 @@ onMounted(() => {
         const isWaveGap = Math.abs(x - waveGap) <= (rowOffset % 5 === 0 ? 1 : 0);
         const isSmallGap = rowOffset > 1 && rowOffset < stackHeight - 1 && (x * 3 + rowOffset) % 17 === 0 && Math.random() > 0.7;
 
-        if (!isWaveGap && !isSmallGap && rowOffset < columnHeights[x]!) {
-          board[y]![x] = colors[(x + Math.floor(rowOffset / 2)) % colors.length]!;
+        const row = board[y];
+        const height = columnHeights[x] ?? 0;
+        const color = colors[(x + Math.floor(rowOffset / 2)) % colors.length];
+        if (!isWaveGap && !isSmallGap && rowOffset < height && row && color !== undefined) {
+          row[x] = color;
         }
       }
 
-      if (board[y]!.every(Boolean)) {
-        board[y]![Math.floor((columns - 1) / 2)] = null;
+      const row = board[y];
+      if (row?.every(Boolean)) {
+        row[Math.floor((columns - 1) / 2)] = null;
       }
     }
   }
@@ -144,7 +152,7 @@ onMounted(() => {
       const boardX = nextX + shapeX;
       const boardY = nextY + shapeY;
 
-      return boardX >= 0 && boardX < columns && boardY < rows && (boardY < 0 || !board[boardY]![boardX]);
+      return boardX >= 0 && boardX < columns && boardY < rows && (boardY < 0 || !board[boardY]?.[boardX]);
     }));
   }
 
@@ -157,8 +165,9 @@ onMounted(() => {
     let nextShape = shape;
 
     for (let index = 0; index < 4; index += 1) {
-      if (!rotations.some(rotation => shapesEqual(rotation, nextShape))) {
-        rotations.push(nextShape);
+      const candidate = nextShape;
+      if (!rotations.some(rotation => shapesEqual(rotation, candidate))) {
+        rotations.push(candidate);
       }
       nextShape = rotateShape(nextShape);
     }
@@ -175,7 +184,8 @@ onMounted(() => {
         const boardY = y + shapeY;
 
         if (cell && boardY >= 0 && boardY < rows && boardX >= 0 && boardX < columns) {
-          testBoard[boardY]![boardX] = "preview";
+          const row = testBoard[boardY];
+          if (row) row[boardX] = "preview";
         }
       });
     });
@@ -186,13 +196,13 @@ onMounted(() => {
       return firstBlock === -1 ? 0 : rows - firstBlock;
     });
     const aggregateHeight = heights.reduce((total, height) => total + height, 0);
-    const bumpiness = heights.slice(1).reduce((total, height, index) => total + Math.abs(height - heights[index]!), 0);
+    const bumpiness = heights.slice(1).reduce((total, height, index) => total + Math.abs(height - (heights[index] ?? 0)), 0);
     let holes = 0;
 
     for (let column = 0; column < columns; column += 1) {
       let hasBlock = false;
       for (let row = 0; row < rows; row += 1) {
-        if (testBoard[row]![column]) {
+        if (testBoard[row]?.[column]) {
           hasBlock = true;
         } else if (hasBlock) {
           holes += 1;
@@ -207,7 +217,7 @@ onMounted(() => {
     let bestMove: { shape: number[][]; x: number; score: number } | null = null;
 
     rotationsOf(shape).forEach((rotation) => {
-      const maxX = columns - rotation[0]!.length;
+      const maxX = columns - (rotation[0]?.length ?? 0);
       for (let x = 0; x <= maxX; x += 1) {
         let y = -rotation.length;
 
@@ -224,7 +234,7 @@ onMounted(() => {
       }
     });
 
-    return bestMove ?? { shape, x: Math.max(0, Math.floor((columns - shape[0]!.length) / 2)), score: 0 };
+    return bestMove ?? { shape, x: Math.max(0, Math.floor((columns - (shape[0]?.length ?? 0)) / 2)), score: 0 };
   }
 
   function planPiece(piece: TetrisPiece) {
@@ -246,9 +256,10 @@ onMounted(() => {
   }
 
   function spawnPiece() {
-    const source = tetrisPieces[Math.floor(Math.random() * tetrisPieces.length)]!;
+    const source = tetrisPieces[Math.floor(Math.random() * tetrisPieces.length)] ?? tetrisPieces[0];
+    if (!source) return;
     const shape = source.shape;
-    const pieceWidth = shape[0]!.length;
+    const pieceWidth = shape[0]?.length ?? 0;
     const targetMove = bestMove(shape);
     const x = Math.max(0, Math.floor((columns - pieceWidth) / 2));
     const y = -shape.length;
@@ -272,7 +283,8 @@ onMounted(() => {
         const boardY = piece.y + shapeY;
 
         if (cell && boardY >= 0 && boardY < rows && boardX >= 0 && boardX < columns) {
-          board[boardY]![boardX] = piece.color;
+          const row = board[boardY];
+          if (row) row[boardX] = piece.color;
         }
       });
     });
@@ -294,11 +306,11 @@ onMounted(() => {
     cellSize = width < 640 ? 14 : 18;
     columns = Math.max(12, Math.ceil(width / cellSize));
     rows = Math.max(18, Math.ceil(height / cellSize));
-    canvas!.width = Math.ceil(width * ratio);
-    canvas!.height = Math.ceil(height * ratio);
-    canvas!.style.width = `${width}px`;
-    canvas!.style.height = `${height}px`;
-    context!.setTransform(ratio, 0, 0, ratio, 0, 0);
+    surface.width = Math.ceil(width * ratio);
+    surface.height = Math.ceil(height * ratio);
+    surface.style.width = `${width}px`;
+    surface.style.height = `${height}px`;
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
     createBoard();
     seedStack();
     activePieces = [];
@@ -311,29 +323,29 @@ onMounted(() => {
     const inset = 1.5;
     const size = cellSize - inset * 2;
 
-    context!.fillStyle = color;
-    context!.strokeStyle = "rgba(255, 255, 255, 0.035)";
-    context!.lineWidth = 1;
-    context!.fillRect(x * cellSize + inset, y * cellSize + inset, size, size);
-    context!.strokeRect(x * cellSize + inset, y * cellSize + inset, size, size);
+    ctx.fillStyle = color;
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.035)";
+    ctx.lineWidth = 1;
+    ctx.fillRect(x * cellSize + inset, y * cellSize + inset, size, size);
+    ctx.strokeRect(x * cellSize + inset, y * cellSize + inset, size, size);
   }
 
   function draw() {
-    context!.clearRect(0, 0, canvas!.width, canvas!.height);
+    ctx.clearRect(0, 0, surface.width, surface.height);
 
-    context!.strokeStyle = "rgba(255, 255, 255, 0.018)";
-    context!.lineWidth = 1;
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.018)";
+    ctx.lineWidth = 1;
     for (let x = 0; x <= columns; x += 1) {
-      context!.beginPath();
-      context!.moveTo(x * cellSize, 0);
-      context!.lineTo(x * cellSize, rows * cellSize);
-      context!.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x * cellSize, 0);
+      ctx.lineTo(x * cellSize, rows * cellSize);
+      ctx.stroke();
     }
     for (let y = 0; y <= rows; y += 1) {
-      context!.beginPath();
-      context!.moveTo(0, y * cellSize);
-      context!.lineTo(columns * cellSize, y * cellSize);
-      context!.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0, y * cellSize);
+      ctx.lineTo(columns * cellSize, y * cellSize);
+      ctx.stroke();
     }
 
     board.forEach((row, y) => {
@@ -404,7 +416,8 @@ onMounted(() => {
         let didLockPiece = false;
 
         for (let index = activePieces.length - 1; index >= 0; index -= 1) {
-          const piece = activePieces[index]!;
+          const piece = activePieces[index];
+          if (!piece) continue;
 
           if (ready(piece)) {
             hardDrop(piece);

@@ -24,9 +24,9 @@ export class Value {
     return Result.isSuccess(parsed) ? parsed.success : null;
   }
 
-  static parsed<T>(text: string, fallback: T): unknown | T {
+  static parsed<T>(text: string, fallback: T): T {
     const value = Value.parseJson(text);
-    return value === null ? fallback : value;
+    return value === null ? fallback : (value as T);
   }
 
   static stringOr(value: unknown, fallback: string): string {

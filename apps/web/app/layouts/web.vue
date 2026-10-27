@@ -9,11 +9,11 @@ import {
 import { settle } from "~~/lib/settle";
 
 import type { AccountsData, ModelsData, UsageData } from "@opendum/providers/contract";
-import type { NavItem, NavSubItem, ProviderAccountIndicator } from "~~/lib/navigation";
+import { isSwitch, primaryNavigation, hrefOf, type NavItem, type NavSubItem, type ProviderAccountIndicator } from "~~/lib/navigation";
 import type { AccountOverviewData, MeData } from "~~/lib/api-types";
-import { isSwitch, primaryNavigation, hrefOf } from "~~/lib/navigation";
 import { hrefMap, accountPath, PROVIDER_ACCOUNT_DEFINITIONS } from "@opendum/providers/provider-accounts";
 import { avatarUrl } from "~~/lib/utils";
+import { compareText } from "@opendum/models/compare";
 
 const route = useRoute();
 const { user: authUser, signOut: endSession } = useAuth();
@@ -268,7 +268,7 @@ function subItems(item: NavItem) {
         const indicatorB = indicatorByHref.value[b.href] ?? "normal";
         return PROVIDER_AVAILABILITY_ORDER[availabilityA] - PROVIDER_AVAILABILITY_ORDER[availabilityB]
           || PROVIDER_STATUS_ORDER[indicatorA] - PROVIDER_STATUS_ORDER[indicatorB]
-          || a.name.localeCompare(b.name);
+          || compareText(a.name, b.name);
       });
   }
 
@@ -328,7 +328,7 @@ const anchorIds = computed(() => primaryNavigation.flatMap((item) => subItems(it
   .filter((subItem) => subItem.href === route.path && subItem.anchorId)
   .map((subItem) => subItem.anchorId as string)));
 
-const { mainContent, activeAnchorId, handleNavClick } = useAnchorNavigation({ anchorIds: anchorIds, onNavigate: closeMobileSidebar });
+const { mainContent, activeAnchorId, handleNavClick } = useAnchorNavigation({ anchorIds, onNavigate: closeMobileSidebar });
 
 function applyPoints(balance: number) {
   if (!me.value) return;

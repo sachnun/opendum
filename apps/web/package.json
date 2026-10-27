@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "nuxt dev",
+    "postinstall": "nuxt prepare",
     "build": "nuxt build",
     "generate": "nuxt generate",
     "test": "bun test",

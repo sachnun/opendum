@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 import type { DbExecutor } from "@opendum/database/client";
-import { DatabaseFailure, databaseFailure } from "@opendum/database/errors";
+import { type DatabaseFailure, databaseFailure } from "@opendum/database/errors";
 import {
   creditPointBalance,
   debitPointBalance,

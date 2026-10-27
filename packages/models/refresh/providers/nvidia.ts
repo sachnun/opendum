@@ -1,5 +1,6 @@
 import { Effect, Option, Schema } from "effect";
 import { raise } from "@opendum/models/refresh/core/raise";
+import { compareText } from "@opendum/models/compare";
 import { buildIndex, upstream } from "@opendum/models/model-store";
 import { fetchDecoded } from "@opendum/models/sync/http";
 import { afterFirstSlash, standardKey } from "@opendum/models/refresh/core/keys";
@@ -107,7 +108,7 @@ const buildMap = (
   existing: ReadonlyMap<string, string>,
   generative: ReadonlySet<string>
 ): Map<string, string> => {
-  const all = [...new Set(available)].sort((left, right) => left.localeCompare(right));
+  const all = [...new Set(available)].sort((left, right) => compareText(left, right));
   const availableSet = new Set(all);
 
   const byKey = new Map<string, string>();
@@ -139,7 +140,7 @@ const buildMap = (
     mapped.add(upstreamName);
   }
 
-  return new Map([...next.entries()].sort(([left], [right]) => left.localeCompare(right)));
+  return new Map([...next.entries()].sort(([left], [right]) => compareText(left, right)));
 };
 
 export const nvidiaSource: ModelSource = {
@@ -168,7 +169,10 @@ export const nvidiaSource: ModelSource = {
         { concurrency: DOCS_URLS.length }
       );
 
-      const generative = new Set(pages.flatMap((page) => [...generativeKeys(page)]));
+      const generative = new Set<string>();
+      for (const page of pages) {
+        for (const key of generativeKeys(page)) generative.add(key);
+      }
       if (generative.size === 0) raise(new Error("unexpected Nvidia model docs payload"));
 
       return sourceOf(buildMap(payload, existingKeys(ctx), generative)) satisfies SourceResult;

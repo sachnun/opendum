@@ -1,5 +1,4 @@
-import { Registry } from "@opendum/models/runtime";
-import type { ModelInfo, ProviderAccessRule } from "@opendum/models/runtime";
+import { Registry, type ModelInfo, type ProviderAccessRule } from "@opendum/models/runtime";
 import { compareEntries } from "@opendum/models/sort";
 import { dirFor } from "@opendum/api/core/context";
 

@@ -20,11 +20,11 @@ import {
   parseModel,
 } from "@opendum/auth/normalize";
 import { type CustomProviderReader, customStore } from "@opendum/auth/store/custom";
-import {
-  type AccountModelAvailability,
-  type AuthResult,
-  type ModelAccess,
-  type ModelValidationResult,
+import type {
+  AccountModelAvailability,
+  AuthResult,
+  ModelAccess,
+  ModelValidationResult,
 } from "@opendum/auth/types";
 
 const VERSION_TTL = 30 * 24 * 60 * 60;

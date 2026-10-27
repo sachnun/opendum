@@ -2,6 +2,7 @@ import { resolveFrom, type CanonicalIndex } from "@opendum/models/model/canonica
 import { GENERATED_PROVIDER_FIELDS } from "@opendum/models/model/merge";
 import { probeSets } from "@opendum/models/model/probes";
 import type { ModelData, ProviderModelConfig } from "@opendum/models/types";
+import { compareText } from "@opendum/models/compare";
 
 export interface CanonicalizationModel {
   relativeId: string;
@@ -154,7 +155,7 @@ export function planCanonicalization(
   const renames: CanonicalRename[] = [];
   const merges: CanonicalMerge[] = [];
 
-  const ordered = [...models].sort((left, right) => modelId(left).localeCompare(modelId(right)));
+  const ordered = [...models].sort((left, right) => compareText(modelId(left), modelId(right)));
 
   for (const model of ordered) {
     const from = modelId(model);

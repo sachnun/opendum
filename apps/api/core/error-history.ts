@@ -72,7 +72,11 @@ export function upsertHistory(
     yield* redisEffect(() => redis.zAdd(historyKey(accountId), { score: createdAt.getTime(), value: entryId }));
     yield* redisEffect(() => redis.expire(historyKey(accountId), DEFAULT_TTL));
   }).pipe(
-    Effect.tapError((error) => Effect.logDebug("error history write failed", { accountId, error: error.message })),
+    Effect.tapError((error) =>
+      Effect.logDebug("error history write failed").pipe(
+        Effect.annotateLogs({ accountId, error: error.message })
+      )
+    ),
     Effect.ignore
   );
 }

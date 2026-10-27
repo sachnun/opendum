@@ -1,14 +1,16 @@
 import { Duration, Effect, Exit, FiberSet, Option, Scope } from "effect";
 
-let registry: FiberSet.FiberSet<unknown, unknown> | null = null;
-let registryScope: Scope.Closeable | null = null;
+const registryState: {
+  set?: FiberSet.FiberSet<unknown, unknown>;
+  scope?: Scope.Closeable;
+} = {};
 
 function registryOf(): FiberSet.FiberSet<unknown, unknown> {
-  if (registry) return registry;
+  if (registryState.set) return registryState.set;
   const scope = Scope.makeUnsafe("parallel");
   const set = Effect.runSync(FiberSet.make().pipe(Effect.provideService(Scope.Scope, scope)));
-  registryScope = scope;
-  registry = set;
+  registryState.scope = scope;
+  registryState.set = set;
   return set;
 }
 
@@ -22,14 +24,14 @@ export function trackPending(task: Promise<unknown>): void {
 }
 
 export function pendingCount(): number {
-  const set = registry;
+  const set = registryState.set;
   if (!set) return 0;
   return Effect.runSync(FiberSet.size(set));
 }
 
 export async function settleTasks(timeoutMs: number): Promise<boolean> {
-  const set = registry;
-  const scope = registryScope;
+  const set = registryState.set;
+  const scope = registryState.scope;
   if (!set || !scope) return true;
   const drain = FiberSet.awaitEmpty(set).pipe(Effect.as(true));
   const program =
@@ -42,8 +44,8 @@ export async function settleTasks(timeoutMs: number): Promise<boolean> {
   const drained = await Effect.runPromise(program.pipe(Effect.orElseSucceed(() => false)));
   if (!drained) {
     await Effect.runPromise(Effect.ignore(Scope.close(scope, Exit.void)));
-    registry = null;
-    registryScope = null;
+    registryState.set = undefined;
+    registryState.scope = undefined;
   }
   return drained;
 }

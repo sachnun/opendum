@@ -2,16 +2,21 @@ import { afterAll, beforeAll, expect, test } from "bun:test";
 
 import * as relations from "@opendum/database/relations";
 import * as schema from "@opendum/database/schema/index";
+import type * as ClientModule from "./client.js";
 
 const UNREACHABLE_URL = "postgres://opendum:opendum@127.0.0.1:1/opendum?sslmode=require";
 
 let originalDatabaseUrl: string | undefined;
-let client: typeof import("./client.js");
+let client: typeof ClientModule;
+
+function loadClient(): Promise<typeof ClientModule> {
+  return import("./client.js");
+}
 
 beforeAll(async () => {
   originalDatabaseUrl = process.env.DATABASE_URL;
   process.env.DATABASE_URL = UNREACHABLE_URL;
-  client = await import("./client.js");
+  client = await loadClient();
 });
 
 afterAll(() => {

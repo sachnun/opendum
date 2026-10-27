@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { PROVIDER_ACCOUNT_DEFINITIONS } from "@opendum/providers/provider-accounts";
+import { compareText } from "@opendum/models/compare";
 
 definePageMeta({ layout: "web" });
 
@@ -45,7 +46,7 @@ const sortedProviders = computed(() => [...providerEntries.value].sort((a, b) =>
     || providerAvailabilityOrder[aAvailability] - providerAvailabilityOrder[bAvailability]
     || providerStatusOrder[aIndicator] - providerStatusOrder[bIndicator]
     || bConnected - aConnected
-    || a.label.localeCompare(b.label);
+    || compareText(a.label, b.label);
 }));
 
 function providerSummary(provider: string) {

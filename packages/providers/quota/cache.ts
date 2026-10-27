@@ -85,10 +85,12 @@ export function quotaJson(
   const encodedBody = body === null || body === undefined ? "" : JSON.stringify(body);
   const key = cacheKey(account, cacheName, method, target, encodedBody);
 
+  const journal = ctx.journal;
+
   const fromCache = Effect.gen(function* () {
-    if (forceRefresh || !ctx.journal) return null;
+    if (forceRefresh || !journal) return null;
     const raw = yield* Effect.tryPromise({
-      try: () => ctx.journal!.get(key),
+      try: () => journal.get(key),
       catch: (cause) => cause,
     }).pipe(Effect.orElseSucceed(() => null));
     if (!raw) return null;
@@ -122,7 +124,8 @@ export function putQuota(
   ctx: QuotaContext,
   result: QuotaJsonResult
 ): Effect.Effect<void> {
-  if (!ctx.journal || result.fromCache || result.cacheKey === "") return Effect.void;
+  const journal = ctx.journal;
+  if (!journal || result.fromCache || result.cacheKey === "") return Effect.void;
   if (result.statusCode < 200 || result.statusCode >= 300) return Effect.void;
   const entry = {
     statusCode: result.statusCode,
@@ -130,7 +133,7 @@ export function putQuota(
     body: Buffer.from(result.raw, "utf8").toString("base64"),
   };
   return Effect.tryPromise({
-    try: () => ctx.journal!.set(result.cacheKey, JSON.stringify(entry), ttlSeconds()),
+    try: () => journal.set(result.cacheKey, JSON.stringify(entry), ttlSeconds()),
     catch: (cause) => cause,
   }).pipe(Effect.ignore);
 }

@@ -11,17 +11,16 @@ import { deviceFlows, oauthFlows, optionsFor, parseCallback, validateContext, ty
 import { isFailed, isPending } from "@opendum/providers/auth/response";
 import type { OAuthResult } from "@opendum/providers/auth/result";
 import type { AuthProvider } from "@opendum/providers/provider-accounts";
-import type { DeviceProviderKey } from "@opendum/providers/provider-accounts";
 import { clearFails } from "@opendum/api/web/lib/proxy/auth";
 import type { ActionResult } from "@opendum/api/web/utils/api";
 import { fromPromise } from "@opendum/api/web/lib/task";
-import { ServiceFailure, badRequest, internal } from "@opendum/api/web/errors";
+import { type ServiceFailure, badRequest, internal } from "@opendum/api/web/errors";
 import { trackProviderEmail } from "@opendum/api/web/services/points";
 
 const OAUTH_PROVIDERS = oauthFlows(authRuntime);
 const DEVICE_PROVIDERS = deviceFlows(authRuntime);
 
-type ProviderAccountKey = AuthProvider | DeviceProviderKey;
+type ProviderAccountKey = AuthProvider;
 
 function encryptRefresh(refreshToken: string | undefined): string {
   return refreshToken ? encrypt(refreshToken) : "";

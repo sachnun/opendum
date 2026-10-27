@@ -1,4 +1,5 @@
 import { SORT_ORDER, categorize, type ModelFamily } from "@opendum/models/ranking";
+import { compareText } from "@opendum/models/compare";
 
 export type ModelSortEntry = string | { id?: string; name?: string; family?: string | null };
 
@@ -71,7 +72,7 @@ function compareVersions(left: number[], right: number[]): number {
 }
 
 function compareFallback(left: string, right: string): number {
-  return left.localeCompare(right, undefined, { numeric: true });
+  return compareText(left, right);
 }
 
 function versionParts(value: string | undefined): number[] {

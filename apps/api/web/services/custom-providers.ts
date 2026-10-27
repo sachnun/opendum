@@ -1,5 +1,5 @@
-import { Result } from "effect";
-import { Effect } from "effect";
+import { Effect, Result } from "effect";
+import { compareText } from "@opendum/models/compare";
 import { and, count, eq, inArray } from "drizzle-orm";
 
 import { db, customProvider, customProviderModel, providerAccount } from "@opendum/database";
@@ -107,13 +107,14 @@ export const listCustomProviders = Effect.fn("customProviders.list")(function* (
     "Failed to count custom provider accounts"
   );
   const countByProvider = new Map(accountCounts.map((row) => [row.provider, row.value]));
-  return providers.map((provider) => ({
-    ...provider,
-    accountCount: countByProvider.get(provider.slug) ?? 0,
-    models: models
-      .filter((row) => row.providerId === provider.id)
-      .sort((a, b) => a.modelId.localeCompare(b.modelId)),
-  }));
+  return providers.map((provider) =>
+    Object.assign(provider, {
+      accountCount: countByProvider.get(provider.slug) ?? 0,
+      models: models
+        .filter((row) => row.providerId === provider.id)
+        .sort((a, b) => compareText(a.modelId, b.modelId)),
+    })
+  );
 });
 
 export const customProviderModels = Effect.fn("customProviders.models")(function* (

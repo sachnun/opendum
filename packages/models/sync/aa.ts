@@ -29,7 +29,7 @@ const LAB_TOKENS: ReadonlySet<string> = new Set([
 ]);
 
 export function normalizeSlug(value: unknown): string {
-  return String(value ?? "")
+  return (typeof value === "string" ? value : "")
     .toLowerCase()
     .replace(/^[^/]*\//, "")
     .replace(/:(?:free|batch|thinking|online|extended|optimized|nitro|floor|latest)$/g, "")
@@ -145,7 +145,10 @@ export function parseLeaderboard(html: string): AaEntry[] {
 export function parseManifest(html: string): AaManifest | null {
   const match = MANIFEST_PATTERN.exec(flightPayload(html));
   if (!match) return null;
-  return { path: match[1]!, key: match[2]! };
+  const path = match[1];
+  const key = match[2];
+  if (path === undefined || key === undefined) return null;
+  return { path, key };
 }
 
 function seal(payload: Uint8Array): Uint8Array | null {

@@ -36,8 +36,8 @@ const diff = (before: Snapshot, after: Snapshot): string => {
 };
 
 const writeSummary = (path: string, content: string): Effect.Effect<void> =>
-  Effect.sync(() => {
-    writeText(path, content);
+  Effect.promise(async () => {
+    await writeText(path, content);
     console.log(`PR summary written to ${path}`);
   });
 
@@ -66,7 +66,7 @@ const program = Effect.gen(function* () {
   return yield* Ref.get(exitCode);
 });
 
-Effect.runPromise(
+await Effect.runPromise(
   program.pipe(
     Effect.tap((code) => Effect.sync(() => {
       if (code !== 0) process.exitCode = code;

@@ -1,3 +1,4 @@
+import { compareText } from "@opendum/models/compare";
 export type JsonRecord = Record<string, unknown>;
 
 export function asRecord(value: unknown): JsonRecord | null {
@@ -61,7 +62,7 @@ export function uniqueStrings(values: Iterable<unknown>): string[] {
 }
 
 export function sortedUnique(values: Iterable<unknown>): string[] {
-  return uniqueStrings(values).sort((a, b) => a.localeCompare(b));
+  return uniqueStrings(values).sort((a, b) => compareText(a, b));
 }
 
 export function idsOf(value: unknown): string[] {

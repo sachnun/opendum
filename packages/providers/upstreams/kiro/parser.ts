@@ -287,7 +287,7 @@ export class KiroNames {
     for (const raw of messages) {
       const message = (raw ?? {}) as Json;
       if (Value.string(message.role) !== "user") continue;
-      const text = String(message.content ?? "").trim();
+      const text = Value.string(message.content).trim();
       if (!text) continue;
       return KiroNames.conversationFromSeed(text);
     }

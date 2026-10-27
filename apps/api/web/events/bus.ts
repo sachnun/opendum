@@ -3,6 +3,7 @@ import { EventPublisher } from "@orpc/server";
 import { Duration, Effect, Match, Queue, Ref, Stream } from "effect";
 
 import { proxyEvents } from "@opendum/api/core/events";
+import type { ServiceFailure } from "@opendum/api/web/errors";
 
 const POINTS_DEBOUNCE = Duration.millis(1_500);
 const SNAPSHOT_DEBOUNCE = Duration.millis(400);
@@ -18,7 +19,7 @@ export interface EventSnapshots {
 export type SnapshotBuilder = (
   userId: string,
   topics: LiveTopic[]
-) => Effect.Effect<Partial<EventSnapshots>, import("@opendum/api/web/errors").ServiceFailure>;
+) => Effect.Effect<Partial<EventSnapshots>, ServiceFailure>;
 
 type TopicSignal = { userId: string; topic: LiveTopic };
 type UsageSignal = { userId: string };
@@ -34,10 +35,10 @@ const pointsSignals = Effect.runSync(Queue.unbounded<PointsSignal>());
 
 const usagePublishedAt = Effect.runSync(Ref.make(new Map<string, number>()));
 
-let buildSnapshots: SnapshotBuilder = () => Effect.succeed({});
+const snapshotState: { builder: SnapshotBuilder } = { builder: () => Effect.succeed({}) };
 
 export function configureSnapshots(builder: SnapshotBuilder): void {
-  buildSnapshots = builder;
+  snapshotState.builder = builder;
 }
 
 function now(): string {
@@ -59,7 +60,7 @@ function updateEvent(topic: LiveTopic, snapshots: Partial<EventSnapshots>): Serv
 
 const publishTopic = Effect.fn("events.publishTopic")(function* (userId: string, topic: LiveTopic) {
   if (!activeUserIds.has(userId)) return;
-  const snapshots = yield* buildSnapshots(userId, [topic]);
+  const snapshots = yield* snapshotState.builder(userId, [topic]);
   const event = updateEvent(topic, snapshots);
   if (event) publishUser(userId, event);
 });
@@ -96,7 +97,7 @@ function topicStream(): void {
           Stream.debounce(SNAPSHOT_DEBOUNCE),
           Stream.runForEach((signal) => publishTopic(signal.userId, signal.topic)),
           Effect.catchCause((cause) =>
-            Effect.logError(`Failed to publish ${key} event`, cause)
+            Effect.logError(`Failed to publish ${key} event`).pipe(Effect.annotateLogs({ cause: String(cause) }))
           )
         )
       ),
@@ -120,7 +121,9 @@ function usageStream(): void {
           }),
           Stream.debounce(USAGE_THROTTLE),
           Stream.runForEach(() => publishUsageEvent(userId)),
-          Effect.catchCause((cause) => Effect.logError(`Failed to publish usage for ${userId}`, cause))
+          Effect.catchCause((cause) =>
+            Effect.logError(`Failed to publish usage for ${userId}`).pipe(Effect.annotateLogs({ cause: String(cause) }))
+          )
         )
       ),
       Stream.runForEach((run) => run),
@@ -137,7 +140,9 @@ function pointsStream(): void {
         stream.pipe(
           Stream.debounce(POINTS_DEBOUNCE),
           Stream.runForEach((signal) => publishPointsEvent(userId, signal.balance)),
-          Effect.catchCause((cause) => Effect.logError(`Failed to publish points for ${userId}`, cause))
+          Effect.catchCause((cause) =>
+            Effect.logError(`Failed to publish points for ${userId}`).pipe(Effect.annotateLogs({ cause: String(cause) }))
+          )
         )
       ),
       Stream.runForEach((run) => run),
@@ -159,11 +164,11 @@ function runHeartbeat(): void {
   );
 }
 
-let workersStarted = false;
+const workerState = { started: false };
 
 function startWorkers(): void {
-  if (workersStarted) return;
-  workersStarted = true;
+  if (workerState.started) return;
+  workerState.started = true;
   topicStream();
   usageStream();
   pointsStream();
@@ -194,7 +199,7 @@ export function publishPoints(userId: string, balance: number): void {
 }
 
 async function* initialEvents(userId: string, topics: LiveTopic[]): AsyncGenerator<ServerEvent, void> {
-  const snapshots = await Effect.runPromise(buildSnapshots(userId, topics));
+  const snapshots = await Effect.runPromise(snapshotState.builder(userId, topics));
   for (const topic of topics) {
     const event = updateEvent(topic, snapshots);
     if (event) yield event;

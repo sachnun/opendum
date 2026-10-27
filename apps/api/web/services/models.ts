@@ -97,29 +97,31 @@ const listModelsInner = Effect.fnUntraced(function* (
         .sort((a, b) => compareEntries({ id: a, family: familyOf(a) }, { id: b, family: familyOf(b) }))
         .map((model): ModelListItem => {
           const available = availableSet.has(model);
-          return {
+          const item: ModelListItem = {
             id: model,
             name: model,
             family: familyOf(model) ?? "Others",
             providers: modelProviders(model, availability, { all: !available }),
-            ...modelInfo(model),
             isEnabled: !disabledModelSet.has(model),
             available,
-            ...(includeStats && available ? { stats: modelStats[model] } : {}),
           };
+          return Object.assign(
+            item,
+            modelInfo(model),
+            includeStats && available ? { stats: modelStats[model] } : {}
+          );
         }),
       ...customEntries(availability).map((entry): ModelListItem => {
-        const canonical = aliasOf(entry.modelId);
-        return {
+        const item: ModelListItem = {
           id: entry.id,
           name: entry.id,
           family: familyOf(entry.modelId) ?? "Others",
           providers: [entry.slug],
-          ...modelInfo(canonical),
           isEnabled: !disabledModelSet.has(entry.id),
           available: true,
           custom: true,
         };
+        return Object.assign(item, modelInfo(aliasOf(entry.modelId)));
       }),
     ];
     return result;
@@ -139,12 +141,14 @@ const searchModelsInner = Effect.fnUntraced(function* (userId: string) {
     const { availability, disabledModelSet, models } = yield* availableFor(userId);
 
     return [
-      ...models.map((model): ModelSearchItem => ({
-        id: model,
-        providers: modelProviders(model, availability),
-        ...modelInfo(model),
-        isEnabled: !disabledModelSet.has(model),
-      })),
+      ...models.map((model): ModelSearchItem => {
+        const item: ModelSearchItem = {
+          id: model,
+          providers: modelProviders(model, availability),
+          isEnabled: !disabledModelSet.has(model),
+        };
+        return Object.assign(item, modelInfo(model));
+      }),
       ...customEntries(availability).map((entry): ModelSearchItem => ({
         id: entry.id,
         providers: [entry.slug],

@@ -319,7 +319,9 @@ export class Rotation {
     reason: StickyMissReason,
     selectedId: string
   ): Effect.Effect<void> {
-    return Effect.logDebug("account affinity miss", { stickyId, reason, selectedId });
+    return Effect.logDebug("account affinity miss").pipe(
+      Effect.annotateLogs({ stickyId, reason, selectedId })
+    );
   }
 
   private remember(userId: string, account: ProviderAccount, scope: string): Effect.Effect<void> {

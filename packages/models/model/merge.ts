@@ -58,7 +58,8 @@ export function mergeData(
   else delete merged.aliases;
 
   for (const key of Object.keys(merged)) {
-    if (isEmpty(merged[key])) delete merged[key];
+    if (!isEmpty(merged[key])) continue;
+    Reflect.deleteProperty(merged, key);
   }
   return merged;
 }

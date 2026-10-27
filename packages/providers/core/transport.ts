@@ -142,11 +142,13 @@ export class EgressPoster {
             await response.body?.cancel();
           }).pipe(
             Effect.flatMap(() =>
-              Effect.logDebug("egress retry", {
-                provider: this.options.provider,
-                attempt: attempt + 1,
-                status: response.status,
-              })
+              Effect.logDebug("egress retry").pipe(
+                Effect.annotateLogs({
+                  provider: this.options.provider,
+                  attempt: attempt + 1,
+                  status: response.status,
+                })
+              )
             ),
             Effect.flatMap(() => Effect.sleep(Duration.millis(Math.min(50 * 2 ** attempt, 2000)))),
             Effect.flatMap(() => loop(attempt + 1))

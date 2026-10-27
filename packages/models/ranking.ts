@@ -1,7 +1,7 @@
 import { MODEL_FAMILY_RANKING } from "@opendum/models/ranking.generated";
+import { compareText } from "@opendum/models/compare";
 
-type RankingEntry = (typeof MODEL_FAMILY_RANKING)[number];
-export type ModelFamily = RankingEntry["name"] | "Others";
+export type ModelFamily = string;
 
 const FAMILY_BENCHMARK_SCORES: ReadonlyMap<string, number> = new Map(
   MODEL_FAMILY_RANKING.map((entry) => [entry.name, entry.score]),
@@ -25,7 +25,7 @@ function compareFamilies(a: string, b: string): number {
   const aScore = FAMILY_BENCHMARK_SCORES.get(a) ?? 0;
   const bScore = FAMILY_BENCHMARK_SCORES.get(b) ?? 0;
   if (aScore !== bScore) return bScore - aScore;
-  return a.localeCompare(b);
+  return compareText(a, b);
 }
 
 export function anchorId(family: ModelFamily): string {

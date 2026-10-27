@@ -1,6 +1,7 @@
 import { compactStrings, uniqueSorted } from "@opendum/models/collections";
 import { familyOf } from "@opendum/models/model/families";
 import type { ModelEntry, ModelInfo } from "@opendum/models/registry";
+import { compareText } from "@opendum/models/compare";
 
 export class Catalog {
   private readonly models = new Map<string, ModelInfo>();
@@ -41,9 +42,8 @@ export class Catalog {
 
   all(): string[] {
     return [...this.effective.entries()]
-      .filter(([, info]) => info.providers.length > 0)
-      .map(([model]) => model)
-      .sort((a, b) => a.localeCompare(b));
+      .flatMap(([model, info]) => (info.providers.length > 0 ? [model] : []))
+      .sort((a, b) => compareText(a, b));
   }
 
   families(): string[] {
@@ -51,11 +51,11 @@ export class Catalog {
     for (const info of this.effective.values()) {
       if (info.family) families.add(info.family);
     }
-    return [...families].sort((a, b) => a.localeCompare(b));
+    return [...families].sort((a, b) => compareText(a, b));
   }
 
   ignoredModels(): string[] {
-    return [...this.ignoredIds].sort((a, b) => a.localeCompare(b));
+    return [...this.ignoredIds].sort((a, b) => compareText(a, b));
   }
 
   private merge(modelId: string, fileId: string, info: ModelInfo): void {

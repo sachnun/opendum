@@ -47,7 +47,7 @@ describe("auth roles", () => {
     const previous = process.env.MAINTAINERS;
     process.env.MAINTAINERS = JSON.stringify(["Ada@Example.com"]);
 
-    const roles = Effect.runSync(
+    Effect.runSync(
       Effect.ensuring(
         Effect.sync(() => {
           expect(roleOf("ada@example.com")).toBe("admin");
@@ -59,7 +59,6 @@ describe("auth roles", () => {
         })
       )
     );
-    void roles;
   });
 });
 

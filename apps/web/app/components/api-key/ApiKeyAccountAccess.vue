@@ -3,6 +3,7 @@ import { errorText, settle } from "~~/lib/settle";
 import { labelOf } from "@opendum/providers/provider-accounts";
 
 import type { AccessMode } from "~~/lib/access-draft";
+import { compareText } from "@opendum/models/compare";
 
 interface ProviderAccountOption {
   id: string;
@@ -85,7 +86,7 @@ async function save(value: { mode: AccessMode; ids: string[] }) {
     :initial-mode="initialMode"
     :initial-ids="initialAccounts"
     :readonly="readonly"
-    :normalize="(ids) => Array.from(new Set(ids)).sort((a, b) => a.localeCompare(b))"
+    :normalize="(ids) => Array.from(new Set(ids)).sort((a, b) => compareText(a, b))"
     @save="save"
   />
 </template>

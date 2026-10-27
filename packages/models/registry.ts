@@ -12,6 +12,7 @@ import { View } from "@opendum/models/view";
 import { Suggester } from "@opendum/models/suggester";
 import { Serializer } from "@opendum/models/serializer";
 import { Policy } from "@opendum/models/policy";
+import { compareText } from "@opendum/models/compare";
 
 export { scoreFor } from "@opendum/models/suggester";
 export { nvidiaAlias } from "@opendum/models/aliases";
@@ -152,7 +153,7 @@ function mergeGenerated(authored: ModelEntry, generated: ModelEntry): void {
   if (authored.info.scores == null) authored.info.scores = generated.info.scores;
   const generatedConfig = generated.info.providerConfig ?? {};
   if (Object.keys(generatedConfig).length > 0) {
-    authored.info.providerConfig = authored.info.providerConfig ?? {};
+    authored.info.providerConfig ??= {};
     for (const [provider, config] of Object.entries(generatedConfig)) {
       const existing = authored.info.providerConfig[provider];
       authored.info.providerConfig[provider] = existing
@@ -191,7 +192,7 @@ function mergeConfig(
   const custom: Record<string, unknown> = { ...merged.custom };
   for (const [key, value] of Object.entries(authored)) {
     if (CONFIG_KEYS.has(key)) continue;
-    delete merged[key];
+    Reflect.deleteProperty(merged, key);
     custom[key] = value;
   }
   if (authored.custom && Object.keys(authored.custom).length > 0) {
@@ -270,7 +271,7 @@ export function flagshipRanking(entries: ModelEntry[]): FlagshipFamily[] {
     const current = best.get(family);
     if (!current || index > current.score) best.set(family, { family, folder: entry.owner || "", score: index });
   }
-  return [...best.values()].sort((a, b) => b.score - a.score || a.family.localeCompare(b.family));
+  return [...best.values()].sort((a, b) => b.score - a.score || compareText(a.family, b.family));
 }
 
 export class Registry {

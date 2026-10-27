@@ -10,11 +10,14 @@ type Service = InstanceType<typeof ProxyService>;
 
 const LOCK_KEY = "opendum:provider-account:refresh-lock:acc-1";
 
-function redis(evalImpl: (script: string, options: { keys?: string[]; arguments?: string[] }) => Promise<unknown>): OpendumRedis {
+function redis(
+  evalImpl: (script: string, options: { keys?: string[]; arguments?: string[] }) => Promise<unknown>,
+  del: (key: string) => Promise<number> = async () => 1
+): OpendumRedis {
   return {
     get: async () => null,
     set: async () => "OK",
-    del: async () => 1,
+    del,
     eval: evalImpl,
   } as unknown as OpendumRedis;
 }
@@ -61,16 +64,18 @@ describe("refresh lock release", () => {
   it("guards the delete behind a value comparison", async () => {
     const deleted: string[] = [];
     let script = "";
-    const service = serviceWith({
-      ...redis(async (source) => {
-        script = source;
-        return 0;
-      }),
-      del: async (key: string) => {
-        deleted.push(key);
-        return 1;
-      },
-    } as unknown as OpendumRedis);
+    const service = serviceWith(
+      redis(
+        async (source) => {
+          script = source;
+          return 0;
+        },
+        async (key: string) => {
+          deleted.push(key);
+          return 1;
+        }
+      )
+    );
 
     await release(service, "acc-1", "stale-value");
 

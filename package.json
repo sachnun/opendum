@@ -19,6 +19,7 @@
     "eslint-plugin-no-comments": "^1.2.1",
     "oxlint": "^1.89.0",
     "oxlint-plugin-effect": "0.29.0",
+    "oxlint-tsgolint": "^7.0.2005",
     "wrangler": "^4.152.0"
   },
   "trustedDependencies": [

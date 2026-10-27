@@ -412,7 +412,7 @@ function byProvider(
   for (const item of entries) {
     if (!item.provider) continue;
     groups[item.provider] ??= [];
-    groups[item.provider]!.push(item);
+    groups[item.provider]?.push(item);
   }
 
   const result: Record<string, Map<string, IndexedModel<unknown>>> = {};

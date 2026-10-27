@@ -1,8 +1,8 @@
-import { Effect, Exit, Ref } from "effect";
+import { Effect, Exit, Ref,Schema } from "effect";
 
-import { Schema } from "effect";
 
-import { ModelFetchFailure, ModelParseFailure, ModelTimeoutFailure } from "@opendum/models/errors";
+import type { ModelFetchFailure, ModelParseFailure, ModelTimeoutFailure } from "@opendum/models/errors";
+import { compareText } from "@opendum/models/compare";
 
 export class ScraperFailure extends Schema.TaggedError<ScraperFailure>()("ScraperFailure", {
   message: Schema.String,
@@ -83,6 +83,6 @@ export function orderScripts(
 ): string[] {
   return [...names].sort((left, right) => {
     const rank = Number(tail.includes(left)) - Number(tail.includes(right));
-    return rank !== 0 ? rank : left.localeCompare(right);
+    return rank !== 0 ? rank : compareText(left, right);
   });
 }
