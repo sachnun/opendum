@@ -3,9 +3,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "bun:test";
 
-import { isTable, getTableName } from "drizzle-orm";
+import { isTable, getTableName, SQL } from "drizzle-orm";
 import { getTableConfig, IndexedColumn, type PgTable } from "drizzle-orm/pg-core";
-import { SQL } from "drizzle-orm";
 
 import * as schema from "@opendum/database/schema/index";
 
@@ -252,8 +251,17 @@ function columnName(column: unknown): string {
   return "";
 }
 
+function named<T extends object>(name: string, value: T): T & { name: string } {
+  return { name, ...value };
+}
+
+function compare(left: string, right: string): number {
+  if (left === right) return 0;
+  return left < right ? -1 : 1;
+}
+
 function sorted<T>(values: T[], key: (value: T) => string): T[] {
-  return [...values].sort((left, right) => key(left).localeCompare(key(right)));
+  return [...values].sort((left, right) => compare(key(left), key(right)));
 }
 
 const sql = loadSql();
@@ -274,10 +282,10 @@ test("table columns match the drizzle schema", () => {
         primary: column.primary,
         defaultValue: normalizeDefault(column.default),
       }))
-      .sort((left, right) => left.name.localeCompare(right.name));
+      .sort((left, right) => compare(left.name, right.name));
     const actual = [...(sql.tables.get(name)?.columns ?? new Map())]
-      .map(([columnName, column]) => ({ name: columnName, ...column }))
-      .sort((left, right) => left.name.localeCompare(right.name));
+      .map(([columnName, column]) => named(columnName, column))
+      .sort((left, right) => compare(left.name, right.name));
 
     expect(actual, `column mismatch for table ${name}`).toEqual(expected);
   }
@@ -289,10 +297,10 @@ test("unique constraints match the drizzle schema", () => {
     const expected = config.columns
       .filter((column) => column.isUnique)
       .map((column) => ({ name: column.uniqueName, columns: [column.name] }))
-      .sort((left, right) => String(left.name).localeCompare(String(right.name)));
+      .sort((left, right) => compare(String(left.name), String(right.name)));
     const actual = [...(sql.tables.get(name)?.uniques ?? new Map())]
       .map(([constraintName, columns]) => ({ name: constraintName, columns }))
-      .sort((left, right) => String(left.name).localeCompare(String(right.name)));
+      .sort((left, right) => compare(String(left.name), String(right.name)));
 
     expect(actual, `unique constraint mismatch for table ${name}`).toEqual(expected);
   }
@@ -308,10 +316,10 @@ test("indexes match the drizzle schema", () => {
         columns: index.config.columns.map(columnName),
       })),
     )
-    .sort((left, right) => String(left.name).localeCompare(String(right.name)));
+    .sort((left, right) => compare(String(left.name), String(right.name)));
   const actual = [...sql.indexes]
-    .map(([indexName, index]) => ({ name: indexName, ...index }))
-    .sort((left, right) => String(left.name).localeCompare(String(right.name)));
+    .map(([indexName, index]) => named(indexName, index))
+    .sort((left, right) => compare(String(left.name), String(right.name)));
 
   expect(actual).toEqual(expected);
 });
@@ -333,10 +341,10 @@ test("foreign keys match the drizzle schema", () => {
         };
       }),
     )
-    .sort((left, right) => String(left.name).localeCompare(String(right.name)));
+    .sort((left, right) => compare(String(left.name), String(right.name)));
   const actual = [...sql.foreignKeys]
-    .map(([constraintName, foreignKey]) => ({ name: constraintName, ...foreignKey }))
-    .sort((left, right) => left.name.localeCompare(right.name));
+    .map(([constraintName, foreignKey]) => named(constraintName, foreignKey))
+    .sort((left, right) => compare(left.name, right.name));
 
   expect(actual).toEqual(expected);
 });

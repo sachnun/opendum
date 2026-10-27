@@ -54,7 +54,9 @@ export function workbuddyQuota(
       if (!payload.ok) return Effect.succeed(payload.info);
       if (payload.data.code !== 0) {
         return Effect.succeed(
-          errorInfo(`WorkBuddy quota request failed: ${payload.data.code} ${payload.data.msg ?? ""}`)
+          errorInfo(
+            `WorkBuddy quota request failed: ${parseNumber(payload.data.code) ?? 0} ${parseString(payload.data.msg)}`
+          )
         );
       }
       const summary = parseRecord(payload.data.data) ?? {};

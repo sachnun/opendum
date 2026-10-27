@@ -4,17 +4,17 @@ export type UserRole = "user" | "maintainer";
 const MAINTAINER_ROLE: UserRole = "maintainer";
 const USER_ROLE: UserRole = "user";
 
-let hasWarned = false;
+const warningState = { warned: false };
 
 function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
 }
 
 function warnInvalid() {
-  if (hasWarned) return;
+  if (warningState.warned) return;
 
   console.warn("MAINTAINERS must be a JSON array of email strings. Ignoring invalid value.");
-  hasWarned = true;
+  warningState.warned = true;
 }
 
 function maintainerEmails(): Set<string> {

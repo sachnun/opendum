@@ -2,7 +2,7 @@ import { Cause, Effect, Exit, Result, Stream } from "effect";
 import { Coerce, Safe } from "@opendum/api/core/helpers";
 import { withHeartbeat } from "@opendum/api/core/heartbeat";
 import { SseScanner } from "@opendum/api/core/sse";
-import { transformOpenAIToAnthropic } from "@opendum/api/core/endpoints";
+import { fromChat as transformOpenAIToAnthropic } from "@opendum/api/core/endpoints/anthropic";
 import { StreamUsageTracker, cacheCounts, usageOf, usageObject } from "@opendum/api/core/usage";
 import type { ResponseContext, StreamCompletion, StreamRecorder } from "@opendum/api/core/types";
 

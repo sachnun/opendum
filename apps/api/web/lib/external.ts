@@ -1,7 +1,7 @@
 import { Effect } from "effect";
 import { hostError } from "@opendum/core/egress";
 import { proxyContext } from "@opendum/api/context";
-import { ServiceFailure, asFailure, badRequest, unavailable } from "@opendum/api/web/errors";
+import { type ServiceFailure, asFailure, badRequest, unavailable } from "@opendum/api/web/errors";
 
 const TIMEOUT_MS = 20 * 1000;
 

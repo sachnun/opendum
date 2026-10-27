@@ -1012,7 +1012,7 @@ export async function adapt(
 }
 
 export function cacheKey(key: string): string {
-  const chars = [...key];
+  const chars = Array.from(key);
   if (chars.length > 64) return chars.slice(0, 64).join("");
   return key;
 }
@@ -1057,7 +1057,7 @@ export async function buildPayload(
       const effort = Value.string(body.reasoning_effort);
       if (effort) payload.reasoning = { effort };
     }
-    let reasoning = payload.reasoning;
+    const reasoning = payload.reasoning;
     if (
       reasoning !== null &&
       typeof reasoning === "object" &&
@@ -1067,8 +1067,7 @@ export async function buildPayload(
     ) {
       (reasoning as Json).summary = "auto";
     }
-    reasoning = undefined;
-    let include = Value.strings(body.include);
+    const include = Value.strings(body.include);
     if (body._includeReasoning === true) include.push("reasoning.encrypted_content");
     if (include.length > 0) payload.include = Value.unique(include);
     for (const key of [

@@ -2,7 +2,7 @@ import { Effect } from "effect";
 import type { H3Event } from "h3";
 
 import { claimsOf, authUser, type AccessTokenClaims } from "@opendum/api/web/lib/claims";
-import { unauthorized } from "@opendum/api/web/errors";
+import { unauthorized, type ServiceFailure } from "@opendum/api/web/errors";
 import { getIdentity, type IdentityService } from "@opendum/api/web/identity";
 
 function bearerToken(headers: Headers): string | null {
@@ -58,6 +58,6 @@ export const sessionFrom = Effect.fn("sessionFrom")(function* (
   if (!claims) return yield* unauthorized();
 
   return claims satisfies AccessTokenClaims;
-}) as (headers: Headers) => Effect.Effect<AccessTokenClaims, import("@opendum/api/web/errors").ServiceFailure>;
+}) as (headers: Headers) => Effect.Effect<AccessTokenClaims, ServiceFailure>;
 
 export type { IdentityService };

@@ -147,16 +147,17 @@ const buildPlaygroundOptions = Effect.fnUntraced(function* (userId: string, prox
     models,
     providerAccounts: [
       ...authlessProviderAccounts,
-      ...providerAccounts.map((account) => ({
-      ...account,
-      disabledModels: disabledByAccount.get(account.id) ?? [],
-      supportedModels: availability.customProviderModels.has(account.provider)
-        ? [
-            ...Array.from(availability.customProviderModels.get(account.provider) ?? []),
-            ...(availability.customProviderStandaloneModels.get(account.provider) ?? []).map((modelId) => `${account.provider}/${modelId}`),
-          ]
-        : Tier.modelsFor(account.provider, account.tier),
-      })),
+      ...providerAccounts.map((account) =>
+        Object.assign(account, {
+          disabledModels: disabledByAccount.get(account.id) ?? [],
+          supportedModels: availability.customProviderModels.has(account.provider)
+            ? [
+                ...Array.from(availability.customProviderModels.get(account.provider) ?? []),
+                ...(availability.customProviderStandaloneModels.get(account.provider) ?? []).map((modelId) => `${account.provider}/${modelId}`),
+              ]
+            : Tier.modelsFor(account.provider, account.tier),
+        })
+      ),
     ],
   };
 

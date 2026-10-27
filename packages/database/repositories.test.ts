@@ -48,7 +48,7 @@ const queries = {
   listOrphaned: mock(async () => []),
 };
 
-mock.module("./queries/index.js", () => queries);
+void mock.module("./queries/index.js", () => queries);
 
 const {
   Customs,
@@ -66,27 +66,27 @@ const lastCall = (fn: { mock: { calls: unknown[][] } }): unknown[] => {
 };
 
 describe("repositories", () => {
-  it("binds the database for provider account queries", async () => {
+  it("binds the database for provider account queries", () => {
     const repo = new Accounts(database);
-    await repo.getForcedAccount("acct-1", "user-1");
+    repo.getForcedAccount("acct-1", "user-1");
     expect(lastCall(queries.getForcedAccount)).toEqual(["acct-1", "user-1", database]);
-    await repo.getQuotaAccount("acct-1", "user-1", "cline");
+    repo.getQuotaAccount("acct-1", "user-1", "cline");
     expect(lastCall(queries.getQuotaAccount)).toEqual(["acct-1", "user-1", "cline", database]);
   });
 
-  it("binds the database for model health queries", async () => {
+  it("binds the database for model health queries", () => {
     const repo = new Health(database);
-    await repo.getModelHealth("acct-1", "gpt-4o");
+    repo.getModelHealth("acct-1", "gpt-4o");
     expect(lastCall(queries.getModelHealth)).toEqual(["acct-1", "gpt-4o", database]);
   });
 
-  it("binds the database for custom provider queries", async () => {
+  it("binds the database for custom provider queries", () => {
     const repo = new Customs(database);
-    await repo.getCustomProvider("user-1", "my-provider");
+    repo.getCustomProvider("user-1", "my-provider");
     expect(lastCall(queries.getCustomProvider)).toEqual(["user-1", "my-provider", database]);
   });
 
-  it("passes usage and point params through unchanged", async () => {
+  it("passes usage and point params through unchanged", () => {
     const usage = new Usage(database);
     const log = {
       userId: "user-1",
@@ -101,12 +101,12 @@ describe("repositories", () => {
       duration: 120,
       createdAt: new Date(0),
     };
-    await usage.insertUsageLog(log);
+    usage.insertUsageLog(log);
     expect(lastCall(queries.insertUsageLog)).toEqual([log, database]);
 
     const points = new Points(database);
     const debit = { userId: "user-1", amount: 6, at: new Date(0) };
-    await points.debitPointBalance(debit);
+    points.debitPointBalance(debit);
     expect(lastCall(queries.debitPointBalance)).toEqual([debit, database]);
   });
 });

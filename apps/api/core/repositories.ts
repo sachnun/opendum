@@ -1,6 +1,5 @@
 import type { Effect } from "effect";
-import type { Database } from "@opendum/database";
-import type { DatabaseFailure } from "@opendum/database";
+import type { Database,DatabaseFailure } from "@opendum/database";
 import {
   Accounts,
   Customs,

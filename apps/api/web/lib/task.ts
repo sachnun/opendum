@@ -35,7 +35,9 @@ export function withContext<A>(
   message: string
 ): Effect.Effect<A, ServiceFailure> {
   return Effect.mapError(effect, (failure) =>
-    failure.message === message ? failure : new ServiceFailure({ ...failure, message })
+    failure.message === message
+      ? failure
+      : new ServiceFailure({ message, status: failure.status, cause: failure.cause })
   );
 }
 

@@ -56,11 +56,9 @@ export class AccountAffinity {
     const now = Date.now();
     if (now - this.lastLogAt < LOG_INTERVAL_MS) return Effect.void;
     this.lastLogAt = now;
-    return Effect.logWarning("account affinity unavailable, routing without it", {
-      action,
-      scope,
-      error: error.message,
-    });
+    return Effect.logWarning("account affinity unavailable, routing without it").pipe(
+      Effect.annotateLogs({ action, scope, error: error.message })
+    );
   }
 }
 

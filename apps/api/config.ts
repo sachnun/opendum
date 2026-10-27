@@ -28,13 +28,13 @@ export const proxyConfig: Config.Config<ProxyConfig> = Config.all({
   nodeEnv,
 }).pipe(
   Config.map(
-    ({ nodeEnv, ...rest }): ProxyConfig => ({
-      ...rest,
-      requestTimeoutMs: REQUEST_TIMEOUT_MS,
-      streamTimeoutMs: STREAM_TIMEOUT_MS,
-      streamHeartbeatMs: STREAM_HEARTBEAT_MS,
-      tokenRefreshIntervalMs: nodeEnv === "production" ? REFRESH_INTERVAL_MS : 0,
-      roamingReconcileIntervalMs: nodeEnv === "production" ? RECONCILE_INTERVAL_MS : 0,
-    })
+    ({ nodeEnv, ...rest }): ProxyConfig =>
+      Object.assign(rest, {
+        requestTimeoutMs: REQUEST_TIMEOUT_MS,
+        streamTimeoutMs: STREAM_TIMEOUT_MS,
+        streamHeartbeatMs: STREAM_HEARTBEAT_MS,
+        tokenRefreshIntervalMs: nodeEnv === "production" ? REFRESH_INTERVAL_MS : 0,
+        roamingReconcileIntervalMs: nodeEnv === "production" ? RECONCILE_INTERVAL_MS : 0,
+      })
   )
 );

@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import { type H3Event } from "h3";
+import type { H3Event } from "h3";
 import type { ProxyContext } from "@opendum/api/core/context";
 import { internalResponse, jsonResponse } from "@opendum/api/handlers/errors";
 
@@ -83,7 +83,9 @@ export async function handleModels(event: H3Event, context: ProxyContext): Promi
     }).pipe(
       Effect.catchCause((cause) =>
         Effect.sync(() => {
-          void Effect.runFork(Effect.logError("model listing failed", { cause: String(cause) }));
+          void Effect.runFork(
+            Effect.logError("model listing failed").pipe(Effect.annotateLogs({ cause: String(cause) }))
+          );
           return internalResponse("openai", "Failed to list models");
         })
       ),

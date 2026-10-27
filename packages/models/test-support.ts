@@ -10,11 +10,11 @@ export function tmpRoot(): string {
   return Bun.env["TMPDIR"] ?? Bun.env["TMP"] ?? Bun.env["TEMP"] ?? "/tmp";
 }
 
-let counter = 0;
+const counterState = { value: 0 };
 
 export function makeDir(prefix = "opendum-models-"): string {
-  counter += 1;
-  const dir = join(tmpRoot(), `${prefix}${process.pid}-${counter}-${Date.now().toString(36)}`);
+  counterState.value += 1;
+  const dir = join(tmpRoot(), `${prefix}${process.pid}-${counterState.value}-${Date.now().toString(36)}`);
 
   mkdirSync(dir, { recursive: true });
   return dir;

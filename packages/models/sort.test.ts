@@ -4,7 +4,7 @@ import { SORT_ORDER } from "@opendum/models/ranking";
 import { compareEntries, compareIds } from "@opendum/models/sort";
 
 const FEATURED_FAMILIES = SORT_ORDER.filter((family) => family !== "Others");
-const TOP_FAMILY = FEATURED_FAMILIES[0]!;
+const TOP_FAMILY = FEATURED_FAMILIES[0] ?? "Others";
 const NEXT_FAMILY = FEATURED_FAMILIES[1] ?? TOP_FAMILY;
 
 const entry = (id: string, family?: string) => ({ id, family });

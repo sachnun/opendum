@@ -35,7 +35,7 @@ export interface RawIndexEntry<TEntry = unknown> {
 }
 
 export function normalizeName(value: unknown): string {
-  return String(value ?? "")
+  return (typeof value === "string" ? value : "")
     .toLowerCase()
     .replace(/^[^/]*\//, "")
     .replace(/:(free|batch|thinking|online|extended)$/, "")

@@ -25,7 +25,8 @@ export const activeTiers = Effect.fn("db.activeTiers")(function* (
   const conditions = [eq(providerAccount.userId, userId)];
   if (!includeInactive) {
     conditions.push(eq(providerAccount.isActive, true));
-    conditions.push(or(isNull(providerAccount.disabledUntil), lte(providerAccount.disabledUntil, now))!);
+    const activeWindow = or(isNull(providerAccount.disabledUntil), lte(providerAccount.disabledUntil, now));
+    if (activeWindow) conditions.push(activeWindow);
   }
   return yield* tryDb("activeTiers", () =>
     database

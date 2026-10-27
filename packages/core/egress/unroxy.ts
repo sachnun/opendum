@@ -35,9 +35,7 @@ export class UnroxyEgress implements Egress {
       : fetch(`${this.baseUrl}${target}`, init);
   }
 
-  async close(): Promise<void> {
-    return;
-  }
+  async close(): Promise<void> {}
 }
 
 function fetchTimeout(

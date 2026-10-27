@@ -35,7 +35,8 @@ export const searchAuditUsers = Effect.fn("maintainer.searchAuditUsers")(functio
     if (query.length < 2) return { users: [], hasMore: false, nextOffset: offset };
 
     const pattern = `%${query.replaceAll("%", "\\%").replaceAll("_", "\\_")}%`;
-    conditions.push(or(ilike(user.name, pattern), ilike(user.email, pattern))!);
+    const match = or(ilike(user.name, pattern), ilike(user.email, pattern));
+    if (match) conditions.push(match);
   }
 
   const rows = yield* fromPromise(

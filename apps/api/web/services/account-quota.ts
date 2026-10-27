@@ -2,7 +2,7 @@ import { Effect } from "effect";
 import { and, eq, inArray } from "drizzle-orm";
 import { db, providerAccount } from "@opendum/database";
 import type { QuotaBatchInput, AccountQuotaInput } from "@opendum/providers/contract";
-import { type QuotaProviderKey } from "@opendum/providers/provider-accounts";
+import type { QuotaProviderKey } from "@opendum/providers/provider-accounts";
 import { proxyContext } from "@opendum/api/context";
 import { fetchQuota as coreQuota } from "@opendum/api/core/quota";
 import { fromPromise } from "@opendum/api/web/lib/task";
@@ -129,14 +129,12 @@ const quotaFor = Effect.fn("accountQuota.fetch")(function* (
   const existing = quotaInFlight.get(inFlightKey);
   if (existing) return yield* existing;
 
-  const pending = Effect.cached(quotaFromCore(userId, provider, accountId, options)).pipe(
-    Effect.flatten
-  );
-  quotaInFlight.set(inFlightKey, pending);
-  return yield* pending.pipe(
+  const work = quotaFromCore(userId, provider, accountId, options);
+  quotaInFlight.set(inFlightKey, work);
+  return yield* work.pipe(
     Effect.ensuring(
       Effect.sync(() => {
-        if (quotaInFlight.get(inFlightKey) === pending) quotaInFlight.delete(inFlightKey);
+        if (quotaInFlight.get(inFlightKey) === work) quotaInFlight.delete(inFlightKey);
       })
     )
   );

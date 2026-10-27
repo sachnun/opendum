@@ -79,7 +79,7 @@ export class ErrorHistory {
     if (ids.length === 0) return [] as ErrorEntry[];
 
     const values = yield* fromPromise(
-      () => redis.mGet(ids.map(ErrorHistory.entryKey)),
+      () => redis.mGet(ids.map((id) => ErrorHistory.entryKey(id))),
       "Failed to read error history entries"
     );
     const missingIds: string[] = [];
@@ -174,7 +174,7 @@ export class ErrorHistory {
     }
 
     const values = yield* fromPromise(
-      () => redis.mGet(ids.map(ErrorHistory.entryKey)),
+      () => redis.mGet(ids.map((id) => ErrorHistory.entryKey(id))),
       "Failed to read error history entries"
     );
     const keysToDelete = new Set<string>([key]);

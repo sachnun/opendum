@@ -2,8 +2,8 @@ import { describe, expect, it } from "bun:test";
 import { mockEvent } from "h3";
 import config from "@opendum/api/nitro.config";
 
-const health = (await import("@opendum/api/routes/health.get")).default;
-const fallback = (await import("@opendum/api/routes/[...]")).default;
+import health from "@opendum/api/routes/health.get";
+import fallback from "@opendum/api/routes/[...]";
 
 describe("routes", () => {
   it("reports health", async () => {

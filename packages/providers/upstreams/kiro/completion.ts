@@ -1,8 +1,7 @@
 import { Value } from "@opendum/providers/core/helpers";
 import { Collector } from "@opendum/providers/transform/collector";
-import { KiroUsage } from "@opendum/providers/upstreams/kiro/events";
+import { KiroUsage, type Json } from "@opendum/providers/upstreams/kiro/events";
 import { BracketCalls, Parser } from "@opendum/providers/upstreams/kiro/parser";
-import type { Json } from "@opendum/providers/upstreams/kiro/events";
 
 export class KiroCompletion {
   static fromEvents(events: Json[], model: string): Json {

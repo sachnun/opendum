@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import type { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
 import { ModelName } from "@opendum/providers/core/identity";
 import type { UpstreamTransport } from "@opendum/providers/core/http";

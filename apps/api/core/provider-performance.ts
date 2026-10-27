@@ -146,7 +146,11 @@ export class ProviderPerformance {
       yield* ProviderPerformance.redisEffect(() => this.redis.expire(key, this.config.sampleTtlSeconds));
       yield* Cache.invalidate(this.scoresCache, key);
     }).pipe(
-      Effect.tapError((error) => Effect.logDebug("provider performance sample dropped", { error, provider: sample.provider })),
+      Effect.tapError((error) =>
+        Effect.logDebug("provider performance sample dropped").pipe(
+          Effect.annotateLogs({ error: String(error), provider: sample.provider })
+        )
+      ),
       Effect.ignore
     );
   }

@@ -7,6 +7,9 @@ export {
   hashString,
   pkcs7Pad,
   pkcs7Unpad,
+  CiphertextFormat,
+  CiphertextLength,
+  Padding,
   type DecryptFailure,
 } from "@opendum/core/crypto/cryptojs";
 export {

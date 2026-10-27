@@ -69,9 +69,10 @@ const incrementInner = Effect.fnUntraced(function* (
     Math.floor(ms / 1000)
   );
 
-  for (let i = 0; i < limits.length; i += 1) {
-    const limit = limits[i]!;
-    const raw = yield* redisCall(() => redis.get(keys[i]!));
+  for (const [index, limit] of limits.entries()) {
+    const key = keys[index];
+    if (key === undefined) continue;
+    const raw = yield* redisCall(() => redis.get(key));
     const current = Number.parseInt(raw ?? "0", 10) || 0;
     if (current >= limit.limit) {
       const bucket = windowBucket(limit.seconds, nowSeconds);
@@ -86,9 +87,11 @@ const incrementInner = Effect.fnUntraced(function* (
     }
   }
 
-  for (let i = 0; i < limits.length; i += 1) {
-    const count = yield* redisCall(() => redis.incr(keys[i]!));
-    if (count === 1) yield* redisCall(() => redis.expire(keys[i]!, limits[i]!.seconds + 1));
+  for (const [index, limit] of limits.entries()) {
+    const key = keys[index];
+    if (key === undefined) continue;
+    const count = yield* redisCall(() => redis.incr(key));
+    if (count === 1) yield* redisCall(() => redis.expire(key, limit.seconds + 1));
   }
   return ALLOWED_RESULT;
 });

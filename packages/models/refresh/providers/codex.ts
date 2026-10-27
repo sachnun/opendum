@@ -1,5 +1,6 @@
 import { Effect, Option, Schema } from "effect";
 import { raise } from "@opendum/models/refresh/core/raise";
+import { causeMessage } from "@opendum/models/refresh/core/failure";
 import { fetchDecoded, fetchText } from "@opendum/models/sync/http";
 import { entryFor, writeEntry } from "@opendum/models/refresh/core/keys";
 import { sourceOf, type ModelSource, type SourceResult } from "@opendum/models/refresh/core/types";
@@ -100,7 +101,7 @@ export const codexSource: ModelSource = {
         Effect.map(freePlanMentions),
         Effect.catchCause((cause) =>
           Effect.andThen(
-            Effect.logWarning(`[Codex] pricing docs unavailable, skipping tier gating (${cause})`),
+            Effect.logWarning(`[Codex] pricing docs unavailable, skipping tier gating (${causeMessage(cause)})`),
             Effect.succeed("")
           )
         )

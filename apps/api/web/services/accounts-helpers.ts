@@ -1,3 +1,4 @@
+import type { ProviderAccountIndicator, ProviderStats } from "@opendum/api/web/services/account-stats";
 export {
   AUTO_PIN_SENTINEL,
   COOLDOWN_RECOVERY_RATIO,
@@ -16,7 +17,7 @@ export { AccountState, Clock, Health, ModelList, Tier } from "@opendum/api/web/s
 export type AccountOverviewSummary = {
   connected: number;
   active: number;
-  indicator: import("./account-stats.js").ProviderAccountIndicator;
-  stats: import("./account-stats.js").ProviderStats;
+  indicator: ProviderAccountIndicator;
+  stats: ProviderStats;
 };
 export { ErrorHistory, HealthRows, Pins, type ErrorEntry } from "@opendum/api/web/services/accounts/store";

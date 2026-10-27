@@ -29,7 +29,7 @@ const server = Bun.serve({
 const baseUrl = `http://127.0.0.1:${server.port}`;
 
 afterAll(() => {
-  server.stop(true);
+  void server.stop(true);
 });
 
 describe("UnroxyEgress", () => {

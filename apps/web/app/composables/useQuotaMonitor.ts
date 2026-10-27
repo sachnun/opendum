@@ -119,7 +119,7 @@ export function useQuotaMonitor(options: {
           }
           return { ok: true as const, provider, providerAccounts, data: fetched.value.data };
         }
-      })), { concurrency: "unbounded" }));
+      })), { concurrency: Math.max(1, accountsByProvider.size) }));
 
       if (runId !== queueRunId) return;
 

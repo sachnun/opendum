@@ -1,4 +1,3 @@
-import {} from "effect";
 import { raise } from "@opendum/providers/core/errors";
 import { Value, Payload, Ids } from "@opendum/providers/core/helpers";
 import {
@@ -536,7 +535,7 @@ export class GeminiStream {
     const candidate = (rawCandidate ?? {}) as Json;
     const content = (candidate.content ?? {}) as Json;
     const parts = anySlice(content.parts);
-    let localToolIndex = 0;
+    const localToolIndex = 0;
     for (const rawPart of parts) {
       const part = rawPart as Json;
       if (part.functionCall !== undefined && part.functionCall !== null) {
@@ -640,7 +639,7 @@ export class GeminiStream {
 ): Promise<Json> {
   let content = "";
   let reasoning = "";
-  let toolCalls: unknown[] = [];
+  const toolCalls: unknown[] = [];
   let usage: Json | null = null;
   let finish = "stop";
   const toolIndex = { value: 0 };
@@ -661,7 +660,7 @@ export class GeminiStream {
     for (const delta of GeminiStream.deltas(response, schemas, toolIndex)) {
       content += Value.string(delta.content);
       reasoning += Value.string(delta.reasoning_content);
-      if (Array.isArray(delta.tool_calls)) toolCalls = [...toolCalls, ...delta.tool_calls];
+      if (Array.isArray(delta.tool_calls)) toolCalls.push(...delta.tool_calls);
     }
     const nextUsage = GeminiStream.usage(response);
     if (nextUsage) usage = nextUsage;
@@ -705,12 +704,12 @@ export class GeminiCompletion {
   static build(response: Json, model: string, schemas: ToolSchemaMap): Json {
   let content = "";
   let reasoning = "";
-  let toolCalls: unknown[] = [];
+  const toolCalls: unknown[] = [];
   const toolIndex = { value: 0 };
   for (const delta of GeminiStream.deltas(response, schemas, toolIndex)) {
     content += Value.string(delta.content);
     reasoning += Value.string(delta.reasoning_content);
-    if (Array.isArray(delta.tool_calls)) toolCalls = [...toolCalls, ...delta.tool_calls];
+    if (Array.isArray(delta.tool_calls)) toolCalls.push(...delta.tool_calls);
   }
   const message: Json = { role: "assistant", content: null };
   if (content) message.content = content;

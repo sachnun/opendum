@@ -2,8 +2,7 @@
 import { errorText, settle } from "~~/lib/settle";
 import { CalendarDate, Time } from "@internationalized/date";
 import { format, isSameDay } from "date-fns";
-import { TimeFieldInput, TimeFieldRoot } from "reka-ui";
-import type { DateValue } from "reka-ui";
+import { TimeFieldInput, TimeFieldRoot, type DateValue } from "reka-ui";
 
 const props = defineProps<{
   apiKeyId: string;

@@ -1,5 +1,4 @@
-import type { Registry } from "@opendum/models/runtime";
-import type { ProviderModelConfig } from "@opendum/models/runtime";
+import type { Registry,ProviderModelConfig } from "@opendum/models/runtime";
 
 export class ModelConfig {
   private readonly registry: Registry;

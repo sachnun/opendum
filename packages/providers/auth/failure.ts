@@ -24,6 +24,6 @@ export function unavailable(message: string, cause?: unknown): AuthFailure {
 export function asFailure(cause: unknown, message = "Request failed"): AuthFailure {
   if (cause instanceof AuthFailure) return cause;
   if (cause === undefined || cause === null) return new AuthFailure({ message, status: 500, cause });
-  const text = cause instanceof Error ? cause.message : String(cause);
+  const text = cause instanceof Error ? cause.message : typeof cause === "string" ? cause : JSON.stringify(cause);
   return new AuthFailure({ message: text || message, status: 500, cause });
 }

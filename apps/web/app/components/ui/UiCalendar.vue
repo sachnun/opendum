@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { DateValue } from "reka-ui";
 import {
+  type DateValue,
   CalendarCell,
   CalendarCellTrigger,
   CalendarGrid,

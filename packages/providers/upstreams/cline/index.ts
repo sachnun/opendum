@@ -1,4 +1,4 @@
-import { Effect, Result } from "effect";
+import { type Effect, Result } from "effect";
 import { OAuth } from "@opendum/providers/core/oauth";
 import { OAuthProvider, type Json, type ProviderOptions } from "@opendum/providers/core/provider";
 import { Value } from "@opendum/providers/core/helpers";

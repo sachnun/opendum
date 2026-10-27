@@ -25,7 +25,7 @@ export function join(...parts: string[]): string {
   const meaningful = parts.filter((part) => part.length > 0);
   if (meaningful.length === 0) return ".";
   const joined = normalize(meaningful.join("/"));
-  const wantsTrailing = meaningful[meaningful.length - 1]!.endsWith("/");
+  const wantsTrailing = meaningful[meaningful.length - 1]?.endsWith("/") ?? false;
   if (!wantsTrailing || joined === "/" || joined.endsWith("/")) return joined;
   return `${joined}/`;
 }
@@ -62,7 +62,7 @@ export function extname(value: string): string {
 export function resolve(...parts: string[]): string {
   let resolved = "";
   for (let index = parts.length - 1; index >= -1; index -= 1) {
-    const part = index >= 0 ? parts[index]! : process.cwd();
+    const part = index >= 0 ? (parts[index] ?? "") : process.cwd();
     if (part.length === 0) continue;
     resolved = resolved.length === 0 ? part : `${part}/${resolved}`;
     if (isAbsolute(part)) break;

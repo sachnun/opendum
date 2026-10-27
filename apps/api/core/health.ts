@@ -89,9 +89,7 @@ export class Health {
   }
 
   private normalizeRows(
-    rows: Awaited<ReturnType<HealthPort["healthByAccount"]>> extends Effect.Effect<infer A, any, any>
-      ? A
-      : never,
+    rows: Effect.Success<Awaited<ReturnType<HealthPort["healthByAccount"]>>>,
     now: Date,
     applyCooldownRecovery: boolean
   ): Effect.Effect<number, DatabaseFailure> {

@@ -43,7 +43,9 @@ export function reconcileOrphans(
         };
         return refundRoamingPoint(points, reservation).pipe(
           Effect.tapError((error) =>
-            Effect.logError("roaming refund failed", { debitId: orphan.id, error: error.message })
+            Effect.logError("roaming refund failed").pipe(
+              Effect.annotateLogs({ debitId: orphan.id, error: error.message })
+            )
           ),
           Effect.as(true),
           Effect.orElseSucceed(() => false)
@@ -66,10 +68,12 @@ export function reconcileLoop(
     Effect.suspend(run).pipe(
       Effect.tap((result) =>
         result.refunded > 0 || result.failed > 0
-          ? Effect.logWarning("roaming reconciliation", result)
+          ? Effect.logWarning("roaming reconciliation").pipe(Effect.annotateLogs({ ...result }))
           : Effect.void
       ),
-      Effect.catchCause((cause) => Effect.logError("roaming reconciliation failed", { cause })),
+      Effect.catchCause((cause) =>
+        Effect.logError("roaming reconciliation failed").pipe(Effect.annotateLogs({ cause: String(cause) }))
+      ),
       Effect.asVoid
     ),
     Schedule.spaced(intervalMs)
