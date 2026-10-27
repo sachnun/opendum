@@ -130,13 +130,13 @@ function applyPatch(apiKeyId: string, value: Partial<KeyListItem>) {
 
 function removeKey(apiKeyId: string) {
   if (!data.value) return;
-  const { [apiKeyId]: _removedRateLimits, ...rateLimitsByKeyId } = data.value.options.rateLimitsByKeyId;
+  const { [apiKeyId]: _removedRateLimits, ...remainingRateLimits } = data.value.options.rateLimitsByKeyId;
   data.value = {
     ...data.value,
     apiKeys: data.value.apiKeys.filter((apiKey) => apiKey.id !== apiKeyId),
     options: {
       ...data.value.options,
-      rateLimitsByKeyId,
+      rateLimitsByKeyId: remainingRateLimits,
     },
   };
   invalidation.removeApiKey(apiKeyId);

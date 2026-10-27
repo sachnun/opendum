@@ -12,7 +12,7 @@
   },
   "jsPlugins": [
     "eslint-plugin-no-comments",
-    "./.oxlint/plugin/index.mjs",
+    "@kevinmichaelchen/oxlint-plugin-naming-convention",
     "oxlint-plugin-effect/plugin"
   ],
   "rules": {
@@ -61,16 +61,23 @@
         ]
       }
     ],
-    "naming/naming-convention": [
+    "naming-convention/naming-convention": [
       "error",
       {
-        "selector": "default",
+        "selector": "variable",
+        "filter": {
+          "match": true,
+          "regex": "^[A-Z][A-Z0-9_]*$"
+        },
         "format": [
-          "camelCase"
+          "UPPER_CASE"
         ],
-        "leadingUnderscore": "allow",
+        "leadingUnderscore": "allowSingleOrDouble",
         "trailingUnderscore": "forbid",
-        "maxSegments": 2
+        "custom": {
+          "match": true,
+          "regex": "^[_$]*(?:[^_$](?:(?!(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z][A-Z])(?=[a-z]))[^_$])*[_$]*){1,3}$|^[_$]*$"
+        }
       },
       {
         "selector": "variable",
@@ -79,39 +86,72 @@
           "UPPER_CASE",
           "PascalCase"
         ],
-        "leadingUnderscore": "allowDouble",
-        "maxSegments": 3
+        "leadingUnderscore": "allowSingleOrDouble",
+        "trailingUnderscore": "forbid",
+        "custom": {
+          "match": true,
+          "regex": "^[_$]*(?:[^_$](?:(?!(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z][A-Z])(?=[a-z]))[^_$])*[_$]*){1,3}$|^[_$]*$"
+        }
       },
       {
         "selector": "function",
         "format": [
           "camelCase"
         ],
-        "maxSegments": 2
+        "leadingUnderscore": "allow",
+        "trailingUnderscore": "forbid",
+        "custom": {
+          "match": true,
+          "regex": "^[_$]*(?:[^_$](?:(?!(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z][A-Z])(?=[a-z]))[^_$])*[_$]*){1,2}$|^[_$]*$"
+        }
       },
       {
-        "selector": "parameter",
+        "selector": [
+          "parameter",
+          "parameterProperty"
+        ],
         "format": [
           "camelCase"
         ],
-        "leadingUnderscore": "allowDouble",
-        "maxSegments": 3
+        "leadingUnderscore": "allowSingleOrDouble",
+        "trailingUnderscore": "forbid",
+        "custom": {
+          "match": true,
+          "regex": "^[_$]*(?:[^_$](?:(?!(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z][A-Z])(?=[a-z]))[^_$])*[_$]*){1,3}$|^[_$]*$"
+        }
       },
       {
-        "selector": "type",
+        "selector": [
+          "typeLike",
+          "enumMember"
+        ],
         "format": [
           "PascalCase"
         ],
-        "maxSegments": 3
+        "leadingUnderscore": "allow",
+        "trailingUnderscore": "forbid",
+        "custom": {
+          "match": true,
+          "regex": "^[_$]*(?:[^_$](?:(?!(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z][A-Z])(?=[a-z]))[^_$])*[_$]*){1,3}$|^[_$]*$"
+        }
       },
       {
-        "selector": "member",
+        "selector": [
+          "classProperty",
+          "classMethod",
+          "classicAccessor",
+          "autoAccessor"
+        ],
         "format": [
           "camelCase",
           "UPPER_CASE"
         ],
         "leadingUnderscore": "allow",
-        "maxSegments": 3
+        "trailingUnderscore": "forbid",
+        "custom": {
+          "match": true,
+          "regex": "^[_$]*(?:[^_$](?:(?!(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z][A-Z])(?=[a-z]))[^_$])*[_$]*){1,3}$|^[_$]*$"
+        }
       }
     ],
     "import/extensions": [
@@ -131,8 +171,7 @@
     "**/.output/**",
     "**/.edgeone/**",
     "**/dist/**",
-    "**/coverage/**",
-    "**/.oxlint/**"
+    "**/coverage/**"
   ],
   "overrides": [
     {
@@ -140,16 +179,23 @@
         "**/composables/**"
       ],
       "rules": {
-        "naming/naming-convention": [
+        "naming-convention/naming-convention": [
           "error",
           {
-            "selector": "default",
+            "selector": "variable",
+            "filter": {
+              "match": true,
+              "regex": "^[A-Z][A-Z0-9_]*$"
+            },
             "format": [
-              "camelCase"
+              "UPPER_CASE"
             ],
-            "leadingUnderscore": "allow",
+            "leadingUnderscore": "allowSingleOrDouble",
             "trailingUnderscore": "forbid",
-            "maxSegments": 3
+            "custom": {
+              "match": true,
+              "regex": "^[_$]*(?:[^_$](?:(?!(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z][A-Z])(?=[a-z]))[^_$])*[_$]*){1,3}$|^[_$]*$"
+            }
           },
           {
             "selector": "variable",
@@ -158,39 +204,72 @@
               "UPPER_CASE",
               "PascalCase"
             ],
-            "leadingUnderscore": "allowDouble",
-            "maxSegments": 3
+            "leadingUnderscore": "allowSingleOrDouble",
+            "trailingUnderscore": "forbid",
+            "custom": {
+              "match": true,
+              "regex": "^[_$]*(?:[^_$](?:(?!(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z][A-Z])(?=[a-z]))[^_$])*[_$]*){1,3}$|^[_$]*$"
+            }
           },
           {
             "selector": "function",
             "format": [
               "camelCase"
             ],
-            "maxSegments": 3
+            "leadingUnderscore": "allow",
+            "trailingUnderscore": "forbid",
+            "custom": {
+              "match": true,
+              "regex": "^[_$]*(?:[^_$](?:(?!(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z][A-Z])(?=[a-z]))[^_$])*[_$]*){1,3}$|^[_$]*$"
+            }
           },
           {
-            "selector": "parameter",
+            "selector": [
+              "parameter",
+              "parameterProperty"
+            ],
             "format": [
               "camelCase"
             ],
-            "leadingUnderscore": "allowDouble",
-            "maxSegments": 3
+            "leadingUnderscore": "allowSingleOrDouble",
+            "trailingUnderscore": "forbid",
+            "custom": {
+              "match": true,
+              "regex": "^[_$]*(?:[^_$](?:(?!(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z][A-Z])(?=[a-z]))[^_$])*[_$]*){1,3}$|^[_$]*$"
+            }
           },
           {
-            "selector": "type",
+            "selector": [
+              "typeLike",
+              "enumMember"
+            ],
             "format": [
               "PascalCase"
             ],
-            "maxSegments": 3
+            "leadingUnderscore": "allow",
+            "trailingUnderscore": "forbid",
+            "custom": {
+              "match": true,
+              "regex": "^[_$]*(?:[^_$](?:(?!(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z][A-Z])(?=[a-z]))[^_$])*[_$]*){1,3}$|^[_$]*$"
+            }
           },
           {
-            "selector": "member",
+            "selector": [
+              "classProperty",
+              "classMethod",
+              "classicAccessor",
+              "autoAccessor"
+            ],
             "format": [
               "camelCase",
               "UPPER_CASE"
             ],
             "leadingUnderscore": "allow",
-            "maxSegments": 3
+            "trailingUnderscore": "forbid",
+            "custom": {
+              "match": true,
+              "regex": "^[_$]*(?:[^_$](?:(?!(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z][A-Z])(?=[a-z]))[^_$])*[_$]*){1,3}$|^[_$]*$"
+            }
           }
         ]
       }

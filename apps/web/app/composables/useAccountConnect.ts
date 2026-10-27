@@ -366,9 +366,9 @@ function startPolling(popup: Window | null) {
   const startedAt = Date.now();
   let intervalMs = 8000;
 
-  const stopPolling = (returnToAuthStep = false) => {
+  const stopPolling = (returnToAuth = false) => {
     stopPolling();
-    if (returnToAuthStep && step.value === finishStep.value && finishStep.value > authStep.value) {
+    if (returnToAuth && step.value === finishStep.value && finishStep.value > authStep.value) {
       step.value = authStep.value;
     }
   };

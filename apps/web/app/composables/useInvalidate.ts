@@ -107,14 +107,14 @@ function patchRoaming(roamingByKey: Record<string, number>) {
 
 function removeApiKey(apiKeyId: string) {
   patchNuxtData<PageData>(dataKeys.apiKeys, (value) => {
-    const { [apiKeyId]: _removedRateLimits, ...rateLimitsByKeyId } = value.options.rateLimitsByKeyId;
+    const { [apiKeyId]: _removedRateLimits, ...remainingRateLimits } = value.options.rateLimitsByKeyId;
 
     return {
       ...value,
       apiKeys: value.apiKeys.filter((apiKey) => apiKey.id !== apiKeyId),
       options: {
         ...value.options,
-        rateLimitsByKeyId,
+        rateLimitsByKeyId: remainingRateLimits,
       },
     };
   });

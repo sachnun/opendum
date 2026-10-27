@@ -181,17 +181,17 @@ function customCounts<V>(counts: Record<string, V>): Record<string, V> {
 
 
 
-const { data: defaultModelFamilyCounts } = useAsyncData(dataKeys.shellModelFamilyCounts, async () => {
+const { data: shellFamilyCounts } = useAsyncData(dataKeys.shellModelFamilyCounts, async () => {
   const counts = await api.models.familyCounts();
   return familyCounts(counts);
 }, {
   default: () => ({ ...emptyCounts }),
 });
 
-const modelFamilyCounts = computed(() => defaultModelFamilyCounts.value ?? emptyCounts);
+const modelFamilyCounts = computed(() => shellFamilyCounts.value ?? emptyCounts);
 
 watch(liveModels, (data) => {
-  if (data) defaultModelFamilyCounts.value = familyCounts(data.familyCounts);
+  if (data) shellFamilyCounts.value = familyCounts(data.familyCounts);
 }, { immediate: true });
 
 const pinnedProviderHrefs = computed(() => {

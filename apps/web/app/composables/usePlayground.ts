@@ -487,11 +487,11 @@ function providers(modelOptions: ModelOption[], accounts: ProviderAccountOption[
     accountsByProvider.set(account.provider, [...(accountsByProvider.get(account.provider) ?? []), account]);
   }
 
-  return Array.from(accountsByProvider.entries()).flatMap(([provider, providerAccountsForProvider]) => {
-    const models = modelOptions.filter((model) => model.providers.includes(provider) && providerAccountsForProvider.some((account) => accountSupports(account, model)));
+  return Array.from(accountsByProvider.entries()).flatMap(([provider, accountsForProvider]) => {
+    const models = modelOptions.filter((model) => model.providers.includes(provider) && accountsForProvider.some((account) => accountSupports(account, model)));
     const presetPanels = models.map((model) => ({ modelId: model.id, provider, accountId: null }));
 
-    return presetPanels.length > 0 ? [{ provider, accounts: providerAccountsForProvider, models: models, panels: presetPanels }] : [];
+    return presetPanels.length > 0 ? [{ provider, accounts: accountsForProvider, models: models, panels: presetPanels }] : [];
   });
 }
 
