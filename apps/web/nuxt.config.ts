@@ -53,5 +53,8 @@ export default defineNuxtConfig({
   typescript: {
     strict: true,
     typeCheck: false,
+    tsConfig: {
+      include: ["../lib/**/*.ts", "../tests/**/*.ts"],
+    },
   },
 });

@@ -102,7 +102,7 @@
         "trailingUnderscore": "forbid",
         "custom": {
           "match": true,
-          "regex": "^[_$]*(?:[^_$](?:(?!(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z][A-Z])(?=[a-z]))[^_$])*[_$]*){1,2}$|^[_$]*$"
+          "regex": "^[_$]*(?:[^_$](?:(?!(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z][A-Z])(?=[a-z]))[^_$])*[_$]*){1,3}$|^[_$]*$"
         }
       },
       {
@@ -164,7 +164,189 @@
     "import/no-relative-parent-imports": "error",
     "effect/noNewPromise": "error",
     "effect/noTryCatch": "error",
-    "effect/noThrowStatement": "error"
+    "effect/noThrowStatement": "error",
+    "eqeqeq": [
+      "error",
+      "always",
+      {
+        "null": "ignore"
+      }
+    ],
+    "no-eq-null": "off",
+    "no-unused-expressions": "error",
+    "no-promise-executor-return": "error",
+    "no-async-promise-executor": "error",
+    "no-constructor-return": "error",
+    "no-prototype-builtins": "error",
+    "no-unsafe-finally": "error",
+    "no-template-curly-in-string": "error",
+    "no-return-assign": "error",
+    "no-sequences": "error",
+    "no-cond-assign": "error",
+    "no-sparse-arrays": "error",
+    "no-new-wrappers": "error",
+    "no-object-constructor": "error",
+    "no-array-constructor": "error",
+    "no-implied-eval": "error",
+    "no-new-func": "error",
+    "no-proto": "error",
+    "no-iterator": "error",
+    "no-extend-native": "error",
+    "no-useless-catch": "error",
+    "no-useless-rename": "error",
+    "no-useless-concat": "error",
+    "no-useless-computed-key": "error",
+    "no-useless-escape": "error",
+    "no-control-regex": "error",
+    "no-invalid-regexp": "error",
+    "no-misleading-character-class": "error",
+    "no-loss-of-precision": "error",
+    "no-irregular-whitespace": "error",
+    "no-unreachable": "error",
+    "no-unreachable-loop": "error",
+    "no-self-assign": "error",
+    "no-self-compare": "error",
+    "no-constant-binary-expression": "error",
+    "no-constant-condition": "error",
+    "no-compare-neg-zero": "error",
+    "no-obj-calls": "error",
+    "no-dupe-keys": "error",
+    "no-shadow-restricted-names": "error",
+    "no-labels": "error",
+    "no-eval": "error",
+    "no-debugger": "error",
+    "no-alert": "error",
+    "no-caller": "error",
+    "no-throw-literal": "error",
+    "no-useless-assignment": "error",
+    "no-multi-assign": "error",
+    "no-inner-declarations": "error",
+    "no-var": "error",
+    "no-param-reassign": "error",
+    "no-implicit-coercion": "error",
+    "no-else-return": "error",
+    "no-unneeded-ternary": "error",
+    "no-lonely-if": "error",
+    "no-fallthrough": "error",
+    "no-useless-return": "error",
+    "prefer-rest-params": "error",
+    "prefer-spread": "error",
+    "prefer-template": "error",
+    "prefer-object-spread": "error",
+    "prefer-exponentiation-operator": "error",
+    "prefer-numeric-literals": "error",
+    "prefer-promise-reject-errors": "error",
+    "prefer-const": "error",
+    "object-shorthand": "error",
+    "logical-assignment-operators": "error",
+    "default-case": "error",
+    "no-duplicate-imports": "error",
+    "no-loop-func": "error",
+    "max-nested-callbacks": "error",
+    "unicorn/error-message": "error",
+    "unicorn/prefer-node-protocol": "error",
+    "unicorn/prefer-includes": "error",
+    "unicorn/prefer-regexp-test": "error",
+    "unicorn/prefer-array-flat": "error",
+    "unicorn/prefer-array-flat-map": "error",
+    "unicorn/no-useless-spread": "error",
+    "unicorn/prefer-object-from-entries": "error",
+    "unicorn/prefer-optional-catch-binding": "error",
+    "unicorn/prefer-type-error": "error",
+    "unicorn/prefer-date-now": "error",
+    "unicorn/prefer-structured-clone": "error",
+    "unicorn/no-document-cookie": "error",
+    "unicorn/no-abusive-eslint-disable": "error",
+    "unicorn/prefer-set-size": "error",
+    "unicorn/no-thenable": "error",
+    "unicorn/no-useless-length-check": "error",
+    "unicorn/no-useless-fallback-in-spread": "error",
+    "unicorn/no-unnecessary-await": "error",
+    "unicorn/no-single-promise-in-promise-methods": "error",
+    "unicorn/no-await-in-promise-methods": "error",
+    "unicorn/no-invalid-fetch-options": "error",
+    "unicorn/no-invalid-remove-event-listener": "error",
+    "unicorn/prefer-dom-node-append": "error",
+    "unicorn/require-module-specifiers": "error",
+    "typescript/no-explicit-any": "error",
+    "typescript/no-empty-object-type": "error",
+    "typescript/no-unsafe-function-type": "error",
+    "typescript/no-wrapper-object-types": "error",
+    "typescript/no-misused-new": "error",
+    "typescript/no-this-alias": "error",
+    "typescript/no-unsafe-declaration-merging": "error",
+    "typescript/no-duplicate-enum-values": "error",
+    "typescript/prefer-enum-initializers": "error",
+    "typescript/prefer-as-const": "error",
+    "typescript/prefer-for-of": "error",
+    "typescript/prefer-string-starts-ends-with": "error",
+    "typescript/no-useless-empty-export": "error",
+    "typescript/no-unnecessary-type-constraint": "error",
+    "typescript/no-non-null-assertion": "error",
+    "typescript/consistent-type-imports": "error",
+    "typescript/no-import-type-side-effects": "error",
+    "typescript/no-dynamic-delete": "error",
+    "default-param-last": "error",
+    "import/no-self-import": "error",
+    "import/no-absolute-path": "error",
+    "import/no-mutable-exports": "error",
+    "import/no-amd": "error",
+    "import/no-empty-named-blocks": "error",
+    "import/no-cycle": "error",
+    "import/no-duplicates": "error",
+    "oxc/bad-array-method-on-arguments": "error",
+    "oxc/bad-char-at-comparison": "error",
+    "oxc/bad-comparison-sequence": "error",
+    "oxc/double-comparisons": "error",
+    "oxc/erasing-op": "error",
+    "oxc/missing-throw": "error",
+    "oxc/number-arg-out-of-range": "error",
+    "oxc/uninvoked-array-callback": "error",
+    "oxc/approx-constant": "error",
+    "oxc/const-comparisons": "error",
+    "oxc/no-async-endpoint-handlers": "error",
+    "oxc/no-accumulating-spread": "error",
+    "vue/no-async-in-computed-properties": "error",
+    "vue/no-side-effects-in-computed-properties": "error",
+    "vue/no-import-compiler-macros": "error",
+    "effect/noEffectDo": "error",
+    "effect/noEffectBind": "error",
+    "effect/noNestedEffectGen": "error",
+    "effect/noSequentialEffectAll": "error",
+    "effect/noSilentCatchAll": "error",
+    "effect/noRunCollectOnUnboundedStream": "error",
+    "effect/noPointFreeLog": "error",
+    "effect/noReduceAccumulatorCopy": "error",
+    "effect/noReflectApply": "error",
+    "effect/noInlineProvide": "error",
+    "effect/noEagerAcquire": "error",
+    "effect/noManagedRuntimeInEffect": "error",
+    "effect/noPlatformLayerOutsideEntry": "error",
+    "effect/noObjectParameters": "error",
+    "effect/noWidenThenAssert": "error",
+    "effect/noLintEvasion": "error",
+    "effect/requireSuppressionReason": "error",
+    "effect/noUnknownTypeAliases": "error",
+    "effect/noAliasTestLayer": "error",
+    "effect/preferServiceOf": "error",
+    "effect/requireNamedEffectFn": "error",
+    "effect/preferCatchTag": "error",
+    "effect/preferMatchTagsExhaustive": "error",
+    "effect/preferPredicateIsTagged": "error",
+    "effect/noUnboundedConcurrency": "error",
+    "effect/noDynamicImports": "error",
+    "effect/noUnboundedRetry": "off",
+    "effect/noArrayFilterMap": "error",
+    "effect/noPositionalLogArguments": "error",
+    "effect/noLocaleCompare": "error",
+    "oxc/no-map-spread": "error",
+    "effect/noModuleLevelMutableState": "error",
+    "effect/preferTaggedConstructors": "error",
+    "effect/noReflectGet": "error",
+    "effect/preferSchemaTaggedUnion": "error",
+    "effect/preferEffectFn": "error",
+    "effect/noPerCallCacheConstruction": "error",
+    "effect/noInterruptibleMemo": "error"
   },
   "ignorePatterns": [
     "**/.nuxt/**",
@@ -176,111 +358,35 @@
   "overrides": [
     {
       "files": [
-        "**/composables/**"
-      ],
-      "rules": {
-        "naming-convention/naming-convention": [
-          "error",
-          {
-            "selector": "variable",
-            "filter": {
-              "match": true,
-              "regex": "^[A-Z][A-Z0-9_]*$"
-            },
-            "format": [
-              "UPPER_CASE"
-            ],
-            "leadingUnderscore": "allowSingleOrDouble",
-            "trailingUnderscore": "forbid",
-            "custom": {
-              "match": true,
-              "regex": "^[_$]*(?:[^_$](?:(?!(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z][A-Z])(?=[a-z]))[^_$])*[_$]*){1,3}$|^[_$]*$"
-            }
-          },
-          {
-            "selector": "variable",
-            "format": [
-              "camelCase",
-              "UPPER_CASE",
-              "PascalCase"
-            ],
-            "leadingUnderscore": "allowSingleOrDouble",
-            "trailingUnderscore": "forbid",
-            "custom": {
-              "match": true,
-              "regex": "^[_$]*(?:[^_$](?:(?!(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z][A-Z])(?=[a-z]))[^_$])*[_$]*){1,3}$|^[_$]*$"
-            }
-          },
-          {
-            "selector": "function",
-            "format": [
-              "camelCase"
-            ],
-            "leadingUnderscore": "allow",
-            "trailingUnderscore": "forbid",
-            "custom": {
-              "match": true,
-              "regex": "^[_$]*(?:[^_$](?:(?!(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z][A-Z])(?=[a-z]))[^_$])*[_$]*){1,3}$|^[_$]*$"
-            }
-          },
-          {
-            "selector": [
-              "parameter",
-              "parameterProperty"
-            ],
-            "format": [
-              "camelCase"
-            ],
-            "leadingUnderscore": "allowSingleOrDouble",
-            "trailingUnderscore": "forbid",
-            "custom": {
-              "match": true,
-              "regex": "^[_$]*(?:[^_$](?:(?!(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z][A-Z])(?=[a-z]))[^_$])*[_$]*){1,3}$|^[_$]*$"
-            }
-          },
-          {
-            "selector": [
-              "typeLike",
-              "enumMember"
-            ],
-            "format": [
-              "PascalCase"
-            ],
-            "leadingUnderscore": "allow",
-            "trailingUnderscore": "forbid",
-            "custom": {
-              "match": true,
-              "regex": "^[_$]*(?:[^_$](?:(?!(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z][A-Z])(?=[a-z]))[^_$])*[_$]*){1,3}$|^[_$]*$"
-            }
-          },
-          {
-            "selector": [
-              "classProperty",
-              "classMethod",
-              "classicAccessor",
-              "autoAccessor"
-            ],
-            "format": [
-              "camelCase",
-              "UPPER_CASE"
-            ],
-            "leadingUnderscore": "allow",
-            "trailingUnderscore": "forbid",
-            "custom": {
-              "match": true,
-              "regex": "^[_$]*(?:[^_$](?:(?!(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z][A-Z])(?=[a-z]))[^_$])*[_$]*){1,3}$|^[_$]*$"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "files": [
         "packages/core/egress/guard.ts"
       ],
       "rules": {
         "import/extensions": "off"
       }
+    },
+    {
+      "files": [
+        "**/*.test.ts",
+        "**/test/**",
+        "**/tests/**"
+      ],
+      "rules": {
+        "typescript/await-thenable": "off",
+        "typescript/no-base-to-string": "off",
+        "typescript/require-array-sort-compare": "off"
+      }
+    },
+    {
+      "files": [
+        "apps/web/app/**/*.vue"
+      ],
+      "rules": {
+        "effect/noModuleLevelMutableState": "off"
+      }
     }
-  ]
+  ],
+  "options": {
+    "typeAware": true,
+    "reportUnusedDisableDirectives": "warn"
+  }
 }
