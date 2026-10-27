@@ -9,6 +9,7 @@ import { causeMessage } from "@opendum/models/refresh/core/failure";
 import type { ModelFetchFailure, ModelTimeoutFailure } from "@opendum/models/errors";
 import type { ModelIndexEntry } from "@opendum/models/types";
 import { sourceOf, type ModelSource, type SourceContext, type SourceResult, type VersionTarget } from "@opendum/models/refresh/core/types";
+import { compareText } from "@opendum/models/compare";
 
 const PROVIDER = "perch";
 const DOCS_URL = "https://www.perchai.app/docs/concepts/models";
@@ -131,7 +132,7 @@ const starterPool = (
   }
 
   return {
-    models: new Map([...models.entries()].sort(([left], [right]) => left.localeCompare(right))),
+    models: new Map([...models.entries()].sort(([left], [right]) => compareText(left, right))),
     unresolved,
   };
 };
@@ -144,7 +145,7 @@ const registeredPool = (modelsDir: string): Map<string, string> =>
         const upstream = perchUpstream(entry);
         return upstream ? [[entry.fileId, upstream] as const] : [];
       })
-      .sort(([left], [right]) => left.localeCompare(right))
+      .sort(([left], [right]) => compareText(left, right))
   );
 
 const degraded = (

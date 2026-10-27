@@ -12,6 +12,7 @@ import {
   type SourceResult,
   type VersionTarget,
 } from "@opendum/models/refresh/core/types";
+import { compareText } from "@opendum/models/compare";
 
 const PROVIDER = "antigravity";
 const DOCS_URL = "https://antigravity.google/docs/models";
@@ -253,7 +254,7 @@ export const antigravitySource: ModelSource = {
           widgets.map((widget) => [keyOf(widget.id), leveledAliases(keyOf(widget.id))])
         );
         return {
-          ...sourceOf(new Map([...models.entries()].sort(([left], [right]) => left.localeCompare(right)))),
+          ...sourceOf(new Map([...models.entries()].sort(([left], [right]) => compareText(left, right)))),
           providerConfig: paidConfig(models, widgets),
           managedKeys: ["allowedTiers"],
           extra: new Map([["aliases", aliases]]),

@@ -4,6 +4,7 @@ import { buildIndex, upstream } from "@opendum/models/model-store";
 import { entryFor, slugify, writeEntry } from "@opendum/models/refresh/core/keys";
 import { env } from "@opendum/models/refresh/core/env";
 import { sourceOf, type ModelSource, type SourceResult } from "@opendum/models/refresh/core/types";
+import { compareText } from "@opendum/models/compare";
 
 const PROVIDER = "workers_ai";
 const API_URL =
@@ -49,7 +50,7 @@ const files = (payload: unknown): ReadonlyArray<File> => {
             : [],
       })
     )
-    .sort((left, right) => left.name.localeCompare(right.name));
+    .sort((left, right) => compareText(left.name, right.name));
 };
 
 const property = (model: Record<string, unknown>, id: string): unknown => {
@@ -192,7 +193,7 @@ export const cloudflareSource: ModelSource = {
       if (models.size === 0) raise(new Error("Cloudflare resolved no models"));
 
       return {
-        ...sourceOf(new Map([...models.entries()].sort(([left], [right]) => left.localeCompare(right)))),
+        ...sourceOf(new Map([...models.entries()].sort(([left], [right]) => compareText(left, right)))),
         extra: new Map([["metadata", metadata]]),
       } satisfies SourceResult;
     }).pipe(

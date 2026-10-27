@@ -4,6 +4,7 @@ import { idMap } from "@opendum/models/model-store";
 import { fetchText } from "@opendum/models/sync/http";
 import { standardKey } from "@opendum/models/refresh/core/keys";
 import { sourceOf, type ModelSource, type SourceResult } from "@opendum/models/refresh/core/types";
+import { compareText } from "@opendum/models/compare";
 
 const MODELS_URL = "https://tokenharbor.ai/models";
 
@@ -85,7 +86,7 @@ function freeIds(html: string): ReadonlyArray<string> {
       return free && textCapable(entry) ? [entry.surface.trim()] : [];
     })
     .filter((id) => id.length > 0)
-    .sort((left, right) => left.localeCompare(right));
+    .sort((left, right) => compareText(left, right));
 }
 
 export const harborSource: ModelSource = {

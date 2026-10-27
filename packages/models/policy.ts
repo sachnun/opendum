@@ -1,4 +1,5 @@
 import type { ModelInfo, ProviderAccessRule, ProviderModelConfig } from "@opendum/models/registry";
+import { compareText } from "@opendum/models/compare";
 
 export type Catalog = {
   info(model: string): ModelInfo | null;
@@ -42,7 +43,7 @@ export class Policy {
       }
     }
     for (const [provider, list] of result) {
-      result.set(provider, [...list].sort((a, b) => a.localeCompare(b)));
+      result.set(provider, [...list].sort((a, b) => compareText(a, b)));
     }
     return result;
   }

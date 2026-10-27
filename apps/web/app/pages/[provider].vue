@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { compareText } from "@opendum/models/compare";
 import type { ActionResult, CustomListItem, CustomModelRow, ErrorHistoryResult, AccountUpdateData, ProviderDetailData, ProviderStats, QuotaGroupDisplay, QuotaProviderKey } from "~~/lib/api-types";
 import { decodeHash, settle } from "~~/lib/settle";
 import type { AccountsData, UsageData } from "@opendum/providers/contract";
@@ -361,12 +362,12 @@ const quotaSummaryGroups = computed<QuotaSummaryGroup[]>(() => {
     }
   }
 
-  return Array.from(groups.values())
-    .map((group) => ({
-      ...group,
+  return Array.from(groups.values()).map((group) =>
+    Object.assign(group, {
       remainingFraction: group.maxRequests > 0 ? Math.max(0, Math.min(1, group.remainingRequests / group.maxRequests)) : 0,
       percentUsed: group.maxRequests > 0 ? Math.round(Math.max(0, Math.min(100, (group.usedRequests / group.maxRequests) * 100))) : 0,
-    }));
+    })
+  );
 });
 function quotaOf(provider: string): QuotaProviderKey | null {
   return QUOTA_PROVIDERS.has(provider) ? provider as QuotaProviderKey : null;
@@ -387,7 +388,7 @@ function compareAccounts(a: Account, b: Account): number {
     || Number(b.isActive) - Number(a.isActive)
     || timeOf(b.lastUsedAt) - timeOf(a.lastUsedAt)
     || timeOf(b.createdAt) - timeOf(a.createdAt)
-    || b.id.localeCompare(a.id);
+    || compareText(b.id, a.id);
 }
 
 function byOrder(a: Account, b: Account): number {

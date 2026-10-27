@@ -23,6 +23,7 @@ import type {
 } from "@opendum/providers/types";
 
 import { CLIENT_ID as CODEX_CLIENT_ID, CODEX_BASE_URL, ORIGINATOR as CODEX_ORIGINATOR, TOKEN_ENDPOINT as CODEX_TOKEN_ENDPOINT } from "@opendum/providers/auth/codex/constants";
+import { compareText } from "@opendum/models/compare";
 
 export const SUPPORTED_CODEX = new Set([
   "model", "instructions", "store", "input", "stream", "tools", "tool_choice",
@@ -74,7 +75,7 @@ function buildPayload(body: Json, modelName: string, upstreamStream: boolean): J
   ) {
     (reasoning as Json).summary = "auto";
   }
-  let include = Value.strings(body.include);
+  const include = Value.strings(body.include);
   if (body._includeReasoning === true || tools.length > 0) {
     include.push("reasoning.encrypted_content");
   }
@@ -366,7 +367,7 @@ export class CodexProvider extends OAuthProvider {
       if (canonical) values.add(canonical);
       if (upstream) values.add(upstream);
     }
-    return [...values].sort((a, b) => a.localeCompare(b));
+    return [...values].sort((a, b) => compareText(a, b));
   }
 
   private resolveModel(model: string): string {
@@ -488,8 +489,10 @@ export function fromResponses(text: string, model: string): Json {
   }
 
   const reasoningText = reasoningOrder
-    .map((key) => reasoningParts.get(key) ?? "")
-    .filter((value) => value)
+    .flatMap((key) => {
+      const value = reasoningParts.get(key);
+      return value ? [value] : [];
+    })
     .join("\n\n");
   collector.addReasoning(reasoningText);
   collector.setFinish(status === "incomplete" ? "length" : "stop");

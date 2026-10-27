@@ -4,6 +4,7 @@ import { idMap } from "@opendum/models/model-store";
 import { fetchJson } from "@opendum/models/sync/http";
 import { slashedKey } from "@opendum/models/refresh/core/keys";
 import type { ModelSource, SourceResult } from "@opendum/models/refresh/core/types";
+import { compareText } from "@opendum/models/compare";
 
 const PLANS_URL = "https://zenmux.ai/api/subscription/public/get_all_plans";
 const MODELS_URL = "https://zenmux.ai/api/v1/models";
@@ -74,7 +75,7 @@ const freeIds = (catalog: unknown, allowed: ReadonlySet<string>): ReadonlyArray<
         .filter((entry) => allowed.has(entry.id) && textOutput(entry))
         .map((entry) => entry.id)
     ),
-  ].sort((left, right) => left.localeCompare(right));
+  ].sort((left, right) => compareText(left, right));
 };
 
 export const zenmuxSource: ModelSource = {

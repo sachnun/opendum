@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { compareText } from "@opendum/models/compare";
 import { SORT_ORDER, anchorId } from "@opendum/models/ranking";
 import { decodeHash, errorText, failureText, settle } from "~~/lib/settle";
 import { compareEntries } from "@opendum/models/sort";
@@ -73,7 +74,7 @@ const modelSections = computed(() => {
 
   const tailSections = [...groupedModels.keys()]
     .filter((family) => family !== "Others" && !rankedSet.has(family))
-    .sort((a, b) => a.localeCompare(b))
+    .sort((a, b) => compareText(a, b))
     .map((family) => ({
       name: family,
       anchorId: anchorId(family),
@@ -243,7 +244,9 @@ async function copyId(modelId: string) {
 
 function applyEnabled(modelId: string, enabled: boolean) {
   if (!data.value) return;
-  data.value = data.value.map((model) => (model.id === modelId ? { ...model, isEnabled: enabled } : model));
+  const target = data.value.find((model) => model.id === modelId);
+  if (target) target.isEnabled = enabled;
+  data.value = [...data.value];
 }
 
 function costSummary(cost: ModelCost) {

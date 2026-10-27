@@ -1,10 +1,11 @@
 import { describe, expect, it } from "bun:test";
 import type { ModelInfo } from "@opendum/models/registry";
 import { Serializer } from "@opendum/models/serializer";
+import { compareText } from "@opendum/models/compare";
 
 function serializerOf(models: Record<string, ModelInfo>): Serializer {
   return new Serializer({
-    models: () => Object.keys(models).sort((a, b) => a.localeCompare(b)),
+    models: () => Object.keys(models).sort((a, b) => compareText(a, b)),
     info: (model) => models[model] ?? null,
   });
 }

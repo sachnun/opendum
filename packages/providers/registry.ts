@@ -13,6 +13,7 @@ import { AntigravityProvider } from "@opendum/providers/upstreams/antigravity/in
 import { WorkersAiProvider } from "@opendum/providers/upstreams/workers-ai/index";
 import { COMPAT_SPECS } from "@opendum/providers/compat-specs";
 import type { AuthlessProvider, CredentialRefresher, Provider } from "@opendum/providers/types";
+import { compareText } from "@opendum/models/compare";
 
 export type ProviderRegistryOptions = {
   models: Registry;
@@ -91,7 +92,7 @@ export class ProviderRegistry {
   }
 
   names(): string[] {
-    return [...this.providers.keys()].sort((a, b) => a.localeCompare(b));
+    return [...this.providers.keys()].sort((a, b) => compareText(a, b));
   }
 
   refreshableProviderNames(): string[] {
@@ -99,7 +100,7 @@ export class ProviderRegistry {
     for (const [name, provider] of this.providers) {
       if (isRefresher(provider)) names.push(name);
     }
-    return names.sort((a, b) => a.localeCompare(b));
+    return names.sort((a, b) => compareText(a, b));
   }
 
   isAuthless(name: string): boolean {

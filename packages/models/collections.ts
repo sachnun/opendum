@@ -1,10 +1,11 @@
+import { compareText } from "@opendum/models/compare";
 export function compactStrings(values: string[] | undefined): string[] {
   if (!values) return [];
   return values.map((value) => value.trim()).filter((value) => value.length > 0);
 }
 
 export function uniqueSorted(values: string[]): string[] {
-  return [...new Set(values.filter((value) => value.length > 0))].sort((a, b) => a.localeCompare(b));
+  return [...new Set(values.filter((value) => value.length > 0))].sort((a, b) => compareText(a, b));
 }
 
 export function stableUnique(values: string[]): string[] {

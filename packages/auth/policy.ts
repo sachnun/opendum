@@ -2,6 +2,7 @@ import type { Registry } from "@opendum/models/runtime";
 import { invalid, valid } from "@opendum/auth/results";
 import { parseModel } from "@opendum/auth/normalize";
 import type { AccountModelAvailability, ModelValidationResult } from "@opendum/auth/types";
+import { compareText } from "@opendum/models/compare";
 
 export class Policy {
   constructor(private readonly registry: Registry) {}
@@ -114,7 +115,7 @@ export class Policy {
       if (canonical) values.add(canonical);
       if (upstream) values.add(upstream);
     }
-    return [...values].sort((a, b) => a.localeCompare(b));
+    return [...values].sort((a, b) => compareText(a, b));
   }
 }
 

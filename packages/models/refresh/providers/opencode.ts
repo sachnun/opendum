@@ -5,6 +5,7 @@ import { stripParams } from "@opendum/models/model/clean-key";
 import { packageVersion } from "@opendum/models/refresh/core/fetch";
 import { join } from "@opendum/models/paths";
 import { sourceOf, type ModelSource, type SourceContext, type SourceResult, type VersionTarget } from "@opendum/models/refresh/core/types";
+import { compareText } from "@opendum/models/compare";
 
 const PROVIDER = "opencode";
 const DOCS_URL =
@@ -104,7 +105,7 @@ const extractFree = (markdown: string): { freeModels: ReadonlyArray<string>; end
   }
   if (freeModels.length === 0) raise(new Error("OpenCode docs listed no free models"));
 
-  return { freeModels: freeModels.sort((left, right) => left.localeCompare(right)), endpoints };
+  return { freeModels: freeModels.sort((left, right) => compareText(left, right)), endpoints };
 };
 
 const availableIds = (payload: unknown): ReadonlySet<string> =>
@@ -200,7 +201,7 @@ export const opencodeSource: ModelSource = {
       if (models.size === 0) raise(new Error("Opencode resolved no free models"));
 
       return {
-        ...sourceOf(new Map([...models.entries()].sort(([left], [right]) => left.localeCompare(right)))),
+        ...sourceOf(new Map([...models.entries()].sort(([left], [right]) => compareText(left, right)))),
         providerConfig: configOf(models, endpoints),
         managedKeys: ["responses_api", "messages_api"],
       } satisfies SourceResult;

@@ -1,4 +1,5 @@
 import { uniqueSorted } from "@opendum/models/collections";
+import { compareText } from "@opendum/models/compare";
 
 const THRESHOLD = 0.7;
 
@@ -32,7 +33,7 @@ export class Suggester {
       }
     }
     for (const list of providers.values()) {
-      list.sort((a, b) => a.value.localeCompare(b.value));
+      list.sort((a, b) => compareText(a.value, b.value));
     }
     return new Suggester(models, providers);
   }
@@ -63,7 +64,7 @@ export class Suggester {
       const rating = score(query, candidate);
       if (rating >= THRESHOLD) matches.push({ value: candidate.value, score: rating });
     }
-    matches.sort((a, b) => (a.score === b.score ? a.value.localeCompare(b.value) : b.score - a.score));
+    matches.sort((a, b) => (a.score === b.score ? compareText(a.value, b.value) : b.score - a.score));
 
     const result: string[] = [];
     const seen = new Set<string>();
@@ -120,13 +121,13 @@ function distance(a: string, b: string): number {
     current[0] = i + 1;
     for (let j = 0; j < right.length; j += 1) {
       const cost = left[i] === right[j] ? 0 : 1;
-      current[j + 1] = Math.min(current[j]! + 1, previous[j + 1]! + 1, previous[j]! + cost);
+      current[j + 1] = Math.min((current[j] ?? 0) + 1, (previous[j + 1] ?? 0) + 1, (previous[j] ?? 0) + cost);
     }
     const swap = previous;
     previous = current;
     current = swap;
   }
-  return previous[right.length]!;
+  return previous[right.length] ?? 0;
 }
 
 function compactScore(term: string, candidate: string): number {

@@ -1,5 +1,6 @@
 import { uniqueSorted } from "@opendum/models/collections";
 import type { ModelInfo } from "@opendum/models/registry";
+import { compareText } from "@opendum/models/compare";
 
 export function nvidiaAlias(upstream: string): string {
   const stripped = upstream.startsWith("library/") ? upstream.slice("library/".length) : upstream;
@@ -21,7 +22,7 @@ export class Aliases {
 
   static build(source: AliasSource): Aliases {
     const index = new Aliases();
-    const canonicals = [...source.canonicalIds()].sort((a, b) => a.localeCompare(b));
+    const canonicals = [...source.canonicalIds()].sort((a, b) => compareText(a, b));
 
     for (const canonical of canonicals) index.aliasToCanonical.set(canonical, canonical);
     for (const canonical of canonicals) {
@@ -35,14 +36,14 @@ export class Aliases {
     for (const canonical of canonicals) {
       const info = source.info(canonical);
       if (!info) continue;
-      const providers = Object.keys(info.providerConfig ?? {}).sort((a, b) => a.localeCompare(b));
+      const providers = Object.keys(info.providerConfig ?? {}).sort((a, b) => compareText(a, b));
       for (const provider of providers) {
         const upstream = (info.providerConfig?.[provider]?.upstream ?? "").trim();
         if (!upstream || upstreamNames.has(upstream)) continue;
         upstreamNames.set(upstream, canonical);
       }
     }
-    for (const upstreamName of [...upstreamNames.keys()].sort((a, b) => a.localeCompare(b))) {
+    for (const upstreamName of [...upstreamNames.keys()].sort((a, b) => compareText(a, b))) {
       const canonical = upstreamNames.get(upstreamName) as string;
       if (!index.aliasToCanonical.has(upstreamName)) index.aliasToCanonical.set(upstreamName, canonical);
       const legacy = nvidiaAlias(upstreamName);
@@ -51,7 +52,7 @@ export class Aliases {
       }
     }
 
-    for (const alias of [...index.aliasToCanonical.keys()].sort((a, b) => a.localeCompare(b))) {
+    for (const alias of [...index.aliasToCanonical.keys()].sort((a, b) => compareText(a, b))) {
       const canonical = index.aliasToCanonical.get(alias) as string;
       if (alias === canonical) continue;
       const list = index.canonicalToAliases.get(canonical) ?? [];
@@ -90,12 +91,12 @@ export class Aliases {
   }
 
   private buildFolded(source: AliasSource): void {
-    const canonicals = [...source.canonicalIds()].sort((a, b) => a.localeCompare(b));
+    const canonicals = [...source.canonicalIds()].sort((a, b) => compareText(a, b));
     for (const canonical of canonicals) {
       const key = canonical.toLowerCase();
       if (!this.foldedAliases.has(key)) this.foldedAliases.set(key, canonical);
     }
-    const aliases = [...this.aliasToCanonical.keys()].sort((a, b) => a.localeCompare(b));
+    const aliases = [...this.aliasToCanonical.keys()].sort((a, b) => compareText(a, b));
     for (const alias of aliases) {
       const key = alias.toLowerCase();
       if (!this.foldedAliases.has(key)) {

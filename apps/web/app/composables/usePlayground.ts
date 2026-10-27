@@ -1,5 +1,4 @@
-import { Effect } from "effect";
-import { Result } from "effect";
+import { Effect, Result } from "effect";
 import { deferred, raise, settle } from "~~/lib/settle";
 import { SORT_ORDER, categorize } from "@opendum/models/ranking";
 import { compareEntries } from "@opendum/models/sort";
@@ -17,17 +16,16 @@ import {
   Sse,
   Tokens,
   ToolCalls,
+  type ReasoningEffort,
+  type PlaygroundEndpoint,
+  type ScenarioMessage,
+  type ParsedUsageData,
+  type ToolCallData,
+  type ParsedCompletionData,
+  type ResponseMetrics,
+  type PlaygroundSettings,
 } from "~~/lib/playground-protocol";
-import type {
-  ReasoningEffort,
-  PlaygroundEndpoint,
-  ScenarioMessage,
-  ParsedUsageData,
-  ToolCallData,
-  ParsedCompletionData,
-  ResponseMetrics,
-  PlaygroundSettings,
-} from "~~/lib/playground-protocol";
+import { compareText } from "@opendum/models/compare";
 
 export function usePlayground() {
 
@@ -76,7 +74,7 @@ const DEFAULT_SETTINGS: PlaygroundSettings = {
   reasoningEffort: "low",
 };
 
-const SCENARIOS: Scenario[] = [
+const SCENARIOS: [Scenario, ...Scenario[]] = [
   {
     id: "text",
     name: "Text",
@@ -182,7 +180,7 @@ const hasAccount = computed(() => Boolean(options.value?.hasAnyProviderAccount))
 const isProxyConfigured = computed(() => Boolean(options.value?.proxyBaseUrl));
 const canUsePlayground = computed(() => hasAccount.value && isProxyConfigured.value && providerAccounts.value.length > 0 && models.value.length > 0);
 
-const selectedScenario = ref<Scenario>(SCENARIOS[0]!);
+const selectedScenario = ref<Scenario>(SCENARIOS[0]);
 const settings = reactive<PlaygroundSettings>({ ...DEFAULT_SETTINGS });
 const settingsOpen = ref(false);
 const panels = ref<PanelState[]>([{ id: Ids.short(), modelId: null, provider: null, accountId: null }]);
@@ -342,16 +340,13 @@ watch(() => route.query, (query) => {
     }
   }
 
-  if (accountId) {
-    const account = accountsById.value.get(accountId);
-    if (account) {
-      const compatibleModels = models.value.filter((m) => accountSupports(account, m));
-      panels.value = compatibleModels.length > 0
-        ? compatibleModels.map((m) => ({ id: Ids.short(), modelId: m.id, provider: null, accountId }))
-        : [{ id: Ids.short(), modelId: null, provider: null, accountId }];
-      responses.value = {};
-      return;
-    }
+  const account = accountId ? accountsById.value.get(accountId) : undefined;
+  if (account && accountId) {
+    const compatibleModels = models.value.filter((m) => accountSupports(account, m));
+    panels.value = compatibleModels.length > 0
+      ? compatibleModels.map((m) => ({ id: Ids.short(), modelId: m.id, provider: null, accountId }))
+      : [{ id: Ids.short(), modelId: null, provider: null, accountId }];
+    responses.value = {};
   }
 });
 
@@ -476,7 +471,7 @@ function families(modelOptions: ModelOption[], accounts: ProviderAccountOption[]
     .sort(([familyA], [familyB]) => {
       const orderA = familyOrder.get(familyA) ?? Number.MAX_SAFE_INTEGER;
       const orderB = familyOrder.get(familyB) ?? Number.MAX_SAFE_INTEGER;
-      return orderA === orderB ? familyA.localeCompare(familyB) : orderA - orderB;
+      return orderA === orderB ? compareText(familyA, familyB) : orderA - orderB;
     })
     .map(([family, familyModels]) => ({ family, models: familyModels }));
 }
@@ -491,7 +486,7 @@ function providers(modelOptions: ModelOption[], accounts: ProviderAccountOption[
     const models = modelOptions.filter((model) => model.providers.includes(provider) && accountsForProvider.some((account) => accountSupports(account, model)));
     const presetPanels = models.map((model) => ({ modelId: model.id, provider, accountId: null }));
 
-    return presetPanels.length > 0 ? [{ provider, accounts: accountsForProvider, models: models, panels: presetPanels }] : [];
+    return presetPanels.length > 0 ? [{ provider, accounts: accountsForProvider, models, panels: presetPanels }] : [];
   });
 }
 
@@ -632,7 +627,7 @@ function groupedModels(panel: PanelState) {
     .sort(([familyA], [familyB]) => {
       const orderA = familyOrder.get(familyA) ?? Number.MAX_SAFE_INTEGER;
       const orderB = familyOrder.get(familyB) ?? Number.MAX_SAFE_INTEGER;
-      return orderA === orderB ? familyA.localeCompare(familyB) : orderA - orderB;
+      return orderA === orderB ? compareText(familyA, familyB) : orderA - orderB;
     })
     .map(([family, familyModels]) => ({ family, models: familyModels.sort(compareEntries) }));
 }
@@ -650,7 +645,7 @@ function pendingAccounts(panel: PanelState): ProviderAccountOption[] {
     .sort((a, b) => {
       const orderA = providerOrder.get(a.provider) ?? Number.MAX_SAFE_INTEGER;
       const orderB = providerOrder.get(b.provider) ?? Number.MAX_SAFE_INTEGER;
-      return orderA === orderB ? accountLabel(a).localeCompare(accountLabel(b)) : orderA - orderB;
+      return orderA === orderB ? compareText(accountLabel(a), accountLabel(b)) : orderA - orderB;
     });
 }
 
@@ -822,7 +817,7 @@ function bindScroll(panelId: string, element: unknown) {
 
 function scrollBottom(panelId: string) {
   if (!autoScroll[panelId]) return;
-  nextTick(() => {
+  void nextTick(() => {
     const element = panelScrollElements.get(panelId);
     const response = responses.value[panelId];
     if (!element || !response?.isLoading || !autoScroll[panelId]) return;
@@ -934,9 +929,9 @@ function streamRequest(input: StreamRequest): Promise<void> {
       processedLength = text.length;
       processor.feed(chunk);
     };
-    function abortRequest() {
+    const abortRequest = () => {
       xhr.abort();
-    }
+    };
 
     xhr.onreadystatechange = () => {
       handleHeaders();
@@ -1199,7 +1194,7 @@ async function runScenario(requestedLoopCount = 1) {
           break;
         }
       }
-    })), { concurrency: "unbounded" }));
+    })), { concurrency: Math.max(1, panelsWithModels.length) }));
   }
   activeLoopProgress.value = null;
   stoppedPanels.clear();
@@ -1264,14 +1259,14 @@ function onTap() {
     longPressFired = false;
     return;
   }
-  runScenario();
+  void runScenario();
 }
 
 function runLoop() {
   if (!loopCountValid.value) return;
   loopCount.value = parsedLoopCount.value;
   loopDialogOpen.value = false;
-  runScenario(parsedLoopCount.value);
+  void runScenario(parsedLoopCount.value);
 }
 
 
@@ -1369,8 +1364,8 @@ async function copyError(panelId: string) {
     copyError,
     error,
     labelOf,
-    extractMessageText: Content.message,
-    extractImageUrls: Content.images,
-    formatToolArguments: ToolCalls.format,
+    extractMessageText: (content: ScenarioMessage["content"]) => Content.message(content),
+    extractImageUrls: (content: ScenarioMessage["content"]) => Content.images(content),
+    formatToolArguments: (argumentsText: string) => ToolCalls.format(argumentsText),
   };
 }

@@ -2,6 +2,7 @@ import type { Provider, ProviderAccount } from "@opendum/providers";
 import { Coerce } from "@opendum/api/core/helpers";
 import { tierFor } from "@opendum/api/core/tiers";
 import type { ProviderRoutingOptions, ProviderScore } from "@opendum/api/core/provider-performance";
+import { compareText } from "@opendum/models/compare";
 
 export const AUTHLESS_ACCOUNT_PREFIX = "authless:";
 export const IDLE_DECAY_MS = 10 * 60 * 1000;
@@ -18,7 +19,8 @@ export function accessMode(mode: string): string {
 }
 
 export function normalizeIds(values: string[]): string[] {
-  return [...new Set(values.map((v) => v.trim()).filter((v) => v.length > 0))].sort((a, b) => a.localeCompare(b));
+  const trimmed = values.map((v) => v.trim());
+  return [...new Set(trimmed.filter((v) => v.length > 0))].sort((a, b) => compareText(a, b));
 }
 
 export function accessDenial(
@@ -163,19 +165,23 @@ export function byPerformance(
   if (!routing) return base;
 
   const scored = present
-    .map((provider) => ({ provider, score: routing.scores.get(provider)?.score ?? Number.NaN }))
-    .filter((entry) => Number.isFinite(entry.score))
+    .flatMap((provider) => {
+      const score = routing.scores.get(provider)?.score;
+      return typeof score === "number" && Number.isFinite(score) ? [{ provider, score }] : [];
+    })
     .sort((a, b) => a.score - b.score);
   if (scored.length === 0) return base;
 
-  const threshold = scored[0]!.score * (1 + routing.bufferRatio);
+  const best = scored[0];
+  if (!best) return base;
+  const threshold = best.score * (1 + routing.bufferRatio);
   const pool = scored.filter((entry) => entry.score <= threshold).map((entry) => entry.provider);
   const poolSet = new Set(pool);
   const rest = base.filter((provider) => !poolSet.has(provider));
 
   const explore = rest.length > 0 && random() < routing.explorationRate;
   const head = explore
-    ? rest[Math.min(rest.length - 1, Math.floor(random() * rest.length))]!
+    ? rest[Math.min(rest.length - 1, Math.floor(random() * rest.length))]
     : weightedPick(pool, routing.scores, random);
   if (!head) return base;
 
@@ -198,9 +204,10 @@ function weightedPick(providers: string[], scores: Map<string, ProviderScore>, r
   let cursor = random() * total;
   for (let index = 0; index < providers.length; index += 1) {
     cursor -= weights[index] ?? 0;
-    if (cursor <= 0) return providers[index]!;
+    const provider = providers[index];
+    if (cursor <= 0 && provider !== undefined) return provider;
   }
-  return providers[providers.length - 1]!;
+  return providers[providers.length - 1] ?? "";
 }
 
 export function paidFirst(accounts: ProviderAccount[]): ProviderAccount[] {

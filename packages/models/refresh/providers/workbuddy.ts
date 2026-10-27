@@ -10,6 +10,7 @@ import { fetchJson } from "@opendum/models/sync/http";
 import { causeMessage } from "@opendum/models/refresh/core/failure";
 import type { ModelFetchFailure, ModelTimeoutFailure } from "@opendum/models/errors";
 import { sourceOf, type ModelSource, type SourceContext, type SourceResult } from "@opendum/models/refresh/core/types";
+import { compareText } from "@opendum/models/compare";
 
 const PROVIDER = "workbuddy";
 const NPM_PACKAGE = "@tencent-ai/codebuddy-code";
@@ -128,7 +129,7 @@ export const workbuddySource: ModelSource = {
         if (models.size < MIN_EXPECTED_MODELS) {
           console.warn(`[WorkBuddy] only ${models.size} models (expected >= ${MIN_EXPECTED_MODELS})`);
         }
-        const sorted = new Map([...models.entries()].sort(([left], [right]) => left.localeCompare(right)));
+        const sorted = new Map([...models.entries()].sort(([left], [right]) => compareText(left, right)));
         return { ...sourceOf(sorted), extra: new Map([["reasoning", reasoning]]) };
       }),
       Effect.catchTags({

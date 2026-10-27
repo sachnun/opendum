@@ -1,4 +1,5 @@
 import type { Registry } from "@opendum/models/runtime";
+import { compareText } from "@opendum/models/compare";
 
 export function parseModel(modelParam: string): [string | null, string] {
   const index = modelParam.indexOf("/");
@@ -11,7 +12,8 @@ export function accessMode(mode: string): string {
 }
 
 export function accountList(values: string[]): string[] {
-  return uniqueSorted(values.map((value) => value.trim()).filter((value) => value.length > 0));
+  const trimmed = values.map((value) => value.trim());
+  return uniqueSorted(trimmed.filter((value) => value.length > 0));
 }
 
 export function modelList(registry: Registry, values: string[]): string[] {
@@ -57,5 +59,5 @@ function providerAlias(provider: string): string {
 }
 
 function uniqueSorted(values: string[]): string[] {
-  return [...new Set(values.filter((value) => value.length > 0))].sort((a, b) => a.localeCompare(b));
+  return [...new Set(values.filter((value) => value.length > 0))].sort((a, b) => compareText(a, b));
 }

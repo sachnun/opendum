@@ -2,6 +2,7 @@ import { Payload, Value } from "@opendum/providers/core/helpers";
 import { ToolNames, anySlice, mapSlice, type Json } from "@opendum/providers/upstreams/antigravity/common";
 import { GeminiTier } from "@opendum/providers/upstreams/antigravity/model";
 import { GeminiSchema } from "@opendum/providers/upstreams/antigravity/transform";
+import { compareText } from "@opendum/models/compare";
 
 const TOOL_ARTIFACT_MARKER = /^\s*(Tool:\s*\w+|(?:thought|think)\s*:)/i;
 
@@ -136,7 +137,7 @@ export class GeminiPayload {
       const tool = rawTool as Json;
       const decls = anySlice(tool.functionDeclarations);
       if (decls.length <= 1) continue;
-      decls.sort((a, b) => Value.string((a as Json).name).localeCompare(Value.string((b as Json).name)));
+      decls.sort((a, b) => compareText(Value.string((a as Json).name), Value.string((b as Json).name)));
       tool.functionDeclarations = decls;
     }
   }

@@ -1,3 +1,4 @@
+import { compareText } from "@opendum/models/compare";
 export const MODELSDEV_CANONICAL_URL = "https://models.dev/models.json";
 
 export const PROVIDER_TO_MODELSDEV: Readonly<Record<string, string>> = {
@@ -54,7 +55,7 @@ function asString(value: unknown): string | undefined {
 }
 
 export function canonicalKey(value: unknown): string {
-  return String(value ?? "")
+  return (typeof value === "string" ? value : "")
     .toLowerCase()
     .replace(/^library\//, "")
     .replace(VARIANT_SUFFIX, "")
@@ -122,7 +123,7 @@ export function canonicalIndex(sources: CanonicalSources): CanonicalIndex {
   const rawModels = asRecord(sources.models);
   if (rawModels) {
     const ordered = Object.keys(rawModels).sort(
-      (left, right) => left.length - right.length || left.localeCompare(right),
+      (left, right) => left.length - right.length || compareText(left, right),
     );
     for (const id of ordered) {
       const record = asRecord(rawModels[id]);
@@ -248,9 +249,10 @@ export function resolveFrom(
   const groups = [probes, options.fallbackProbes ?? []];
 
   for (const group of groups) {
-    const values = [...group]
-      .map((probe) => (typeof probe === "string" ? probe.trim() : ""))
-      .filter((probe) => probe.length > 0 && probeVariants(probe).length > 0);
+    const values = [...group].flatMap((probe) => {
+      const trimmed = typeof probe === "string" ? probe.trim() : "";
+      return trimmed.length > 0 && probeVariants(trimmed).length > 0 ? [trimmed] : [];
+    });
     if (values.length === 0) continue;
 
     for (const probe of values) {
