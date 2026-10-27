@@ -1,8 +1,6 @@
 {
   "id": "nemotron-3-super-120b-a12b",
   "providers": [
-    "kilo_code",
-    "openrouter",
     "workers_ai",
     "nvidia_nim"
   ],
@@ -45,20 +43,10 @@
     }
   },
   "providerConfig": {
-    "kilo_code": {
-      "upstream": "nvidia/nemotron-3-super-120b-a12b:free",
-      "contextWindow": 262144,
-      "maxOutputTokens": 235929
-    },
     "nvidia_nim": {
       "upstream": "nvidia/nemotron-3-super-120b-a12b",
       "contextWindow": 262144,
       "maxOutputTokens": 262144
-    },
-    "openrouter": {
-      "upstream": "nvidia/nemotron-3-super-120b-a12b:free",
-      "contextWindow": 262144,
-      "maxOutputTokens": 235929
     },
     "workers_ai": {
       "upstream": "@cf/nvidia/nemotron-3-120b-a12b",
