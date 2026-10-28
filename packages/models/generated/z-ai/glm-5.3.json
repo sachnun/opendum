@@ -1,8 +1,7 @@
 {
   "providers": [
     "hyper",
-    "workbuddy",
-    "nvidia_nim"
+    "workbuddy"
   ],
   "reasoning": true,
   "reasoning_effort": [
@@ -38,11 +37,6 @@
     "hyper": {
       "contextWindow": 1000000,
       "maxOutputTokens": 128000
-    },
-    "nvidia_nim": {
-      "upstream": "z-ai/glm-5.3",
-      "contextWindow": 1048576,
-      "maxOutputTokens": 131072
     },
     "workbuddy": {
       "contextWindow": 1048576,

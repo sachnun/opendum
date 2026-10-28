@@ -14,7 +14,7 @@ export function codexQuota(
   const headers: Record<string, string> = {
     Authorization: `Bearer ${accessToken}`,
     Accept: "application/json",
-    "User-Agent": `opencode/1.19.4 (${process.platform} ${process.platform}; ${process.arch})`,
+    "User-Agent": `opencode/1.19.5 (${process.platform} ${process.platform}; ${process.arch})`,
     Origin: "https://chatgpt.com",
     Referer: "https://chatgpt.com/",
     originator: "opencode",

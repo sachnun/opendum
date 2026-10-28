@@ -306,7 +306,7 @@ export class CodexProvider extends OAuthProvider {
       "Content-Type": "application/json",
       Accept: "text/event-stream",
       originator: CODEX_ORIGINATOR,
-      "User-Agent": `opencode/1.19.4 (${process.platform} ${process.platform}; ${process.arch})`,
+      "User-Agent": `opencode/1.19.5 (${process.platform} ${process.platform}; ${process.arch})`,
     };
     if (accountId) headers["ChatGPT-Account-Id"] = accountId;
     const sessionId = Value.string(request.body._sessionId);
