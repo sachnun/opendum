@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { PROVIDER_ACCOUNT_DEFINITIONS } from "@opendum/providers/provider-accounts";
 import { compareText } from "@opendum/models/compare";
+import { Routes } from "~~/lib/routes";
 
-definePageMeta({ layout: "web" });
+definePageMeta({ layout: "web", alias: Routes.accounts });
 
 const route = useRoute();
 const redirectTarget = computed(() => {

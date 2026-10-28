@@ -70,7 +70,7 @@ describe("auth users", () => {
 
 describe("sign in handoff", () => {
   it("keeps relative redirects only", () => {
-    expect(safePath("/keys?tab=models")).toBe("/keys?tab=models");
+    expect(safePath("/api-keys?tab=models")).toBe("/api-keys?tab=models");
     expect(safePath("//evil.example.com")).toBeNull();
     expect(safePath("https://evil.example.com")).toBeNull();
     expect(safePath(undefined)).toBeNull();
@@ -79,30 +79,30 @@ describe("sign in handoff", () => {
   it("accepts any absolute web origin", () => {
     expect(webOrigin("https://app.example.com/")).toBe("https://app.example.com");
     expect(webOrigin("http://localhost:3000/auth/callback?tab=models")).toBe("http://localhost:3000");
-    expect(webOrigin("https://app.example.com:8443/keys")).toBe("https://app.example.com:8443");
+    expect(webOrigin("https://app.example.com:8443/api-keys")).toBe("https://app.example.com:8443");
     expect(webOrigin("javascript:alert(1)")).toBeNull();
     expect(webOrigin("not-a-url")).toBeNull();
     expect(webOrigin(undefined)).toBeNull();
   });
 
   it("builds the oauth callback url", () => {
-    const url = new URL(handoffUrl("https://api.example.com", { to: "https://app.example.com", redirect: "/keys" }));
+    const url = new URL(handoffUrl("https://api.example.com", { to: "https://app.example.com", redirect: "/api-keys" }));
 
     expect(url.origin).toBe("https://api.example.com");
     expect(url.pathname).toBe("/api/auth/handoff");
     expect(url.searchParams.get("to")).toBe("https://app.example.com");
-    expect(url.searchParams.get("redirect")).toBe("/keys");
+    expect(url.searchParams.get("redirect")).toBe("/api-keys");
   });
 
   it("hands tokens to the app in the url fragment", () => {
-    const url = loginUrl("https://app.example.com", { token: "access", session: "session", redirect: "/keys" });
+    const url = loginUrl("https://app.example.com", { token: "access", session: "session", redirect: "/api-keys" });
 
     expect(url.startsWith("https://app.example.com/auth/callback#")).toBe(true);
 
     const fragment = new URLSearchParams(url.split("#")[1]);
     expect(fragment.get("token")).toBe("access");
     expect(fragment.get("session")).toBe("session");
-    expect(fragment.get("redirect")).toBe("/keys");
+    expect(fragment.get("redirect")).toBe("/api-keys");
   });
 
   it("sends errors back to the login screen", () => {

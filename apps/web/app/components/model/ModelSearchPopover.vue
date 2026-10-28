@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { labelOf } from "@opendum/providers/provider-accounts";
 import type { ModelSearchItem } from "~~/lib/api-types";
+import { Routes } from "~~/lib/routes";
 
 type ModelListItem = ModelSearchItem;
 
@@ -136,7 +137,7 @@ async function selectModel(model: ModelListItem) {
   searchInput.value?.blur();
   closeSuggestions();
   await navigateTo({
-    path: "/models",
+    path: Routes.models,
     hash: `#model-${encodeURIComponent(model.id)}`,
   });
 }

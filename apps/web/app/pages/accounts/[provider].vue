@@ -3,9 +3,10 @@ import { compareText } from "@opendum/models/compare";
 import type { ActionResult, CustomListItem, CustomModelRow, ErrorHistoryResult, AccountUpdateData, ProviderDetailData, ProviderStats, QuotaGroupDisplay, QuotaProviderKey } from "~~/lib/api-types";
 import { decodeHash, settle } from "~~/lib/settle";
 import type { AccountsData, UsageData } from "@opendum/providers/contract";
-import { BY_KEY, providerOf, QUOTA_PROVIDER_KEYS, type ProviderAccountKey } from "@opendum/providers/provider-accounts";
+import { accountPath, BY_KEY, providerOf, QUOTA_PROVIDER_KEYS, type ProviderAccountKey } from "@opendum/providers/provider-accounts";
 import { COMMON_HEADER_NAMES } from "~~/lib/headers";
 import { messageOf } from "~~/lib/utils";
+import { parentRoute } from "~~/lib/routes";
 
 definePageMeta({
   middleware: ["provider", "auth"],
@@ -57,7 +58,7 @@ const providerSlug = computed(() => providerMeta.value?.slug ?? selectedProvider
 const providerNotFound = computed(() => !providerMeta.value && customProvidersData.value !== undefined);
 
 watch(providerNotFound, (value) => {
-  if (value) void navigateTo("/", { replace: true });
+  if (value) void navigateTo(parentRoute(route.path), { replace: true });
 }, { immediate: true });
 
 type Account = ProviderDetailData["accounts"][number];
@@ -270,7 +271,7 @@ watch(
     accountElement?.scrollIntoView({ block: "center", behavior: "smooth" });
 
     setTimeout(() => {
-      if (route.path === `/${providerSlug.value}` && hashAccount(route.hash) === accountId) {
+      if (route.path === accountPath(providerSlug.value) && hashAccount(route.hash) === accountId) {
         if (typeof window !== "undefined") {
           window.history.replaceState(window.history.state, "", route.path);
         }
@@ -869,7 +870,7 @@ async function deleteProvider() {
   deleteOpen.value = false;
   settingsOpen.value = false;
   await refreshCustomProviders();
-  await navigateTo("/");
+  await navigateTo(parentRoute(route.path));
 }
 
 function hashAccount(hash: string): string | null {

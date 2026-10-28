@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { AccountOverviewData } from "~~/lib/api-types";
+import { accountPath } from "@opendum/providers/provider-accounts";
 
 type ProviderOverview = AccountOverviewData["summaries"][string];
 type StatDeltaTone = "positive" | "negative" | "neutral";
@@ -189,7 +190,7 @@ function pinnedToggled(providerKey: string, pinned: boolean) {
 
 <template>
   <UiCard class="group relative h-full gap-3 border-transparent bg-transparent p-0 shadow-none transition-colors">
-    <NuxtLink :to="`/${provider.slug}`" class="absolute inset-0 z-10 rounded-lg outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50" :aria-label="`Open ${provider.label} accounts`" />
+    <NuxtLink :to="accountPath(provider.slug)" class="absolute inset-0 z-10 rounded-lg outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50" :aria-label="`Open ${provider.label} accounts`" />
 
     <div class="pointer-events-none relative z-20 flex items-start justify-between gap-2">
       <div class="flex items-center gap-1">

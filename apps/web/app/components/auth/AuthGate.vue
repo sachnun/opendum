@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import { Routes } from "~~/lib/routes";
+
 const route = useRoute();
 const { isAuthenticated } = useAuth();
 
-const isCallback = computed(() => route.path === "/auth/callback");
+const isCallback = computed(() => route.path === Routes.authCallback);
 </script>
 
 <template>

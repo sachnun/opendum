@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import { parentRoute } from "~~/lib/routes";
+
 definePageMeta({
   layout: false,
   middleware: [
-    () => navigateTo("/", { replace: true, redirectCode: 301 }),
+    (to) => navigateTo({ path: parentRoute(to.path), query: to.query, hash: to.hash }, { replace: true }),
   ],
 });
 </script>

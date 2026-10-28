@@ -38,6 +38,7 @@ import {
   type StatMetric,
 } from "~~/lib/account-format";
 import { percentRemaining, resetTitle } from "~~/lib/quota-display";
+import { Routes } from "~~/lib/routes";
 
 import type { AccountQuotaInfo, ErrorHistoryResult, AccountUpdateData, ProviderDetailData, QuotaGroupDisplay } from "~~/lib/api-types";
 import { QUOTA_PROVIDER_KEYS } from "@opendum/providers/provider-accounts";
@@ -353,7 +354,7 @@ const errorPlaygroundRoute = computed(() => {
     addParams(query, params);
   }
 
-  return { path: "/play", query };
+  return { path: Routes.playground, query };
 });
 const hasPrevious = computed(() => activeErrorIndex.value < allPreviewEntries.value.length - 1);
 const hasNewer = computed(() => activeErrorIndex.value > 0);
@@ -732,7 +733,7 @@ function cancelDrag() {
               <UiButton variant="outline" size="sm" :disabled="readonly" :aria-label="`Delete ${accountTitle}`" @click="deleteDialogOpen = true"><UiIcon name="i-lucide-trash-2" class="size-3 text-destructive" /></UiButton>
             </UiTooltip>
             <UiTooltip text="Playground">
-              <NuxtLink :to="`/play?accountId=${account.id}`">
+              <NuxtLink :to="{ path: Routes.playground, query: { accountId: account.id } }">
                 <UiButton variant="outline" size="sm"><UiIcon name="i-lucide-flask-conical" class="size-3" /></UiButton>
               </NuxtLink>
             </UiTooltip>

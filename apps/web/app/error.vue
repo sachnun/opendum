@@ -1,8 +1,11 @@
 <script setup lang="ts">
-const route = useRoute();
+import { parentRoute } from "~~/lib/routes";
 
-if (route.path !== "/") {
-  await clearError({ redirect: "/" });
+const route = useRoute();
+const parent = parentRoute(route.path);
+
+if (parent !== route.path) {
+  await clearError({ redirect: parent });
 } else {
   clearError();
 }

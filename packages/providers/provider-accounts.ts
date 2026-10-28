@@ -1,5 +1,5 @@
 import type { AuthMethod, ProviderSpec } from "@opendum/providers/core/spec";
-import { BY_KEY, BY_SLUG, SPECS } from "@opendum/providers/registry-specs";
+import { accountPath, BY_KEY, BY_SLUG, SPECS } from "@opendum/providers/registry-specs";
 
 export type { AuthMethod as AuthMethodKey, ProviderCategory } from "@opendum/providers/core/spec";
 export type ProviderAccountDefinition = ProviderSpec;
@@ -27,14 +27,10 @@ export type DeviceProviderKey = string;
 export type KeyProvider = string;
 export type QuotaProviderKey = string;
 
-export { BY_KEY, BY_SLUG };
+export { accountPath, BY_KEY, BY_SLUG };
 
 export function labelOf(provider: string): string {
   return BY_KEY[provider]?.label ?? provider;
-}
-
-export function accountPath(provider: string): string {
-  return `/${BY_KEY[provider]?.slug ?? provider}`;
 }
 
 export function hrefMap<V>(data: Record<string, V>): Record<string, V> {

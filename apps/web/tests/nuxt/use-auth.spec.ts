@@ -181,11 +181,11 @@ describe("useAuth", () => {
   it("builds the sign in url with a relative redirect only", () => {
     const auth = useAuth();
 
-    const url = new URL(auth.loginUrl("github", "/keys?tab=models"));
+    const url = new URL(auth.loginUrl("github", "/api-keys?tab=models"));
     expect(url.origin + url.pathname).toBe("https://api.example.com/api/auth/start");
     expect(url.searchParams.get("provider")).toBe("github");
     expect(url.searchParams.get("to")).toBe(window.location.origin);
-    expect(url.searchParams.get("redirect")).toBe("/keys?tab=models");
+    expect(url.searchParams.get("redirect")).toBe("/api-keys?tab=models");
 
     expect(new URL(auth.loginUrl("google", "https://evil.example.com")).searchParams.get("redirect")).toBeNull();
   });

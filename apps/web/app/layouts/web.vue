@@ -12,6 +12,7 @@ import type { AccountsData, ModelsData, UsageData } from "@opendum/providers/con
 import { isSwitch, primaryNavigation, hrefOf, type NavItem, type NavSubItem, type ProviderAccountIndicator } from "~~/lib/navigation";
 import type { AccountOverviewData, MeData } from "~~/lib/api-types";
 import { hrefMap, accountPath, PROVIDER_ACCOUNT_DEFINITIONS } from "@opendum/providers/provider-accounts";
+import { isHome, Routes } from "~~/lib/routes";
 import { avatarUrl } from "~~/lib/utils";
 import { compareText } from "@opendum/models/compare";
 
@@ -52,7 +53,7 @@ const supportNavigation = computed<NavItem[]>(() => [
       { name: "Card", href: "/tools/card", disabled: true, tag: "soon" },
     ],
   },
-  { name: "Playground", href: "/play", icon: "i-lucide-flask-conical" },
+  { name: "Playground", href: Routes.playground, icon: "i-lucide-flask-conical" },
 ]);
 const PROVIDER_AVAILABILITY_ORDER = { active: 0, inactive: 1 } as const;
 const PROVIDER_STATUS_ORDER = { error: 0, warning: 1, normal: 2 } as const;
@@ -65,13 +66,13 @@ const { models: liveModels } = useEventStream({
   onModels: applyModels,
   onUsage: applyUsage,
 });
-const accountsNavigationHref = "/";
+const accountsNavigationHref = Routes.home;
 const { data: accountsOverviewData } = useNuxtData<AccountOverviewData>(dataKeys.accountsOverview);
 const { data: customProvidersData } = useAsyncData(dataKeys.customProviders, () => api.customProviders.list());
 const customProviders = computed(() => customProvidersData.value ?? []);
 const hrefByKey = computed<Record<string, string>>(() => Object.fromEntries([
   ...PROVIDER_ACCOUNT_DEFINITIONS.map((definition) => [definition.key, accountPath(definition.key)]),
-  ...customProviders.value.map((provider) => [provider.slug, `/${provider.slug}`]),
+  ...customProviders.value.map((provider) => [provider.slug, accountPath(provider.slug)]),
 ]));
 const navigation = computed<NavItem[]>(() => primaryNavigation.map((item) => item.href === accountsNavigationHref
   ? {
@@ -80,7 +81,7 @@ const navigation = computed<NavItem[]>(() => primaryNavigation.map((item) => ite
         ...[...PROVIDER_ACCOUNT_DEFINITIONS]
           .sort((a, b) => (a.navOrder ?? Number.MAX_SAFE_INTEGER) - (b.navOrder ?? Number.MAX_SAFE_INTEGER))
           .map((definition) => ({ name: definition.label, href: accountPath(definition.key) })),
-        ...customProviders.value.map((provider) => ({ name: provider.name, href: `/${provider.slug}` })),
+        ...customProviders.value.map((provider) => ({ name: provider.name, href: accountPath(provider.slug) })),
       ],
     }
   : item));
@@ -132,7 +133,7 @@ function applyModels(data: ModelsData): void {
   invalidation.patchModels(data.list);
 }
 
-const isOverviewRoute = computed(() => route.path === accountsNavigationHref);
+const isOverviewRoute = computed(() => isHome(route.path));
 
 const { data: accountSummaryData } = useAsyncData(dataKeys.shellAccounts, async (): Promise<ShellAccountSummary> => {
   if (isOverviewRoute.value) {
@@ -167,14 +168,14 @@ const countByHref = computed<Record<string, number>>(() => ({ ...hrefMap(account
 const indicatorByHref = computed<Record<string, ProviderAccountIndicator>>(() => ({ ...hrefMap(accountIndicators.value), ...customCounts(accountIndicators.value) }));
 const accountNavigationHrefs = computed(() => new Set([
   ...PROVIDER_ACCOUNT_DEFINITIONS.map((definition) => accountPath(definition.key)),
-  ...customProviders.value.map((provider) => `/${provider.slug}`),
+  ...customProviders.value.map((provider) => accountPath(provider.slug)),
 ]));
 
 function customCounts<V>(counts: Record<string, V>): Record<string, V> {
   const result: Record<string, V> = {};
   for (const provider of customProviders.value) {
     const value = counts[provider.slug];
-    if (value !== undefined) result[`/${provider.slug}`] = value;
+    if (value !== undefined) result[accountPath(provider.slug)] = value;
   }
   return result;
 }
@@ -221,8 +222,8 @@ const sheetOverlayStyle = computed(() => {
 });
 
 function isActive(href: string) {
-  if (href === accountsNavigationHref && accountNavigationHrefs.value.has(route.path)) return true;
-  return route.path === href || (href !== "/" && route.path.startsWith(href));
+  if (href === accountsNavigationHref) return isHome(route.path) || accountNavigationHrefs.value.has(route.path);
+  return route.path === href || route.path.startsWith(href);
 }
 
 function accountsItem(item: NavItem) {
@@ -272,7 +273,7 @@ function subItems(item: NavItem) {
       });
   }
 
-  if (item.href === "/models") {
+  if (item.href === Routes.models) {
     return item.children.filter((subItem) => subItem.anchorId ? (modelFamilyCounts.value[subItem.anchorId] ?? 0) > 0 : true);
   }
 

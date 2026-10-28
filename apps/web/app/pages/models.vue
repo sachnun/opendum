@@ -7,6 +7,7 @@ import { dayKeys, emptyStats, hourKeys, LOOKBACK_HOURS, MODEL_STATS_DAYS, type M
 import { costEntries, costPoints, type ModelCost } from "~~/lib/model-cost";
 import type { UsageData } from "@opendum/providers/contract";
 import { labelOf } from "@opendum/providers/provider-accounts";
+import { Routes } from "~~/lib/routes";
 
 definePageMeta({ middleware: "auth", layout: "web" });
 
@@ -295,8 +296,8 @@ watch(
       highlightTimer = null;
     }, HIGHLIGHT_DURATION_MS);
 
-    if (route.path === "/models" && typeof window !== "undefined") {
-      window.history.replaceState(window.history.state, "", "/models");
+    if (route.path === Routes.models && typeof window !== "undefined") {
+      window.history.replaceState(window.history.state, "", Routes.models);
     }
   },
   { immediate: true }
@@ -342,11 +343,11 @@ watch(
                   <UiMarquee :text="model.id" class="flex-1 font-mono text-sm font-semibold leading-5" />
                 </button>
                 <div class="mt-0.5 flex shrink-0 items-center gap-1.5">
-                  <NuxtLink v-if="!isLinked(model)" :to="`/play?model=${encodeURIComponent(model.id)}&compare=auto`" class="inline-flex size-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground" aria-label="Try in Playground">
+                  <NuxtLink v-if="!isLinked(model)" :to="{ path: Routes.playground, query: { model: model.id, compare: 'auto' } }" class="inline-flex size-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground" aria-label="Try in Playground">
                     <UiIcon name="i-lucide-flask-conical" class="size-3" />
                   </NuxtLink>
                   <UiTooltip v-else text="Playground">
-                    <NuxtLink :to="`/play?model=${encodeURIComponent(model.id)}&compare=auto`" class="inline-flex size-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground" aria-label="Try in Playground">
+                    <NuxtLink :to="{ path: Routes.playground, query: { model: model.id, compare: 'auto' } }" class="inline-flex size-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground" aria-label="Try in Playground">
                       <UiIcon name="i-lucide-flask-conical" class="size-3" />
                     </NuxtLink>
                   </UiTooltip>

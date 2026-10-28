@@ -57,7 +57,7 @@ export function labelOf(provider: string): string {
 }
 
 export function accountPath(provider: string): string {
-  return `/${slugOf(provider)}`;
+  return `/accounts/${slugOf(provider)}`;
 }
 
 export function providerOf(slug: string): string | null {

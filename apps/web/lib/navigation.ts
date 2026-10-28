@@ -1,5 +1,6 @@
 import { NAV_ITEMS } from "@opendum/models/ranking";
 import { accountPath, PROVIDER_ACCOUNT_DEFINITIONS } from "@opendum/providers/provider-accounts";
+import { Routes } from "~~/lib/routes";
 
 export interface NavItem {
   name: string;
@@ -35,25 +36,25 @@ const ACCOUNT_NAV_CHILDREN: NavSubItem[] = [...PROVIDER_ACCOUNT_DEFINITIONS]
 export const primaryNavigation: NavItem[] = [
   {
     name: "Accounts",
-    href: "/",
+    href: Routes.home,
     icon: "i-lucide-user",
     children: ACCOUNT_NAV_CHILDREN,
   },
   {
     name: "API Keys",
-    href: "/keys",
+    href: Routes.apiKeys,
     icon: "i-lucide-key",
     children: [
-      { name: "Sharing", href: "/keys", control: "switch" },
+      { name: "Sharing", href: Routes.apiKeys, control: "switch" },
     ],
   },
   {
     name: "Models",
-    href: "/models",
+    href: Routes.models,
     icon: "i-lucide-cpu",
     children: NAV_ITEMS.map((family) => ({
       name: family.name,
-      href: "/models",
+      href: Routes.models,
       anchorId: family.anchorId,
     })),
   },
