@@ -1,8 +1,8 @@
 import { Effect, Result } from "effect";
-import { Value, Ids, Responses } from "@opendum/providers/core/helpers";
-import { RequestFailure } from "@opendum/providers/core/http";
-import { OAuth } from "@opendum/providers/core/oauth";
-import { OAuthProvider, type ProviderOptions } from "@opendum/providers/core/provider";
+import { Value, Ids, Responses } from "@opendum/providers/helpers";
+import { RequestFailure } from "@opendum/providers/http";
+import { OAuth } from "@opendum/providers/oauth";
+import { OAuthProvider, type ProviderOptions } from "@opendum/providers/provider";
 import { REFRESH_ENDPOINT as KIRO_REFRESH_ENDPOINT } from "@opendum/providers/auth/kiro/constants";
 import {
   BracketCalls,

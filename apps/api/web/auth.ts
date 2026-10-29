@@ -1,5 +1,5 @@
 import { Effect, Result } from "effect";
-import { raise } from "@opendum/core/raise";
+import { raise } from "@opendum/platform/raise";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { admin, bearer, jwt } from "better-auth/plugins";

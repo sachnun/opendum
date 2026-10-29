@@ -1,9 +1,9 @@
 import { Effect, Option, Schema } from "effect";
-import { raise } from "@opendum/models/refresh/core/raise";
-import { causeMessage } from "@opendum/models/refresh/core/failure";
+import { raise } from "@opendum/models/refresh/sources/raise";
+import { causeMessage } from "@opendum/models/refresh/sources/failure";
 import { fetchDecoded, fetchText } from "@opendum/models/sync/http";
-import { entryFor, writeEntry } from "@opendum/models/refresh/core/keys";
-import { sourceOf, type ModelSource, type SourceResult } from "@opendum/models/refresh/core/types";
+import { entryFor, writeEntry } from "@opendum/models/refresh/sources/keys";
+import { sourceOf, type ModelSource, type SourceResult } from "@opendum/models/refresh/sources/types";
 
 const MODELS_URL =
   "https://raw.githubusercontent.com/openai/codex/main/codex-rs/models-manager/models.json";

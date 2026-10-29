@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 import type { DatabaseFailure } from "@opendum/database";
-import { hashString } from "@opendum/core/crypto";
+import { hashString } from "@opendum/platform/crypto";
 import type { Registry } from "@opendum/models/runtime";
 import {
   deactivateAPIKey,

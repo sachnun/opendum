@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
 import { ANTIGRAVITY_TOKEN_ENDPOINT } from "@opendum/providers/auth/antigravity/constants";
-import type { UpstreamTransport } from "@opendum/providers/core/http";
+import type { UpstreamTransport } from "@opendum/providers/http";
 import type { ProviderAccount } from "@opendum/providers/types";
 import { AntigravityProvider } from "@opendum/providers/upstreams/antigravity/index";
 

@@ -1,10 +1,10 @@
 import { Effect, Match, Option, Schema } from "effect";
-import { raise } from "@opendum/models/refresh/core/raise";
+import { raise } from "@opendum/models/refresh/sources/raise";
 import { idMap } from "@opendum/models/model-store";
 import { fetchDecoded } from "@opendum/models/sync/http";
 import { arrayAt, asRecord, stringAt, trimmed } from "@opendum/models/json";
-import { slashedKey } from "@opendum/models/refresh/core/keys";
-import { sourceOf, type ModelSource, type SourceResult } from "@opendum/models/refresh/core/types";
+import { slashedKey } from "@opendum/models/refresh/sources/keys";
+import { sourceOf, type ModelSource, type SourceResult } from "@opendum/models/refresh/sources/types";
 import { compareText } from "@opendum/models/compare";
 
 const MODELS_URL = "https://openrouter.ai/api/v1/models";

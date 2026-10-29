@@ -1,7 +1,7 @@
 import { Effect } from "effect";
 import { quotaJson, putQuota, type QuotaJsonResult } from "@opendum/providers/quota/cache";
-import { asError } from "@opendum/providers/core/errors";
-import { Value } from "@opendum/providers/core/values";
+import { asError } from "@opendum/providers/errors";
+import { Value } from "@opendum/providers/values";
 import { errorInfo, expiredInfo } from "@opendum/providers/quota/helpers";
 import type { AccountQuotaInfo, QuotaAccount, QuotaContext } from "@opendum/providers/quota/types";
 

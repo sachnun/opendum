@@ -3,7 +3,7 @@ import { Effect, Exit } from "effect";
 
 import { ServiceFailure, asFailure, badRequest, forbidden, internal, notFound, unauthorized, unavailable } from "@opendum/api/web/errors";
 import { fromPromise, fromSync, toResult, toVoid, withContext } from "@opendum/api/web/lib/task";
-import { raise } from "@opendum/core/raise";
+import { raise } from "@opendum/platform/raise";
 
 describe("web errors", () => {
   it("maps status codes to tagged failures", () => {

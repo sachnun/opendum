@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import { passthrough, passthroughStream } from "@opendum/api/core/stream";
-import { protocolStream } from "@opendum/api/core/protocol-stream";
-import type { ResponseContext, StreamRecorder, UsageCounts } from "@opendum/api/core/types";
+import { passthrough, passthroughStream } from "@opendum/api/proxy/stream";
+import { protocolStream } from "@opendum/api/proxy/protocol-stream";
+import type { ResponseContext, StreamRecorder, UsageCounts } from "@opendum/api/proxy/types";
 
 function sseResponse(chunks: string[]): Response {
   const encoder = new TextEncoder();

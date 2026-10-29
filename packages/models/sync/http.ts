@@ -1,5 +1,5 @@
 import { Duration, Effect, Schedule } from "effect";
-import { raise } from "@opendum/models/refresh/core/raise";
+import { raise } from "@opendum/models/refresh/sources/raise";
 
 import {
   ModelFetchFailure,

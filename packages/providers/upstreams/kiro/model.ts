@@ -1,5 +1,5 @@
 import type { Registry } from "@opendum/models/runtime";
-import { ModelName } from "@opendum/providers/core/identity";
+import { ModelName } from "@opendum/providers/identity";
 import type { ProviderAccount } from "@opendum/providers/types";
 import { KIRO_REGION } from "@opendum/providers/auth/kiro/constants";
 

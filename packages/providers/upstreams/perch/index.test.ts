@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
 import { PERCH_APP_URL, PERCH_CONFIG_PATH } from "@opendum/providers/auth/perch/constants";
-import type { UpstreamTransport } from "@opendum/providers/core/http";
+import type { UpstreamTransport } from "@opendum/providers/http";
 import type { ProviderAccount } from "@opendum/providers/types";
 import { PerchProvider } from "@opendum/providers/upstreams/perch/index";
 import { PerchCompletion } from "@opendum/providers/upstreams/perch/stream";

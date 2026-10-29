@@ -6,14 +6,14 @@ import {
   SHARED_ACCOUNT_SCOPE,
   affinityKey,
   type OpendumRedis,
-} from "@opendum/core/redis";
+} from "@opendum/platform/redis";
 import type { ProviderAccount, ProviderRegistry } from "@opendum/providers";
 import type { Registry } from "@opendum/models/runtime";
-import type { Health } from "@opendum/api/core/health";
-import type { ProviderPerformance } from "@opendum/api/core/provider-performance";
-import { Rotation } from "@opendum/api/core/rotation";
+import type { Health } from "@opendum/api/proxy/health";
+import type { ProviderPerformance } from "@opendum/api/proxy/provider-performance";
+import { Rotation } from "@opendum/api/proxy/rotation";
 import { fakes } from "@opendum/api/test/fakes";
-import { raise } from "@opendum/core/raise";
+import { raise } from "@opendum/platform/raise";
 
 function memoryRedis(fail = false): { redis: OpendumRedis; store: Map<string, string> } {
   const store = new Map<string, string>();

@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import { parseJson } from "@opendum/core/json";
+import { parseJson } from "@opendum/platform/json";
 import { db, pinnedProvider, accountModelHealth } from "@opendum/database";
 import { fromPromise } from "@opendum/api/web/lib/task";
 import { getRedisClient } from "@opendum/api/web/lib/redis";

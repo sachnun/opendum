@@ -1,14 +1,14 @@
 import { Effect, Cause } from "effect";
-import { raise } from "@opendum/models/refresh/core/raise";
+import { raise } from "@opendum/models/refresh/sources/raise";
 import { buildIndex } from "@opendum/models/model-store";
 import { fetchText } from "@opendum/models/sync/http";
 import { normalizeKey, normalizeName } from "@opendum/models/model/similarity";
 import { join } from "@opendum/models/paths";
-import { packageVersion } from "@opendum/models/refresh/core/fetch";
-import { causeMessage } from "@opendum/models/refresh/core/failure";
+import { packageVersion } from "@opendum/models/refresh/sources/fetch";
+import { causeMessage } from "@opendum/models/refresh/sources/failure";
 import type { ModelFetchFailure, ModelTimeoutFailure } from "@opendum/models/errors";
 import type { ModelIndexEntry } from "@opendum/models/types";
-import { sourceOf, type ModelSource, type SourceContext, type SourceResult, type VersionTarget } from "@opendum/models/refresh/core/types";
+import { sourceOf, type ModelSource, type SourceContext, type SourceResult, type VersionTarget } from "@opendum/models/refresh/sources/types";
 import { compareText } from "@opendum/models/compare";
 
 const PROVIDER = "perch";

@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import { raise } from "@opendum/models/refresh/core/raise";
+import { raise } from "@opendum/models/refresh/sources/raise";
 
 import {
   aaIndex,
@@ -13,7 +13,7 @@ import { modelProbes } from "@opendum/models/model/probes";
 import { fetchBytes, fetchText, orThrow } from "@opendum/models/sync/http";
 import { buildIndex, generatedPath, read, writeGenerated } from "@opendum/models/model-store";
 import { exists, readText } from "@opendum/models/fs";
-import { dataDir } from "@opendum/models/refresh/core/env";
+import { dataDir } from "@opendum/models/refresh/sources/env";
 import type { ModelData } from "@opendum/models/types";
 
 const LEADERBOARD_URL = "https://artificialanalysis.ai/leaderboards/models";

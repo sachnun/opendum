@@ -1,9 +1,9 @@
 import { Effect, Option, Schema } from "effect";
-import { raise } from "@opendum/models/refresh/core/raise";
+import { raise } from "@opendum/models/refresh/sources/raise";
 import { idMap } from "@opendum/models/model-store";
 import { fetchDecoded } from "@opendum/models/sync/http";
-import { afterFirstSlash, standardKey } from "@opendum/models/refresh/core/keys";
-import type { ModelSource, SourceResult } from "@opendum/models/refresh/core/types";
+import { afterFirstSlash, standardKey } from "@opendum/models/refresh/sources/keys";
+import type { ModelSource, SourceResult } from "@opendum/models/refresh/sources/types";
 
 const MODELS_URL = "https://api.kilo.ai/api/gateway/models";
 const AUTO_PREFIX = "kilo-auto/";

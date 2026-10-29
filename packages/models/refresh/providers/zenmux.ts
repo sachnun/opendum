@@ -1,9 +1,9 @@
 import { Effect, Option, Schema } from "effect";
-import { raise } from "@opendum/models/refresh/core/raise";
+import { raise } from "@opendum/models/refresh/sources/raise";
 import { idMap } from "@opendum/models/model-store";
 import { fetchJson } from "@opendum/models/sync/http";
-import { slashedKey } from "@opendum/models/refresh/core/keys";
-import type { ModelSource, SourceResult } from "@opendum/models/refresh/core/types";
+import { slashedKey } from "@opendum/models/refresh/sources/keys";
+import type { ModelSource, SourceResult } from "@opendum/models/refresh/sources/types";
 import { compareText } from "@opendum/models/compare";
 
 const PLANS_URL = "https://zenmux.ai/api/subscription/public/get_all_plans";

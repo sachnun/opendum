@@ -358,7 +358,7 @@
   "overrides": [
     {
       "files": [
-        "packages/core/egress/guard.ts"
+        "packages/platform/egress/guard.ts"
       ],
       "rules": {
         "import/extensions": "off"

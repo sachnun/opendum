@@ -1,4 +1,4 @@
-import { raise } from "@opendum/models/refresh/core/raise";
+import { raise } from "@opendum/models/refresh/sources/raise";
 import { Effect, Result } from "effect";
 
 import { familyOf } from "@opendum/models/model/families";

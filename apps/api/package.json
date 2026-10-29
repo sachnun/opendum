@@ -13,7 +13,6 @@
   },
   "dependencies": {
     "@opendum/auth": "workspace:*",
-    "@opendum/core": "workspace:*",
     "@opendum/database": "workspace:*",
     "@opendum/models": "workspace:*",
     "@opendum/protocol": "workspace:*",
@@ -23,7 +22,8 @@
     "drizzle-orm": "^0.45.4",
     "effect": "4.0.6",
     "h3": "^2.0.8",
-    "zod": "^4.6.7"
+    "zod": "^4.6.7",
+    "@opendum/platform": "workspace:*"
   },
   "devDependencies": {
     "@types/bun": "^1.4.4",

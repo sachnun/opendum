@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import { Messages, Responses } from "@opendum/api/core/endpoints";
-import { protocolResponse, protocolStream } from "@opendum/api/core/protocol-stream";
-import { routeFailure, type ResponseContext, type StreamRecorder, type UsageCounts } from "@opendum/api/core/types";
+import { Messages, Responses } from "@opendum/api/proxy/endpoints";
+import { protocolResponse, protocolStream } from "@opendum/api/proxy/protocol-stream";
+import { routeFailure, type ResponseContext, type StreamRecorder, type UsageCounts } from "@opendum/api/proxy/types";
 
 const encoder = new TextEncoder();
 

@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 import type { H3Event } from "h3";
-import type { ProxyContext } from "@opendum/api/core/context";
+import type { ProxyContext } from "@opendum/api/proxy/context";
 import { internalResponse, jsonResponse } from "@opendum/api/handlers/errors";
 
 export async function handleModels(event: H3Event, context: ProxyContext): Promise<Response> {

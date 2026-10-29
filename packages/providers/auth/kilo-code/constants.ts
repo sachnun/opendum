@@ -1,4 +1,4 @@
-import type { ProviderEntry } from "@opendum/providers/core/spec";
+import type { ProviderEntry } from "@opendum/providers/spec";
 
 export const API_BASE_URL = "https://api.kilo.ai/api/gateway";
 export const FALLBACK_BASE_URL = "https://unroxy.koyeb.app/api.kilo.ai/api/gateway";

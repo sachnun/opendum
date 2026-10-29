@@ -1,8 +1,8 @@
 import { Effect, Schema } from "effect";
 import type { H3Event } from "h3";
-import type { ProxyContext } from "@opendum/api/core/context";
-import { sessionKey } from "@opendum/api/core/service";
-import type { Adapter } from "@opendum/api/core/endpoints";
+import type { ProxyContext } from "@opendum/api/proxy/context";
+import { sessionKey } from "@opendum/api/proxy/service";
+import type { Adapter } from "@opendum/api/proxy/endpoints";
 import { errorEnvelope, internalResponse, jsonResponse } from "@opendum/api/handlers/errors";
 
 const BodySchema = Schema.Record(Schema.String, Schema.Unknown);

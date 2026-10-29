@@ -1,4 +1,4 @@
-import { Value, Payload } from "@opendum/providers/core/helpers";
+import { Value, Payload } from "@opendum/providers/helpers";
 import { pick } from "@opendum/providers/upstreams/kiro/common";
 import { KiroModel } from "@opendum/providers/upstreams/kiro/model";
 
