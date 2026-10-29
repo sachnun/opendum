@@ -1,8 +1,9 @@
 import { Coerce, Records } from "@opendum/api/core/helpers";
 import type { ErrorFormat, ParsedEndpointRequest, ResponseContext, RouteError, StreamRecorder } from "@opendum/api/core/types";
-import { nonStream, anthropicStream, passthrough, passthroughStream } from "@opendum/api/core/stream";
-import { fromChat, toChat } from "@opendum/api/core/endpoints/anthropic";
-import { toMessages, toolsOf } from "@opendum/api/core/endpoints/responses";
+import { passthrough, passthroughStream } from "@opendum/api/core/stream";
+import { protocolResponse, protocolStream } from "@opendum/api/core/protocol-stream";
+import { chatPayload, messagesPayload, irOf, responsesPayload } from "@opendum/api/core/protocol";
+import type { Dialect } from "@opendum/protocol/upstream";
 
 type Json = Record<string, unknown>;
 
@@ -24,31 +25,6 @@ function errorParams(params: Json, stream: boolean): Json {
 
 function withSession(payload: Json, sessionId: string): void {
   if (sessionId) payload._sessionId = sessionId;
-}
-
-function reasoningDisabled(body: Json): boolean {
-  if (typeof body.include_thoughts === "boolean") return !body.include_thoughts;
-  const effort = Coerce.string(body.reasoning_effort).trim().toLowerCase();
-  if (effort) return effort === "none";
-  const reasoning = body.reasoning;
-  if (reasoning !== null && typeof reasoning === "object" && !Array.isArray(reasoning)) {
-    const record = reasoning as Json;
-    const include = record.include_thoughts ?? record.includeThoughts;
-    if (typeof include === "boolean" && !include) return true;
-    const nestedEffort = Coerce.string(record.effort).trim().toLowerCase();
-    if (nestedEffort) return nestedEffort === "none";
-  }
-  return false;
-}
-
-function reasoningRequested(body: Json): boolean {
-  if (reasoningDisabled(body)) return false;
-  if (typeof body.include_thoughts === "boolean") return body.include_thoughts;
-  if (Coerce.string(body.reasoning_effort)) return true;
-  if (body.reasoning !== null && typeof body.reasoning === "object" && !Array.isArray(body.reasoning)) {
-    return true;
-  }
-  return body.thinking_budget !== undefined && body.thinking_budget !== null;
 }
 
 export abstract class Adapter {
@@ -100,25 +76,21 @@ export class Chat extends Adapter {
     }
     const stream = streamParam(body);
     const params = Records.omit(body, "model", "messages", "stream");
+    const request = irOf("chat", body);
     return {
       modelParam: model,
       stream,
       forcedAccountId: null,
-      reasoningRequested: reasoningRequested(body),
+      reasoningRequested: request.reasoning !== undefined && request.reasoning.mode !== "off",
       messagesForError: body.messages,
       paramsForError: errorParams(params, stream),
-      routeData: { messages: body.messages, params },
+      routeData: { body },
     };
   }
 
   protected toPayload(parsed: ParsedEndpointRequest, model: string, stream: boolean): Json {
-    const params = (parsed.routeData.params ?? {}) as Json;
-    const body: Json = Records.clone(params);
-    body.model = model;
-    body.messages = parsed.routeData.messages;
-    body.stream = stream;
-    body._includeReasoning = parsed.reasoningRequested;
-    return body;
+    const body = (parsed.routeData.body ?? {}) as Json;
+    return chatPayload(irOf("chat", body), model, stream);
   }
 }
 
@@ -131,19 +103,20 @@ export class Messages extends Adapter {
 
   readonly noAccountsStatus = 529;
 
-  readonly handleStream = anthropicStream;
+  readonly handleStream = protocolMessagesStream;
 
-  readonly handleNonStream = nonStream;
+  readonly handleNonStream = protocolMessagesResponse;
 
   protected toParsed(body: Json, model: string): ParsedEndpointRequest | RouteError {
     const stream = streamParam(body);
     const params = Records.omit(body, "model", "messages", "stream");
     params.stream = stream;
+    const request = irOf("messages", body);
     return {
       modelParam: model,
       stream,
       forcedAccountId: null,
-      reasoningRequested: false,
+      reasoningRequested: request.reasoning !== undefined && request.reasoning.mode !== "off",
       messagesForError: body.messages,
       paramsForError: params,
       routeData: { body },
@@ -152,10 +125,7 @@ export class Messages extends Adapter {
 
   protected toPayload(parsed: ParsedEndpointRequest, model: string, stream: boolean): Json {
     const body = (parsed.routeData.body ?? {}) as Json;
-    const payload = toChat(body);
-    payload.model = model;
-    payload.stream = stream;
-    return payload;
+    return messagesPayload(body, model, stream);
   }
 }
 
@@ -168,9 +138,9 @@ export class Responses extends Adapter {
 
   readonly noAccountsStatus = 503;
 
-  readonly handleStream = passthroughStream;
+  readonly handleStream = protocolResponsesStream;
 
-  readonly handleNonStream = passthrough;
+  readonly handleNonStream = protocolResponsesResponse;
 
   protected toParsed(body: Json, model: string): ParsedEndpointRequest | RouteError {
     if (!Array.isArray(body.input)) {
@@ -178,7 +148,7 @@ export class Responses extends Adapter {
     }
     const stream = streamParam(body);
     const instructions = Coerce.string(body.instructions);
-    const messages = toMessages(body.input, instructions);
+    const request = irOf("responses", body);
     const params = Records.omit(body, "model", "input", "instructions", "stream");
     if (params.max_output_tokens !== undefined) {
       params.max_tokens = params.max_output_tokens;
@@ -190,26 +160,37 @@ export class Responses extends Adapter {
       modelParam: model,
       stream,
       forcedAccountId: null,
-      reasoningRequested: reasoningRequested(params),
-      messagesForError: messages,
+      reasoningRequested: request.reasoning !== undefined && request.reasoning.mode !== "off",
+      messagesForError: request.messages,
       paramsForError: sanitized,
-      routeData: { messages, responsesInput: body.input, instructions, params },
+      routeData: { body, instructions },
     };
   }
 
   protected toPayload(parsed: ParsedEndpointRequest, model: string, stream: boolean): Json {
-    const params = (parsed.routeData.params ?? {}) as Json;
-    const body: Json = Records.clone(params);
-    body.model = model;
-    body.messages = parsed.routeData.messages;
-    if (Array.isArray(body.tools)) body.tools = toolsOf(body.tools);
-    body.stream = stream;
-    body._includeReasoning = parsed.reasoningRequested;
-    body._responsesInput = parsed.routeData.responsesInput;
-    const instructions = parsed.routeData.instructions;
-    if (typeof instructions === "string" && instructions) body.instructions = instructions;
-    return body;
+    const body = (parsed.routeData.body ?? {}) as Json;
+    return responsesPayload(body, model, stream);
   }
+}
+
+function dialectFor(target: Dialect): { from: Dialect; to: Dialect } {
+  return { from: "chat", to: target };
+}
+
+function protocolMessagesStream(ctx: ResponseContext, recorder: StreamRecorder): Promise<Response> {
+  return protocolStream(ctx, recorder, { ...dialectFor("messages"), model: ctx.model });
+}
+
+function protocolMessagesResponse(ctx: ResponseContext, recorder: StreamRecorder): Promise<Response> {
+  return protocolResponse(ctx, recorder, { ...dialectFor("messages"), model: ctx.model });
+}
+
+function protocolResponsesStream(ctx: ResponseContext, recorder: StreamRecorder): Promise<Response> {
+  return protocolStream(ctx, recorder, { ...dialectFor("responses"), model: ctx.model });
+}
+
+function protocolResponsesResponse(ctx: ResponseContext, recorder: StreamRecorder): Promise<Response> {
+  return protocolResponse(ctx, recorder, { ...dialectFor("responses"), model: ctx.model });
 }
 
 export function adapters(): Record<string, Adapter> {
@@ -219,5 +200,3 @@ export function adapters(): Record<string, Adapter> {
     responses: new Responses(),
   };
 }
-
-export { fromChat as transformOpenAIToAnthropic, toChat as transformAnthropicToOpenAI };

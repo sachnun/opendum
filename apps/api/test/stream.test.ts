@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { anthropicStream, passthrough, passthroughStream } from "@opendum/api/core/stream";
+import { passthrough, passthroughStream } from "@opendum/api/core/stream";
+import { protocolStream } from "@opendum/api/core/protocol-stream";
 import type { ResponseContext, StreamRecorder, UsageCounts } from "@opendum/api/core/types";
 
 function sseResponse(chunks: string[]): Response {
@@ -170,7 +171,7 @@ describe("passthrough", () => {
   });
 });
 
-describe("anthropicStream", () => {
+describe("protocolStream", () => {
   it("emits anthropic events from chat chunks", async () => {
     const ctx = context(
       sseResponse([
@@ -182,7 +183,7 @@ describe("anthropicStream", () => {
       "kiro"
     );
     const { recorder: rec } = recorder();
-    const response = await anthropicStream(ctx, rec);
+    const response = await protocolStream(ctx, rec, { from: "chat", to: "messages", model: "gpt-4o" });
     const text = await bodyText(response);
     expect(text).toMatch(/event: message_start/);
     expect(text).toMatch(/event: content_block_start/);

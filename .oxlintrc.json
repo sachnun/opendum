@@ -383,6 +383,14 @@
       "rules": {
         "effect/noModuleLevelMutableState": "off"
       }
+    },
+    {
+      "files": [
+        "packages/protocol/**/*.ts"
+      ],
+      "rules": {
+        "naming-convention/naming-convention": "off"
+      }
     }
   ],
   "options": {

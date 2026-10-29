@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { Chat, Messages, Responses, adapters, transformAnthropicToOpenAI, transformOpenAIToAnthropic } from "@opendum/api/core/endpoints";
+import { Chat, Messages, Responses, adapters } from "@opendum/api/core/endpoints";
+import { decodeRequest, encodeRequest, decodeResponse, encodeResponse } from "@opendum/protocol/upstream";
 import { SseScanner } from "@opendum/api/core/sse";
 import { routeFailure } from "@opendum/api/core/types";
 import { ProviderError } from "@opendum/api/core/errors";
@@ -53,7 +54,8 @@ describe("messages transform", () => {
   });
 
   it("converts openai completion to anthropic", () => {
-    const response = transformOpenAIToAnthropic(
+    const ir = decodeResponse(
+      "chat",
       {
         id: "abc",
         choices: [{ index: 0, message: { role: "assistant", content: "hi", reasoning_content: "why" }, finish_reason: "stop" }],
@@ -61,23 +63,26 @@ describe("messages transform", () => {
       },
       "claude"
     );
+    const response = encodeResponse("messages", ir) as Record<string, unknown>;
     expect(response.type).toBe("message");
     const content = response.content as Array<Record<string, unknown>>;
-    expect(content[0].type).toBe("thinking");
-    expect(content[1].type).toBe("text");
+    expect(content[0]?.type).toBe("thinking");
+    expect(content[1]?.type).toBe("text");
     expect((response.usage as Record<string, number>).input_tokens).toBe(5);
   });
 
   it("drops orphaned tool_use blocks", () => {
-    const payload = transformAnthropicToOpenAI({
+    const ir = decodeRequest("messages", {
       model: "claude",
+      max_tokens: 16,
       messages: [
         { role: "assistant", content: [{ type: "tool_use", id: "orphan", name: "x", input: {} }] },
         { role: "user", content: [{ type: "tool_result", tool_use_id: "kept", content: "ok" }] },
       ],
     });
+    const payload = encodeRequest("chat", ir);
     const messages = payload.messages as Array<Record<string, unknown>>;
-    expect(messages[0].tool_calls).toBeUndefined();
+    expect(messages[0]?.tool_calls).toBeUndefined();
   });
 });
 
