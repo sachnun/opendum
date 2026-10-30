@@ -37,7 +37,7 @@ export function antigravityQuota(
       headers: {
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
-        "User-Agent": `antigravity/2.28.1 ${process.platform}/${process.arch}`,
+        "User-Agent": `antigravity/2.28.2 ${process.platform}/${process.arch}`,
       },
       body: { project: projectId },
       label: "Antigravity",

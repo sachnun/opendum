@@ -92,7 +92,7 @@ export class AntigravityProvider extends OAuthProvider {
     "https://cloudcode-pa.googleapis.com",
   ];
   private readonly defaultProject = "rising-fact-p41fc";
-  private readonly userAgent = `antigravity/2.28.1 ${process.platform}/${process.arch}`;
+  private readonly userAgent = `antigravity/2.28.2 ${process.platform}/${process.arch}`;
   private readonly apiClient = "google-cloud-sdk vscode_cloudshelleditor/0.1";
   private readonly clientMetadata =
     '{"ideType":"IDE_UNSPECIFIED","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI"}';
