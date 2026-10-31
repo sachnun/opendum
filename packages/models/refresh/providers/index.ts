@@ -12,7 +12,7 @@ import { openrouterSource } from "@opendum/models/refresh/providers/openrouter";
 import { perchSource } from "@opendum/models/refresh/providers/perch";
 import { workbuddySource } from "@opendum/models/refresh/providers/workbuddy";
 import { zenmuxSource } from "@opendum/models/refresh/providers/zenmux";
-import type { ModelSource } from "@opendum/models/refresh/core/types";
+import type { ModelSource } from "@opendum/models/refresh/sources/types";
 
 export const SOURCES: ReadonlyArray<ModelSource> = [
   antigravitySource,

@@ -1,8 +1,8 @@
 import { SUPPORTED_HARBOR, SUPPORTED_HYPER, SUPPORTED_KILO, SUPPORTED_NVIDIA, SUPPORTED_OPENROUTER, SUPPORTED_ZENMUX } from "@opendum/providers/upstreams/compat/index";
-import type { CompatSpec } from "@opendum/providers/core/spec";
+import type { CompatSpec } from "@opendum/providers/spec";
 import { COMPAT_ENTRIES } from "@opendum/providers/registry-specs";
 
-export type { CompatSpec } from "@opendum/providers/core/spec";
+export type { CompatSpec } from "@opendum/providers/spec";
 
 const PARAMS: Record<string, Set<string>> = {
   openrouter: SUPPORTED_OPENROUTER,

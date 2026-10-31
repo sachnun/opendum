@@ -3,9 +3,9 @@ import type { AuthResult, AuthService, ModelValidationResult } from "@opendum/au
 import { Effect } from "effect";
 import { ProviderTransportFailure, type Provider, type ProviderRegistry } from "@opendum/providers";
 import type { Registry } from "@opendum/models/runtime";
-import type { OpendumRedis } from "@opendum/core/redis";
-import { ProxyService } from "@opendum/api/core/service";
-import { Chat } from "@opendum/api/core/endpoints";
+import type { OpendumRedis } from "@opendum/platform/redis";
+import { ProxyService } from "@opendum/api/proxy/service";
+import { Chat } from "@opendum/api/proxy/endpoints";
 import { fakes } from "@opendum/api/test/fakes";
 
 const SSE_OK = 'data: {"choices":[{"delta":{"content":"ok"}}]}\n\ndata: [DONE]\n\n';

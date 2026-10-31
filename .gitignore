@@ -40,6 +40,7 @@ Thumbs.db
 .vercel/
 
 PLAN.md
+README.md
 
 *.tsbuildinfo
 

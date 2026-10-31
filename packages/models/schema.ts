@@ -1,5 +1,5 @@
 import { Effect, Result, Schema } from "effect";
-import { raise } from "@opendum/models/refresh/core/raise";
+import { raise } from "@opendum/models/refresh/sources/raise";
 
 import { ModelParseFailure } from "@opendum/models/errors";
 import type { ModelData, ProviderModelConfig } from "@opendum/models/types";

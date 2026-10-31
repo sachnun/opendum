@@ -1,0 +1,33 @@
+{
+  "name": "@opendum/protocol",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./index.ts",
+    "./ir": "./ir.ts",
+    "./sse": "./sse.ts",
+    "./usage": "./usage.ts",
+    "./stream": "./stream.ts",
+    "./upstream": "./upstream.ts",
+    "./openai/chat": "./openai/chat.ts",
+    "./openai/responses": "./openai/responses.ts",
+    "./anthropic/messages": "./anthropic/messages.ts",
+    "./*": "./*.ts",
+    "./anthropic/codec": "./anthropic/codec.ts",
+    "./openai/chat-codec": "./openai/chat-codec.ts",
+    "./openai/responses-codec": "./openai/responses-codec.ts",
+    "./types": "./types.ts"
+  },
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "bun check"
+  },
+  "dependencies": {
+    "effect": "4.0.6"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.4",
+    "typescript": "^6.0.3"
+  }
+}

@@ -1,7 +1,7 @@
 import { Effect } from "effect";
-import { lastUsed, validationKey, type OpendumRedis } from "@opendum/core/redis";
+import { lastUsed, validationKey, type OpendumRedis } from "@opendum/platform/redis";
 import { touchLastUsed } from "@opendum/database/queries";
-import { ignore, tryAsync } from "@opendum/core/best-effort";
+import { ignore, tryAsync } from "@opendum/platform/best-effort";
 import type { RateLimitRule } from "@opendum/auth/types";
 
 export const VALID_TTL = 45;

@@ -1,0 +1,35 @@
+{
+  "name": "@opendum/platform",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./index.ts",
+    "./config": "./config.ts",
+    "./best-effort": "./best-effort.ts",
+    "./crypto": "./crypto/index.ts",
+    "./cryptojs": "./crypto/cryptojs.ts",
+    "./signature": "./crypto/signature.ts",
+    "./redis": "./redis/index.ts",
+    "./redis/keys": "./redis/keys.ts",
+    "./egress": "./egress/index.ts",
+    "./*": "./*.ts",
+    "./raise": "./raise.ts",
+    "./json": "./json.ts"
+  },
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "bun check"
+  },
+  "dependencies": {
+    "effect": "4.0.6",
+    "redis": "^6.3.0",
+    "undici": "^8.12.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3",
+    "@types/bun": "^1.4.4"
+  }
+}

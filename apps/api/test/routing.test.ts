@@ -5,10 +5,10 @@ import {
   Generic,
   Kiro,
   tierFor,
-} from "@opendum/api/core/tiers";
-import type { ProviderRoutingOptions, ProviderScore } from "@opendum/api/core/provider-performance";
-import { Priority, Sticky, compose } from "@opendum/api/core/routing";
-import { paidTier } from "@opendum/api/core/service-helpers";
+} from "@opendum/api/proxy/tiers";
+import type { ProviderRoutingOptions, ProviderScore } from "@opendum/api/proxy/provider-performance";
+import { Priority, Sticky, compose } from "@opendum/api/proxy/routing";
+import { paidTier } from "@opendum/api/proxy/service-helpers";
 
 function account(id: string, provider: string, extra: Partial<ProviderAccount> = {}): ProviderAccount {
   return { id, userId: "u", provider, status: "active", lastUsedAt: null, ...extra } as unknown as ProviderAccount;

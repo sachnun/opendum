@@ -1,7 +1,7 @@
-import { raise } from "@opendum/providers/core/errors";
+import { raise } from "@opendum/providers/errors";
 import {Effect} from "effect";
-import { Value, Payload, Ids, Responses, JSONText } from "@opendum/providers/core/helpers";
-import { ResponsesImageInliner } from "@opendum/providers/core/images";
+import { Value, Payload, Ids, Responses, JSONText } from "@opendum/providers/helpers";
+import { ResponsesImageInliner } from "@opendum/providers/images";
 
 type Json = Record<string, unknown>;
 

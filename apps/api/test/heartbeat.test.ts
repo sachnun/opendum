@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { withHeartbeat } from "@opendum/api/core/heartbeat";
+import { withHeartbeat } from "@opendum/api/proxy/heartbeat";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();

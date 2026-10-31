@@ -358,7 +358,7 @@
   "overrides": [
     {
       "files": [
-        "packages/core/egress/guard.ts"
+        "packages/platform/egress/guard.ts"
       ],
       "rules": {
         "import/extensions": "off"
@@ -382,6 +382,14 @@
       ],
       "rules": {
         "effect/noModuleLevelMutableState": "off"
+      }
+    },
+    {
+      "files": [
+        "packages/protocol/**/*.ts"
+      ],
+      "rules": {
+        "naming-convention/naming-convention": "off"
       }
     }
   ],

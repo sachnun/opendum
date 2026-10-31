@@ -1,9 +1,9 @@
 import { describe, expect, it } from "bun:test";
-import { raise } from "@opendum/providers/core/errors";
+import { raise } from "@opendum/providers/errors";
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
 import { OpencodeProvider } from "@opendum/providers/upstreams/opencode/index";
-import type { UpstreamTransport } from "@opendum/providers/core/http";
+import type { UpstreamTransport } from "@opendum/providers/http";
 import type { ProviderRequest } from "@opendum/providers/types";
 
 const SESSION_PATTERN = /^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$/;

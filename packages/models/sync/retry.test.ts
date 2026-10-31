@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { Effect, Exit } from "effect";
-import { raise } from "@opendum/models/refresh/core/raise";
+import { raise } from "@opendum/models/refresh/sources/raise";
 
 import { fetchDecoded, fetchJson, retryTransient, orThrow } from "@opendum/models/sync/http";
 import { ModelFetchFailure } from "@opendum/models/errors";

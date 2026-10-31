@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { Effect } from "effect";
 
-import { pendingCount, settleTasks, trackPending, trackWork } from "@opendum/api/core/pending";
+import { pendingCount, settleTasks, trackPending, trackWork } from "@opendum/api/proxy/pending";
 
 describe("pending task tracker", () => {
   it("tracks work until it settles", async () => {

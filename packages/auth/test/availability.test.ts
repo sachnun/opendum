@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
-import type { OpendumRedis } from "@opendum/core/redis";
+import type { OpendumRedis } from "@opendum/platform/redis";
 import { Policy } from "@opendum/auth/policy";
 import { Availability, type Queries } from "@opendum/auth/availability";
 import type { CustomModels } from "@opendum/auth/custom-models";

@@ -18,9 +18,10 @@
       "version": "0.1.0",
       "dependencies": {
         "@opendum/auth": "workspace:*",
-        "@opendum/core": "workspace:*",
         "@opendum/database": "workspace:*",
         "@opendum/models": "workspace:*",
+        "@opendum/platform": "workspace:*",
+        "@opendum/protocol": "workspace:*",
         "@opendum/providers": "workspace:*",
         "@orpc/server": "1.16.1",
         "better-auth": "^1.7.12",
@@ -74,25 +75,10 @@
       "name": "@opendum/auth",
       "version": "0.1.0",
       "dependencies": {
-        "@opendum/core": "workspace:*",
         "@opendum/database": "workspace:*",
         "@opendum/models": "workspace:*",
+        "@opendum/platform": "workspace:*",
         "effect": "4.0.6",
-      },
-      "devDependencies": {
-        "@types/bun": "^1.4.4",
-        "@types/node": "^26.6.5",
-        "tsx": "^4.23.15",
-        "typescript": "^6.0.3",
-      },
-    },
-    "packages/core": {
-      "name": "@opendum/core",
-      "version": "0.1.0",
-      "dependencies": {
-        "effect": "4.0.6",
-        "redis": "^6.3.0",
-        "undici": "^8.12.3",
       },
       "devDependencies": {
         "@types/bun": "^1.4.4",
@@ -132,12 +118,38 @@
         "typescript": "^6.0.3",
       },
     },
+    "packages/platform": {
+      "name": "@opendum/platform",
+      "version": "0.1.0",
+      "dependencies": {
+        "effect": "4.0.6",
+        "redis": "^6.3.0",
+        "undici": "^8.12.3",
+      },
+      "devDependencies": {
+        "@types/bun": "^1.4.4",
+        "@types/node": "^26.6.5",
+        "tsx": "^4.23.15",
+        "typescript": "^6.0.3",
+      },
+    },
+    "packages/protocol": {
+      "name": "@opendum/protocol",
+      "version": "0.1.0",
+      "dependencies": {
+        "effect": "4.0.6",
+      },
+      "devDependencies": {
+        "@types/bun": "^1.4.4",
+        "typescript": "^6.0.3",
+      },
+    },
     "packages/providers": {
       "name": "@opendum/providers",
       "version": "0.1.0",
       "dependencies": {
-        "@opendum/core": "workspace:*",
         "@opendum/models": "workspace:*",
+        "@opendum/platform": "workspace:*",
         "@orpc/contract": "1.16.1",
         "effect": "4.0.6",
         "zod": "^4.6.7",
@@ -422,11 +434,13 @@
 
     "@opendum/auth": ["@opendum/auth@workspace:packages/auth"],
 
-    "@opendum/core": ["@opendum/core@workspace:packages/core"],
-
     "@opendum/database": ["@opendum/database@workspace:packages/database"],
 
     "@opendum/models": ["@opendum/models@workspace:packages/models"],
+
+    "@opendum/platform": ["@opendum/platform@workspace:packages/platform"],
+
+    "@opendum/protocol": ["@opendum/protocol@workspace:packages/protocol"],
 
     "@opendum/providers": ["@opendum/providers@workspace:packages/providers"],
 

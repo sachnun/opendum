@@ -1,12 +1,12 @@
 import { Effect } from "effect";
 import type { DatabaseFailure } from "@opendum/database";
-import { ignore } from "@opendum/core/best-effort";
+import { ignore } from "@opendum/platform/best-effort";
 import type { Registry } from "@opendum/models/runtime";
 import {
   versionBump,
   versionKey,
   type OpendumRedis,
-} from "@opendum/core/redis";
+} from "@opendum/platform/redis";
 import { Policy } from "@opendum/auth/policy";
 import { Cache } from "@opendum/auth/cache";
 import { Keys } from "@opendum/auth/keys";

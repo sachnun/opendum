@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { Effect } from "effect";
-import type { OpendumRedis } from "@opendum/core/redis";
+import type { OpendumRedis } from "@opendum/platform/redis";
 import type { ProviderAccount } from "@opendum/providers";
 import {
   DEFAULT_CONFIG,
@@ -10,8 +10,8 @@ import {
   scoreMetrics,
   type ProviderRoutingOptions,
   type ProviderScore,
-} from "@opendum/api/core/provider-performance";
-import { byPerformance, prioritizeAccounts } from "@opendum/api/core/service-helpers";
+} from "@opendum/api/proxy/provider-performance";
+import { byPerformance, prioritizeAccounts } from "@opendum/api/proxy/service-helpers";
 
 const config = DEFAULT_CONFIG;
 

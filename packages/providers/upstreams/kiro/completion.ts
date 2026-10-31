@@ -1,4 +1,4 @@
-import { Value } from "@opendum/providers/core/helpers";
+import { Value } from "@opendum/providers/helpers";
 import { Collector } from "@opendum/providers/transform/collector";
 import { KiroUsage, type Json } from "@opendum/providers/upstreams/kiro/events";
 import { BracketCalls, Parser } from "@opendum/providers/upstreams/kiro/parser";
