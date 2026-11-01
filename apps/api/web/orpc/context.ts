@@ -4,6 +4,7 @@ import { HTTPError } from "h3";
 
 import { contextOf, type RequestContext } from "@opendum/api/web/utils/api";
 import { asFailure } from "@opendum/api/web/errors";
+import { orpcError as serviceError } from "@opendum/api/web/orpc/run";
 
 export interface OrpcInitialContext {
   headers: Headers;
@@ -14,17 +15,16 @@ export interface OrpcContext extends OrpcInitialContext {
   requestContext: RequestContext;
 }
 
-function orpcError(error: unknown) {
+function contextError(error: unknown) {
   if (error instanceof HTTPError) {
     if (error.status === 401) return new ORPCError("UNAUTHORIZED", { message: "Unauthorized" });
     if (error.status === 403) return new ORPCError("FORBIDDEN", { message: error.statusText || "Forbidden" });
   }
-  const failure = asFailure(error);
-  return new ORPCError("INTERNAL_SERVER_ERROR", { message: failure.message });
+  return serviceError(asFailure(error));
 }
 
 export function resolveContext(headers: Headers) {
-  return contextOf(headers).pipe(Effect.mapError(orpcError));
+  return contextOf(headers).pipe(Effect.mapError(contextError));
 }
 
 export function requireWritable(requestContext: RequestContext) {

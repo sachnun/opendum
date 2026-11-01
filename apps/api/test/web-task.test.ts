@@ -3,6 +3,7 @@ import { Effect, Exit } from "effect";
 
 import { ServiceFailure, asFailure, badRequest, forbidden, internal, notFound, unauthorized, unavailable } from "@opendum/api/web/errors";
 import { fromPromise, fromSync, toResult, toVoid, withContext } from "@opendum/api/web/lib/task";
+import { resolveContext } from "@opendum/api/web/orpc/context";
 import { raise } from "@opendum/core/raise";
 
 describe("web errors", () => {
@@ -37,6 +38,22 @@ describe("web errors", () => {
   it("falls back to the provided message for non error causes", () => {
     expect(asFailure("nope", "Request failed").message).toBe("nope");
     expect(asFailure(undefined, "Request failed").message).toBe("Request failed");
+  });
+});
+
+describe("orpc context errors", () => {
+  it("keeps the unauthorized status for a missing or expired access token", async () => {
+    process.env.BETTER_AUTH_SECRET ??= "test-secret";
+
+    const missing = await Effect.runPromise(Effect.flip(resolveContext(new Headers())));
+    expect(missing.code).toBe("UNAUTHORIZED");
+    expect(missing.status).toBe(401);
+
+    const expired = await Effect.runPromise(
+      Effect.flip(resolveContext(new Headers({ authorization: "Bearer expired.jwt.token" })))
+    );
+    expect(expired.code).toBe("UNAUTHORIZED");
+    expect(expired.status).toBe(401);
   });
 });
 

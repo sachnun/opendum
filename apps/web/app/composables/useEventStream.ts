@@ -29,13 +29,7 @@ export function useEventStream(handlers: EventStreamHandlers = {}) {
   const models = useState<ModelsData | null>(liveEventKey("models"), () => null);
   const usage = useState<UsageData | null>(liveEventKey("usage"), () => null);
 
-  const refreshAuth = async () => {
-    if (await auth.refreshAccessToken()) return true;
-
-    auth.expireSession();
-    void navigateTo("/");
-    return false;
-  };
+  const refreshAuth = () => auth.refreshAccessToken();
 
   const baseUrl = apiUrl(config.public.apiUrl);
   let cancel: (() => Promise<void>) | undefined;
@@ -98,7 +92,11 @@ export function useEventStream(handlers: EventStreamHandlers = {}) {
 
   async function runStream(): Promise<void> {
     lastEventAt = Date.now();
-    const client = apiClient({ baseUrl, refresh: refreshAuth });
+    const client = apiClient({
+      baseUrl,
+      refresh: refreshAuth,
+      expire: auth.expireAndRedirect,
+    });
     const iterator = client.events.subscribe({ topics: SUBSCRIBED_TOPICS });
 
     await Effect.runPromise(

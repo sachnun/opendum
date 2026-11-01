@@ -12,6 +12,7 @@ import {
 } from "~~/lib/auth-token";
 import { raise, settle } from "~~/lib/settle";
 import { apiUrl } from "~~/lib/api-url";
+import { Routes } from "~~/lib/routes";
 
 function sanitizeRedirect(value: string | undefined): string | null {
   if (!value || !value.startsWith("/") || value.startsWith("//")) return null;
@@ -64,6 +65,11 @@ export function useAuth() {
     clearNuxtData();
     claims.value = null;
     hasSession.value = false;
+  }
+
+  function expireAndRedirect() {
+    expireSession();
+    void navigateTo(Routes.home, { replace: true });
   }
 
   async function requestAccessToken(sessionToken: string): Promise<string | null> {
@@ -173,6 +179,7 @@ export function useAuth() {
     applyHandoff,
     applyAccessToken,
     expireSession,
+    expireAndRedirect,
     refreshAccessToken,
     startAudit,
     stopAudit,

@@ -39,15 +39,12 @@ type RateLimitRule = { target: string; targetType: "model" | "family"; perMinute
 export function useApi() {
   const config = useRuntimeConfig();
   const auth = useAuth();
-  const refreshAuth = async () => {
-    if (await auth.refreshAccessToken()) return true;
-
-    auth.expireSession();
-    void navigateTo("/");
-    return false;
-  };
   const baseUrl = apiUrl(config.public.apiUrl);
-  const rpc = apiClient({ baseUrl, refresh: refreshAuth });
+  const rpc = apiClient({
+    baseUrl,
+    refresh: auth.refreshAccessToken,
+    expire: auth.expireAndRedirect,
+  });
 
   return {
     me: {

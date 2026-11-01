@@ -23,12 +23,8 @@ const { apiClient } = await import("~~/lib/orpc");
 function createClient() {
   return apiClient({
     baseUrl: "https://api.example.com",
-    refresh: async () => {
-      if (await refreshAccessToken()) return true;
-
-      expireSession();
-      return false;
-    },
+    refresh: refreshAccessToken,
+    expire: expireSession,
   });
 }
 
@@ -78,6 +74,21 @@ describe("api client access tokens", () => {
     expect(refreshAccessToken).toHaveBeenCalledTimes(1);
     expect(expireSession).toHaveBeenCalledTimes(1);
     expect(requests).toHaveLength(1);
+  });
+
+  it("expires the session when the retry is still unauthorized", async () => {
+    setTokens({ access: "stale-token", session: "session-token" });
+    refreshAccessToken.mockImplementation(async () => {
+      setTokens({ access: "fresh-token", session: "session-token" });
+      return true;
+    });
+    responder = () => jsonResponse({}, 401);
+
+    await callMe(createClient());
+
+    expect(refreshAccessToken).toHaveBeenCalledTimes(1);
+    expect(expireSession).toHaveBeenCalledTimes(1);
+    expect(requests).toHaveLength(2);
   });
 
   it("leaves other failures alone", async () => {

@@ -7,9 +7,10 @@ import { accessToken } from "~~/lib/auth-token";
 export interface ClientOptions {
   baseUrl: string;
   refresh: () => Promise<boolean>;
+  expire: () => void;
 }
 
-export function apiClient({ baseUrl, refresh }: ClientOptions): ApiContractClient {
+export function apiClient({ baseUrl, refresh, expire }: ClientOptions): ApiContractClient {
   const link = new RPCLink({
     url: `${baseUrl}/rpc`,
     headers: () => {
@@ -19,12 +20,20 @@ export function apiClient({ baseUrl, refresh }: ClientOptions): ApiContractClien
     fetch: async (request) => {
       const response = await fetch(request.clone());
       if (response.status !== 401) return response;
-      if (!(await refresh())) return response;
+
+      if (!(await refresh())) {
+        expire();
+        return response;
+      }
 
       const token = accessToken();
       const headers = new Headers(request.headers);
       if (token) headers.set("authorization", `Bearer ${token}`);
-      return fetch(new Request(request, { headers }));
+
+      const retried = await fetch(new Request(request, { headers }));
+      if (retried.status === 401) expire();
+
+      return retried;
     },
   });
 
