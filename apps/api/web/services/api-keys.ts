@@ -144,7 +144,7 @@ const buildOptions = Effect.fnUntraced(function* (userId: string) {
         ...authlessProviderAccounts,
         ...providerAccounts,
       ],
-      limitsByKey,
+      rateLimitsByKeyId: limitsByKey,
     };
   }
 });
