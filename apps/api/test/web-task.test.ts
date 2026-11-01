@@ -3,8 +3,15 @@ import { Effect, Exit } from "effect";
 
 import { ServiceFailure, asFailure, badRequest, forbidden, internal, notFound, unauthorized, unavailable } from "@opendum/api/web/errors";
 import { fromPromise, fromSync, toResult, toVoid, withContext } from "@opendum/api/web/lib/task";
-import { resolveContext } from "@opendum/api/web/orpc/context";
 import { raise } from "@opendum/core/raise";
+
+process.env.BETTER_AUTH_SECRET ??= "test-secret";
+process.env.GITHUB_CLIENT_ID ??= "test-github-client-id";
+process.env.GITHUB_CLIENT_SECRET ??= "test-github-client-secret";
+process.env.GOOGLE_CLIENT_ID ??= "test-google-client-id";
+process.env.GOOGLE_CLIENT_SECRET ??= "test-google-client-secret";
+
+const { resolveContext } = await import("@opendum/api/web/orpc/context");
 
 describe("web errors", () => {
   it("maps status codes to tagged failures", () => {
@@ -43,8 +50,6 @@ describe("web errors", () => {
 
 describe("orpc context errors", () => {
   it("keeps the unauthorized status for a missing or expired access token", async () => {
-    process.env.BETTER_AUTH_SECRET ??= "test-secret";
-
     const missing = await Effect.runPromise(Effect.flip(resolveContext(new Headers())));
     expect(missing.code).toBe("UNAUTHORIZED");
     expect(missing.status).toBe(401);
