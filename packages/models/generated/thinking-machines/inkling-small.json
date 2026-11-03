@@ -1,6 +1,7 @@
 {
   "providers": [
-    "openrouter"
+    "openrouter",
+    "kilo_code"
   ],
   "reasoning": true,
   "reasoning_effort": [
@@ -36,6 +37,9 @@
     }
   },
   "providerConfig": {
+    "kilo_code": {
+      "upstream": "thinkingmachines/inkling-small:free"
+    },
     "openrouter": {
       "upstream": "thinkingmachines/inkling-small:free",
       "contextWindow": 524288,

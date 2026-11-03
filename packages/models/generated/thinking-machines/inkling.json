@@ -1,7 +1,8 @@
 {
   "providers": [
     "openrouter",
-    "hyper"
+    "hyper",
+    "kilo_code"
   ],
   "reasoning": true,
   "reasoning_effort": [
@@ -40,6 +41,9 @@
     "hyper": {
       "contextWindow": 1048576,
       "maxOutputTokens": 65536
+    },
+    "kilo_code": {
+      "upstream": "thinkingmachines/inkling:free"
     },
     "openrouter": {
       "upstream": "thinkingmachines/inkling:free",
