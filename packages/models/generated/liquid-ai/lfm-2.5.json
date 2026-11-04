@@ -1,6 +1,5 @@
 {
   "providers": [
-    "kilo_code",
     "openrouter"
   ],
   "aliases": [
@@ -14,9 +13,6 @@
   ],
   "reasoning": true,
   "providerConfig": {
-    "kilo_code": {
-      "upstream": "liquid/lfm-2.5-2.6b:free"
-    },
     "openrouter": {
       "upstream": "liquid/lfm-2.5-2.6b:free"
     }

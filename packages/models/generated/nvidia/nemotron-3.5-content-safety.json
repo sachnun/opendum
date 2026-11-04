@@ -1,6 +1,5 @@
 {
   "providers": [
-    "kilo_code",
     "openrouter"
   ],
   "reasoning": true,
@@ -25,11 +24,6 @@
     "output": 1
   },
   "providerConfig": {
-    "kilo_code": {
-      "upstream": "nvidia/nemotron-3.5-content-safety:free",
-      "contextWindow": 131072,
-      "maxOutputTokens": 117964
-    },
     "openrouter": {
       "upstream": "nvidia/nemotron-3.5-content-safety:free",
       "contextWindow": 131072,

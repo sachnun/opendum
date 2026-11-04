@@ -1,0 +1,14 @@
+{
+  "providers": [
+    "kilo_code",
+    "opencode"
+  ],
+  "providerConfig": {
+    "kilo_code": {
+      "upstream": "stealth/crouton-alpha"
+    },
+    "opencode": {
+      "upstream": "crouton-alpha-free"
+    }
+  }
+}
