@@ -39,7 +39,7 @@ jobs:
     environment:
       name: web
     env:
-      NUXT_PUBLIC_API_URL: ${{ vars.NUXT_PUBLIC_API_URL }}
+      VITE_API_URL: ${{ vars.VITE_API_URL }}
 
     steps:
       - name: Checkout repository
@@ -55,9 +55,7 @@ jobs:
 
       - name: Build web
         working-directory: apps/web
-        run: bun run generate
-        env:
-          NITRO_PRESET: cloudflare-pages-static
+        run: bun run build
 
       - name: Deploy web to Cloudflare Pages
         uses: cloudflare/wrangler-action@v4
