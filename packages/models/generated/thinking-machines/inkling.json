@@ -1,6 +1,5 @@
 {
   "providers": [
-    "openrouter",
     "hyper"
   ],
   "reasoning": true,
@@ -40,11 +39,6 @@
     "hyper": {
       "contextWindow": 1048576,
       "maxOutputTokens": 65536
-    },
-    "openrouter": {
-      "upstream": "thinkingmachines/inkling:free",
-      "contextWindow": 524288,
-      "maxOutputTokens": 471859
     }
   }
 }

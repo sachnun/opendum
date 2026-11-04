@@ -1,7 +1,4 @@
 {
-  "providers": [
-    "openrouter"
-  ],
   "reasoning": true,
   "reasoning_effort": [
     "low",
@@ -33,13 +30,6 @@
     "artificialAnalysis": {
       "index": 25.7,
       "estimated": false
-    }
-  },
-  "providerConfig": {
-    "openrouter": {
-      "upstream": "thinkingmachines/inkling-small:free",
-      "contextWindow": 524288,
-      "maxOutputTokens": 262144
     }
   }
 }
