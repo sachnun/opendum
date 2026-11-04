@@ -36,6 +36,4 @@ for (const key of browserGlobals) {
 (globalThis as Record<string, unknown>).requestAnimationFrame = (callback: FrameRequestCallback): number =>
   setTimeout(() => callback(Date.now()), 0) as unknown as number;
 (globalThis as Record<string, unknown>).cancelAnimationFrame = (handle: number): void => clearTimeout(handle);
-
-const vue = await import("vue");
-Object.assign(globalThis, vue);
+(globalThis as Record<string, unknown>).matchMedia = win.matchMedia.bind(win);

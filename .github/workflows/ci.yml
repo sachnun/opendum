@@ -28,13 +28,14 @@ jobs:
       - name: Test web
         run: bun run --filter @opendum/web test
 
+      - name: Test web components
+        run: bun run --filter @opendum/web test:components
+
       - name: Typecheck web
-        run: bun run --filter @opendum/web typecheck
+        run: bun run --filter @opendum/web check
 
       - name: Build web
-        run: bun run --filter @opendum/web generate
-        env:
-          NITRO_PRESET: cloudflare-pages-static
+        run: bun run --filter @opendum/web build
 
   checks:
     name: Checks

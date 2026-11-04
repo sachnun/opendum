@@ -4,8 +4,7 @@
     "import",
     "typescript",
     "unicorn",
-    "oxc",
-    "vue"
+    "oxc"
   ],
   "categories": {
     "correctness": "error"
@@ -76,7 +75,7 @@
         "trailingUnderscore": "forbid",
         "custom": {
           "match": true,
-          "regex": "^[_$]*(?:[^_$](?:(?!(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z][A-Z])(?=[a-z]))[^_$])*[_$]*){1,3}$|^[_$]*$"
+          "regex": "^[_$]*(?:[^_$](?:(?!(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z][A-Z])(?=[a-z]))[^_$])*[_$]*){1,5}$|^[_$]*$"
         }
       },
       {
@@ -90,19 +89,20 @@
         "trailingUnderscore": "forbid",
         "custom": {
           "match": true,
-          "regex": "^[_$]*(?:[^_$](?:(?!(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z][A-Z])(?=[a-z]))[^_$])*[_$]*){1,3}$|^[_$]*$"
+          "regex": "^[_$]*(?:[^_$](?:(?!(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z][A-Z])(?=[a-z]))[^_$])*[_$]*){1,5}$|^[_$]*$"
         }
       },
       {
         "selector": "function",
         "format": [
-          "camelCase"
+          "camelCase",
+          "PascalCase"
         ],
         "leadingUnderscore": "allow",
         "trailingUnderscore": "forbid",
         "custom": {
           "match": true,
-          "regex": "^[_$]*(?:[^_$](?:(?!(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z][A-Z])(?=[a-z]))[^_$])*[_$]*){1,3}$|^[_$]*$"
+          "regex": "^[_$]*(?:[^_$](?:(?!(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z][A-Z])(?=[a-z]))[^_$])*[_$]*){1,5}$|^[_$]*$"
         }
       },
       {
@@ -117,7 +117,7 @@
         "trailingUnderscore": "forbid",
         "custom": {
           "match": true,
-          "regex": "^[_$]*(?:[^_$](?:(?!(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z][A-Z])(?=[a-z]))[^_$])*[_$]*){1,3}$|^[_$]*$"
+          "regex": "^[_$]*(?:[^_$](?:(?!(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z][A-Z])(?=[a-z]))[^_$])*[_$]*){1,5}$|^[_$]*$"
         }
       },
       {
@@ -132,7 +132,7 @@
         "trailingUnderscore": "forbid",
         "custom": {
           "match": true,
-          "regex": "^[_$]*(?:[^_$](?:(?!(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z][A-Z])(?=[a-z]))[^_$])*[_$]*){1,3}$|^[_$]*$"
+          "regex": "^[_$]*(?:[^_$](?:(?!(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z][A-Z])(?=[a-z]))[^_$])*[_$]*){1,5}$|^[_$]*$"
         }
       },
       {
@@ -150,16 +150,13 @@
         "trailingUnderscore": "forbid",
         "custom": {
           "match": true,
-          "regex": "^[_$]*(?:[^_$](?:(?!(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z][A-Z])(?=[a-z]))[^_$])*[_$]*){1,3}$|^[_$]*$"
+          "regex": "^[_$]*(?:[^_$](?:(?!(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z][A-Z])(?=[a-z]))[^_$])*[_$]*){1,5}$|^[_$]*$"
         }
       }
     ],
     "import/extensions": [
       "error",
-      "never",
-      {
-        "vue": "always"
-      }
+      "never"
     ],
     "import/no-relative-parent-imports": "error",
     "effect/noNewPromise": "error",
@@ -306,9 +303,6 @@
     "oxc/const-comparisons": "error",
     "oxc/no-async-endpoint-handlers": "error",
     "oxc/no-accumulating-spread": "error",
-    "vue/no-async-in-computed-properties": "error",
-    "vue/no-side-effects-in-computed-properties": "error",
-    "vue/no-import-compiler-macros": "error",
     "effect/noEffectDo": "error",
     "effect/noEffectBind": "error",
     "effect/noNestedEffectGen": "error",
@@ -349,7 +343,6 @@
     "effect/noInterruptibleMemo": "error"
   },
   "ignorePatterns": [
-    "**/.nuxt/**",
     "**/.output/**",
     "**/.edgeone/**",
     "**/dist/**",
@@ -378,10 +371,19 @@
     },
     {
       "files": [
-        "apps/web/app/**/*.vue"
+        "apps/web/src/**/*.ts",
+        "apps/web/src/**/*.tsx"
       ],
       "rules": {
-        "effect/noModuleLevelMutableState": "off"
+        "effect/noModuleLevelMutableState": "off",
+        "effect/noNewPromise": "off",
+        "effect/noThrowStatement": "off",
+        "effect/noTryCatch": "off",
+        "effect/noDynamicImports": "off",
+        "oxc/no-map-spread": "off",
+        "typescript/no-dynamic-delete": "off",
+        "eslint/no-unassigned-vars": "off",
+        "import/extensions": "off"
       }
     }
   ],
