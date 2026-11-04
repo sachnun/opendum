@@ -61,7 +61,7 @@ jobs:
         run: bun run --filter "./packages/*" --if-present test
 
       - name: Typecheck api
-        run: bun run --filter @opendum/api check
+        run: bun run --filter @opendum/api typecheck
 
       - name: Test api
         run: bun run --filter @opendum/api test
