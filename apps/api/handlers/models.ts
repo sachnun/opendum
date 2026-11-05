@@ -3,9 +3,6 @@ import type { H3Event } from "h3";
 import type { ProxyContext } from "@opendum/api/core/context";
 import { internalResponse, jsonResponse } from "@opendum/api/handlers/errors";
 
-const PUBLIC_CACHE = "public, max-age=60, stale-while-revalidate=120";
-const KEY_CACHE = "private, max-age=30";
-
 export async function handleModels(event: H3Event, context: ProxyContext): Promise<Response> {
   return Effect.runPromise(
     Effect.gen(function* () {
@@ -34,7 +31,7 @@ export async function handleModels(event: H3Event, context: ProxyContext): Promi
 
       const allModels = context.models.openAiModels();
       if (!userId) {
-        return jsonResponse({ object: "list", data: allModels }, 200, undefined, PUBLIC_CACHE);
+        return jsonResponse({ object: "list", data: allModels });
       }
 
       const disabledSet = yield* context.auth.disabledModels(userId);
@@ -82,7 +79,7 @@ export async function handleModels(event: H3Event, context: ProxyContext): Promi
         enabled.push(item);
       }
 
-      return jsonResponse({ object: "list", data: enabled }, 200, undefined, KEY_CACHE);
+      return jsonResponse({ object: "list", data: enabled });
     }).pipe(
       Effect.catchCause((cause) =>
         Effect.sync(() => {

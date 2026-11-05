@@ -47,13 +47,14 @@ describe("config", () => {
   it("redirects the root to /v1", () => {
     expect(config.routeRules?.["/"]).toMatchObject({ redirect: { to: "/v1", status: 308 } });
   });
-});
 
-describe("model listing cache headers", () => {
-  it("allows anonymous model listings to be cached by the browser", async () => {
-    const { jsonResponse } = await import("@opendum/api/handlers/errors");
-    const response = jsonResponse({ object: "list", data: [] }, 200, undefined, "public, max-age=60");
-
-    expect(response.headers.get("cache-control")).toBe("public, max-age=60");
+  it("declares cache headers in route rules instead of handlers", () => {
+    expect(config.routeRules?.["/v1/models"]).toMatchObject({
+      headers: { "cache-control": "private, max-age=30, stale-while-revalidate=60", vary: "authorization" },
+    });
+    expect(config.routeRules?.["/v1/**"]).toMatchObject({ headers: { "cache-control": "no-store" } });
+    expect(config.routeRules?.["/rpc/**"]).toMatchObject({ headers: { "cache-control": "no-store" } });
+    expect(config.routeRules?.["/api/auth/**"]).toMatchObject({ headers: { "cache-control": "no-store" } });
+    expect(config.routeRules?.["/health"]).toMatchObject({ headers: { "cache-control": "no-store" } });
   });
 });
