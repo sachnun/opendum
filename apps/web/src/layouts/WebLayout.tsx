@@ -52,11 +52,11 @@ export function WebLayout(props: { children?: JSX.Element }): JSX.Element {
     defaultValue: { role: "user" as const, isMaintainer: false },
   });
   const customProvidersQuery = createQuery(dataKeys.customProviders, () => api.customProviders.list(), { defaultValue: [] });
-  const accountsOverviewEntry = queryEntry<AccountOverviewData>(dataKeys.accountsOverview);
+  const accountsOverviewEntry = () => queryEntry<AccountOverviewData>(dataKeys.accountsOverview);
   const shellAccountsQuery = createQuery<ShellAccountSummary>(
     dataKeys.shellAccounts,
-    async () => toSummary(await api.accounts.ping()),
-    { defaultValue: emptySummary }
+    async () => toSummary(accountsOverviewEntry()?.data() ?? (await api.accounts.ping())),
+    { defaultValue: emptySummary, immediate: false }
   );
   const shellFamilyCountsQuery = createQuery(dataKeys.shellModelFamilyCounts, async () => familyCounts(await api.models.familyCounts()), {
     defaultValue: emptyCounts,
@@ -113,7 +113,10 @@ export function WebLayout(props: { children?: JSX.Element }): JSX.Element {
         : item
     );
 
-  const summary = (): ShellAccountSummary => shellAccountsQuery.data() ?? emptySummary;
+  const summary = (): ShellAccountSummary => {
+    const overview = accountsOverviewEntry()?.data();
+    return overview ? toSummary(overview) : (shellAccountsQuery.data() ?? emptySummary);
+  };
   const accountCounts = () => summary().accountCounts;
   const activeAccountCounts = () => summary().activeAccountCounts;
   const accountIndicators = () => summary().accountIndicators;
@@ -267,7 +270,7 @@ export function WebLayout(props: { children?: JSX.Element }): JSX.Element {
   });
 
   function applyOverview(next: AccountOverviewData): void {
-    accountsOverviewEntry?.setData(next);
+    accountsOverviewEntry()?.setData(next);
   }
 
   useLiveEvent("accounts", (data: AccountsData) => applyOverview(data.overview));
@@ -282,6 +285,9 @@ export function WebLayout(props: { children?: JSX.Element }): JSX.Element {
   onMount(() => {
     syncMeFromQuery();
     setSharingEnabled(me()?.sharing?.enabled ?? false);
+    const fallback = setTimeout(() => {
+      if (!accountsOverviewEntry()) void shellAccountsQuery.load();
+    }, 0);
     stopStream = startEventStream({
       onPoints: (balance) => {
         const current = me();
@@ -294,6 +300,7 @@ export function WebLayout(props: { children?: JSX.Element }): JSX.Element {
       },
       onModels: (data) => invalidation.patchModels(data.list),
     });
+    onCleanup(() => clearTimeout(fallback));
   });
 
   onCleanup(() => {

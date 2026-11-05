@@ -1,7 +1,13 @@
 import type { ErrorFormat } from "@opendum/api/core/types";
 
-export function jsonResponse(value: unknown, status = 200, extraHeaders?: Record<string, string>): Response {
+export function jsonResponse(
+  value: unknown,
+  status = 200,
+  extraHeaders?: Record<string, string>,
+  cacheControl?: string
+): Response {
   const headers = new Headers({ "content-type": "application/json" });
+  if (cacheControl) headers.set("cache-control", cacheControl);
   if (extraHeaders) {
     for (const [key, val] of Object.entries(extraHeaders)) headers.set(key, val);
   }

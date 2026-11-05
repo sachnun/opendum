@@ -39,11 +39,21 @@ describe("config", () => {
         methods: ["GET", "POST", "OPTIONS"],
         allowHeaders: "*",
         exposeHeaders: "*",
+        maxAge: "86400",
       },
     });
   });
 
   it("redirects the root to /v1", () => {
     expect(config.routeRules?.["/"]).toMatchObject({ redirect: { to: "/v1", status: 308 } });
+  });
+});
+
+describe("model listing cache headers", () => {
+  it("allows anonymous model listings to be cached by the browser", async () => {
+    const { jsonResponse } = await import("@opendum/api/handlers/errors");
+    const response = jsonResponse({ object: "list", data: [] }, 200, undefined, "public, max-age=60");
+
+    expect(response.headers.get("cache-control")).toBe("public, max-age=60");
   });
 });

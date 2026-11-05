@@ -225,7 +225,18 @@ function collectEntries(authoredDir: string, generatedDir: string): ModelEntry[]
 }
 
 export function loadEntries(dir: string): ModelEntry[] {
-  return collectEntries(dir, generatedDir(dir));
+  return cachedEntries(dir) ?? rememberEntries(dir, collectEntries(dir, generatedDir(dir)));
+}
+
+const entryCache = new Map<string, ModelEntry[]>();
+
+function cachedEntries(dir: string): ModelEntry[] | undefined {
+  return entryCache.get(dir);
+}
+
+function rememberEntries(dir: string, entries: ModelEntry[]): ModelEntry[] {
+  entryCache.set(dir, entries);
+  return entries;
 }
 
 export function loadSafe(
@@ -252,8 +263,10 @@ export function tryLoad(
   dir: string,
   options: { familyFromFolder?: boolean } = {}
 ): Effect.Effect<Registry, ModelsDirectoryFailure | ModelReadFailure | ModelParseFailure> {
-  return Effect.map(loadSafe(dir), (entries) => Registry.fromEntries(entries, options));
+  return Effect.map(loadSafe(dir), () => Registry.load(dir, options));
 }
+
+const registryCache = new Map<string, Registry>();
 
 export type FlagshipFamily = {
   family: string;
@@ -307,7 +320,12 @@ export class Registry {
   }
 
   static load(dir: string, options: { familyFromFolder?: boolean } = {}): Registry {
-    return new Registry(loadEntries(dir), options);
+    const key = `${dir}\u0000${options.familyFromFolder === true ? "folder" : "default"}`;
+    const cached = registryCache.get(key);
+    if (cached) return cached;
+    const registry = new Registry(loadEntries(dir), options);
+    registryCache.set(key, registry);
+    return registry;
   }
 
   static fromEntries(entries: ModelEntry[], options: { familyFromFolder?: boolean } = {}): Registry {

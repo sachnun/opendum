@@ -131,7 +131,6 @@ function patchModels(list: ModelListItem[]) {
 
 function invalidateAccountCollection(provider: string) {
   return refreshData([
-    dataKeys.shellAccounts,
     dataKeys.accountsOverview,
     dataKeys.accountsDetail(provider),
     dataKeys.models,
@@ -143,7 +142,7 @@ function invalidateAccountCollection(provider: string) {
 }
 
 function invalidateAccountOverview() {
-  return refreshData([dataKeys.shellAccounts, dataKeys.accountsOverview]);
+  return refreshData([dataKeys.accountsOverview]);
 }
 
 function clearOptions() {

@@ -1,21 +1,12 @@
 import { Context, Effect, Layer, ManagedRuntime } from "effect";
-import { createAuth, type AuthInstance, type AuthSession } from "@opendum/api/web/auth";
+import { createAuth, ACCESS_TOKEN_AUDIENCE, ACCESS_TOKEN_ISSUER, type AuthInstance, type AuthSession } from "@opendum/api/web/auth";
+import { verifyAccessToken } from "@opendum/api/web/lib/jwks";
 
 export class IdentityService {
   readonly auth: AuthInstance;
 
   constructor(auth: AuthInstance = createAuth()) {
     this.auth = auth;
-  }
-
-  verifyAccessToken(token: string): Effect.Effect<Record<string, unknown> | null> {
-    return Effect.tryPromise({
-      try: () => this.auth.api.verifyJWT({ body: { token } }),
-      catch: (cause) => cause,
-    }).pipe(
-      Effect.map((result) => result.payload ?? null),
-      Effect.catch(() => Effect.succeed(null))
-    );
   }
 
   sessionFromHeaders(headers: Headers): Effect.Effect<AuthSession | null> {
@@ -37,6 +28,15 @@ export class IdentityService {
 }
 
 export class IdentityTag extends Context.Service<IdentityTag, IdentityService>()("opendum/identity") {}
+
+export const verifyAccessTokenEffect = (token: string): Effect.Effect<Record<string, unknown> | null> =>
+  Effect.tryPromise({
+    try: () => verifyAccessToken(token, { issuer: ACCESS_TOKEN_ISSUER, audience: ACCESS_TOKEN_AUDIENCE }),
+    catch: (cause) => cause,
+  }).pipe(
+    Effect.map((payload) => (payload ? { ...payload } : null)),
+    Effect.catch(() => Effect.succeed(null))
+  );
 
 export const IdentityLayer = Layer.effect(
   IdentityTag,

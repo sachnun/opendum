@@ -13,6 +13,7 @@ export default defineConfig({
         methods: ["GET", "POST", "OPTIONS"],
         allowHeaders: "*",
         exposeHeaders: "*",
+        maxAge: "86400",
       },
     },
     "/": { redirect: { to: "/v1", status: 308 } },
