@@ -3,6 +3,9 @@
     "kilo_code": {
       "authless": true,
       "free": true
+    },
+    "opencode": {
+      "responses_api": true
     }
   }
 }
