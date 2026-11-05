@@ -1,11 +1,11 @@
-import { raise } from "@opendum/models/refresh/core/raise";
+import { raise } from "@opendum/models/refresh/sources/raise";
 import { folderOf } from "@opendum/models/model/families";
 import { buildIndex, persist, moveFiles, generatedDir } from "@opendum/models/model-store";
 import { applyMerge, planCanonicalization } from "@opendum/models/model/canonicalize";
 import { modelProbes } from "@opendum/models/model/probes";
 import { exists, remove, rename } from "@opendum/models/fs";
 import { basename, dirname, join } from "@opendum/models/paths";
-import { flags, dataDir, runScript } from "@opendum/models/refresh/core/env";
+import { flags, dataDir, runScript } from "@opendum/models/refresh/sources/env";
 import type { ModelData } from "@opendum/models/types";
 import {
   modelPatch,

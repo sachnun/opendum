@@ -1,4 +1,4 @@
-import { raise } from "@opendum/models/refresh/core/raise";
+import { raise } from "@opendum/models/refresh/sources/raise";
 import { expect, test } from "bun:test";
 
 import { MAX_FETCH_ATTEMPTS, runJson, runText, sleep } from "@opendum/models/sync/http";

@@ -1,4 +1,4 @@
-import { parseJson } from "@opendum/core/json";
+import { parseJson } from "@opendum/platform/json";
 export type UserRole = "user" | "maintainer";
 
 const MAINTAINER_ROLE: UserRole = "maintainer";

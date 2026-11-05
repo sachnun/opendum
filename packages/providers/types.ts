@@ -1,7 +1,7 @@
 import type { Effect } from "effect";
-import type { ProviderCredentialFailure, ProviderFailure } from "@opendum/providers/core/errors";
+import type { ProviderCredentialFailure, ProviderFailure } from "@opendum/providers/errors";
 
-export type { ProviderFailure, ProviderCredentialFailure } from "@opendum/providers/core/errors";
+export type { ProviderFailure, ProviderCredentialFailure } from "@opendum/providers/errors";
 
 export type ProviderAccount = {
   id: string;

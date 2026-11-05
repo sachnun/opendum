@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { Effect } from "effect";
-import { hashString } from "@opendum/core/crypto";
+import { hashString } from "@opendum/platform/crypto";
 import type { Registry } from "@opendum/models/runtime";
 import {
   type Cache,

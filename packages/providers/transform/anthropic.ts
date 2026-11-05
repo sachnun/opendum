@@ -1,6 +1,6 @@
-import { Value, Payload, Ids, JSONText } from "@opendum/providers/core/helpers";
+import { Value, Payload, Ids, JSONText } from "@opendum/providers/helpers";
 import { Effect } from "effect";
-import { ChatImageInliner, type ImageFetch } from "@opendum/providers/core/images";
+import { ChatImageInliner, type ImageFetch } from "@opendum/providers/images";
 
 type Json = Record<string, unknown>;
 

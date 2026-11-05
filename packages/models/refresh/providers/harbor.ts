@@ -1,9 +1,9 @@
 import { Chunk, Effect, Option, Schema } from "effect";
-import { parseJson as parseJsonPayload } from "@opendum/models/refresh/core/json";
+import { parseJson as parseJsonPayload } from "@opendum/models/refresh/sources/json";
 import { idMap } from "@opendum/models/model-store";
 import { fetchText } from "@opendum/models/sync/http";
-import { standardKey } from "@opendum/models/refresh/core/keys";
-import { sourceOf, type ModelSource, type SourceResult } from "@opendum/models/refresh/core/types";
+import { standardKey } from "@opendum/models/refresh/sources/keys";
+import { sourceOf, type ModelSource, type SourceResult } from "@opendum/models/refresh/sources/types";
 import { compareText } from "@opendum/models/compare";
 
 const MODELS_URL = "https://tokenharbor.ai/models";

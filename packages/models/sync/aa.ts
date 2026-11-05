@@ -1,4 +1,4 @@
-import { parseJson } from "@opendum/models/refresh/core/json";
+import { parseJson } from "@opendum/models/refresh/sources/json";
 import { Effect } from "effect";
 
 import { ModelDecodeFailure, asError } from "@opendum/models/errors";

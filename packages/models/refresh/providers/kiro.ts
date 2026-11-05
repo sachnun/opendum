@@ -1,9 +1,9 @@
 import { Effect } from "effect";
-import { raise } from "@opendum/models/refresh/core/raise";
+import { raise } from "@opendum/models/refresh/sources/raise";
 import { fetchText } from "@opendum/models/sync/http";
 import { stripParams } from "@opendum/models/model/clean-key";
 import { join } from "@opendum/models/paths";
-import { sourceOf, type ModelSource, type SourceContext, type SourceResult, type VersionTarget } from "@opendum/models/refresh/core/types";
+import { sourceOf, type ModelSource, type SourceContext, type SourceResult, type VersionTarget } from "@opendum/models/refresh/sources/types";
 
 const PROVIDER = "kiro";
 const DOCS_URL = "https://kiro.dev/docs/models/";

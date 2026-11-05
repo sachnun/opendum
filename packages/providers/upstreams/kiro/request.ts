@@ -1,5 +1,5 @@
 import type { Registry } from "@opendum/models/runtime";
-import { Value } from "@opendum/providers/core/helpers";
+import { Value } from "@opendum/providers/helpers";
 import { pick } from "@opendum/providers/upstreams/kiro/common";
 import { KiroModel } from "@opendum/providers/upstreams/kiro/model";
 import { KiroNames } from "@opendum/providers/upstreams/kiro/parser";

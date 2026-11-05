@@ -1,15 +1,15 @@
 import { Effect, Option, Schema, Cause } from "effect";
-import { raise } from "@opendum/models/refresh/core/raise";
-import { parseJson } from "@opendum/models/refresh/core/json";
+import { raise } from "@opendum/models/refresh/sources/raise";
+import { parseJson } from "@opendum/models/refresh/sources/json";
 import { buildIndex } from "@opendum/models/model-store";
 import { exists, readText } from "@opendum/models/fs";
 import { join } from "@opendum/models/paths";
-import { env } from "@opendum/models/refresh/core/env";
-import { entryFor, writeEntry } from "@opendum/models/refresh/core/keys";
+import { env } from "@opendum/models/refresh/sources/env";
+import { entryFor, writeEntry } from "@opendum/models/refresh/sources/keys";
 import { fetchJson } from "@opendum/models/sync/http";
-import { causeMessage } from "@opendum/models/refresh/core/failure";
+import { causeMessage } from "@opendum/models/refresh/sources/failure";
 import type { ModelFetchFailure, ModelTimeoutFailure } from "@opendum/models/errors";
-import { sourceOf, type ModelSource, type SourceContext, type SourceResult } from "@opendum/models/refresh/core/types";
+import { sourceOf, type ModelSource, type SourceContext, type SourceResult } from "@opendum/models/refresh/sources/types";
 import { compareText } from "@opendum/models/compare";
 
 const PROVIDER = "workbuddy";

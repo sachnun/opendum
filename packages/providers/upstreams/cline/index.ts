@@ -1,8 +1,8 @@
 import { type Effect, Result } from "effect";
-import { OAuth } from "@opendum/providers/core/oauth";
-import { OAuthProvider, type Json, type ProviderOptions } from "@opendum/providers/core/provider";
-import { Value } from "@opendum/providers/core/helpers";
-import { JSONPoster } from "@opendum/providers/core/http";
+import { OAuth } from "@opendum/providers/oauth";
+import { OAuthProvider, type Json, type ProviderOptions } from "@opendum/providers/provider";
+import { Value } from "@opendum/providers/helpers";
+import { JSONPoster } from "@opendum/providers/http";
 import type {
   ProviderAccount,
   ProviderFailure,

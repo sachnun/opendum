@@ -1,8 +1,8 @@
 import { Effect, Option, Result, Schema } from "effect";
 import { idMap } from "@opendum/models/model-store";
 import { fetchJson } from "@opendum/models/sync/http";
-import { slashedKey } from "@opendum/models/refresh/core/keys";
-import { sourceOf, type ModelSource, type SourceFailure, type SourceResult } from "@opendum/models/refresh/core/types";
+import { slashedKey } from "@opendum/models/refresh/sources/keys";
+import { sourceOf, type ModelSource, type SourceFailure, type SourceResult } from "@opendum/models/refresh/sources/types";
 
 const MODELS_URL = "https://api.cline.bot/api/v1/ai/cline/recommended-models";
 

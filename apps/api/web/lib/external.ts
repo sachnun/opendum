@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import { hostError } from "@opendum/core/egress";
+import { hostError } from "@opendum/platform/egress";
 import { proxyContext } from "@opendum/api/context";
 import { type ServiceFailure, asFailure, badRequest, unavailable } from "@opendum/api/web/errors";
 

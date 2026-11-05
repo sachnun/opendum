@@ -1,7 +1,7 @@
 import { Effect, Result } from "effect";
-import type { OpendumRedis } from "@opendum/core/redis";
-import { Value, Payload, Responses, JSONText } from "@opendum/providers/core/helpers";
-import { Jwt, ModelName } from "@opendum/providers/core/identity";
+import type { OpendumRedis } from "@opendum/platform/redis";
+import { Value, Payload, Responses, JSONText } from "@opendum/providers/helpers";
+import { Jwt, ModelName } from "@opendum/providers/identity";
 import { Collector } from "@opendum/providers/transform/collector";
 import { anthropicUsage } from "@opendum/providers/transform/anthropic";
 import {
@@ -11,9 +11,9 @@ import {
   sseStream,
   callId,
 } from "@opendum/providers/transform/responses";
-import { RequestFailure } from "@opendum/providers/core/http";
-import { OAuth } from "@opendum/providers/core/oauth";
-import { OAuthProvider, type ProviderOptions } from "@opendum/providers/core/provider";
+import { RequestFailure } from "@opendum/providers/http";
+import { OAuth } from "@opendum/providers/oauth";
+import { OAuthProvider, type ProviderOptions } from "@opendum/providers/provider";
 import type {
   ProviderAccount,
   ProviderFailure,

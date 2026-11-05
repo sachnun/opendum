@@ -1,8 +1,8 @@
 import { Effect, Layer, ManagedRuntime } from "effect";
-import { envFile } from "@opendum/core/config";
-import { ProxyContextLayer } from "@opendum/api/core/context";
-import { LoggerLayer } from "@opendum/api/core/logger";
-import { ProxyContextTag, type ProxyContext } from "@opendum/api/core/services";
+import { envFile } from "@opendum/platform/config";
+import { ProxyContextLayer } from "@opendum/api/proxy/context";
+import { LoggerLayer } from "@opendum/api/proxy/logger";
+import { ProxyContextTag, type ProxyContext } from "@opendum/api/proxy/services";
 
 type Runtime = ManagedRuntime.ManagedRuntime<Layer.Success<typeof ProxyContextLayer>, Layer.Error<typeof ProxyContextLayer>>;
 

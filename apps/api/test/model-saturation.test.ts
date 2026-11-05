@@ -3,10 +3,10 @@ import type { AuthResult, AuthService, ModelValidationResult } from "@opendum/au
 import { Effect } from "effect";
 import type { Provider, ProviderRegistry } from "@opendum/providers";
 import type { Registry } from "@opendum/models/runtime";
-import type { OpendumRedis } from "@opendum/core/redis";
-import { ProxyService } from "@opendum/api/core/service";
-import { Chat } from "@opendum/api/core/endpoints";
-import { ModelSaturation, isSaturated } from "@opendum/api/core/model-saturation";
+import type { OpendumRedis } from "@opendum/platform/redis";
+import { ProxyService } from "@opendum/api/proxy/service";
+import { Chat } from "@opendum/api/proxy/endpoints";
+import { ModelSaturation, isSaturated } from "@opendum/api/proxy/model-saturation";
 import { fakes } from "@opendum/api/test/fakes";
 
 function memoryRedis(): OpendumRedis {

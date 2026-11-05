@@ -1,10 +1,10 @@
 import { Effect, Option, Schema } from "effect";
-import { raise } from "@opendum/models/refresh/core/raise";
+import { raise } from "@opendum/models/refresh/sources/raise";
 import { compareText } from "@opendum/models/compare";
 import { buildIndex, upstream } from "@opendum/models/model-store";
 import { fetchDecoded } from "@opendum/models/sync/http";
-import { afterFirstSlash, standardKey } from "@opendum/models/refresh/core/keys";
-import { sourceOf, type ModelSource, type SourceContext, type SourceResult } from "@opendum/models/refresh/core/types";
+import { afterFirstSlash, standardKey } from "@opendum/models/refresh/sources/keys";
+import { sourceOf, type ModelSource, type SourceContext, type SourceResult } from "@opendum/models/refresh/sources/types";
 
 const MODELS_URL = "https://integrate.api.nvidia.com/v1/models";
 const DOCS_URLS = [

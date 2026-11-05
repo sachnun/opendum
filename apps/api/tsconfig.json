@@ -12,7 +12,7 @@
     "resolveJsonModule": true
   },
   "include": [
-    "core/**/*",
+    "proxy/**/*",
     "handlers/**/*",
     "plugins/**/*",
     "routes/**/*",

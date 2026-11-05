@@ -1,10 +1,10 @@
 import { Effect, Match, Option, Ref } from "effect";
 import { buildIndex } from "@opendum/models/model-store";
 import { writeText } from "@opendum/models/fs";
-import { dataDir, flags, repoRoot } from "@opendum/models/refresh/core/env";
+import { dataDir, flags, repoRoot } from "@opendum/models/refresh/sources/env";
 import { SOURCES } from "@opendum/models/refresh/providers/index";
-import { runSources } from "@opendum/models/refresh/core/runner";
-import type { SourceContext } from "@opendum/models/refresh/core/types";
+import { runSources } from "@opendum/models/refresh/sources/runner";
+import type { SourceContext } from "@opendum/models/refresh/sources/types";
 
 type Snapshot = ReadonlyMap<string, ReadonlySet<string>>;
 

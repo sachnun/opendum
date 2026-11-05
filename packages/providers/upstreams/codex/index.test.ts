@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
 import { CLIENT_ID as CODEX_CLIENT_ID, TOKEN_ENDPOINT as CODEX_TOKEN_ENDPOINT } from "@opendum/providers/auth/codex/constants";
-import type { UpstreamTransport } from "@opendum/providers/core/http";
+import type { UpstreamTransport } from "@opendum/providers/http";
 import type { ProviderAccount } from "@opendum/providers/types";
 import { CodexProvider, fromResponses } from "@opendum/providers/upstreams/codex/index";
 

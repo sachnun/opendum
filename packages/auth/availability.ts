@@ -1,8 +1,8 @@
 import { Effect } from "effect";
 import type { DatabaseFailure } from "@opendum/database";
 import type { Registry } from "@opendum/models/runtime";
-import { disabledKey, type OpendumRedis } from "@opendum/core/redis";
-import { ignore, tryAsync } from "@opendum/core/best-effort";
+import { disabledKey, type OpendumRedis } from "@opendum/platform/redis";
+import { ignore, tryAsync } from "@opendum/platform/best-effort";
 import {
   activeTiers,
   disabledByAccounts,

@@ -1,5 +1,5 @@
-import { raise } from "@opendum/providers/core/errors";
-import { Ids, Value } from "@opendum/providers/core/helpers";
+import { raise } from "@opendum/providers/errors";
+import { Ids, Value } from "@opendum/providers/helpers";
 import { Collector } from "@opendum/providers/transform/collector";
 import { PerchUsage, UpstreamError, type Json } from "@opendum/providers/upstreams/perch/auth";
 

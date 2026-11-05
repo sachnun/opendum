@@ -1,7 +1,7 @@
 import { mkdir as fsMkdir, rename as fsRename } from "node:fs/promises";
 
 import { Effect, Result } from "effect";
-import { raise } from "@opendum/models/refresh/core/raise";
+import { raise } from "@opendum/models/refresh/sources/raise";
 
 import { ModelParseFailure, ModelReadFailure, ModelWriteFailure, asError } from "@opendum/models/errors";
 import { dirname } from "@opendum/models/paths";

@@ -1,8 +1,8 @@
 import { describe, expect, it, mock } from "bun:test";
 import { Effect } from "effect";
 
-import { adjustRoamingPoints, refundRoamingPoint, reserveRoamingPoint } from "@opendum/api/core/points";
-import type { PointPort } from "@opendum/api/core/repositories";
+import { adjustRoamingPoints, refundRoamingPoint, reserveRoamingPoint } from "@opendum/api/proxy/points";
+import type { PointPort } from "@opendum/api/proxy/repositories";
 import { fakes } from "@opendum/api/test/fakes";
 
 function pointPort(overrides: Partial<PointPort> = {}): PointPort {

@@ -12,7 +12,8 @@
     "db:push": "bun run --filter @opendum/database db:push",
     "db:generate": "bun run --filter @opendum/database db:generate",
     "db:migrate": "bun run --filter @opendum/database db:migrate",
-    "models:refresh": "bun run --filter @opendum/models refresh && bun run --filter @opendum/models family-ranking"
+    "models:refresh": "bun run --filter @opendum/models refresh && bun run --filter @opendum/models family-ranking",
+    "test": "bun run --filter '*' test"
   },
   "devDependencies": {
     "@kevinmichaelchen/oxlint-plugin-naming-convention": "^0.1.1",

@@ -1,7 +1,7 @@
-import type { AuthMethod, ProviderSpec } from "@opendum/providers/core/spec";
+import type { AuthMethod, ProviderSpec } from "@opendum/providers/spec";
 import { accountPath, BY_KEY, BY_SLUG, SPECS } from "@opendum/providers/registry-specs";
 
-export type { AuthMethod as AuthMethodKey, ProviderCategory } from "@opendum/providers/core/spec";
+export type { AuthMethod as AuthMethodKey, ProviderCategory } from "@opendum/providers/spec";
 export type ProviderAccountDefinition = ProviderSpec;
 export type ProviderAccountKey = string;
 

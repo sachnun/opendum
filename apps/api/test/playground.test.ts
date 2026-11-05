@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { playgroundSignature } from "@opendum/core/crypto";
-import { Playground } from "@opendum/api/core/playground";
+import { playgroundSignature } from "@opendum/platform/crypto";
+import { Playground } from "@opendum/api/proxy/playground";
 
 const SECRET = "playground-secret";
 const REQUEST_PATH = "/v1/chat/completions";

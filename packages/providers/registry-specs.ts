@@ -1,4 +1,4 @@
-import type { ProviderEntry, ProviderSpec } from "@opendum/providers/core/spec";
+import type { ProviderEntry, ProviderSpec } from "@opendum/providers/spec";
 
 import { PROVIDER as antigravity } from "@opendum/providers/auth/antigravity/constants";
 import { PROVIDER as cline } from "@opendum/providers/auth/cline/constants";

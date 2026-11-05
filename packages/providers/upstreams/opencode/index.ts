@@ -8,9 +8,9 @@ import {
   messagesStream,
   payloadFor,
 } from "@opendum/providers/transform/anthropic";
-import { Value, Ids, Responses } from "@opendum/providers/core/helpers";
-import { ModelConfig } from "@opendum/providers/core/model-config";
-import { StaticProvider, type ProviderOptions } from "@opendum/providers/core/provider";
+import { Value, Ids, Responses } from "@opendum/providers/helpers";
+import { ModelConfig } from "@opendum/providers/model-config";
+import { StaticProvider, type ProviderOptions } from "@opendum/providers/provider";
 import {
   EgressPoster,
   FallbackPoster,
@@ -19,8 +19,8 @@ import {
   type FetchLike,
   type Logger,
   type ProviderTransportFailure,
-} from "@opendum/providers/core/http";
-import type { FallbackState } from "@opendum/providers/core/fallback";
+} from "@opendum/providers/http";
+import type { FallbackState } from "@opendum/providers/fallback";
 import type { ProviderFailure, ProviderRequest } from "@opendum/providers/types";
 
 const CHAT_ENDPOINT = "https://opencode.ai/inference/v1/chat/completions";
