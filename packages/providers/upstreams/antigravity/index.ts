@@ -44,6 +44,7 @@ const MIN_THINKING_BUDGET = 1024;
 const MAX_OUTPUT_TOKENS = 64000;
 const SIGNATURE_PREFIX = "opendum:thought-signature";
 const SIGNATURE_TTL_SECONDS = 24 * 60 * 60;
+const SKIP_THOUGHT_SIGNATURE = "skip_thought_signature_validator";
 const CLAUDE_BETA_HEADER = "interleaved-thinking-2025-05-14";
 const ANTIGRAVITY_SYSTEM_INSTRUCTION =
   "You are Antigravity, a powerful agentic AI coding assistant designed by the Google Deepmind team working on Advanced Agentic Coding.You are pair programming with a USER to solve their coding task. The task may require creating a new codebase, modifying or debugging an existing codebase, or simply answering a question.**Absolute paths only****Proactiveness**";
@@ -677,25 +678,33 @@ export class AntigravityProvider extends OAuthProvider {
     return this.configString(model, "signature_family") || this.configString(model, "transform");
   }
 
-  private signatureCacheKey(model: string, sessionId: string, thoughtText: string): string {
+  private signatureCacheKey(model: string, sessionId: string, key: string): string {
     const hash = new Bun.CryptoHasher("sha256")
-      .update(`${this.signatureFamily(model)}:${sessionId}:${thoughtText.trim()}`)
+      .update(`${this.signatureFamily(model)}:${sessionId}:${key}`)
       .digest("hex");
     return `${SIGNATURE_PREFIX}:${hash}`;
   }
 
-  async getCachedSignature(model: string, sessionId: string, thoughtText: string): Promise<string> {
-    if (!this.redis || !sessionId || !thoughtText.trim()) return "";
-    const raw = await this.redis.get(this.signatureCacheKey(model, sessionId, thoughtText)).catch(() => null);
+  private static thoughtKey(thoughtText: string): string {
+    return `thought:${thoughtText.trim()}`;
+  }
+
+  private static callKey(callId: string): string {
+    return `call:${callId}`;
+  }
+
+  async getCachedSignature(model: string, sessionId: string, key: string): Promise<string> {
+    if (!this.redis || !sessionId || !key) return "";
+    const raw = await this.redis.get(this.signatureCacheKey(model, sessionId, key)).catch(() => null);
     if (!raw) return "";
     const cached = Value.parseJson(raw) as Json;
     return Value.string(cached?.signature);
   }
 
-  async cacheSignature(model: string, sessionId: string, thoughtText: string, signature: string): Promise<void> {
-    if (!this.redis || !sessionId || !thoughtText.trim() || !signature.trim()) return;
+  async cacheSignature(model: string, sessionId: string, key: string, signature: string): Promise<void> {
+    if (!this.redis || !sessionId || !key || !signature.trim()) return;
     await this.redis
-      .set(this.signatureCacheKey(model, sessionId, thoughtText), JSON.stringify({ signature }), {
+      .set(this.signatureCacheKey(model, sessionId, key), JSON.stringify({ signature }), {
         EX: SIGNATURE_TTL_SECONDS,
       })
       .catch(() => undefined);
@@ -706,10 +715,16 @@ export class AntigravityProvider extends OAuthProvider {
       const content = ((candidate as Json).content ?? {}) as Json;
       for (const rawPart of anySlice(content.parts)) {
         const part = (rawPart ?? {}) as Json;
+        const signature = Value.string(part.thoughtSignature);
+        if (!signature) continue;
         if (part.thought === true) {
           const text = Value.string(part.text);
-          const signature = Value.string(part.thoughtSignature);
-          if (text && signature) await this.cacheSignature(model, sessionId, text, signature);
+          if (text) await this.cacheSignature(model, sessionId, AntigravityProvider.thoughtKey(text), signature);
+          continue;
+        }
+        if (part.functionCall !== undefined && part.functionCall !== null) {
+          const callId = Value.string((part.functionCall as Json).id);
+          if (callId) await this.cacheSignature(model, sessionId, AntigravityProvider.callKey(callId), signature);
         }
       }
     }
@@ -767,28 +782,30 @@ export class AntigravityProvider extends OAuthProvider {
       const parts = anySlice(content.parts);
       const filtered: unknown[] = [];
       let currentThoughtSignature = "";
+      let signedCallInStep = false;
       for (const rawPart of parts) {
         const part = rawPart as Json;
         if (typeof part.text === "string" && part.text === "") continue;
         if (part.thought === true) {
           const thoughtText = Value.string(part.text);
           let signature = Value.string(part.thoughtSignature);
+          const key = AntigravityProvider.thoughtKey(thoughtText);
           if (strict) {
             if (!signature || signature.length < 50) {
-              const cached = await this.getCachedSignature(model, sessionId, thoughtText);
+              const cached = await this.getCachedSignature(model, sessionId, key);
               if (cached) {
                 signature = cached;
                 part.thoughtSignature = cached;
               }
             }
             if (signature.length > 50) {
-              await this.cacheSignature(model, sessionId, thoughtText, signature);
+              await this.cacheSignature(model, sessionId, key, signature);
               currentThoughtSignature = signature;
             } else {
               continue;
             }
           } else {
-            const cached = await this.getCachedSignature(model, sessionId, thoughtText);
+            const cached = await this.getCachedSignature(model, sessionId, key);
             if (cached) {
               part.thoughtSignature = cached;
               currentThoughtSignature = cached;
@@ -801,15 +818,23 @@ export class AntigravityProvider extends OAuthProvider {
           const fn = part.functionCall as Json;
           const name = Value.string(fn.name);
           if (fn.id === undefined || fn.id === null) fn.id = Ids.random(name);
+          const callId = Value.string(fn.id);
           if (strict && name) {
             callIdQueues[name] ??= [];
-            callIdQueues[name].push(Value.string(fn.id));
+            callIdQueues[name].push(callId);
           }
-          if (!strict && this.configBool(model, "inject_thought_signature") && part.thoughtSignature === undefined) {
-            part.thoughtSignature = currentThoughtSignature || "skip_thought_signature_validator";
+          if (!strict && this.configBool(model, "inject_thought_signature")) {
+            if (part.thoughtSignature === undefined && !signedCallInStep) {
+              const cached = callId
+                ? await this.getCachedSignature(model, sessionId, AntigravityProvider.callKey(callId))
+                : "";
+              part.thoughtSignature = cached || currentThoughtSignature || SKIP_THOUGHT_SIGNATURE;
+            }
+            if (part.thoughtSignature !== undefined) signedCallInStep = true;
           }
         }
         if (part.functionResponse !== undefined && part.functionResponse !== null) {
+          signedCallInStep = false;
           const fn = part.functionResponse as Json;
           if (fn.id === undefined || fn.id === null) {
             const name = Value.string(fn.name);
