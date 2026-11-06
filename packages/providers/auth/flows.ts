@@ -9,6 +9,7 @@ import {
 import { codexAuth } from "@opendum/providers/auth/codex/index";
 import { kiroAuth } from "@opendum/providers/auth/kiro/index";
 import { workbuddyAuth } from "@opendum/providers/auth/workbuddy/index";
+import { zroAuth } from "@opendum/providers/auth/zro/client";
 import { perchAuth } from "@opendum/providers/auth/perch/index";
 import { clineAuth } from "@opendum/providers/auth/cline/index";
 import { badRequest, type AuthFailure } from "@opendum/providers/auth/failure";
@@ -124,6 +125,7 @@ export function deviceFlows(runtime: AuthRuntime): Record<DeviceProviderKey, Dev
   const codex = codexAuth(runtime);
   const workbuddy = workbuddyAuth(runtime);
   const cline = clineAuth(runtime);
+  const zro = zroAuth(runtime);
 
   return {
     codex: {
@@ -148,6 +150,15 @@ export function deviceFlows(runtime: AuthRuntime): Record<DeviceProviderKey, Dev
       flow: {
         startDeviceFlow: () => cline.startDeviceFlow(),
         pollDeviceAuth: (deviceCode) => cline.pollDeviceAuth(deviceCode),
+      },
+    },
+    zro: {
+      label: "Zro",
+      emailPrefix: "zro",
+      flow: {
+        startDeviceFlow: () => zro.startDeviceFlow(),
+        pollDeviceAuth: (deviceCode, userCode, codeVerifier) =>
+          zro.pollDeviceAuth(deviceCode, userCode, codeVerifier),
       },
     },
   };
