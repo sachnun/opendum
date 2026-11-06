@@ -9,7 +9,7 @@ import { compareText } from "@opendum/models/compare";
 
 const PROVIDER = "opencode";
 const DOCS_URL =
-  "https://raw.githubusercontent.com/anomalyco/opencode/dev/services/www/src/docs/content/console/models.mdx";
+  "https://raw.githubusercontent.com/anomalyco/opencode/dev/services/site/src/docs/content/console/models.mdx";
 const MODELS_URL = "https://opencode.ai/zen/v1/models";
 const NPM_PACKAGE = "opencode-ai";
 
