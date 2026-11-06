@@ -9,6 +9,7 @@ import { API_BASE_URL as kiloBaseUrl } from "@opendum/providers/auth/kilo-code/c
 import { API_BASE_URL as harborBaseUrl } from "@opendum/providers/auth/harbor/constants";
 import { API_BASE_URL as zenmuxBaseUrl } from "@opendum/providers/auth/zenmux/constants";
 import { API_BASE_URL as hyperBaseUrl } from "@opendum/providers/auth/hyper/constants";
+import { API_BASE_URL as zroBaseUrl } from "@opendum/providers/auth/zro/constants";
 import { baseUrl, validationRequest } from "@opendum/providers/auth/key-settings";
 import { KEY_PROVIDERS } from "@opendum/providers/provider-accounts";
 
@@ -19,6 +20,7 @@ const DECLARED: Record<string, string> = {
   harbor: harborBaseUrl,
   zenmux: zenmuxBaseUrl,
   hyper: hyperBaseUrl,
+  zro: zroBaseUrl,
 };
 
 type CompatLike = { baseUrl?: unknown };

@@ -7,6 +7,7 @@ import {
   openrouterQuota,
   workbuddyQuota,
   zenmuxQuota,
+  zroQuota,
 } from "@opendum/providers/quota/fetchers/index";
 import { fetchQuota as perchQuota } from "@opendum/providers/quota/perch";
 import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaFetcher } from "@opendum/providers/quota/types";
@@ -51,6 +52,11 @@ const FETCHERS: QuotaFetcher[] = [
     provider: "workbuddy",
     withoutToken: false,
     fetch: (ctx, account, accessToken, forceRefresh) => workbuddyQuota(ctx, account, accessToken, forceRefresh),
+  },
+  {
+    provider: "zro",
+    withoutToken: true,
+    fetch: (ctx, account, _accessToken, forceRefresh) => zroQuota(ctx, account, forceRefresh),
   },
 ];
 

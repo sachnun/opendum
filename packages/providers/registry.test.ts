@@ -17,6 +17,7 @@ const EXPECTED = [
   "workers_ai",
   "workbuddy",
   "zenmux",
+  "zro",
 ];
 
 describe("provider registry", () => {

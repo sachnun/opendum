@@ -1,4 +1,4 @@
-import { SUPPORTED_HARBOR, SUPPORTED_HYPER, SUPPORTED_KILO, SUPPORTED_NVIDIA, SUPPORTED_OPENROUTER, SUPPORTED_ZENMUX } from "@opendum/providers/upstreams/compat/index";
+import { SUPPORTED_HARBOR, SUPPORTED_HYPER, SUPPORTED_KILO, SUPPORTED_NVIDIA, SUPPORTED_OPENROUTER, SUPPORTED_ZENMUX, SUPPORTED_ZRO } from "@opendum/providers/upstreams/compat/index";
 import type { CompatSpec } from "@opendum/providers/core/spec";
 import { COMPAT_ENTRIES } from "@opendum/providers/registry-specs";
 
@@ -11,6 +11,7 @@ const PARAMS: Record<string, Set<string>> = {
   harbor: SUPPORTED_HARBOR,
   zenmux: SUPPORTED_ZENMUX,
   hyper: SUPPORTED_HYPER,
+  zro: SUPPORTED_ZRO,
 };
 
 export type CompatRoute = CompatSpec & { readonly supportedParams: Set<string> };

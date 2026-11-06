@@ -37,6 +37,11 @@ export const KEY_SETTINGS: Record<KeyProvider, KeySetting> = {
     requireSuccessfulStatus: false,
     skipInference: true,
   },
+  zro: {
+    label: "Zro",
+    validationPath: "/models",
+    requireSuccessfulStatus: true,
+  },
 };
 
 export function baseUrl(provider: string): string {
