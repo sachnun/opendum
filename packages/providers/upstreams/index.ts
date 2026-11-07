@@ -8,3 +8,4 @@ export * from "@opendum/providers/upstreams/workbuddy/index";
 export * from "@opendum/providers/upstreams/workers-ai/index";
 export * from "@opendum/providers/upstreams/kiro/index";
 export * from "@opendum/providers/upstreams/antigravity/index";
+export * from "@opendum/providers/upstreams/deepai/index";

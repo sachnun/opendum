@@ -6,6 +6,7 @@ const EXPECTED = [
   "antigravity",
   "cline",
   "codex",
+  "deepai",
   "harbor",
   "hyper",
   "kilo_code",

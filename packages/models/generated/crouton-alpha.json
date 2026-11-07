@@ -1,9 +1,14 @@
 {
   "providers": [
     "kilo_code",
-    "opencode"
+    "opencode",
+    "deepai"
   ],
   "providerConfig": {
+    "deepai": {
+      "contextWindow": 1048576,
+      "maxOutputTokens": 131072
+    },
     "kilo_code": {
       "upstream": "stealth/crouton-alpha"
     },

@@ -12,6 +12,7 @@ export const providerDisplayNames: Record<string, string> = {
   workbuddy: "WorkBuddy",
   zenmux: "ZenMux",
   zro: "Zro",
+  deepai: "DeepAI",
   opencode: "Opencode",
   kilo_code: "Kilo Code",
 };
