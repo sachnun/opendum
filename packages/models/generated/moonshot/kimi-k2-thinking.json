@@ -1,8 +1,5 @@
 {
   "id": "kimi-k2-thinking",
-  "providers": [
-    "hyper"
-  ],
   "aliases": [
     "kimi-k2",
     "kimi-k2-0905",
@@ -35,13 +32,6 @@
     "artificialAnalysis": {
       "index": 22,
       "estimated": true
-    }
-  },
-  "providerConfig": {
-    "hyper": {
-      "upstream": "kimi-k2-thinking",
-      "contextWindow": 262144,
-      "maxOutputTokens": 26214
     }
   }
 }
