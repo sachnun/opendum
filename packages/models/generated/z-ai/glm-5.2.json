@@ -1,6 +1,5 @@
 {
   "providers": [
-    "hyper",
     "workbuddy"
   ],
   "reasoning": true,
@@ -33,10 +32,6 @@
     }
   },
   "providerConfig": {
-    "hyper": {
-      "contextWindow": 1000000,
-      "maxOutputTokens": 32768
-    },
     "workbuddy": {
       "contextWindow": 96000,
       "maxOutputTokens": 96000

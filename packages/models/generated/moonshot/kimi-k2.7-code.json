@@ -1,7 +1,4 @@
 {
-  "providers": [
-    "hyper"
-  ],
   "reasoning": true,
   "reasoning_effort": [
     "high"
@@ -28,12 +25,6 @@
     "artificialAnalysis": {
       "index": 25.8,
       "estimated": false
-    }
-  },
-  "providerConfig": {
-    "hyper": {
-      "contextWindow": 256000,
-      "maxOutputTokens": 16000
     }
   }
 }

@@ -1,0 +1,10 @@
+{
+  "providers": [
+    "opencode"
+  ],
+  "providerConfig": {
+    "opencode": {
+      "upstream": "inkling-2-small-free"
+    }
+  }
+}
