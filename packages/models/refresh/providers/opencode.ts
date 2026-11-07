@@ -1,15 +1,20 @@
-import { Effect, Option, Schema } from "effect";
+import { Cause, Effect, Option, Schema } from "effect";
 import { raise } from "@opendum/models/refresh/core/raise";
+import { buildIndex } from "@opendum/models/model-store";
 import { fetchText } from "@opendum/models/sync/http";
 import { stripParams } from "@opendum/models/model/clean-key";
 import { packageVersion } from "@opendum/models/refresh/core/fetch";
+import { causeMessage } from "@opendum/models/refresh/core/failure";
+import type { ModelFetchFailure, ModelTimeoutFailure } from "@opendum/models/errors";
 import { join } from "@opendum/models/paths";
 import { sourceOf, type ModelSource, type SourceContext, type SourceResult, type VersionTarget } from "@opendum/models/refresh/core/types";
 import { compareText } from "@opendum/models/compare";
 
 const PROVIDER = "opencode";
-const DOCS_URL =
-  "https://raw.githubusercontent.com/anomalyco/opencode/dev/services/www/src/docs/content/console/models.mdx";
+const DOCS_URLS = [
+  "https://opencode.ai/docs/console/models.md",
+  "https://raw.githubusercontent.com/anomalyco/opencode/dev/services/site/src/docs/content/console/models.mdx",
+];
 const MODELS_URL = "https://opencode.ai/zen/v1/models";
 const NPM_PACKAGE = "opencode-ai";
 
@@ -129,6 +134,38 @@ const configOf = (
   return config;
 };
 
+const registeredPool = (modelsDir: string): Map<string, string> =>
+  new Map(
+    Object.values(buildIndex(modelsDir))
+      .flatMap((entry) => {
+        if (!(entry.data.providers ?? []).includes(PROVIDER)) return [];
+        const configured = entry.data.providerConfig?.[PROVIDER]?.upstream;
+        const upstream = typeof configured === "string" && configured.trim() ? configured.trim() : entry.id;
+        return [[entry.fileId, upstream] as const];
+      })
+      .sort(([left], [right]) => compareText(left, right))
+  );
+
+const degraded = (
+  ctx: SourceContext,
+  cause: ModelFetchFailure | ModelTimeoutFailure
+): Effect.Effect<SourceResult> => {
+  const models = registeredPool(ctx.modelsDir);
+  return Effect.andThen(
+    Effect.logWarning(
+      `[Opencode] console docs unavailable (${causeMessage(Cause.fail(cause))}); keeping the ${models.size} registered model(s)`
+    ),
+    Effect.sync(() => sourceOf(models) as SourceResult)
+  );
+};
+
+const fetchDocs = (): Effect.Effect<string, ModelFetchFailure | ModelTimeoutFailure> =>
+  Effect.firstSuccessOf(
+    DOCS_URLS.map((url) =>
+      fetchText(url, { label: "OpenCode Console docs", headers: { Accept: "text/markdown" } })
+    )
+  );
+
 const versionTargets = (ctx: SourceContext): ReadonlyArray<VersionTarget> => [
   {
     label: "opencode provider",
@@ -174,9 +211,9 @@ export const opencodeSource: ModelSource = {
   order: 60,
   phase: "fetch",
 
-  fetch: () =>
+  fetch: (ctx) =>
     Effect.gen(function* () {
-      const markdown = yield* fetchText(DOCS_URL, { label: "OpenCode Console docs" });
+      const markdown = yield* fetchDocs();
       const payload = yield* fetchText(MODELS_URL, { label: "OpenCode model list" }).pipe(
         Effect.flatMap((text) =>
           Effect.try(() => JSON.parse(text) as unknown).pipe(Effect.orElseSucceed(() => ({})))
@@ -205,7 +242,16 @@ export const opencodeSource: ModelSource = {
         providerConfig: configOf(models, endpoints),
         managedKeys: ["responses_api", "messages_api"],
       } satisfies SourceResult;
-    }).pipe(Effect.mapError((cause) => ({ provider: PROVIDER, message: cause.message }))),
+    }).pipe(
+      Effect.catchTags({
+        ModelFetchFailure: (cause) => degraded(ctx, cause),
+        ModelTimeoutFailure: (cause) => degraded(ctx, cause),
+      }),
+      Effect.mapError((cause: unknown) => ({
+        provider: PROVIDER,
+        message: cause instanceof Error ? cause.message : String(cause),
+      }))
+    ),
 
   versionTargets,
   latestVersion,
