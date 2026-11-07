@@ -6,7 +6,8 @@
     "workbuddy",
     "zenmux",
     "perch",
-    "opencode"
+    "opencode",
+    "zro"
   ],
   "aliases": [
     "deepseek-v4.1-flash",
@@ -73,6 +74,10 @@
       "upstream": "deepseek/deepseek-v4.1-flash",
       "contextWindow": 1000000,
       "maxOutputTokens": 384000
+    },
+    "zro": {
+      "contextWindow": 1048576,
+      "maxOutputTokens": 64000
     }
   }
 }

@@ -13,6 +13,7 @@ import { PROVIDER as openrouter } from "@opendum/providers/auth/openrouter/const
 import { PROVIDER as perch } from "@opendum/providers/auth/perch/constants";
 import { PROVIDER as workbuddy } from "@opendum/providers/auth/workbuddy/constants";
 import { PROVIDER as zenmux } from "@opendum/providers/auth/zenmux/constants";
+import { PROVIDER as zro } from "@opendum/providers/auth/zro/constants";
 
 export const PROVIDERS: ReadonlyArray<ProviderEntry> = [
   antigravity,
@@ -28,6 +29,7 @@ export const PROVIDERS: ReadonlyArray<ProviderEntry> = [
   perch,
   workbuddy,
   zenmux,
+  zro,
 ] as ReadonlyArray<ProviderEntry>;
 
 export const SPECS: ReadonlyArray<ProviderSpec> = PROVIDERS.flatMap((entry) =>

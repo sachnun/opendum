@@ -12,6 +12,7 @@ import { openrouterSource } from "@opendum/models/refresh/providers/openrouter";
 import { perchSource } from "@opendum/models/refresh/providers/perch";
 import { workbuddySource } from "@opendum/models/refresh/providers/workbuddy";
 import { zenmuxSource } from "@opendum/models/refresh/providers/zenmux";
+import { zroSource } from "@opendum/models/refresh/providers/zro";
 import type { ModelSource } from "@opendum/models/refresh/core/types";
 
 export const SOURCES: ReadonlyArray<ModelSource> = [
@@ -29,4 +30,5 @@ export const SOURCES: ReadonlyArray<ModelSource> = [
   perchSource,
   workbuddySource,
   zenmuxSource,
+  zroSource,
 ];

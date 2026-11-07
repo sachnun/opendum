@@ -1,7 +1,8 @@
 {
   "providers": [
     "hyper",
-    "workbuddy"
+    "workbuddy",
+    "zro"
   ],
   "reasoning": true,
   "reasoning_effort": [
@@ -41,6 +42,10 @@
     "workbuddy": {
       "contextWindow": 1048576,
       "maxOutputTokens": 131072
+    },
+    "zro": {
+      "contextWindow": 1048576,
+      "maxOutputTokens": 131000
     }
   }
 }

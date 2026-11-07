@@ -1,0 +1,21 @@
+{
+  "providers": [
+    "zro"
+  ],
+  "reasoning": true,
+  "modalities": {
+    "input": [
+      "image",
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "providerConfig": {
+    "zro": {
+      "contextWindow": 1048576,
+      "maxOutputTokens": 64000
+    }
+  }
+}

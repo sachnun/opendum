@@ -58,6 +58,12 @@ export const SUPPORTED_HYPER = new Set([
   "frequency_penalty", "n", "stop", "seed", "response_format", "reasoning", "reasoning_effort",
 ]);
 
+export const SUPPORTED_ZRO = new Set([
+  "model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream",
+  "stream_options", "tools", "tool_choice", "parallel_tool_calls", "presence_penalty",
+  "frequency_penalty", "n", "stop", "seed", "response_format", "reasoning", "reasoning_effort",
+]);
+
 type Json = Record<string, unknown>;
 
 export type CompatOptions = {
