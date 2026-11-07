@@ -67,6 +67,13 @@ describe("provider base urls", () => {
     }
     const request = validationRequest("openrouter", "key", { model: "upstream-model" });
     expect(request.url).toBe(`${openrouterBaseUrl}/models`);
+    const deepaiRequest = validationRequest("deepai", "key-1", {});
+    expect(deepaiRequest.url).toBe(`${deepaiBaseUrl}/theos`);
+    expect(deepaiRequest.headers["api-key"]).toBe("key-1");
+    expect(deepaiRequest.headers["X-DeepAI-Code-Theos"]).toBe("4");
+    expect(deepaiRequest.headers["X-DeepAI-Code-Instance"]).toMatch(/^[0-9a-f]{32}$/);
+    expect(deepaiRequest.headers["X-DeepAI-Code-Machine"]).toMatch(/^[0-9a-f]{64}$/);
+    expect(deepaiRequest.headers.Authorization).toBeUndefined();
   });
 
   it("declares https base urls without trailing slash", () => {

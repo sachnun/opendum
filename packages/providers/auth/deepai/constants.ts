@@ -9,6 +9,7 @@ export const RESPONSES_PATH = "/responses";
 export const LANE_VERSION = "4";
 export const LANE_HEADER = "X-DeepAI-Code-Theos";
 export const INSTANCE_HEADER = "X-DeepAI-Code-Instance";
+export const MACHINE_HEADER = "X-DeepAI-Code-Machine";
 export const API_KEY_HEADER = "api-key";
 
 export const DEFAULT_SYSTEM_PROMPT = "You are a helpful assistant.";

@@ -12,7 +12,8 @@ import {
 } from "@opendum/providers/quota/helpers";
 import type { AccountQuotaInfo, QuotaAccount, QuotaContext, QuotaGroupDisplay } from "@opendum/providers/quota/types";
 import { quotaPayload, type Json } from "@opendum/providers/quota/fetchers/shared";
-import { API_BASE_URL, API_KEY_HEADER, THEOS_PATH } from "@opendum/providers/auth/deepai/constants";
+import { API_BASE_URL, THEOS_PATH } from "@opendum/providers/auth/deepai/constants";
+import { deepaiHeaders } from "@opendum/providers/auth/deepai/machine";
 
 export function deepaiQuota(
   ctx: QuotaContext,
@@ -34,7 +35,7 @@ export function deepaiQuota(
     cache: "deepai:theos",
     method: "GET",
     url: `${API_BASE_URL}${THEOS_PATH}`,
-    headers: { [API_KEY_HEADER]: apiKey, Accept: "application/json" },
+    headers: { ...deepaiHeaders(apiKey), Accept: "application/json" },
     label: "DeepAI allowance",
     expiredMessage: "DeepAI API key is invalid or expired. Please reconnect this account.",
   }).pipe(

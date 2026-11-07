@@ -47,6 +47,7 @@ describe("DeepAI request contract", () => {
     expect(captured.headers["api-key"]).toBe("key-1");
     expect(captured.headers["X-DeepAI-Code-Theos"]).toBe("4");
     expect(captured.headers["X-DeepAI-Code-Instance"]).toMatch(/^[0-9a-f]{32}$/);
+    expect(captured.headers["X-DeepAI-Code-Machine"]).toMatch(/^[0-9a-f]{64}$/);
     expect(captured.headers.Authorization).toBeUndefined();
   });
 

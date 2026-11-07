@@ -16,14 +16,11 @@ import type { FallbackState } from "@opendum/providers/core/fallback";
 import type { ProviderFailure, ProviderRequest } from "@opendum/providers/types";
 import {
   API_BASE_URL,
-  API_KEY_HEADER,
   CHAT_PATH,
   DEFAULT_SYSTEM_PROMPT,
-  INSTANCE_HEADER,
-  LANE_HEADER,
-  LANE_VERSION,
   RESPONSES_PATH,
 } from "@opendum/providers/auth/deepai/constants";
+import { deepaiHeaders } from "@opendum/providers/auth/deepai/machine";
 
 export const SUPPORTED_DEEPAI = new Set([
   "model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream",
@@ -218,11 +215,7 @@ export class DeepAIProvider extends StaticProvider {
   }
 
   private headers(credentials: string): Record<string, string> {
-    return {
-      [API_KEY_HEADER]: credentials.trim(),
-      [LANE_HEADER]: LANE_VERSION,
-      [INSTANCE_HEADER]: this.instance,
-    };
+    return deepaiHeaders(credentials, this.instance);
   }
 
   private modelOf(model: string): string {

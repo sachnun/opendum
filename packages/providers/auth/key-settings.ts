@@ -2,9 +2,8 @@ import { COMPAT_SPECS } from "@opendum/providers/compat-specs";
 import type { KeyProvider } from "@opendum/providers/provider-accounts";
 import {
   API_BASE_URL as deepaiBaseUrl,
-  API_KEY_HEADER,
-  INSTANCE_HEADER,
 } from "@opendum/providers/auth/deepai/constants";
+import { deepaiHeaders } from "@opendum/providers/auth/deepai/machine";
 
 export type KeySetting = {
   label: string;
@@ -66,10 +65,7 @@ export function baseUrl(provider: string): string {
 
 function directHeaders(provider: string, apiKey: string): Record<string, string> | null {
   if (provider !== "deepai") return null;
-  return {
-    [API_KEY_HEADER]: apiKey,
-    [INSTANCE_HEADER]: crypto.randomUUID().replaceAll("-", ""),
-  };
+  return deepaiHeaders(apiKey);
 }
 
 export type ValidationRequest = {
@@ -95,6 +91,7 @@ export function validationRequest(
   };
   const direct = directHeaders(provider, apiKey);
   if (direct) {
+    delete headers.Authorization;
     for (const [key, value] of Object.entries(direct)) headers[key] = value;
   }
   let body: Record<string, unknown> | undefined;

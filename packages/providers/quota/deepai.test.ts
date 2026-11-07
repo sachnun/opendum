@@ -39,7 +39,9 @@ describe("deepai quota", () => {
 
     expect(captured.url).toBe("https://api.deepai.org/deepai_code/theos");
     expect(captured.headers?.get("api-key")).toBe("key-1");
-    expect(captured.headers?.get("X-DeepAI-Code-Theos")).toBeNull();
+    expect(captured.headers?.get("X-DeepAI-Code-Theos")).toBe("4");
+    expect(captured.headers?.get("X-DeepAI-Code-Instance")).toMatch(/^[0-9a-f]{32}$/);
+    expect(captured.headers?.get("X-DeepAI-Code-Machine")).toMatch(/^[0-9a-f]{64}$/);
     expect(result.status).toBe("success");
     expect(result.groups.map((group) => group.name)).toEqual(["theos-balance", "lane"]);
     const [balance] = result.groups;
