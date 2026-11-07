@@ -14,6 +14,7 @@ import { PROVIDER as perch } from "@opendum/providers/auth/perch/constants";
 import { PROVIDER as workbuddy } from "@opendum/providers/auth/workbuddy/constants";
 import { PROVIDER as zenmux } from "@opendum/providers/auth/zenmux/constants";
 import { PROVIDER as zro } from "@opendum/providers/auth/zro/constants";
+import { PROVIDER as deepai } from "@opendum/providers/auth/deepai/constants";
 
 export const PROVIDERS: ReadonlyArray<ProviderEntry> = [
   antigravity,
@@ -30,6 +31,7 @@ export const PROVIDERS: ReadonlyArray<ProviderEntry> = [
   workbuddy,
   zenmux,
   zro,
+  deepai,
 ] as ReadonlyArray<ProviderEntry>;
 
 export const SPECS: ReadonlyArray<ProviderSpec> = PROVIDERS.flatMap((entry) =>

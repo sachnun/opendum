@@ -1,5 +1,8 @@
 {
   "providerConfig": {
+    "deepai": {
+      "free": true
+    },
     "zro": {
       "free": true
     }

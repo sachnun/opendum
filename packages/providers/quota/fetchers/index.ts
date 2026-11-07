@@ -7,3 +7,4 @@ export * from "@opendum/providers/quota/fetchers/zenmux";
 export * from "@opendum/providers/quota/fetchers/hyper";
 export * from "@opendum/providers/quota/fetchers/workbuddy";
 export * from "@opendum/providers/quota/fetchers/zro";
+export * from "@opendum/providers/quota/fetchers/deepai";

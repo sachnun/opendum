@@ -10,6 +10,7 @@ import { API_BASE_URL as harborBaseUrl } from "@opendum/providers/auth/harbor/co
 import { API_BASE_URL as zenmuxBaseUrl } from "@opendum/providers/auth/zenmux/constants";
 import { API_BASE_URL as hyperBaseUrl } from "@opendum/providers/auth/hyper/constants";
 import { API_BASE_URL as zroBaseUrl } from "@opendum/providers/auth/zro/constants";
+import { API_BASE_URL as deepaiBaseUrl } from "@opendum/providers/auth/deepai/constants";
 import { baseUrl, validationRequest } from "@opendum/providers/auth/key-settings";
 import { KEY_PROVIDERS } from "@opendum/providers/provider-accounts";
 
@@ -21,6 +22,10 @@ const DECLARED: Record<string, string> = {
   zenmux: zenmuxBaseUrl,
   hyper: hyperBaseUrl,
   zro: zroBaseUrl,
+};
+
+const DEDICATED: Record<string, string> = {
+  deepai: deepaiBaseUrl,
 };
 
 type CompatLike = { baseUrl?: unknown };
@@ -54,16 +59,18 @@ describe("provider base urls", () => {
 
   it("validates api keys against the same base url", () => {
     for (const provider of KEY_PROVIDERS) {
-      expect(baseUrl(provider)).toBe(DECLARED[provider]);
+      const expected = DECLARED[provider] ?? DEDICATED[provider];
+      expect(expected, `missing base url for ${provider}`).toBeDefined();
+      expect(baseUrl(provider)).toBe(expected);
       const request = validationRequest(provider, "key", { model: "upstream-model" });
-      expect(request.url.startsWith(DECLARED[provider])).toBe(true);
+      expect(request.url.startsWith(expected)).toBe(true);
     }
     const request = validationRequest("openrouter", "key", { model: "upstream-model" });
     expect(request.url).toBe(`${openrouterBaseUrl}/models`);
   });
 
   it("declares https base urls without trailing slash", () => {
-    for (const [name, url] of Object.entries(DECLARED)) {
+    for (const [name, url] of Object.entries({ ...DECLARED, ...DEDICATED })) {
       expect(url.startsWith("https://"), `insecure base url for ${name}`).toBeTruthy();
       expect(url.endsWith("/"), `trailing slash for ${name}`).toBeFalsy();
     }

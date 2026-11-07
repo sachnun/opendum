@@ -6,7 +6,8 @@
     "nvidia_nim",
     "workbuddy",
     "opencode",
-    "zro"
+    "zro",
+    "deepai"
   ],
   "reasoning": true,
   "reasoning_effort": [
@@ -41,6 +42,10 @@
     }
   },
   "providerConfig": {
+    "deepai": {
+      "contextWindow": 1048576,
+      "maxOutputTokens": 131072
+    },
     "hyper": {
       "contextWindow": 1048576,
       "maxOutputTokens": 131072
