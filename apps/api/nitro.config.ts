@@ -25,6 +25,8 @@ export default defineConfig({
     "/v1/**": { headers: { "cache-control": "no-store" } },
     "/health": { headers: { "cache-control": "no-store" } },
     "/rpc/**": { headers: { "cache-control": "no-store" } },
+    "/mcp": { headers: { "cache-control": "no-store" } },
+    "/.well-known/**": { headers: { "cache-control": "no-store" } },
     "/api/auth/**": { headers: { "cache-control": "no-store" } },
     "/": { redirect: { to: "/v1", status: 308 } },
   },
