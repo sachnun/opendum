@@ -1,0 +1,12 @@
+{
+  "providerConfig": {
+    "antigravity": {
+      "allowedTiers": [
+        "g1-pro-tier",
+        "g1-ultra-tier",
+        "standard-tier",
+        "paid"
+      ]
+    }
+  }
+}

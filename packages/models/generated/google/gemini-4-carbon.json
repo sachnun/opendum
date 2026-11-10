@@ -1,0 +1,25 @@
+{
+  "providers": [
+    "antigravity"
+  ],
+  "aliases": [
+    "gemini-4-carbon-high",
+    "gemini-4-carbon-low",
+    "gemini-4-carbon-medium"
+  ],
+  "reasoning": true,
+  "modalities": {
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "providerConfig": {
+    "antigravity": {
+      "upstream": "gemini-4-carbon-medium"
+    }
+  }
+}
