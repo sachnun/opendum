@@ -1,7 +1,4 @@
 {
-  "providers": [
-    "openrouter"
-  ],
   "reasoning": true,
   "reasoning_effort": [
     "high"
@@ -21,12 +18,5 @@
   "cost": {
     "input": 0,
     "output": 0
-  },
-  "providerConfig": {
-    "openrouter": {
-      "upstream": "xingchen-agi/xing4.0-29b-a4b:free",
-      "contextWindow": 262144,
-      "maxOutputTokens": 235929
-    }
   }
 }
