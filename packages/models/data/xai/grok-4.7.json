@@ -1,0 +1,12 @@
+{
+  "providerConfig": {
+    "kiro": {
+      "allowedTiers": [
+        "pro",
+        "pro+",
+        "power",
+        "standalone"
+      ]
+    }
+  }
+}

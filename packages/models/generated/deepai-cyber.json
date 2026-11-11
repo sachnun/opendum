@@ -13,8 +13,8 @@
   },
   "providerConfig": {
     "deepai": {
-      "contextWindow": 65536,
-      "maxOutputTokens": 8192
+      "contextWindow": 1048576,
+      "maxOutputTokens": 131072
     }
   }
 }

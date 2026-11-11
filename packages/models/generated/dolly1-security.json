@@ -1,7 +1,4 @@
 {
-  "providers": [
-    "zro"
-  ],
   "reasoning": true,
   "modalities": {
     "input": [
@@ -11,11 +8,5 @@
     "output": [
       "text"
     ]
-  },
-  "providerConfig": {
-    "zro": {
-      "contextWindow": 1048576,
-      "maxOutputTokens": 64000
-    }
   }
 }
