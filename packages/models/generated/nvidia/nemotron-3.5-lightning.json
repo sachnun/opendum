@@ -6,6 +6,10 @@
     "nvidia_nim",
     "cline"
   ],
+  "aliases": [
+    "nvidia-nemotron-3.5-lightning-free",
+    "nvidia/nemotron-3.5-lightning-free"
+  ],
   "reasoning": true,
   "reasoning_effort": [
     "low",

@@ -1,13 +1,9 @@
 {
   "providers": [
     "opencode",
-    "openrouter",
-    "kilo_code"
+    "openrouter"
   ],
   "providerConfig": {
-    "kilo_code": {
-      "upstream": "thinkingmachines/inkling-2-small:free"
-    },
     "opencode": {
       "upstream": "inkling-2-small-free"
     },
