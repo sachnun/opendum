@@ -1,0 +1,14 @@
+{
+  "providers": [
+    "openrouter",
+    "kilo_code"
+  ],
+  "providerConfig": {
+    "kilo_code": {
+      "upstream": "apodex/apodex-1.1-mini:free"
+    },
+    "openrouter": {
+      "upstream": "apodex/apodex-1.1-mini:free"
+    }
+  }
+}

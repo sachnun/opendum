@@ -72,7 +72,7 @@ export class KiroProvider extends OAuthProvider {
           "Content-Type": "application/x-amz-json-1.0",
           Accept: "application/json",
           "x-amz-target": "AmazonCodeWhispererService.GetUsageLimits",
-          "User-Agent": "KiroIDE-1.3.11",
+          "User-Agent": "KiroIDE-1.4.154",
         },
         body: JSON.stringify({ origin: "AI_EDITOR" }),
       })
