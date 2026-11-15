@@ -1,5 +1,5 @@
-import { Value } from "@opendum/providers/core/helpers";
-import { ModelName } from "@opendum/providers/core/identity";
+import { Value } from "@opendum/providers/helpers";
+import { ModelName } from "@opendum/providers/identity";
 import type { Registry } from "@opendum/models/runtime";
 import type { Json } from "@opendum/providers/upstreams/antigravity/common";
 

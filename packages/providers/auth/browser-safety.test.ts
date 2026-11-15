@@ -17,7 +17,7 @@ const ENTRY_POINTS = [
 const PREFIXES: Record<string, string> = {
   "@opendum/providers": "packages/providers",
   "@opendum/models": "packages/models",
-  "@opendum/core": "packages/core",
+  "@opendum/platform": "packages/platform",
 };
 
 function targetOf(spec: string, from: string): string[] {

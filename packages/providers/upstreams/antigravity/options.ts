@@ -1,6 +1,6 @@
-import type { OpendumRedis } from "@opendum/core/redis";
+import type { OpendumRedis } from "@opendum/platform/redis";
 import type { Json } from "@opendum/providers/upstreams/antigravity/common";
-import type { ProviderOptions } from "@opendum/providers/core/provider";
+import type { ProviderOptions } from "@opendum/providers/provider";
 
 export type AccountInfo = {
   projectId: string;

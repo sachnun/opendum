@@ -1,8 +1,8 @@
 import { Effect, Option, Schema } from "effect";
-import { raise } from "@opendum/models/refresh/core/raise";
+import { raise } from "@opendum/models/refresh/sources/raise";
 import { fetchJson } from "@opendum/models/sync/http";
-import { entryFor, slugify, writeEntry } from "@opendum/models/refresh/core/keys";
-import { sourceOf, type ModelSource, type SourceResult } from "@opendum/models/refresh/core/types";
+import { entryFor, slugify, writeEntry } from "@opendum/models/refresh/sources/keys";
+import { sourceOf, type ModelSource, type SourceResult } from "@opendum/models/refresh/sources/types";
 import { compareText } from "@opendum/models/compare";
 
 const MODELS_URL = "https://hyper.charm.land/v1/models";

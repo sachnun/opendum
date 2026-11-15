@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import type { OpendumRedis } from "@opendum/core/redis";
+import type { OpendumRedis } from "@opendum/platform/redis";
 import { proxyContext } from "@opendum/api/context";
 import { fromPromise } from "@opendum/api/web/lib/task";
 import type { ServiceFailure } from "@opendum/api/web/errors";

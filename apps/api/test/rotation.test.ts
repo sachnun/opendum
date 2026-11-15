@@ -1,10 +1,10 @@
 import { describe, expect, it } from "bun:test";
-import type { AccountAffinity } from "@opendum/core/redis";
+import type { AccountAffinity } from "@opendum/platform/redis";
 import type { ProviderAccount, ProviderRegistry } from "@opendum/providers";
 import type { Registry } from "@opendum/models/runtime";
-import type { Health } from "@opendum/api/core/health";
-import type { ProviderPerformance } from "@opendum/api/core/provider-performance";
-import { Rotation } from "@opendum/api/core/rotation";
+import type { Health } from "@opendum/api/proxy/health";
+import type { ProviderPerformance } from "@opendum/api/proxy/provider-performance";
+import { Rotation } from "@opendum/api/proxy/rotation";
 import { fakes } from "@opendum/api/test/fakes";
 
 const repositories = fakes();

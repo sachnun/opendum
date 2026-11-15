@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { Effect } from "effect";
 
 import { zroSource } from "@opendum/models/refresh/providers/zro";
-import type { SourceContext } from "@opendum/models/refresh/core/types";
+import type { SourceContext } from "@opendum/models/refresh/sources/types";
 
 const CONTEXT: SourceContext = {
   modelsDir: "packages/models/data",

@@ -1,7 +1,7 @@
 import { Duration, Effect, Result } from "effect";
-import type { OpendumRedis } from "@opendum/core/redis";
+import type { OpendumRedis } from "@opendum/platform/redis";
 
-import { Value, Payload, Ids, Responses } from "@opendum/providers/core/helpers";
+import { Value, Payload, Ids, Responses } from "@opendum/providers/helpers";
 import {
   anySlice,
   defaultAny,
@@ -13,10 +13,10 @@ import {
   GeminiSchema,
   GeminiStream,
 } from "@opendum/providers/upstreams/antigravity/transform";
-import { ChatImageInliner } from "@opendum/providers/core/images";
-import { RequestFailure } from "@opendum/providers/core/http";
-import { OAuth } from "@opendum/providers/core/oauth";
-import { OAuthProvider } from "@opendum/providers/core/provider";
+import { ChatImageInliner } from "@opendum/providers/images";
+import { RequestFailure } from "@opendum/providers/http";
+import { OAuth } from "@opendum/providers/oauth";
+import { OAuthProvider } from "@opendum/providers/provider";
 import { CodeAssist, type AccountInfo, type AntigravityOptions } from "@opendum/providers/upstreams/antigravity/options";
 import { GeminiModel, GeminiTier } from "@opendum/providers/upstreams/antigravity/model";
 import {

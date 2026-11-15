@@ -1,4 +1,4 @@
-import type { ProviderEntry } from "@opendum/providers/core/spec";
+import type { ProviderEntry } from "@opendum/providers/spec";
 
 export const API_BASE_URL = "https://integrate.api.nvidia.com/v1";
 

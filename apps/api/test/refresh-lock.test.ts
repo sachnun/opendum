@@ -1,10 +1,10 @@
 import { describe, expect, it } from "bun:test";
 import type { AuthService } from "@opendum/auth";
-import type { OpendumRedis } from "@opendum/core/redis";
+import type { OpendumRedis } from "@opendum/platform/redis";
 
-import { ProxyService } from "@opendum/api/core/service";
+import { ProxyService } from "@opendum/api/proxy/service";
 import { fakes } from "@opendum/api/test/fakes";
-import { raise } from "@opendum/core/raise";
+import { raise } from "@opendum/platform/raise";
 
 type Service = InstanceType<typeof ProxyService>;
 

@@ -1,4 +1,4 @@
-import { raise } from "@opendum/core/raise";
+import { raise } from "@opendum/platform/raise";
 import { Buffer } from "node:buffer";
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 

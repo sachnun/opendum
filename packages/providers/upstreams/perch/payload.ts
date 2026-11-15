@@ -1,4 +1,4 @@
-import { Value } from "@opendum/providers/core/helpers";
+import { Value } from "@opendum/providers/helpers";
 import type { Json } from "@opendum/providers/upstreams/perch/auth";
 
 export class PerchPayload {

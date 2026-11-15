@@ -9,7 +9,7 @@ import {
   cacheKey,
   usageOf,
 } from "@opendum/providers/transform/responses";
-import { Payload } from "@opendum/providers/core/helpers";
+import { Payload } from "@opendum/providers/helpers";
 import { fromMessages, payloadFor } from "@opendum/providers/transform/anthropic";
 
 function streamOf(text: string): ReadableStream<Uint8Array> {

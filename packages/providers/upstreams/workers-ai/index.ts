@@ -1,8 +1,8 @@
 import { Effect } from "effect";
-import { Value } from "@opendum/providers/core/helpers";
-import { ChatImageInliner } from "@opendum/providers/core/images";
-import { JSONPoster, RequestFailure } from "@opendum/providers/core/http";
-import { StaticProvider, type Json } from "@opendum/providers/core/provider";
+import { Value } from "@opendum/providers/helpers";
+import { ChatImageInliner } from "@opendum/providers/images";
+import { JSONPoster, RequestFailure } from "@opendum/providers/http";
+import { StaticProvider, type Json } from "@opendum/providers/provider";
 import type { ProviderFailure, ProviderRequest } from "@opendum/providers/types";
 
 export const SUPPORTED_WORKERS_AI = new Set([

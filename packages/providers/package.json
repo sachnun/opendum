@@ -9,7 +9,7 @@
     "./registry": "./registry.ts",
     "./display-names": "./display-names.ts",
     "./provider-accounts": "./provider-accounts.ts",
-    "./http": "./core/http.ts",
+    "./http": "./http.ts",
     "./endpoints": "./endpoints.ts",
     "./responses-transform": "./transform/responses.ts",
     "./quota": "./quota/index.ts",
@@ -23,11 +23,11 @@
     "typecheck": "bun check"
   },
   "dependencies": {
-    "@opendum/core": "workspace:*",
     "@orpc/contract": "1.16.1",
     "zod": "^4.6.7",
     "@opendum/models": "workspace:*",
-    "effect": "4.0.6"
+    "effect": "4.0.6",
+    "@opendum/platform": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

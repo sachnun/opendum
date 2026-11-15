@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 import { OAuthError, OAuthErrorCode, type AuthInfo } from "@modelcontextprotocol/server";
-import { raise } from "@opendum/core/raise";
+import { raise } from "@opendum/platform/raise";
 import { jsonResponse } from "@opendum/api/handlers/errors";
 import type { ModelIdentity } from "@opendum/api/handlers/model-listing";
 import type { McpContext } from "@opendum/api/mcp/types";

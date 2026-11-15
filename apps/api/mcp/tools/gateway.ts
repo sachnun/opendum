@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Effect } from "effect";
 import type { CallToolResult, McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { Chat } from "@opendum/api/core/endpoints";
+import { Chat } from "@opendum/api/proxy/endpoints";
 import { listVisibleModels } from "@opendum/api/handlers/model-listing";
 import { parseJsonObject, runOutcome } from "@opendum/api/mcp/run";
 import { DATA_OUTPUT, JSON_RECORD, READ_ONLY, WRITE, isRecord, jsonResult, textError, type ToolEnv } from "@opendum/api/mcp/tools/shared";

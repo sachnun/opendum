@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { Effect } from "effect";
 
 import { deepaiSource } from "@opendum/models/refresh/providers/deepai";
-import type { SourceContext, SourceFailure, SourceResult } from "@opendum/models/refresh/core/types";
+import type { SourceContext, SourceFailure, SourceResult } from "@opendum/models/refresh/sources/types";
 
 const CONTEXT: SourceContext = {
   modelsDir: "packages/models/data",

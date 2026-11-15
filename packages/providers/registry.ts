@@ -1,7 +1,7 @@
 import type { Registry } from "@opendum/models/runtime";
-import type { OpendumRedis } from "@opendum/core/redis";
-import { Transport, type EgressFetch, type Logger } from "@opendum/providers/core/http";
-import type { FallbackState } from "@opendum/providers/core/fallback";
+import type { OpendumRedis } from "@opendum/platform/redis";
+import { Transport, type EgressFetch, type Logger } from "@opendum/providers/http";
+import type { FallbackState } from "@opendum/providers/fallback";
 import { CompatProvider } from "@opendum/providers/upstreams/compat/index";
 import { OpencodeProvider } from "@opendum/providers/upstreams/opencode/index";
 import { ClineProvider } from "@opendum/providers/upstreams/cline/index";

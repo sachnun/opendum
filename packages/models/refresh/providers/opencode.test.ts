@@ -5,7 +5,7 @@ import { writeText } from "@opendum/models/fs";
 import { join } from "@opendum/models/paths";
 import { makeDir, removeDir } from "@opendum/models/test-support";
 import { opencodeSource } from "@opendum/models/refresh/providers/opencode";
-import type { SourceContext, SourceResult } from "@opendum/models/refresh/core/types";
+import type { SourceContext, SourceResult } from "@opendum/models/refresh/sources/types";
 
 const DOCS = [
   "| Model | Model ID | Endpoint |",

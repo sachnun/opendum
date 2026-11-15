@@ -2,7 +2,7 @@ import type { AccountsData, LiveTopic, ModelsData, ServerEvent, UsageData } from
 import { EventPublisher } from "@orpc/server";
 import { Duration, Effect, Match, Queue, Ref, Stream } from "effect";
 
-import { proxyEvents } from "@opendum/api/core/events";
+import { proxyEvents } from "@opendum/api/proxy/events";
 import type { ServiceFailure } from "@opendum/api/web/errors";
 
 const POINTS_DEBOUNCE = Duration.millis(1_500);

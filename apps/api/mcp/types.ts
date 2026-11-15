@@ -1,5 +1,5 @@
 import type { AuthService } from "@opendum/auth";
-import type { ProxyService } from "@opendum/api/core/service";
+import type { ProxyService } from "@opendum/api/proxy/service";
 import type { Registry } from "@opendum/models/runtime";
 import type * as accountsService from "@opendum/api/web/services/accounts";
 import type * as accountAuthService from "@opendum/api/web/services/account-auth";

@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
 import { DeepAIProvider } from "@opendum/providers/upstreams/deepai/index";
-import type { UpstreamTransport } from "@opendum/providers/core/http";
+import type { UpstreamTransport } from "@opendum/providers/http";
 import type { ProviderRequest } from "@opendum/providers/types";
 
 type Captured = { url: string; headers: Record<string, string>; body: Record<string, unknown> };

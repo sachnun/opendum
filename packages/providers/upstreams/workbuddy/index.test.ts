@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { Effect } from "effect";
 import type { Registry } from "@opendum/models/runtime";
 import { WORKBUDDY_BASE_URL, WORKBUDDY_DOMAIN } from "@opendum/providers/auth/workbuddy/constants";
-import type { UpstreamTransport } from "@opendum/providers/core/http";
+import type { UpstreamTransport } from "@opendum/providers/http";
 import type { ProviderAccount } from "@opendum/providers/types";
 import { WorkbuddyProvider, fromStream } from "@opendum/providers/upstreams/workbuddy/index";
 

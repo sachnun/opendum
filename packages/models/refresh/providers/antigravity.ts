@@ -1,9 +1,9 @@
 import { Effect, Option, Schema } from "effect";
-import { raise } from "@opendum/models/refresh/core/raise";
-import { parseJson } from "@opendum/models/refresh/core/json";
+import { raise } from "@opendum/models/refresh/sources/raise";
+import { parseJson } from "@opendum/models/refresh/sources/json";
 import { buildIndex } from "@opendum/models/model-store";
 import { fetchText } from "@opendum/models/sync/http";
-import { entryFor, writeEntry } from "@opendum/models/refresh/core/keys";
+import { entryFor, writeEntry } from "@opendum/models/refresh/sources/keys";
 import { join } from "@opendum/models/paths";
 import {
   sourceOf,
@@ -11,7 +11,7 @@ import {
   type SourceContext,
   type SourceResult,
   type VersionTarget,
-} from "@opendum/models/refresh/core/types";
+} from "@opendum/models/refresh/sources/types";
 import { compareText } from "@opendum/models/compare";
 
 const PROVIDER = "antigravity";

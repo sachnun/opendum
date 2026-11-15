@@ -1,4 +1,4 @@
-import { Ids, Value } from "@opendum/providers/core/helpers";
+import { Ids, Value } from "@opendum/providers/helpers";
 
 export type Json = Record<string, unknown>;
 

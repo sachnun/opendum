@@ -1,7 +1,7 @@
 import { defineHandler } from "nitro";
 import { getQuery, HTTPError } from "h3";
 import { Effect } from "effect";
-import { raise } from "@opendum/core/raise";
+import { raise } from "@opendum/platform/raise";
 
 import { webOrigin, safePath, loginUrl } from "@opendum/api/web/lib/handoff";
 import { sessionOf, mintAccessToken } from "@opendum/api/web/utils/session";

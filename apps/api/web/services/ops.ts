@@ -1,10 +1,10 @@
 import { ORPCError } from "@orpc/server";
 import { Effect } from "effect";
-import { hostError } from "@opendum/core/egress";
+import { hostError } from "@opendum/platform/egress";
 
 import type { QuotaInput, RelayInput, RelayResult } from "@opendum/providers/contract";
-import type { ProxyContext } from "@opendum/api/core/context";
-import { fetchQuota } from "@opendum/api/core/quota";
+import type { ProxyContext } from "@opendum/api/proxy/context";
+import { fetchQuota } from "@opendum/api/proxy/quota";
 import { fromPromise } from "@opendum/api/web/lib/task";
 
 const RELAY_TIMEOUT_MS = 20 * 1000;

@@ -14,9 +14,10 @@
   "dependencies": {
     "@modelcontextprotocol/server": "^2.4.0",
     "@opendum/auth": "workspace:*",
-    "@opendum/core": "workspace:*",
     "@opendum/database": "workspace:*",
     "@opendum/models": "workspace:*",
+    "@opendum/platform": "workspace:*",
+    "@opendum/protocol": "workspace:*",
     "@opendum/providers": "workspace:*",
     "@orpc/server": "1.16.1",
     "better-auth": "^1.7.12",

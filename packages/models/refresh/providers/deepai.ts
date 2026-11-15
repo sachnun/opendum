@@ -1,9 +1,9 @@
 import { Effect } from "effect";
-import { raise } from "@opendum/models/refresh/core/raise";
+import { raise } from "@opendum/models/refresh/sources/raise";
 import { idMap } from "@opendum/models/model-store";
 import { fetchText } from "@opendum/models/sync/http";
-import { standardKey } from "@opendum/models/refresh/core/keys";
-import { sourceOf, type ModelSource, type SourceResult } from "@opendum/models/refresh/core/types";
+import { standardKey } from "@opendum/models/refresh/sources/keys";
+import { sourceOf, type ModelSource, type SourceResult } from "@opendum/models/refresh/sources/types";
 
 const PAGE_URL = "https://deepai.org/chat/ai-code";
 const EXCLUDED_IDS = new Set(["gpt-oss-120b"]);

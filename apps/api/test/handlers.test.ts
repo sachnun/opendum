@@ -1,10 +1,10 @@
 import { describe, expect, it } from "bun:test";
 import { mockEvent } from "h3";
-import type { ProxyContext } from "@opendum/api/core/context";
-import { Chat, Messages } from "@opendum/api/core/endpoints";
+import type { ProxyContext } from "@opendum/api/proxy/context";
+import { Chat, Messages } from "@opendum/api/proxy/endpoints";
 import { handleInference } from "@opendum/api/handlers/inference";
 import { handleModels } from "@opendum/api/handlers/models";
-import { raise } from "@opendum/core/raise";
+import { raise } from "@opendum/platform/raise";
 
 function fakeContext(overrides: Partial<ProxyContext> = {}): ProxyContext {
   return {

@@ -15,10 +15,10 @@
     "typecheck": "bun check"
   },
   "dependencies": {
-    "@opendum/core": "workspace:*",
     "@opendum/database": "workspace:*",
     "@opendum/models": "workspace:*",
-    "effect": "4.0.6"
+    "effect": "4.0.6",
+    "@opendum/platform": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

@@ -6,7 +6,7 @@ import type {
   PointPort,
   AccountPort,
   UsagePort,
-} from "@opendum/api/core/repositories";
+} from "@opendum/api/proxy/repositories";
 
 type Stub<T> = {
   [K in keyof T]: T[K] extends (...args: infer A) => infer R ? Mock<(...args: A) => R> : never;

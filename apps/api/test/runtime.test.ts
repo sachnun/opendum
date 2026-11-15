@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { ConfigProvider, Effect, Exit, Schedule } from "effect";
 import { TestClock } from "effect/testing";
 import { proxyConfig } from "@opendum/api/config";
-import { AuthenticationFailure, FailureMap, RateLimitFailure, ValidationFailure, type ProxyFailure } from "@opendum/api/core/errors";
+import { AuthenticationFailure, FailureMap, RateLimitFailure, ValidationFailure, type ProxyFailure } from "@opendum/api/proxy/errors";
 
 const env = {
   DATABASE_URL: "postgres://localhost/db",

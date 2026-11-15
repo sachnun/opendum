@@ -1,9 +1,9 @@
 import { Effect, Option, Schema } from "effect";
-import { raise } from "@opendum/models/refresh/core/raise";
+import { raise } from "@opendum/models/refresh/sources/raise";
 import { idMap } from "@opendum/models/model-store";
 import { fetchDecoded } from "@opendum/models/sync/http";
-import { entryFor, standardKey, writeEntry } from "@opendum/models/refresh/core/keys";
-import { sourceOf, type ModelSource, type SourceResult } from "@opendum/models/refresh/core/types";
+import { entryFor, standardKey, writeEntry } from "@opendum/models/refresh/sources/keys";
+import { sourceOf, type ModelSource, type SourceResult } from "@opendum/models/refresh/sources/types";
 import { compareText } from "@opendum/models/compare";
 
 const MODELS_URL = "https://zro.moonmath.ai/api/cli/models/public";

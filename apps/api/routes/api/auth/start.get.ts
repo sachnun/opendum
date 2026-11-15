@@ -1,4 +1,4 @@
-import { raise } from "@opendum/core/raise";
+import { raise } from "@opendum/platform/raise";
 import { defineHandler } from "nitro";
 import { getQuery, HTTPError } from "h3";
 import { z } from "zod";

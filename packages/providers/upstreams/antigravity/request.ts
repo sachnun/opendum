@@ -1,4 +1,4 @@
-import { Value } from "@opendum/providers/core/helpers";
+import { Value } from "@opendum/providers/helpers";
 import { anySlice, type Json } from "@opendum/providers/upstreams/antigravity/common";
 import { GeminiMedia, GeminiToolBlocks } from "@opendum/providers/upstreams/antigravity/payload";
 import { GeminiModel } from "@opendum/providers/upstreams/antigravity/model";

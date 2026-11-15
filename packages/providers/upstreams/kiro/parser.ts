@@ -1,5 +1,5 @@
-import { Ids, Value } from "@opendum/providers/core/helpers";
-import { ModelName } from "@opendum/providers/core/identity";
+import { Ids, Value } from "@opendum/providers/helpers";
+import { ModelName } from "@opendum/providers/identity";
 import { KiroBracket, KiroEvents, type Json } from "@opendum/providers/upstreams/kiro/events";
 
 export const THINKING_START = "<thinking>";

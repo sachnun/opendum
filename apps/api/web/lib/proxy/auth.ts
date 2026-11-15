@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 import { AuthService, type AccountModelAvailability } from "@opendum/auth";
-import type { OpendumRedis } from "@opendum/core/redis";
+import type { OpendumRedis } from "@opendum/platform/redis";
 import { getRedisClient } from "@opendum/api/web/lib/redis";
 import { fromEffect, fromPromise } from "@opendum/api/web/lib/task";
 import { registry } from "@opendum/api/web/lib/proxy/models";
