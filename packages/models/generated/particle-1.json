@@ -1,0 +1,14 @@
+{
+  "providers": [
+    "openrouter",
+    "kilo_code"
+  ],
+  "providerConfig": {
+    "kilo_code": {
+      "upstream": "particle-ai/particle-1:free"
+    },
+    "openrouter": {
+      "upstream": "particle-ai/particle-1:free"
+    }
+  }
+}

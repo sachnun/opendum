@@ -3,7 +3,8 @@
   "providers": [
     "hyper",
     "workbuddy",
-    "kiro"
+    "kiro",
+    "deepai"
   ],
   "aliases": [
     "kimi-k3-eco"
@@ -39,6 +40,10 @@
     }
   },
   "providerConfig": {
+    "deepai": {
+      "contextWindow": 1048576,
+      "maxOutputTokens": 131072
+    },
     "hyper": {
       "contextWindow": 1048576,
       "maxOutputTokens": 16000

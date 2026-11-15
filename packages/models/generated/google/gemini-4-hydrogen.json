@@ -1,0 +1,26 @@
+{
+  "providers": [
+    "antigravity",
+    "deepai"
+  ],
+  "aliases": [
+    "gemini-4-hydrogen-high",
+    "gemini-4-hydrogen-low",
+    "gemini-4-hydrogen-medium"
+  ],
+  "reasoning": true,
+  "modalities": {
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "providerConfig": {
+    "antigravity": {
+      "upstream": "gemini-4-hydrogen-medium"
+    }
+  }
+}

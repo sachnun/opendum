@@ -1,6 +1,7 @@
 {
   "providers": [
-    "kilo_code"
+    "kilo_code",
+    "deepai"
   ],
   "reasoning": true,
   "reasoning_effort": [
@@ -27,6 +28,10 @@
     "cacheRead": 0
   },
   "providerConfig": {
+    "deepai": {
+      "contextWindow": 256000,
+      "maxOutputTokens": 131072
+    },
     "kilo_code": {
       "upstream": "stealth/glyph-cluster",
       "contextWindow": 256000,

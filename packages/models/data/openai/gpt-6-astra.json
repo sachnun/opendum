@@ -10,6 +10,9 @@
         "team",
         "student"
       ]
+    },
+    "deepai": {
+      "responses_api": true
     }
   }
 }

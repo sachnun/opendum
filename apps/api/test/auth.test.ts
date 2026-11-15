@@ -109,3 +109,13 @@ describe("sign in handoff", () => {
     expect(loginUrl("https://app.example.com", { error: "AccessDenied" })).toBe("https://app.example.com/?error=AccessDenied");
   });
 });
+
+describe("access token verification", () => {
+  it("rejects tokens without a key id", async () => {
+    const { verifyAccessToken } = await import("@opendum/api/web/lib/jwks");
+    const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
+    const token = `${encode({ alg: "EdDSA" })}.${encode({ sub: "user-1", aud: "opendum", iss: "opendum" })}.sig`;
+
+    expect(await verifyAccessToken(token, { issuer: "opendum", audience: "opendum" })).toBeNull();
+  });
+});

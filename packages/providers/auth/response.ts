@@ -66,12 +66,14 @@ export interface DeviceCodeInitiate {
   verificationUrlComplete: string;
   expiresIn: number;
   interval: number;
+  codeVerifier?: string;
 }
 
 export interface DeviceCodeFlow {
   startDeviceFlow(): Effect.Effect<DeviceCodeInitiate, AuthFailure>;
   pollDeviceAuth(
     deviceCode: string,
-    userCode: string
+    userCode: string,
+    codeVerifier: string
   ): Effect.Effect<PollResult | OAuthResult, AuthFailure>;
 }

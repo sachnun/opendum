@@ -1,0 +1,7 @@
+{
+  "providers": [
+    "hyper",
+    "deepai"
+  ],
+  "reasoning": true
+}

@@ -1,7 +1,6 @@
 {
   "providers": [
-    "zenmux",
-    "hyper"
+    "zenmux"
   ],
   "aliases": [
     "@cf-deepseek-ai-deepseek-v4-flash-0731",
@@ -45,11 +44,6 @@
     }
   },
   "providerConfig": {
-    "hyper": {
-      "upstream": "deepseek-v4-flash-0731",
-      "contextWindow": 1000000,
-      "maxOutputTokens": 384000
-    },
     "zenmux": {
       "upstream": "deepseek/deepseek-v4-flash",
       "contextWindow": 1000000,

@@ -1,5 +1,6 @@
 import { Chunk, Effect, Option, Schema } from "effect";
 import { parseJson as parseJsonPayload } from "@opendum/models/refresh/sources/json";
+import { raise } from "@opendum/models/refresh/sources/raise";
 import { idMap } from "@opendum/models/model-store";
 import { fetchText } from "@opendum/models/sync/http";
 import { standardKey } from "@opendum/models/refresh/sources/keys";
@@ -76,7 +77,7 @@ function freeIds(html: string): ReadonlyArray<string> {
   const entries = Chunk.appendAll(detailed(html))(fallback(html));
   const bySurface = firstBySurface(entries);
 
-  if (bySurface.size === 0) return [];
+  if (bySurface.size === 0) raise(new Error("unexpected Harbor /models page payload"));
 
   return Chunk.toReadonlyArray(Chunk.dedupe(Chunk.map(entries, (entry) => entry.surface)))
     .flatMap((surface) => {

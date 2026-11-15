@@ -1,7 +1,6 @@
 {
   "providers": [
-    "zenmux",
-    "hyper"
+    "zenmux"
   ],
   "reasoning": true,
   "reasoning_effort": [
@@ -29,10 +28,6 @@
     "cacheWrite": 0.17625
   },
   "providerConfig": {
-    "hyper": {
-      "contextWindow": 1000000,
-      "maxOutputTokens": 64000
-    },
     "zenmux": {
       "upstream": "qwen/qwen3.7-flash",
       "contextWindow": 991000,

@@ -1,8 +1,7 @@
 {
   "id": "beam-1.0-501b-a23b",
   "providers": [
-    "opencode",
-    "kilo_code"
+    "opencode"
   ],
   "aliases": [
     "beam",
@@ -36,11 +35,6 @@
     "cacheRead": 0.175
   },
   "providerConfig": {
-    "kilo_code": {
-      "upstream": "reflection/beam-free",
-      "contextWindow": 1048576,
-      "maxOutputTokens": 131072
-    },
     "opencode": {
       "upstream": "beam-free",
       "contextWindow": 1048576,

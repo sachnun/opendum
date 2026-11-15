@@ -8,10 +8,27 @@ import { familyCounts, listModels } from "@opendum/api/web/services/models";
 import { pointStatus } from "@opendum/api/web/services/points";
 import { configureSnapshots, type EventSnapshots } from "@opendum/api/web/events/bus";
 
-const buildAccounts = Effect.fn("snapshots.buildAccounts")(function* (userId: string) {
-  const overview = yield* getAccountOverview(userId, { autoPin: true });
-  const accounts = yield* listAccounts(userId);
-  const providers = Array.from(new Set(accounts.map((account) => account.provider)));
+type BaseData = {
+  overview: Effect.Success<ReturnType<typeof getAccountOverview>>;
+  accounts: Effect.Success<ReturnType<typeof listAccounts>>;
+  models: Effect.Success<ReturnType<typeof listModels>>;
+};
+
+const loadBase = Effect.fnUntraced(function* (userId: string) {
+  const [overview, accounts, models] = yield* Effect.all(
+    [
+      getAccountOverview(userId, { autoPin: true }),
+      listAccounts(userId),
+      listModels(userId, { includeStats: false }),
+    ],
+    { concurrency: "unbounded" }
+  );
+
+  return { overview, accounts, models } satisfies BaseData;
+});
+
+const buildAccounts = Effect.fn("snapshots.buildAccounts")(function* (userId: string, base: BaseData) {
+  const providers = Array.from(new Set(base.accounts.map((account) => account.provider)));
   const details = yield* Effect.forEach(
     providers,
     (provider) =>
@@ -22,29 +39,22 @@ const buildAccounts = Effect.fn("snapshots.buildAccounts")(function* (userId: st
   );
 
   return {
-    overview,
+    overview: base.overview,
     providers: Object.fromEntries(details) as Record<string, ProviderDetailPayload>,
   } satisfies AccountsData;
 });
 
-const buildModels = Effect.fn("snapshots.buildModels")(function* (userId: string) {
+const buildModels = Effect.fn("snapshots.buildModels")(function* (base: BaseData) {
+  yield* Effect.void;
   return {
-    list: yield* listModels(userId, { includeStats: false }),
+    list: base.models,
     familyCounts: familyCounts(),
   } satisfies ModelsData;
 });
 
-const buildUsage = Effect.fn("snapshots.buildUsage")(function* (userId: string) {
-  const [overview, accounts, models] = yield* Effect.all(
-    [
-      getAccountOverview(userId, { autoPin: true }),
-      listAccounts(userId),
-      listModels(userId, { includeStats: false }),
-    ],
-    { concurrency: "unbounded" }
-  );
-  const accountIds = accounts.map((account) => account.id);
-  const availableModels = models.flatMap((model) => (model.available === false ? [] : [model.id]));
+const buildUsage = Effect.fn("snapshots.buildUsage")(function* (userId: string, base: BaseData) {
+  const accountIds = base.accounts.map((account) => account.id);
+  const availableModels = base.models.flatMap((model) => (model.available === false ? [] : [model.id]));
   const [accountStats, modelStats, points] = yield* Effect.all(
     [
       buildAccountStats(userId, accountIds),
@@ -55,7 +65,7 @@ const buildUsage = Effect.fn("snapshots.buildUsage")(function* (userId: string) 
   );
 
   return {
-    overview,
+    overview: base.overview,
     accountStats,
     modelStats: Object.fromEntries(Object.entries(modelStats).filter(([, stats]) => stats.totalRequests > 0)),
     roamingByKey: points.roamingByKey,
@@ -64,11 +74,14 @@ const buildUsage = Effect.fn("snapshots.buildUsage")(function* (userId: string) 
 
 const buildSnapshots = Effect.fn("snapshots.build")(function* (userId: string, topics: LiveTopic[]) {
   const wanted = new Set(topics);
+  if (wanted.size === 0) return {} satisfies Partial<EventSnapshots>;
+
+  const base = yield* loadBase(userId);
   const [accounts, models, usage] = yield* Effect.all(
     [
-      wanted.has("accounts") ? buildAccounts(userId) : Effect.succeed(undefined),
-      wanted.has("models") ? buildModels(userId) : Effect.succeed(undefined),
-      wanted.has("usage") ? buildUsage(userId) : Effect.succeed(undefined),
+      wanted.has("accounts") ? buildAccounts(userId, base) : Effect.succeed(undefined),
+      wanted.has("models") ? buildModels(base) : Effect.succeed(undefined),
+      wanted.has("usage") ? buildUsage(userId, base) : Effect.succeed(undefined),
     ],
     { concurrency: "unbounded" }
   );

@@ -7,8 +7,10 @@
     "mistral-large-3",
     "mistral-large-3-675b-instruct-2512",
     "mistral-large-3-instruct",
+    "mistralai-mistral-large-4-1t-a52b",
     "mistralai/mistral-large",
-    "mistralai/mistral-large-3-675b-instruct-2512"
+    "mistralai/mistral-large-3-675b-instruct-2512",
+    "mistralai/mistral-large-4-1t-a52b"
   ],
   "reasoning": false,
   "modalities": {

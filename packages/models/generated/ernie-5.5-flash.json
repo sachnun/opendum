@@ -1,0 +1,14 @@
+{
+  "providers": [
+    "openrouter",
+    "kilo_code"
+  ],
+  "providerConfig": {
+    "kilo_code": {
+      "upstream": "baidu/ernie-5.5-flash-preview:free"
+    },
+    "openrouter": {
+      "upstream": "baidu/ernie-5.5-flash-preview:free"
+    }
+  }
+}

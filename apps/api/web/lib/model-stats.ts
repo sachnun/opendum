@@ -54,51 +54,54 @@ export const statsByModel = Effect.fn("statsByModel")(function* (userId: string,
   const hourBucketExpression = sql<Date>`date_trunc('hour', ${usageLog.createdAt})`;
   const modelWhere = and(eq(usageLog.userId, userId), inArray(normalizedModelExpression, Array.from(new Set(allModels.flatMap(keysOf)))));
 
-  const allTimeRows = yield* fromPromise(
-    () =>
-      db
-      .select({
-        model: normalizedModelExpression,
-        requestCount: sql<number>`count(*)`,
-        totalTokens: sql<number>`coalesce(sum(${usageLog.inputTokens} + ${usageLog.outputTokens}), 0)`,
-        successCount: sql<number>`count(*) filter (where ${usageLog.statusCode} >= 200 and ${usageLog.statusCode} < 400)`,
-        durationTotal: sql<number>`coalesce(sum(${usageLog.duration}), 0)`,
-        durationCount: sql<number>`count(${usageLog.duration})`,
-      })
-      .from(usageLog)
-      .where(modelWhere)
-      .groupBy(normalizedModelExpression),
-    "Failed to load model usage"
-  );
-
-  const dailyRows = yield* fromPromise(
-    () =>
-      db
-      .select({
-        model: normalizedModelExpression,
-        dayBucket: dayBucketExpression,
-        requestCount: sql<number>`count(*)`,
-        successCount: sql<number>`count(*) filter (where ${usageLog.statusCode} >= 200 and ${usageLog.statusCode} < 400)`,
-      })
-      .from(usageLog)
-      .where(and(modelWhere, gte(usageLog.createdAt, statsStartDate)))
-      .groupBy(normalizedModelExpression, dayBucketExpression),
-    "Failed to load daily model usage"
-  );
-
-  const durationRows = yield* fromPromise(
-    () =>
-      db
-      .select({
-        model: normalizedModelExpression,
-        hourBucket: hourBucketExpression,
-        durationTotal: sql<number>`coalesce(sum(${usageLog.duration}), 0)`,
-        durationCount: sql<number>`count(${usageLog.duration})`,
-      })
-      .from(usageLog)
-      .where(and(modelWhere, gte(usageLog.createdAt, durationStartDate)))
-      .groupBy(normalizedModelExpression, hourBucketExpression),
-    "Failed to load model durations"
+  const [allTimeRows, dailyRows, durationRows] = yield* Effect.all(
+    [
+      fromPromise(
+        () =>
+          db
+            .select({
+              model: normalizedModelExpression,
+              requestCount: sql<number>`count(*)`,
+              totalTokens: sql<number>`coalesce(sum(${usageLog.inputTokens} + ${usageLog.outputTokens}), 0)`,
+              successCount: sql<number>`count(*) filter (where ${usageLog.statusCode} >= 200 and ${usageLog.statusCode} < 400)`,
+              durationTotal: sql<number>`coalesce(sum(${usageLog.duration}), 0)`,
+              durationCount: sql<number>`count(${usageLog.duration})`,
+            })
+            .from(usageLog)
+            .where(modelWhere)
+            .groupBy(normalizedModelExpression),
+        "Failed to load model usage"
+      ),
+      fromPromise(
+        () =>
+          db
+            .select({
+              model: normalizedModelExpression,
+              dayBucket: dayBucketExpression,
+              requestCount: sql<number>`count(*)`,
+              successCount: sql<number>`count(*) filter (where ${usageLog.statusCode} >= 200 and ${usageLog.statusCode} < 400)`,
+            })
+            .from(usageLog)
+            .where(and(modelWhere, gte(usageLog.createdAt, statsStartDate)))
+            .groupBy(normalizedModelExpression, dayBucketExpression),
+        "Failed to load daily model usage"
+      ),
+      fromPromise(
+        () =>
+          db
+            .select({
+              model: normalizedModelExpression,
+              hourBucket: hourBucketExpression,
+              durationTotal: sql<number>`coalesce(sum(${usageLog.duration}), 0)`,
+              durationCount: sql<number>`count(${usageLog.duration})`,
+            })
+            .from(usageLog)
+            .where(and(modelWhere, gte(usageLog.createdAt, durationStartDate)))
+            .groupBy(normalizedModelExpression, hourBucketExpression),
+        "Failed to load model durations"
+      ),
+    ],
+    { concurrency: "unbounded" }
   );
 
   const rawByModel = new Map<string, RawModelStats>();

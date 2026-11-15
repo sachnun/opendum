@@ -32,30 +32,24 @@ export function dailyDate(now: Date = new Date()): string {
   }).format(now);
 }
 
+const normalizedEmailExpression = sql`concat(split_part(lower(btrim(${user.email})), '+', 1), '@', split_part(lower(btrim(${user.email})), '@', 2))`;
+
 const isExcluded = Effect.fn("points.isExcluded")(function* (
   client: PointDatabase,
   userId: string
 ) {
   const rows = yield* fromPromise(
-    () => client.select({ email: user.email }).from(user).where(eq(user.id, userId)).limit(1),
-    "Failed to load user email"
-  );
-  const normalized = rows[0]?.email ? normalizeEmail(rows[0].email) : "";
-  if (!normalized) return false;
-
-  const matches = yield* fromPromise(
     () =>
       client
         .select({ email: providerEmailRegistry.email })
         .from(providerEmailRegistry)
-        .where(
-          and(eq(providerEmailRegistry.email, normalized), ne(providerEmailRegistry.userId, userId))
-        )
+        .innerJoin(user, eq(providerEmailRegistry.email, normalizedEmailExpression))
+        .where(and(eq(user.id, userId), ne(providerEmailRegistry.userId, userId)))
         .limit(1),
     "Failed to load provider email registry"
   );
 
-  return matches.length > 0;
+  return rows.length > 0;
 });
 
 const applyTransaction = Effect.fn("points.applyPointTransaction")(function* (
@@ -163,6 +157,20 @@ const revokeBonus = Effect.fn("points.revokeUserBonus")(function* (
   });
 
   return result.balance ?? row.balance;
+});
+
+const readBalance = Effect.fn("points.readBalance")(function* (userId: string) {
+  const rows = yield* fromPromise(
+    () =>
+      db
+        .select({ balance: userPointBalance.balance, rewardsExcluded: userPointBalance.rewardsExcluded })
+        .from(userPointBalance)
+        .where(eq(userPointBalance.userId, userId))
+        .limit(1),
+    "Failed to load point balance"
+  );
+
+  return rows[0] ?? null;
 });
 
 const ensureBalanceWith = Effect.fn("points.ensureBalance")(function* (
@@ -296,15 +304,25 @@ export const claimDaily = Effect.fn("points.claimDaily")(function* (
 });
 
 export const pointStatus = Effect.fn("points.pointStatus")(function* (userId: string) {
-  const balance = yield* ensureBalance(userId);
-  const roamingApiKeys = yield* fromPromise(
-    () =>
-      db
-        .select({ id: proxyApiKey.id })
-        .from(proxyApiKey)
-        .where(and(eq(proxyApiKey.userId, userId), eq(proxyApiKey.roamingEnabled, true))),
-    "Failed to load roaming api keys"
+  const [balanceRow, excluded, roamingApiKeys] = yield* Effect.all(
+    [
+      readBalance(userId),
+      isExcluded(db, userId),
+      fromPromise(
+        () =>
+          db
+            .select({ id: proxyApiKey.id })
+            .from(proxyApiKey)
+            .where(and(eq(proxyApiKey.userId, userId), eq(proxyApiKey.roamingEnabled, true))),
+        "Failed to load roaming api keys"
+      ),
+    ],
+    { concurrency: "unbounded" }
   );
+
+  const settled = balanceRow && (balanceRow.rewardsExcluded || !excluded);
+  const balance = settled ? (balanceRow?.balance ?? 0) : yield* ensureBalance(userId);
+
   const apiKeyIds = roamingApiKeys.map((apiKey) => apiKey.id);
   const pointsByKey = yield* roamingPoints(userId, apiKeyIds);
   const roamingByKey: Record<string, number> = Object.fromEntries(

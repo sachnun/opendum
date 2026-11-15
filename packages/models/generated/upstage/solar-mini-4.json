@@ -1,0 +1,20 @@
+{
+  "providers": [
+    "deepai"
+  ],
+  "reasoning": true,
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "providerConfig": {
+    "deepai": {
+      "contextWindow": 524288,
+      "maxOutputTokens": 131072
+    }
+  }
+}

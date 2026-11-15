@@ -6,6 +6,7 @@ const EXPECTED = [
   "antigravity",
   "cline",
   "codex",
+  "deepai",
   "harbor",
   "hyper",
   "kilo_code",
@@ -17,6 +18,7 @@ const EXPECTED = [
   "workers_ai",
   "workbuddy",
   "zenmux",
+  "zro",
 ];
 
 describe("provider registry", () => {

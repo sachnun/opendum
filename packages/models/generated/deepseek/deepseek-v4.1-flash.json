@@ -6,7 +6,9 @@
     "workbuddy",
     "zenmux",
     "perch",
-    "opencode"
+    "opencode",
+    "zro",
+    "deepai"
   ],
   "aliases": [
     "deepseek-v4.1-flash",
@@ -45,6 +47,10 @@
     }
   },
   "providerConfig": {
+    "deepai": {
+      "contextWindow": 1048576,
+      "maxOutputTokens": 131072
+    },
     "harbor": {
       "upstream": "deepseek-v4.1-flash:free",
       "contextWindow": 1048576,
@@ -73,6 +79,10 @@
       "upstream": "deepseek/deepseek-v4.1-flash",
       "contextWindow": 1000000,
       "maxOutputTokens": 384000
+    },
+    "zro": {
+      "contextWindow": 1048576,
+      "maxOutputTokens": 64000
     }
   }
 }

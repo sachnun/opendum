@@ -192,7 +192,7 @@ export const pollAuth = Effect.fn("accountAuth.pollAuth")(function* (
   input: DevicePollInput
 ) {
   const config = DEVICE_PROVIDERS[input.provider];
-  const result = yield* config.flow.pollDeviceAuth(input.deviceCode, input.userCode ?? "").pipe(
+  const result = yield* config.flow.pollDeviceAuth(input.deviceCode, input.userCode ?? "", input.codeVerifier ?? "").pipe(
     Effect.mapError((failure) => {
       const error = failure as { message?: string; cause?: unknown } | null;
       return internal(error?.message || "Account auth failed", error?.cause);

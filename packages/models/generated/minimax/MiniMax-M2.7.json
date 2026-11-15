@@ -1,8 +1,5 @@
 {
   "id": "MiniMax-M2.7",
-  "providers": [
-    "hyper"
-  ],
   "aliases": [
     "minimax-m2.7",
     "minimax-m2.7-free"
@@ -36,13 +33,6 @@
     "artificialAnalysis": {
       "index": 22.8,
       "estimated": false
-    }
-  },
-  "providerConfig": {
-    "hyper": {
-      "upstream": "minimax-m2.7",
-      "contextWindow": 262100,
-      "maxOutputTokens": 6553
     }
   }
 }

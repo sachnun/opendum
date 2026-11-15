@@ -11,6 +11,8 @@ export const providerDisplayNames: Record<string, string> = {
   workers_ai: "Cloudflare",
   workbuddy: "WorkBuddy",
   zenmux: "ZenMux",
+  zro: "Zro",
+  deepai: "DeepAI",
   opencode: "Opencode",
   kilo_code: "Kilo Code",
 };

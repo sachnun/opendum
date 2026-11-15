@@ -104,4 +104,95 @@ describe("antigravity makeRequest", () => {
     );
     expect(injected).toBe(true);
   });
+
+  it("backfills a thought signature on replayed function calls", async () => {
+    let sent = "";
+    const provider = antigravityProvider(stubTransport(STREAM, (value) => (sent = value)));
+    await Effect.runPromise(
+      provider.makeRequest({
+        account: { id: "a", userId: "u", provider: "antigravity", projectId: "proj" },
+        credentials: "token",
+        body: {
+          model: "gemini-3.8-flash-high",
+          messages: [
+            { role: "user", content: "hi" },
+            {
+              role: "assistant",
+              content: null,
+              tool_calls: [{ id: "call_1", type: "function", function: { name: "bash", arguments: "{}" } }],
+            },
+            { role: "tool", tool_call_id: "call_1", name: "bash", content: "ok" },
+            { role: "user", content: "again" },
+          ],
+        },
+        stream: true,
+      })
+    );
+    const payload = JSON.parse(sent) as {
+      request?: { contents?: { role?: string; parts?: { functionCall?: { id?: string }; thoughtSignature?: string }[] }[] };
+    };
+    const call = payload.request?.contents
+      ?.flatMap((content) => content.parts ?? [])
+      .find((part) => part.functionCall?.id === "call_1");
+    expect(call?.thoughtSignature).toBe("skip_thought_signature_validator");
+  });
+
+  it("derives the gemini family thinking config without registry entries", async () => {
+    let sent = "";
+    const provider = antigravityProvider(stubTransport(STREAM, (value) => (sent = value)));
+    await Effect.runPromise(
+      provider.makeRequest({
+        account: { id: "a", userId: "u", provider: "antigravity", projectId: "proj" },
+        credentials: "token",
+        body: { model: "gemini-3.8-flash-high", messages: [{ role: "user", content: "hi" }] },
+        stream: true,
+      })
+    );
+    const payload = JSON.parse(sent) as {
+      request?: { generationConfig?: { thinkingConfig?: { thinkingLevel?: string; includeThoughts?: boolean } } };
+    };
+    expect(payload.request?.generationConfig?.thinkingConfig?.thinkingLevel).toBe("high");
+    expect(payload.request?.generationConfig?.thinkingConfig?.includeThoughts).toBe(true);
+  });
+
+  it("signs only the first call of a parallel tool call step", async () => {
+    let sent = "";
+    const provider = antigravityProvider(stubTransport(STREAM, (value) => (sent = value)));
+    await Effect.runPromise(
+      provider.makeRequest({
+        account: { id: "a", userId: "u", provider: "antigravity", projectId: "proj" },
+        credentials: "token",
+        body: {
+          model: "gemini-3.8-flash-high",
+          messages: [
+            { role: "user", content: "hi" },
+            {
+              role: "assistant",
+              content: null,
+              tool_calls: [
+                { id: "c1", type: "function", function: { name: "bash", arguments: "{}" } },
+                { id: "c2", type: "function", function: { name: "read", arguments: "{}" } },
+              ],
+            },
+            { role: "tool", tool_call_id: "c1", name: "bash", content: "ok" },
+            { role: "tool", tool_call_id: "c2", name: "read", content: "ok" },
+            { role: "user", content: "again" },
+          ],
+        },
+        stream: true,
+      })
+    );
+    const payload = JSON.parse(sent) as {
+      request?: {
+        contents?: {
+          parts?: { functionCall?: { id?: string }; thoughtSignature?: string }[];
+        }[];
+      };
+    };
+    const calls = payload.request?.contents?.flatMap((content) => content.parts ?? []) ?? [];
+    const first = calls.find((part) => part.functionCall?.id === "c1");
+    const second = calls.find((part) => part.functionCall?.id === "c2");
+    expect(first?.thoughtSignature).toBe("skip_thought_signature_validator");
+    expect(second?.thoughtSignature).toBeUndefined();
+  });
 });

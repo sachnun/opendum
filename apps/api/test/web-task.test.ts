@@ -5,6 +5,14 @@ import { ServiceFailure, asFailure, badRequest, forbidden, internal, notFound, u
 import { fromPromise, fromSync, toResult, toVoid, withContext } from "@opendum/api/web/lib/task";
 import { raise } from "@opendum/platform/raise";
 
+process.env.BETTER_AUTH_SECRET ??= "test-secret";
+process.env.GITHUB_CLIENT_ID ??= "test-github-client-id";
+process.env.GITHUB_CLIENT_SECRET ??= "test-github-client-secret";
+process.env.GOOGLE_CLIENT_ID ??= "test-google-client-id";
+process.env.GOOGLE_CLIENT_SECRET ??= "test-google-client-secret";
+
+const { resolveContext } = await import("@opendum/api/web/orpc/context");
+
 describe("web errors", () => {
   it("maps status codes to tagged failures", () => {
     expect(badRequest("bad").status).toBe(400);
@@ -37,6 +45,20 @@ describe("web errors", () => {
   it("falls back to the provided message for non error causes", () => {
     expect(asFailure("nope", "Request failed").message).toBe("nope");
     expect(asFailure(undefined, "Request failed").message).toBe("Request failed");
+  });
+});
+
+describe("orpc context errors", () => {
+  it("keeps the unauthorized status for a missing or expired access token", async () => {
+    const missing = await Effect.runPromise(Effect.flip(resolveContext(new Headers())));
+    expect(missing.code).toBe("UNAUTHORIZED");
+    expect(missing.status).toBe(401);
+
+    const expired = await Effect.runPromise(
+      Effect.flip(resolveContext(new Headers({ authorization: "Bearer expired.jwt.token" })))
+    );
+    expect(expired.code).toBe("UNAUTHORIZED");
+    expect(expired.status).toBe(401);
   });
 });
 

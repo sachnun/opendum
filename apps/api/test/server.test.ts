@@ -39,11 +39,22 @@ describe("config", () => {
         methods: ["GET", "POST", "OPTIONS"],
         allowHeaders: "*",
         exposeHeaders: "*",
+        maxAge: "86400",
       },
     });
   });
 
   it("redirects the root to /v1", () => {
     expect(config.routeRules?.["/"]).toMatchObject({ redirect: { to: "/v1", status: 308 } });
+  });
+
+  it("declares cache headers in route rules instead of handlers", () => {
+    expect(config.routeRules?.["/v1/models"]).toMatchObject({
+      headers: { "cache-control": "private, max-age=30, stale-while-revalidate=60", vary: "authorization" },
+    });
+    expect(config.routeRules?.["/v1/**"]).toMatchObject({ headers: { "cache-control": "no-store" } });
+    expect(config.routeRules?.["/rpc/**"]).toMatchObject({ headers: { "cache-control": "no-store" } });
+    expect(config.routeRules?.["/api/auth/**"]).toMatchObject({ headers: { "cache-control": "no-store" } });
+    expect(config.routeRules?.["/health"]).toMatchObject({ headers: { "cache-control": "no-store" } });
   });
 });

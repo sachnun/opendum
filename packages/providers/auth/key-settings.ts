@@ -1,9 +1,13 @@
 import { COMPAT_SPECS } from "@opendum/providers/compat-specs";
 import type { KeyProvider } from "@opendum/providers/provider-accounts";
+import {
+  API_BASE_URL as deepaiBaseUrl,
+} from "@opendum/providers/auth/deepai/constants";
+import { deepaiHeaders } from "@opendum/providers/auth/deepai/machine";
 
 export type KeySetting = {
   label: string;
-  validationPath: "/models" | "/chat/completions";
+  validationPath: "/models" | "/chat/completions" | "/theos";
   requireSuccessfulStatus: boolean;
   skipInference?: boolean;
 };
@@ -37,11 +41,31 @@ export const KEY_SETTINGS: Record<KeyProvider, KeySetting> = {
     requireSuccessfulStatus: false,
     skipInference: true,
   },
+  zro: {
+    label: "Zro",
+    validationPath: "/models",
+    requireSuccessfulStatus: true,
+  },
+  deepai: {
+    label: "DeepAI",
+    validationPath: "/theos",
+    requireSuccessfulStatus: true,
+  },
+};
+
+const DIRECT_BASE_URLS: Record<string, string> = {
+  deepai: deepaiBaseUrl,
 };
 
 export function baseUrl(provider: string): string {
   const spec = COMPAT_SPECS.find((item) => item.name === provider);
-  return spec?.baseUrl ?? "";
+  if (spec) return spec.baseUrl;
+  return DIRECT_BASE_URLS[provider] ?? "";
+}
+
+function directHeaders(provider: string, apiKey: string): Record<string, string> | null {
+  if (provider !== "deepai") return null;
+  return deepaiHeaders(apiKey);
 }
 
 export type ValidationRequest = {
@@ -65,6 +89,11 @@ export function validationRequest(
     "Content-Type": "application/json",
     Accept: "application/json",
   };
+  const direct = directHeaders(provider, apiKey);
+  if (direct) {
+    delete headers.Authorization;
+    for (const [key, value] of Object.entries(direct)) headers[key] = value;
+  }
   let body: Record<string, unknown> | undefined;
   if (isPost) {
     body = setting.skipInference

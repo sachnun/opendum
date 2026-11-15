@@ -26,7 +26,6 @@
   "trustedDependencies": [
     "esbuild",
     "unrs-resolver",
-    "vue-demi",
     "workerd"
   ],
   "workspaces": [

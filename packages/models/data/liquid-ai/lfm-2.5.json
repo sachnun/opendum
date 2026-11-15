@@ -1,9 +1,3 @@
 {
-  "ignored": true,
-  "providerConfig": {
-    "kilo_code": {
-      "authless": true,
-      "free": true
-    }
-  }
+  "ignored": true
 }

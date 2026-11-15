@@ -1,7 +1,8 @@
 {
   "id": "gpt-6.1-sol",
   "providers": [
-    "codex"
+    "codex",
+    "deepai"
   ],
   "aliases": [
     "gpt-6.1-sol-pro"
@@ -43,6 +44,10 @@
   "providerConfig": {
     "codex": {
       "contextWindow": 1050000,
+      "maxOutputTokens": 128000
+    },
+    "deepai": {
+      "contextWindow": 1048576,
       "maxOutputTokens": 128000
     }
   }

@@ -2,7 +2,8 @@
   "id": "claude-opus-5-5",
   "providers": [
     "antigravity",
-    "kiro"
+    "kiro",
+    "deepai"
   ],
   "aliases": [
     "claude-opus-5-5-high",
@@ -47,6 +48,10 @@
       "upstream": "claude-opus-5-5-medium",
       "contextWindow": 1000000,
       "maxOutputTokens": 128000
+    },
+    "deepai": {
+      "contextWindow": 1000000,
+      "maxOutputTokens": 64000
     },
     "kiro": {
       "upstream": "claude-opus-5.5",

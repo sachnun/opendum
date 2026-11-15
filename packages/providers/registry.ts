@@ -6,6 +6,7 @@ import { CompatProvider } from "@opendum/providers/upstreams/compat/index";
 import { OpencodeProvider } from "@opendum/providers/upstreams/opencode/index";
 import { ClineProvider } from "@opendum/providers/upstreams/cline/index";
 import { WorkbuddyProvider } from "@opendum/providers/upstreams/workbuddy/index";
+import { DeepAIProvider } from "@opendum/providers/upstreams/deepai/index";
 import { PerchProvider } from "@opendum/providers/upstreams/perch/index";
 import { CodexProvider } from "@opendum/providers/upstreams/codex/index";
 import { KiroProvider } from "@opendum/providers/upstreams/kiro/index";
@@ -57,6 +58,14 @@ export class ProviderRegistry {
       })
     );
     this.register(new WorkersAiProvider({ registry: options.models, transport: this.transport }));
+    this.register(
+      new DeepAIProvider({
+        registry: options.models,
+        transport: this.transport,
+        fallback: options.fallback,
+        logger: options.logger,
+      })
+    );
     for (const spec of COMPAT_SPECS) {
       this.register(
         new CompatProvider({
