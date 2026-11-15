@@ -1,7 +1,4 @@
 {
-  "providers": [
-    "zenmux"
-  ],
   "aliases": [
     "ling-2.6-1t"
   ],
@@ -27,13 +24,6 @@
     "artificialAnalysis": {
       "index": 17,
       "estimated": true
-    }
-  },
-  "providerConfig": {
-    "zenmux": {
-      "upstream": "inclusionai/ling-2.6-1t",
-      "contextWindow": 262000,
-      "maxOutputTokens": 65000
     }
   }
 }

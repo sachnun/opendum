@@ -1,6 +1,3 @@
 {
-  "providers": [
-    "hyper"
-  ],
   "reasoning": true
 }

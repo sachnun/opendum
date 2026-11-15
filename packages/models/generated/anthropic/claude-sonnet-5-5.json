@@ -2,7 +2,8 @@
   "id": "claude-sonnet-5-5",
   "providers": [
     "antigravity",
-    "kiro"
+    "kiro",
+    "deepai"
   ],
   "aliases": [
     "claude-sonnet-5-5-high",

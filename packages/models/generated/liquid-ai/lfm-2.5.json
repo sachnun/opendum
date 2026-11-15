@@ -1,7 +1,4 @@
 {
-  "providers": [
-    "openrouter"
-  ],
   "aliases": [
     "lfm-2.5-1.2b-instruct",
     "lfm-2.5-1.2b-thinking",
@@ -11,10 +8,5 @@
     "liquid/lfm-2.5-1.2b-instruct:free",
     "liquid/lfm-2.5-1.2b-thinking:free"
   ],
-  "reasoning": true,
-  "providerConfig": {
-    "openrouter": {
-      "upstream": "liquid/lfm-2.5-2.6b:free"
-    }
-  }
+  "reasoning": true
 }

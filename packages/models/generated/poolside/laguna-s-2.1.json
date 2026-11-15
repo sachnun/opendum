@@ -1,7 +1,4 @@
 {
-  "providers": [
-    "perch"
-  ],
   "reasoning": true,
   "reasoning_effort": [
     "high"
@@ -22,12 +19,5 @@
     "input": 0.45,
     "output": 0.9,
     "cacheRead": 0.045
-  },
-  "providerConfig": {
-    "perch": {
-      "upstream": "laguna-s",
-      "contextWindow": 1048576,
-      "maxOutputTokens": 32768
-    }
   }
 }
