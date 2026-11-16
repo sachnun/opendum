@@ -1,8 +1,5 @@
 {
   "id": "llama-3.2-11b-vision-instruct",
-  "providers": [
-    "nvidia_nim"
-  ],
   "aliases": [
     "llama-3.2-90b-vision-instruct",
     "llama-3.2-vision",
@@ -12,10 +9,5 @@
     "meta/llama-3.2-11b-vision-instruct",
     "meta/llama-3.2-90b-vision-instruct"
   ],
-  "reasoning": false,
-  "providerConfig": {
-    "nvidia_nim": {
-      "upstream": "meta/llama-3.2-11b-vision-instruct"
-    }
-  }
+  "reasoning": false
 }

@@ -1,0 +1,10 @@
+{
+  "providers": [
+    "opencode"
+  ],
+  "providerConfig": {
+    "opencode": {
+      "upstream": "hy4-flash-free"
+    }
+  }
+}
