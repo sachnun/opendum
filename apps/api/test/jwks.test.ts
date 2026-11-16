@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { SignJWT, exportJWK, generateKeyPair } from "jose";
+import * as database from "@opendum/database";
 
 process.env.BETTER_AUTH_SECRET ??= "test-secret";
 
@@ -8,12 +9,12 @@ type Row = { id: string; publicKey: string; alg: string | null };
 const state: { rows: Row[] } = { rows: [] };
 
 await mock.module("@opendum/database", () => ({
+  ...database,
   db: {
     select: () => ({
       from: async () => state.rows,
     }),
   },
-  jwks: { id: "id", publicKey: "publicKey", alg: "alg" },
 }));
 
 const { invalidateJwks, verifyAccessToken } = await import("@opendum/api/web/lib/jwks");
