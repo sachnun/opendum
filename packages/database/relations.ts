@@ -16,6 +16,12 @@ import {
   disabledModel,
   customProvider,
   customProviderModel,
+  oauthAccessToken,
+  oauthClient,
+  oauthClientResource,
+  oauthConsent,
+  oauthRefreshToken,
+  oauthResource,
 } from "@opendum/database/schema/index";
 
 export const userRelations = relations(user, ({ one, many }) => ({
@@ -36,6 +42,10 @@ export const userRelations = relations(user, ({ one, many }) => ({
   usageLogs: many(usageLog),
   disabledModels: many(disabledModel),
   customProviders: many(customProvider),
+  oauthClients: many(oauthClient),
+  oauthAccessTokens: many(oauthAccessToken),
+  oauthRefreshTokens: many(oauthRefreshToken),
+  oauthConsents: many(oauthConsent),
 }));
 
 export const balanceRelations = relations(
@@ -58,11 +68,13 @@ export const sharingRelations = relations(
   }),
 );
 
-export const sessionRelations = relations(session, ({ one }) => ({
+export const sessionRelations = relations(session, ({ one, many }) => ({
   user: one(user, {
     fields: [session.userId],
     references: [user.id],
   }),
+  oauthAccessTokens: many(oauthAccessToken),
+  oauthRefreshTokens: many(oauthRefreshToken),
 }));
 
 export const accountRelations = relations(account, ({ one }) => ({
@@ -186,3 +198,78 @@ export const customModelRelations = relations(
     }),
   }),
 );
+
+export const oauthClientRelations = relations(oauthClient, ({ one, many }) => ({
+  user: one(user, {
+    fields: [oauthClient.userId],
+    references: [user.id],
+  }),
+  resources: many(oauthClientResource),
+  accessTokens: many(oauthAccessToken),
+  refreshTokens: many(oauthRefreshToken),
+  consents: many(oauthConsent),
+}));
+
+export const oauthResourceRelations = relations(oauthResource, ({ many }) => ({
+  clients: many(oauthClientResource),
+}));
+
+export const oauthClientResourceRelations = relations(
+  oauthClientResource,
+  ({ one }) => ({
+    client: one(oauthClient, {
+      fields: [oauthClientResource.clientId],
+      references: [oauthClient.clientId],
+    }),
+    resource: one(oauthResource, {
+      fields: [oauthClientResource.resourceId],
+      references: [oauthResource.identifier],
+    }),
+  }),
+);
+
+export const oauthRefreshTokenRelations = relations(oauthRefreshToken, ({ one, many }) => ({
+  client: one(oauthClient, {
+    fields: [oauthRefreshToken.clientId],
+    references: [oauthClient.clientId],
+  }),
+  session: one(session, {
+    fields: [oauthRefreshToken.sessionId],
+    references: [session.id],
+  }),
+  user: one(user, {
+    fields: [oauthRefreshToken.userId],
+    references: [user.id],
+  }),
+  accessTokens: many(oauthAccessToken),
+}));
+
+export const oauthAccessTokenRelations = relations(oauthAccessToken, ({ one }) => ({
+  client: one(oauthClient, {
+    fields: [oauthAccessToken.clientId],
+    references: [oauthClient.clientId],
+  }),
+  session: one(session, {
+    fields: [oauthAccessToken.sessionId],
+    references: [session.id],
+  }),
+  user: one(user, {
+    fields: [oauthAccessToken.userId],
+    references: [user.id],
+  }),
+  refreshToken: one(oauthRefreshToken, {
+    fields: [oauthAccessToken.refreshId],
+    references: [oauthRefreshToken.id],
+  }),
+}));
+
+export const oauthConsentRelations = relations(oauthConsent, ({ one }) => ({
+  client: one(oauthClient, {
+    fields: [oauthConsent.clientId],
+    references: [oauthClient.clientId],
+  }),
+  user: one(user, {
+    fields: [oauthConsent.userId],
+    references: [user.id],
+  }),
+}));

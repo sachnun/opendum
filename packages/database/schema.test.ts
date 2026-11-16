@@ -191,10 +191,37 @@ function parseSql(statements: string[]): ParsedSchema {
     const dropConstraint = statement.match(/^ALTER TABLE "([^"]+)" DROP CONSTRAINT "([^"]+)"$/);
     if (dropConstraint) {
       parsed.foreignKeys.delete(dropConstraint[2]);
+      for (const [name] of parsed.indexes) {
+        if (name === dropConstraint[2]) parsed.indexes.delete(name);
+      }
+      for (const table of parsed.tables.values()) {
+        table.uniques.delete(dropConstraint[2]);
+      }
       if (dropConstraint[2].endsWith("_pkey")) {
         for (const column of parsed.tables.get(dropConstraint[1])?.columns.values() ?? []) {
           column.primary = false;
         }
+      }
+      continue;
+    }
+
+    const addUnique = statement.match(
+      /^ALTER TABLE "([^"]+)" ADD CONSTRAINT "([^"]+)" UNIQUE\(([^)]*)\)$/,
+    );
+    if (addUnique) {
+      parsed.tables.get(addUnique[1])?.uniques.set(addUnique[2], columnList(addUnique[3]));
+      continue;
+    }
+
+    const dropTable = statement.match(/^DROP TABLE "([^"]+)"( CASCADE)?$/);
+    if (dropTable) {
+      const name = dropTable[1];
+      parsed.tables.delete(name);
+      for (const [indexName, index] of parsed.indexes) {
+        if (index.table === name) parsed.indexes.delete(indexName);
+      }
+      for (const [constraintName, foreignKey] of parsed.foreignKeys) {
+        if (foreignKey.table === name) parsed.foreignKeys.delete(constraintName);
       }
       continue;
     }
