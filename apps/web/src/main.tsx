@@ -14,6 +14,8 @@ const ApiKeysPage = lazy(() => import("~/pages/ApiKeysPage"));
 const ModelsPage = lazy(() => import("~/pages/ModelsPage"));
 const PlaygroundPage = lazy(() => import("~/pages/PlaygroundPage"));
 const AuthCallbackPage = lazy(() => import("~/pages/AuthCallbackPage"));
+const OAuthBridgePage = lazy(() => import("~/pages/OAuthBridgePage"));
+const OAuthConsentPage = lazy(() => import("~/pages/OAuthConsentPage"));
 const NotFoundPage = lazy(() => import("~/pages/NotFoundPage"));
 
 function Shell(props: { children?: JSX.Element }): JSX.Element {
@@ -36,6 +38,8 @@ render(
     <MetaProvider>
       <Router root={App}>
         <Route path="/auth/callback" component={AuthCallbackPage} />
+        <Route path={Routes.oauthBridge} component={OAuthBridgePage} />
+        <Route path={Routes.oauthConsent} component={OAuthConsentPage} />
         <Route path="/" component={() => <Shell><AccountsPage /></Shell>} />
         <Route path={Routes.accounts} component={() => <Shell><AccountsPage /></Shell>} />
         <Route path={`${Routes.accounts}/:provider`} component={() => <Shell><ProviderPage /></Shell>} />

@@ -324,7 +324,7 @@ export function createPlayground(routeQuery: () => PlaygroundQuery) {
 
   const playgroundSetupMessage = createMemo(() => {
     if (!hasAccount()) return "Connect a provider account before running Playground.";
-    if (!isProxyConfigured()) return "Set VITE_API_URL to your API URL before running Playground.";
+    if (!isProxyConfigured()) return "Set VITE_API to your API URL before running Playground.";
     if (providerAccounts().length === 0) return "Enable at least one provider account before running Playground.";
     if (models().length === 0) return "";
     return "";

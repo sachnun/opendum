@@ -5,6 +5,8 @@ export const Routes = {
   apiKeys: "/api-keys",
   playground: "/playground",
   authCallback: "/auth/callback",
+  oauthBridge: "/oauth-bridge",
+  oauthConsent: "/oauth-consent",
 } as const;
 
 const PARENTS = new Set<string>(Object.values(Routes));

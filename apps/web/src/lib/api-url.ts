@@ -1,5 +1,5 @@
 export function apiUrl(configured: unknown): string {
   const value = (typeof configured === "string" ? configured : "").trim().replace(/\/+$/, "");
-  if (value) return value;
-  return import.meta.env.DEV ? "http://localhost:4001" : "";
+  if (!value) throw new Error("VITE_API is required");
+  return value;
 }
