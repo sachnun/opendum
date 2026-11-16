@@ -12,6 +12,9 @@
     "lint": "oxlint ."
   },
   "dependencies": {
+    "@better-auth/cimd": "^1.7.25",
+    "@better-auth/mcp": "^1.7.25",
+    "@better-auth/oauth-provider": "^1.7.25",
     "@modelcontextprotocol/server": "^2.4.0",
     "@opendum/auth": "workspace:*",
     "@opendum/database": "workspace:*",
@@ -20,7 +23,7 @@
     "@opendum/protocol": "workspace:*",
     "@opendum/providers": "workspace:*",
     "@orpc/server": "1.16.1",
-    "better-auth": "^1.7.12",
+    "better-auth": "^1.7.25",
     "drizzle-orm": "^0.45.4",
     "effect": "4.0.6",
     "h3": "^2.0.8",
@@ -28,6 +31,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.16",
     "@modelcontextprotocol/client": "^2.4.0",
     "@types/bun": "^1.4.4",
     "@types/node": "^26.6.5",
