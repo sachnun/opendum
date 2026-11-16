@@ -3,13 +3,15 @@ import { raise } from "@opendum/platform/raise";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { admin, bearer, jwt } from "better-auth/plugins";
+import { mcp } from "@better-auth/mcp";
+import { cimd } from "@better-auth/cimd";
+import { fetchClientMetadataResource } from "@better-auth/cimd/node";
 import { eq } from "drizzle-orm";
 import { db as defaultDb, schema, user, type Database } from "@opendum/database";
-import { ensureBalance } from "@opendum/api/web/services/points";
 import { roleOf as maintainerRole } from "@opendum/api/web/utils/maintainers";
+import { mcpResourceUrl, oauthIssuer, OAUTH_SCOPES, webOrigin } from "@opendum/api/web/lib/oauth";
 
 export const ACCESS_TOKEN_TTL = "7d";
-export const ACCESS_TOKEN_ISSUER = "opendum";
 export const ACCESS_TOKEN_AUDIENCE = "opendum";
 export const ADMIN_ROLE = "admin";
 export const USER_ROLE = "user";
@@ -25,6 +27,8 @@ export function roleOf(email: string | null | undefined): string {
 }
 
 export function createAuth(db: Database = defaultDb, options: { baseURL?: string } = {}) {
+  const baseURL = options.baseURL ?? process.env.BETTER_AUTH_URL;
+  const issuer = oauthIssuer(baseURL);
   return betterAuth({
     database: drizzleAdapter(db, {
       provider: "pg",
@@ -33,8 +37,9 @@ export function createAuth(db: Database = defaultDb, options: { baseURL?: string
       },
     }),
     secret: process.env.BETTER_AUTH_SECRET,
-    baseURL: options.baseURL ?? process.env.BETTER_AUTH_URL,
+    baseURL,
     trustedOrigins: ["*"],
+    disabledPaths: ["/token"],
     advanced: {
       ipAddress: {
         ipAddressHeaders: ["cf-connecting-ip", "x-forwarded-for", "x-real-ip"],
@@ -47,6 +52,7 @@ export function createAuth(db: Database = defaultDb, options: { baseURL?: string
             return { data: { ...createdUser, role: roleOf(createdUser.email) } };
           },
           after: async (createdUser) => {
+            const { ensureBalance } = await import("@opendum/api/web/services/points");
             const balanced = await Effect.runPromise(
               Effect.result(ensureBalance(createdUser.id))
             ).then((outcome) => (Result.isFailure(outcome) ? outcome.failure : null));
@@ -88,8 +94,9 @@ export function createAuth(db: Database = defaultDb, options: { baseURL?: string
     plugins: [
       bearer(),
       jwt({
+        disableSettingJwtHeader: true,
         jwt: {
-          issuer: ACCESS_TOKEN_ISSUER,
+          issuer,
           audience: ACCESS_TOKEN_AUDIENCE,
           expirationTime: ACCESS_TOKEN_TTL,
           definePayload: ({ user, session }) => ({
@@ -99,6 +106,17 @@ export function createAuth(db: Database = defaultDb, options: { baseURL?: string
             impersonatedBy: (session as { impersonatedBy?: string | null }).impersonatedBy ?? null,
           }),
         },
+      }),
+      mcp({
+        resource: mcpResourceUrl(issuer),
+        loginPage: `${webOrigin()}/oauth-bridge`,
+        consentPage: `${webOrigin()}/oauth-consent`,
+        scopes: OAUTH_SCOPES,
+        enforcePerClientResources: false,
+      }),
+      cimd({
+        fetchClientMetadataResource,
+        metadataProfile: "mcp-2026-07-28",
       }),
       admin({
         defaultRole: USER_ROLE,

@@ -3,8 +3,8 @@ import { Effect } from "effect";
 import type { McpHttpHandler } from "@modelcontextprotocol/server";
 import type { H3Event } from "h3";
 import { emptyResult, type AuthResult } from "@opendum/auth/types";
-import { protectedResourceMetadata, MCP_SCOPE } from "@opendum/api/mcp/auth";
 import { mcpEndpoint } from "@opendum/api/mcp/endpoint";
+import { MCP_SCOPE } from "@opendum/api/web/lib/oauth";
 import type { McpContext } from "@opendum/api/mcp/types";
 
 const VALID_RESULT: AuthResult = {
@@ -89,12 +89,4 @@ test("key store failures surface as server errors", async () => {
   const response = await serve(eventFor(mcpRequest({ authorization: "Bearer opendum-key" })));
 
   expect(response.status).toBe(500);
-});
-
-test("the protected resource metadata document advertises the mcp endpoint", async () => {
-  const response = protectedResourceMetadata(new Request("http://localhost:4001/.well-known/oauth-protected-resource/mcp"));
-  expect(response.status).toBe(200);
-  const body = (await response.json()) as Record<string, unknown>;
-  expect(body.resource).toBe("http://localhost:4001/mcp");
-  expect(body.scopes_supported).toEqual([MCP_SCOPE]);
 });

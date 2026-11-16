@@ -1,5 +1,6 @@
 import { Context, Effect, Layer, ManagedRuntime } from "effect";
-import { createAuth, ACCESS_TOKEN_AUDIENCE, ACCESS_TOKEN_ISSUER, type AuthInstance, type AuthSession } from "@opendum/api/web/auth";
+import { createAuth, ACCESS_TOKEN_AUDIENCE, type AuthInstance, type AuthSession } from "@opendum/api/web/auth";
+import { oauthIssuer } from "@opendum/api/web/lib/oauth";
 import { verifyAccessToken } from "@opendum/api/web/lib/jwks";
 
 export class IdentityService {
@@ -31,7 +32,7 @@ export class IdentityTag extends Context.Service<IdentityTag, IdentityService>()
 
 export const verifyAccessTokenEffect = (token: string): Effect.Effect<Record<string, unknown> | null> =>
   Effect.tryPromise({
-    try: () => verifyAccessToken(token, { issuer: ACCESS_TOKEN_ISSUER, audience: ACCESS_TOKEN_AUDIENCE }),
+    try: () => verifyAccessToken(token, { issuer: oauthIssuer(), audience: ACCESS_TOKEN_AUDIENCE }),
     catch: (cause) => cause,
   }).pipe(
     Effect.map((payload) => (payload ? { ...payload } : null)),

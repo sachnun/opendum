@@ -1,6 +1,7 @@
 import { createMcpHandler, requireBearerAuth, type McpHttpHandler } from "@modelcontextprotocol/server";
 import type { H3Event } from "h3";
-import { requestOrigin, verifyOpendumKey } from "@opendum/api/mcp/auth";
+import { verifyOpendumToken } from "@opendum/api/mcp/auth";
+import { oauthIssuer } from "@opendum/api/web/lib/oauth";
 import { createMcpServer } from "@opendum/api/mcp/server";
 import type { McpContext } from "@opendum/api/mcp/types";
 
@@ -22,9 +23,10 @@ export function mcpEndpoint(
 ): (event: H3Event) => Promise<Response> {
   return async (event) => {
     const request = event.req;
+    const issuer = oauthIssuer();
     const gate = requireBearerAuth({
-      verifier: { verifyAccessToken: (token) => verifyOpendumKey(context, token) },
-      resourceMetadataUrl: `${requestOrigin(request)}/.well-known/oauth-protected-resource/mcp`,
+      verifier: { verifyAccessToken: (token) => verifyOpendumToken(context, token) },
+      resourceMetadataUrl: `${issuer}/.well-known/oauth-protected-resource/mcp`,
     });
     const auth = await gate(request);
     if (auth instanceof Response) return auth;

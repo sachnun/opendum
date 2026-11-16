@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { Effect } from "effect";
 import { Client } from "@modelcontextprotocol/client";
 import { InMemoryTransport, type AuthInfo, type McpServer } from "@modelcontextprotocol/server";
-import { MCP_SCOPE } from "@opendum/api/mcp/auth";
+import { MCP_SCOPE } from "@opendum/api/web/lib/oauth";
 import { createMcpServer } from "@opendum/api/mcp/server";
 import type { McpContext, McpWebServices } from "@opendum/api/mcp/types";
 import { emptyAvailability, emptyResult, type AuthResult } from "@opendum/auth/types";
