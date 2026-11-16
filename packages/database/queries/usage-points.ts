@@ -162,7 +162,7 @@ export const listOrphaned = Effect.fn("db.listOrphaned")(function* (
         eq(pointTransaction.type, "roaming_debit"),
         lt(pointTransaction.createdAt, params.olderThan),
         sql`not exists (
-          select 1 from ${settlement}
+          select 1 from ${pointTransaction} ${sql.identifier("settlement")}
           where ${settlement.idempotencyKey} in (
             'roaming_refund:' || ${pointTransaction.id},
             'roaming_settle:' || ${pointTransaction.id},

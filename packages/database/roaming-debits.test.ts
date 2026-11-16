@@ -31,6 +31,7 @@ describe("listOrphaned", () => {
     expect(statement).toContain("roaming_settle:");
     expect(statement).toContain("sharing_credit:");
     expect(statement).toContain("not exists");
+    expect(statement).toContain('select 1 from "point_transaction" "settlement"');
   });
 
   it("filters by debit type and the grace cutoff", async () => {
