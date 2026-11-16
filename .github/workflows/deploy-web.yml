@@ -39,7 +39,7 @@ jobs:
     environment:
       name: web
     env:
-      VITE_API_URL: ${{ vars.VITE_API_URL }}
+      VITE_API: ${{ vars.VITE_API }}
 
     steps:
       - name: Checkout repository
