@@ -1,8 +1,5 @@
 {
   "id": "mistral-nemo",
-  "providers": [
-    "nvidia_nim"
-  ],
   "aliases": [
     "mistral-nemo-12b-instruct",
     "mistral-nemo-instruct",
@@ -30,12 +27,5 @@
     "input": 0.095,
     "output": 0.15,
     "cacheRead": 0.25075
-  },
-  "providerConfig": {
-    "nvidia_nim": {
-      "upstream": "nv-mistralai/mistral-nemo-12b-instruct",
-      "contextWindow": 16384,
-      "maxOutputTokens": 8192
-    }
   }
 }

@@ -1,17 +1,9 @@
 {
-  "providers": [
-    "nvidia_nim"
-  ],
   "aliases": [
     "granite-3.0-3b-a800m-instruct",
     "granite-3.0-8b-instruct",
     "granite-3.0-instruct",
     "ibm/granite-3.0-3b-a800m-instruct",
     "ibm/granite-3.0-8b-instruct"
-  ],
-  "providerConfig": {
-    "nvidia_nim": {
-      "upstream": "ibm/granite-3.0-3b-a800m-instruct"
-    }
-  }
+  ]
 }

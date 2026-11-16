@@ -1,17 +1,9 @@
 {
-  "providers": [
-    "nvidia_nim"
-  ],
   "aliases": [
     "granite-34b-code-instruct",
     "granite-8b-code-instruct",
     "granite-code-instruct",
     "ibm/granite-34b-code-instruct",
     "ibm/granite-8b-code-instruct"
-  ],
-  "providerConfig": {
-    "nvidia_nim": {
-      "upstream": "ibm/granite-34b-code-instruct"
-    }
-  }
+  ]
 }

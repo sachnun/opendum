@@ -1,8 +1,7 @@
 {
   "id": "nemotron-3-super-120b-a12b",
   "providers": [
-    "workers_ai",
-    "nvidia_nim"
+    "workers_ai"
   ],
   "aliases": [
     "@cf-nvidia-nemotron-3-120b-a12b",
@@ -43,11 +42,6 @@
     }
   },
   "providerConfig": {
-    "nvidia_nim": {
-      "upstream": "nvidia/nemotron-3-super-120b-a12b",
-      "contextWindow": 262144,
-      "maxOutputTokens": 262144
-    },
     "workers_ai": {
       "upstream": "@cf/nvidia/nemotron-3-120b-a12b",
       "contextWindow": 256000,
