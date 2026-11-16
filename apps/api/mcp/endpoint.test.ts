@@ -7,6 +7,9 @@ import { mcpEndpoint } from "@opendum/api/mcp/endpoint";
 import { MCP_SCOPE } from "@opendum/api/web/lib/oauth";
 import type { McpContext } from "@opendum/api/mcp/types";
 
+process.env.BETTER_AUTH_URL ??= "http://localhost:4001/api/auth";
+process.env.WEB ??= "http://localhost:3000";
+
 const VALID_RESULT: AuthResult = {
   valid: true,
   userId: "user-1",
