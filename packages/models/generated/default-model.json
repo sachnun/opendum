@@ -1,3 +1,6 @@
 {
+  "providers": [
+    "workbuddy"
+  ],
   "reasoning": true
 }

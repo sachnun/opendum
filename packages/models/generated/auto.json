@@ -1,7 +1,6 @@
 {
   "providers": [
-    "zro",
-    "workbuddy"
+    "zro"
   ],
   "reasoning": true,
   "modalities": {
