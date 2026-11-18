@@ -1,8 +1,12 @@
 {
   "providers": [
-    "openrouter"
+    "openrouter",
+    "kilo_code"
   ],
   "providerConfig": {
+    "kilo_code": {
+      "upstream": "inclusionai/ling-3.2-flash:free"
+    },
     "openrouter": {
       "upstream": "inclusionai/ling-3.2-flash:free"
     }

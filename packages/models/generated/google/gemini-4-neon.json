@@ -1,0 +1,25 @@
+{
+  "providers": [
+    "antigravity"
+  ],
+  "aliases": [
+    "gemini-4-neon-high",
+    "gemini-4-neon-low",
+    "gemini-4-neon-medium"
+  ],
+  "reasoning": true,
+  "modalities": {
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "providerConfig": {
+    "antigravity": {
+      "upstream": "gemini-4-neon-medium"
+    }
+  }
+}
