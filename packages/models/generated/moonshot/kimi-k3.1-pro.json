@@ -1,7 +1,13 @@
 {
   "providers": [
     "hyper",
-    "deepai"
+    "deepai",
+    "nvidia_nim"
   ],
-  "reasoning": true
+  "reasoning": true,
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "moonshotai/kimi-k3.1-pro"
+    }
+  }
 }

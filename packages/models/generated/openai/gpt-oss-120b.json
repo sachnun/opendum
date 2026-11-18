@@ -2,7 +2,6 @@
   "id": "gpt-oss-120b",
   "providers": [
     "hyper",
-    "nvidia_nim",
     "workers_ai",
     "antigravity"
   ],
@@ -62,11 +61,6 @@
       "upstream": "gpt-oss-120b",
       "contextWindow": 131072,
       "maxOutputTokens": 13107
-    },
-    "nvidia_nim": {
-      "upstream": "openai/gpt-oss-20b",
-      "contextWindow": 128000,
-      "maxOutputTokens": 16384
     },
     "workers_ai": {
       "upstream": "@cf/openai/gpt-oss-120b",
