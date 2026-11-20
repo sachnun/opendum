@@ -1,7 +1,4 @@
 {
-  "providers": [
-    "cline"
-  ],
   "reasoning": true,
   "reasoning_effort": [
     "low",
@@ -31,13 +28,6 @@
     "artificialAnalysis": {
       "index": 24.1,
       "estimated": false
-    }
-  },
-  "providerConfig": {
-    "cline": {
-      "upstream": "cline-free/solar-mini4",
-      "contextWindow": 524288,
-      "maxOutputTokens": 131072
     }
   }
 }
