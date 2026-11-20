@@ -1,9 +1,5 @@
 {
   "id": "north-mini-code-1-0",
-  "providers": [
-    "kilo_code",
-    "openrouter"
-  ],
   "aliases": [
     "cohere-north-mini-code:free",
     "cohere/north-mini-code:free",
@@ -33,18 +29,6 @@
     "artificialAnalysis": {
       "index": 9.9,
       "estimated": false
-    }
-  },
-  "providerConfig": {
-    "kilo_code": {
-      "upstream": "cohere/north-mini-code:free",
-      "contextWindow": 256000,
-      "maxOutputTokens": 64000
-    },
-    "openrouter": {
-      "upstream": "cohere/north-mini-code:free",
-      "contextWindow": 256000,
-      "maxOutputTokens": 64000
     }
   }
 }
