@@ -1,0 +1,10 @@
+{
+  "providers": [
+    "opencode"
+  ],
+  "providerConfig": {
+    "opencode": {
+      "upstream": "tidepool-alpha-free"
+    }
+  }
+}
