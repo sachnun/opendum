@@ -1,8 +1,4 @@
 {
-  "providers": [
-    "openrouter",
-    "kilo_code"
-  ],
   "reasoning": true,
   "reasoning_effort": [
     "high"
@@ -23,13 +19,5 @@
   "cost": {
     "input": 0,
     "output": 0
-  },
-  "providerConfig": {
-    "kilo_code": {
-      "upstream": "dots-studio/dots-3-note-preview:free"
-    },
-    "openrouter": {
-      "upstream": "dots-studio/dots-3-note-preview:free"
-    }
   }
 }

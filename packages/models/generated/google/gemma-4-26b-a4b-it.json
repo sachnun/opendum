@@ -1,7 +1,6 @@
 {
   "id": "gemma-4-26b-a4b-it",
   "providers": [
-    "nvidia_nim",
     "openrouter",
     "workers_ai",
     "hyper"
@@ -57,11 +56,6 @@
       "upstream": "gemma-4-26b-a4b-it",
       "contextWindow": 256000,
       "maxOutputTokens": 25600
-    },
-    "nvidia_nim": {
-      "upstream": "google/gemma-4-31b-it",
-      "contextWindow": 262144,
-      "maxOutputTokens": 131072
     },
     "openrouter": {
       "upstream": "google/gemma-4-26b-a4b-it:free",
