@@ -1,8 +1,7 @@
 import { Config, Effect } from "effect";
 
 export function envFile(path = ".env"): void {
-  const loaded = Effect.runSyncExit(Effect.try(() => process.loadEnvFile(path)));
-  void loaded;
+  Effect.runSyncExit(Effect.try(() => process.loadEnvFile(path)));
 }
 
 export const effectEnv = Config.all({

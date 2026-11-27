@@ -48,7 +48,7 @@ function parseJson(value: string): unknown {
   return Result.isSuccess(parsed) ? parsed.success : null;
 }
 
-function contentParts(content: unknown, role: string): Array<IrText | IrImage> {
+function contentParts(content: unknown, _role: string): Array<IrText | IrImage> {
   if (typeof content === "string") return content ? [{ type: "text", text: content }] : [];
   const out: Array<IrText | IrImage> = [];
   for (const raw of array(content)) {
@@ -80,7 +80,6 @@ function contentParts(content: unknown, role: string): Array<IrText | IrImage> {
         break;
     }
   }
-  void role;
   return out;
 }
 

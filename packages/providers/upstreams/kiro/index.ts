@@ -208,7 +208,6 @@ async function* transformSse(source: ReadableStream<Uint8Array>, model: string):
       const [contentDelta, parsedReasoningDelta] = parser.processContent(event.content, false);
       const reasoningDelta = hasNativeReasoning ? "" : parsedReasoningDelta;
       emitContent(contentDelta, reasoningDelta);
-      void contentDelta;
     }
     const name = Value.string(event.name);
     if (name && Value.string(event.toolUseId)) {
@@ -280,8 +279,6 @@ async function* transformSse(source: ReadableStream<Uint8Array>, model: string):
   writeChunk({}, finish, usage);
   pending.push("data: [DONE]\n\n");
   for (const chunk of pending.splice(0)) yield chunk;
-  void flushContent;
-  void flushReasoning;
 }
 
 function sseStream(source: ReadableStream<Uint8Array>, model: string): ReadableStream<Uint8Array> {

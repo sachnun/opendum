@@ -93,7 +93,6 @@ function windowGroups(primary: Json, secondary: Json, tier: string, apiNames: bo
 function windowGroup(name: string, record: Json, tier: string, apiNames: boolean): QuotaGroupDisplay | null {
   const used = parseNumber(record.used_percent);
   if (used === null) return null;
-  void tier;
   let windowMinutes = parseNumber(record.window_minutes) ?? 0;
   if (!apiNames) {
     windowMinutes = parseNumber(record.limit_window_minutes) ?? 0;

@@ -535,7 +535,7 @@ export class GeminiStream {
     const candidate = (rawCandidate ?? {}) as Json;
     const content = (candidate.content ?? {}) as Json;
     const parts = anySlice(content.parts);
-    const localToolIndex = 0;
+
     for (const rawPart of parts) {
       const part = rawPart as Json;
       if (part.functionCall !== undefined && part.functionCall !== null) {
@@ -548,7 +548,6 @@ export class GeminiStream {
         if (!id) id = Ids.random("call");
         const idx = toolIndex.value;
         toolIndex.value += 1;
-        void localToolIndex;
         deltas.push({
           tool_calls: [{ index: idx, id, type: "function", function: { name, arguments: encodedArgs } }],
         });

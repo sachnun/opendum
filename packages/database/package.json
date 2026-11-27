@@ -28,8 +28,8 @@
     "effect": "4.0.6"
   },
   "devDependencies": {
-    "@types/node": "^26.6.5",
-    "dotenv": "^18.0.9",
+    "@types/node": "^26.6.11",
+    "dotenv": "^18.0.10",
     "drizzle-kit": "^0.31.11",
     "pg": "^8.23.1",
     "tsx": "^4.23.15",
