@@ -103,3 +103,37 @@ test("deepai source fails on a page whose tables disagree with the picker", asyn
   expect(failure?.provider).toBe("deepai");
   expect(failure?.message).toContain("unexpected DeepAI catalog page layout");
 });
+
+const CURRENT_PAGE = `
+  <ul>
+    <li><span class="mn">DeepAI Cyber</span><code>deepai/deepai-cyber</code><span class="th">Thinking</span></li>
+    <li><span class="mn">GLM 5.3 Flash</span><code>deepai/glm-5.3-flash</code><span class="th">Thinking</span></li>
+    <li><span class="mn">GLM 5.3</span><code>deepai/glm-5.3</code><span class="th">Thinking</span></li>
+  </ul>
+  <p>All 16 frontier models share a free daily allowance of Theos.</p>
+  <table>
+    <tr><th scope="row"><span class="dc-mn">GLM 5.3 Flash</span> <span class="dc-mp">Z.ai</span></th><td><span class="dc-mv">~10 Theos/request</span></td></tr>
+    <tr><th scope="row"><span class="dc-mn">GLM 5.3</span> <span class="dc-mp">Z.ai</span></th><td><span class="dc-mv">~3 Theos/request</span></td></tr>
+  </table>
+`;
+
+test("deepai source tolerates no free rows and unpriced picks", async () => {
+  const result = await withFetch(
+    () => pageResponse(CURRENT_PAGE),
+    () => Effect.runPromise(deepaiSource.fetch(CONTEXT))
+  );
+
+  expect([...result.models.keys()]).toEqual(["deepai-cyber", "glm-5.3", "glm-5.3-flash"]);
+  expect(result.providerConfig?.size ?? 0).toBe(0);
+  expect(result.managedKeys).toEqual(["free"]);
+});
+
+test("deepai source fails when no pricing rows are found", async () => {
+  const failure = await withFetch(
+    () => pageResponse(`<ul><li><code>deepai/glm-5.3</code></li></ul><p>no pricing here</p>`),
+    () => failureOf(deepaiSource.fetch(CONTEXT))
+  );
+
+  expect(failure?.provider).toBe("deepai");
+  expect(failure?.message).toContain("unexpected DeepAI catalog page layout");
+});

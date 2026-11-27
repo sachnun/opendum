@@ -20,7 +20,8 @@ const pageIds = (html: string): ReadonlyArray<string> =>
 const pageFreeCount = (html: string, total: number): number => {
   const free = (html.match(FREE_ROW) ?? []).length;
   const metered = (html.match(METERED_ROW) ?? []).length;
-  if (free === 0 || free + metered !== total) raise(new Error("unexpected DeepAI catalog page layout"));
+  const priced = free + metered;
+  if (priced === 0 || priced > total) raise(new Error("unexpected DeepAI catalog page layout"));
   return free;
 };
 
