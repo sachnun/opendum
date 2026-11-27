@@ -86,7 +86,11 @@ export const ProxyContextLayer = Layer.effect(
 
     if (config.tokenRefreshIntervalMs > 0) {
       yield* Effect.forkScoped(
-        service.refreshTokenLoop(config.tokenRefreshIntervalMs).pipe(Effect.catchCause(() => Effect.void))
+        service.refreshTokenLoop(config.tokenRefreshIntervalMs).pipe(
+          Effect.catchCause((cause) =>
+            Effect.logError("token refresh loop failed").pipe(Effect.annotateLogs({ cause: String(cause) }))
+          )
+        )
       );
     }
 
@@ -94,7 +98,11 @@ export const ProxyContextLayer = Layer.effect(
       yield* Effect.forkScoped(
         reconcileLoop(config.roamingReconcileIntervalMs, () =>
           reconcileOrphans(service.points)
-        ).pipe(Effect.catchCause(() => Effect.void))
+        ).pipe(
+          Effect.catchCause((cause) =>
+            Effect.logError("roaming reconcile loop failed").pipe(Effect.annotateLogs({ cause: String(cause) }))
+          )
+        )
       );
     }
 

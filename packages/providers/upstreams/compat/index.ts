@@ -21,7 +21,7 @@ import {
   type UpstreamTransport,
 } from "@opendum/providers/http";
 import { BaseProvider } from "@opendum/providers/provider";
-import type { ProviderAccount, ProviderFailure, ProviderRequest } from "@opendum/providers/types";
+import type { ProviderFailure, ProviderRequest } from "@opendum/providers/types";
 
 export const SUPPORTED_ZENMUX = new Set([
   "model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream",
@@ -114,7 +114,6 @@ export class CompatProvider extends BaseProvider implements ResponsesNativeProvi
     const body = request.body;
     const model = this.normalizeModel(Value.string(body.model));
     const modelName = this.resolveModel(model);
-    const onStart = request.onResponseStart;
     const direct = this.transport.direct;
 
     if (this.requiresResponsesAPI(model)) {
@@ -123,7 +122,7 @@ export class CompatProvider extends BaseProvider implements ResponsesNativeProvi
           try: () => buildPayload(body, modelName, request.stream, direct),
           catch: (cause) => RequestFailure.transport(this.name, cause),
         });
-        const resp = yield* this.post("/responses", request, payload, model, this.extraRequestHeaders(request.account));
+        const resp = yield* this.post("/responses", request, payload, model, this.extraRequestHeaders());
         if (resp.status < 200 || resp.status >= 300) return resp;
         if (Array.isArray(body._responsesInput)) return resp;
         if (request.stream && resp.body) {
@@ -137,7 +136,6 @@ export class CompatProvider extends BaseProvider implements ResponsesNativeProvi
 
     const payload = this.buildPayload(body, model, modelName, request.stream);
     const convertImages = this.convertImages(model);
-    void onStart;
     return Effect.gen({ self: this }, function* () {
       if (convertImages) {
         const messages = payload.messages;
@@ -150,7 +148,7 @@ export class CompatProvider extends BaseProvider implements ResponsesNativeProvi
         request,
         payload,
         model,
-        this.extraRequestHeaders(request.account)
+        this.extraRequestHeaders()
       );
     });
   }
@@ -218,13 +216,12 @@ export class CompatProvider extends BaseProvider implements ResponsesNativeProvi
     return payload;
   }
 
-  private extraRequestHeaders(account: ProviderAccount): Record<string, string> | undefined {
+  private extraRequestHeaders(): Record<string, string> | undefined {
     const headers: Record<string, string> = {};
     if (this.name === "zenmux") headers["x-zenmux-apikey-source"] = "subscription";
     if (this.extraHeaders) {
       for (const [key, value] of Object.entries(this.extraHeaders)) headers[key] = value;
     }
-    void account;
     return Object.keys(headers).length > 0 ? headers : undefined;
   }
 

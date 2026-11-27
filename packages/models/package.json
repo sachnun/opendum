@@ -28,9 +28,9 @@
     "fuzzball": "^2.2.6"
   },
   "devDependencies": {
-    "@types/node": "^26.6.5",
+    "@types/node": "^26.6.11",
     "tsx": "^4.23.15",
     "typescript": "^6.0.3",
-    "@types/bun": "^1.4.4"
+    "@types/bun": "^1.4.5"
   }
 }

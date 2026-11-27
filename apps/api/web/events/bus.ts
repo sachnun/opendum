@@ -102,7 +102,9 @@ function topicStream(): void {
         )
       ),
       Stream.runForEach((run) => run),
-      Effect.catchCause(() => Effect.void)
+      Effect.catchCause((cause) =>
+        Effect.logError("topic stream failed").pipe(Effect.annotateLogs({ cause: String(cause) }))
+      )
     )
   );
 }
@@ -127,7 +129,9 @@ function usageStream(): void {
         )
       ),
       Stream.runForEach((run) => run),
-      Effect.catchCause(() => Effect.void)
+      Effect.catchCause((cause) =>
+        Effect.logError("usage stream failed").pipe(Effect.annotateLogs({ cause: String(cause) }))
+      )
     )
   );
 }
@@ -146,7 +150,9 @@ function pointsStream(): void {
         )
       ),
       Stream.runForEach((run) => run),
-      Effect.catchCause(() => Effect.void)
+      Effect.catchCause((cause) =>
+        Effect.logError("points stream failed").pipe(Effect.annotateLogs({ cause: String(cause) }))
+      )
     )
   );
 }
@@ -159,7 +165,9 @@ function runHeartbeat(): void {
           for (const userId of activeUserIds) publishUser(userId, { type: "ping", at: now() });
         })
       ),
-      Effect.catchCause(() => Effect.void)
+      Effect.catchCause((cause) =>
+        Effect.logError("heartbeat failed").pipe(Effect.annotateLogs({ cause: String(cause) }))
+      )
     )
   );
 }
