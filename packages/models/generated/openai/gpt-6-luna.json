@@ -2,7 +2,8 @@
   "providers": [
     "codex",
     "zenmux",
-    "deepai"
+    "deepai",
+    "kiro"
   ],
   "reasoning": true,
   "reasoning_effort": [
